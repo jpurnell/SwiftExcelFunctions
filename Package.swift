@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 // SwiftExcelCore is not yet published, so it resolves by path. Both dependencies
