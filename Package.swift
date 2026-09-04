@@ -1,8 +1,6 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// SwiftExcelCore is not yet published, so it resolves by path. Both dependencies
-// become pinned tags at the first release — see project/master_plan.md.
 let package = Package(
     name: "SwiftExcelFunctions",
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
@@ -10,9 +8,13 @@ let package = Package(
         .library(name: "SwiftExcelFunctions", targets: ["SwiftExcelFunctions"])
     ],
     dependencies: [
-        .package(path: "../SwiftExcelCore"),
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", exact: "0.1.0"),
         .package(url: "https://github.com/jpurnell/BusinessMath", exact: "2.9.0"),
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3")
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
+        // Test-only: FormulaParserIntegrationTests needs SwiftXLSX's parser to feed
+        // this package's evaluator. Resolves by path until SwiftXLSX ships the
+        // release that removes the functions; a version pin then replaces it.
+        .package(path: "../SwiftXLSX")
     ],
     targets: [
         .target(
@@ -26,7 +28,10 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftExcelFunctionsTests",
-            dependencies: ["SwiftExcelFunctions"],
+            dependencies: [
+                "SwiftExcelFunctions",
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
             path: "Tests/SwiftExcelFunctionsTests"
         )
     ]

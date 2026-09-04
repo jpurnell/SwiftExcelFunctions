@@ -1,5 +1,6 @@
 import Testing
 @testable import SwiftExcelFunctions
+import SwiftExcelCore
 
 /// The package is reachable, and so is the vocabulary it computes over.
 ///
