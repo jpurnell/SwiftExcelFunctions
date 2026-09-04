@@ -73,8 +73,9 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**Pre-release.** Scaffolded 2026-09-04. Nothing implemented; 73 functions arrive by extraction
-from SwiftXLSX.
+**v0.1.0 — released 2026-09-04.** The 73 functions, the registry and the evaluator arrived by
+extraction from SwiftXLSX. 546 tests, gate 45/45 at 0/0. Dependencies pinned: SwiftExcelCore
+0.1.0, BusinessMath 2.9.0, and SwiftXLSX 0.13.0 for tests only.
 
 Against Microsoft's 519 documented worksheet functions:
 
