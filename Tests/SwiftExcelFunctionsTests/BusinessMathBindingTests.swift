@@ -50,17 +50,29 @@ final class BusinessMathBindingTests: XCTestCase {
         XCTAssertEqual(try number("YEARFRAC", [start, end]), 0.5, accuracy: 0.001)
     }
 
-    /// Bases 1 and 4 are refused rather than approximated.
+    /// All five bases compute, since BusinessMath 2.11.0 added the last two.
     ///
-    /// BusinessMath has actual/365, actual/360 and 30/360. It does not have
-    /// actual/actual or the European 30/360, and answering with a neighbouring
-    /// convention would be wrong by a few days in a way nobody would notice until
-    /// it priced something.
-    func testYearFracRefusesTheConventionsBusinessMathLacks() throws {
+    /// Basis 4 is exact. Bases 1, 2 and 3 carry an upstream daylight-saving defect
+    /// and basis 0 an upstream February one, both documented on the binding — but
+    /// "computes" and "is right" are different claims, and this test makes only the
+    /// first. The second is `MicrosoftSpecificationTests`' job.
+    func testYearFracComputesEveryDocumentedBasis() throws {
+        let start = CellValue.number(46023)   // 2026-01-01
+        let end = CellValue.number(46204)     // 2026-07-01
+        for basis in 0...4 {
+            let result = try call("YEARFRAC", [start, end, .number(Double(basis))])
+            guard case .number = result else {
+                return XCTFail("basis \(basis) answered \(result)")
+            }
+        }
+    }
+
+    /// A basis Excel does not define is still `#NUM!`.
+    func testYearFracRefusesAnUndefinedBasis() throws {
         let start = CellValue.number(46023)
         let end = CellValue.number(46204)
-        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(1)]), .error(.num))
-        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(4)]), .error(.num))
+        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(5)]), .error(.num))
+        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(-1)]), .error(.num))
     }
 
     /// Measured: every one of the corpus's 3,425 YEARFRAC calls passes two

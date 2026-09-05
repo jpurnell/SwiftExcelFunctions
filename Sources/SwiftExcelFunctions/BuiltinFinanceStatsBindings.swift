@@ -27,13 +27,29 @@ public enum BuiltinBindingFunctions {
     /// Bound to `DayCountConvention.yearFraction`. Excel's basis argument selects
     /// a convention, and the three BusinessMath has cover three of the five:
     ///
-    /// | Basis | Convention | Available |
+    /// | Basis | Convention | State |
     /// |---|---|---|
-    /// | 0 (default) | US 30/360 | yes, but see below |
-    /// | 1 | actual/actual | **not yet** |
-    /// | 2 | actual/360 | yes |
-    /// | 3 | actual/365 | yes |
-    /// | 4 | European 30/360 | **not yet** |
+    /// | 0 (default) | US 30/360 | a day out for a February month end |
+    /// | 1 | actual/actual | an hour out across a daylight-saving boundary |
+    /// | 2 | actual/360 | an hour out across a daylight-saving boundary |
+    /// | 3 | actual/365 | an hour out across a daylight-saving boundary |
+    /// | 4 | European 30/360 | correct |
+    ///
+    /// All five compute. The two caveats are upstream defects in BusinessMath's
+    /// `DayCountConvention`, described below and reported; neither is worked around
+    /// here, because a second implementation of a day count is the thing this split
+    /// exists to prevent.
+    ///
+    /// ## The actual/* conventions gain an hour across daylight saving
+    ///
+    /// Bases 1, 2 and 3 measure elapsed time through a calendar in the machine's
+    /// local zone rather than counting civil days, so an interval crossing a
+    /// daylight-saving boundary picks up the offset. 1 January to 1 July 2026 comes
+    /// back as 181.0417 days when the two dates are exact UTC midnights exactly
+    /// 181.0 days apart.
+    ///
+    /// Invisible in UTC and invisible in a zone without daylight saving, which is
+    /// how it survived. Worth about two parts in ten thousand on an accrual.
     ///
     /// ## Basis 0 is a day out for a February month end
     ///
@@ -57,11 +73,7 @@ public enum BuiltinBindingFunctions {
     /// month end as their start date, but 48 sit behind an `IF(YEAR(a)=YEAR(b), …)`
     /// guard and only five show a cached value proving the call ran.
     ///
-    /// The two missing ones answer `#NUM!` rather than being approximated by a
-    /// neighbouring convention. A day count that is wrong by a few days is wrong
-    /// in a way nobody notices until it has priced something, so refusing is the
-    /// only honest option until BusinessMath gains them.
-    ///
+
     /// ## What the corpus asks for
     ///
     /// Measured rather than assumed, because the answer decided whether the two
@@ -84,11 +96,13 @@ public enum BuiltinBindingFunctions {
         let convention: DayCountConvention
         switch basis {
         case 0: convention = .thirty360
+        // BusinessMath 2.11.0 gave the plain name to the spreadsheet's rule and
+        // `isdaActualActual` to the standard, which is the right way round: someone
+        // arriving from a spreadsheet should not have to know there are two.
+        case 1: convention = .actualActual
         case 2: convention = .actual360
         case 3: convention = .actual365
-        // Basis 1 is actual/actual and basis 4 the European 30/360. Neither is in
-        // BusinessMath yet; both are on its work list.
-        case 1, 4: return .error(.num)
+        case 4: convention = .thirty360European
         default: return .error(.num)
         }
 

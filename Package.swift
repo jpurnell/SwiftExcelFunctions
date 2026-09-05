@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/jpurnell/SwiftExcelCore", exact: "0.5.0"),
-        .package(url: "https://github.com/jpurnell/BusinessMath", exact: "2.9.0"),
+        .package(url: "https://github.com/jpurnell/BusinessMath", from: "2.11.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
         // Test-only: FormulaParserIntegrationTests needs SwiftXLSX's parser to feed
         // this package's evaluator. 0.13.0 is the release that removed these

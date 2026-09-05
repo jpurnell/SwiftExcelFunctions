@@ -215,20 +215,33 @@ final class MicrosoftSpecificationTests: XCTestCase {
                        150.0 / 360.0, accuracy: 1e-12)
     }
 
-    /// Bases 1 and 4 are refused rather than approximated by a neighbour.
+    /// Basis 4, European 30/360: every month is thirty days, with no February rule
+    /// and no end-of-month pull-back. 1 January to 1 July 2026 is six months.
     ///
-    /// Flips to an unexpected pass when BusinessMath ships `actualActual` and
-    /// `thirty360European`, which is the notification we want.
-    func testYearFracRefusesWhatItCannotComputeYet() throws {
-        for basis in [1.0, 4.0] {
-            let result = try function("YEARFRAC").evaluate([
-                .number(Self.jan1_2026), .number(Self.jul1_2026), .number(basis),
-            ])
-            XCTAssertEqual(result, .error(.num), "basis \(basis)")
-        }
+    /// The only basis with no outstanding defect behind it.
+    func testYearFracEuropeanThirtyThreeSixty() throws {
+        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(4)]),
+                       0.5, accuracy: 1e-12)
+    }
+
+    /// Basis 1 within a single calendar year divides by that year's length. 2026 is
+    /// not a leap year, so 1 January to 1 July is 181/365.
+    ///
+    /// Carries the same daylight-saving hour as bases 2 and 3 — `actualActual` was
+    /// added in BusinessMath 2.11.0 on top of the same elapsed-time measurement.
+    func testYearFracActualActualWithinOneYear() throws {
+        XCTExpectFailure("BusinessMath's actual/actual inherits the local-zone measurement")
+        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(1)]),
+                       181.0 / 365.0, accuracy: 1e-12)
+    }
+
+    /// A basis Excel does not define is `#NUM!`.
+    func testYearFracRefusesAnUndefinedBasis() throws {
         XCTAssertEqual(try function("YEARFRAC").evaluate([
             .number(Self.jan1_2026), .number(Self.jul1_2026), .number(5),
-        ]), .error(.num), "an undefined basis is #NUM!")
+        ]), .error(.num))
     }
 
     // MARK: - Lookups
