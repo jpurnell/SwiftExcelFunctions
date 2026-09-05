@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-04
+
+### Added
+- `FormulaAST.missing` evaluates to `.blank`. An argument that is not there is not zero: `ADDRESS`
+  reads an omitted fourth argument as its default reference style and `IFERROR` reads an omitted
+  second as empty, so blank is what gets passed and the interpretation stays with the function.
+
+### Changed
+- SwiftExcelCore **0.2.0** and, for tests only, SwiftXLSX **0.14.0** — the release whose parser
+  produces `.missing` and whole-column ranges.
+
+
 ## [0.1.0] - 2026-09-04
 
 Excel's function library, extracted from SwiftXLSX. One registry, asked for any function by the
@@ -43,5 +55,6 @@ mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 3
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
 See `project/plans/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jpurnell/SwiftExcelFunctions/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jpurnell/SwiftExcelFunctions/releases/tag/v0.1.0

@@ -105,6 +105,14 @@ public enum FormulaEvaluator {
         case .error(let e):
             return .error(e)
 
+        case .missing:
+            // An argument that is not there evaluates to blank, and the function
+            // decides what that means for it. `ADDRESS` reads an omitted fourth
+            // argument as its default reference style; `IFERROR` reads an omitted
+            // second as empty. Neither is 0, so blank is what gets passed and the
+            // interpretation stays where it belongs.
+            return .blank
+
         // MARK: References
         case .cellRef(let ref):
             return cells.value(at: ref) ?? .blank
