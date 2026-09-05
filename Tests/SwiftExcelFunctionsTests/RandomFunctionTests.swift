@@ -30,6 +30,11 @@ final class RandomFunctionTests: XCTestCase {
             defer { index += 1 }
             return values[index % values.count]
         }
+
+        /// Scales the fixed sequence, so a test can still steer the integer draw.
+        func nextInteger(below bound: Int) -> Int {
+            Swift.min(Int(nextUniform() * Double(bound)), bound - 1)
+        }
     }
 
     private func evaluate(_ ast: FormulaAST, random: RandomSource?) throws -> CellValue {
@@ -56,6 +61,29 @@ final class RandomFunctionTests: XCTestCase {
             .function("RANDBETWEEN", [.number(1), .number(6)]),
             random: FixedSource([0.999_999_999]))
         XCTAssertEqual(high, .number(6))
+    }
+
+    /// Every outcome is reachable and none is favoured.
+    ///
+    /// The check that matters after moving off a scaled double: over a range that
+    /// does not divide the generator's period evenly, a scaled draw leans. A
+    /// rejecting integer draw does not.
+    func testRandBetweenIsEvenOverAnAwkwardRange() throws {
+        let source = SeededRandomSource(seed: 99)
+        var counts: [Double: Int] = [:]
+        for _ in 0..<30_000 {
+            guard case .number(let value) = try evaluate(
+                .function("RANDBETWEEN", [.number(1), .number(7)]), random: source) else {
+                return XCTFail("expected a number")
+            }
+            counts[value, default: 0] += 1
+        }
+        XCTAssertEqual(counts.count, 7, "every outcome reachable")
+        for (outcome, count) in counts {
+            // 30,000 over 7 is ~4,286; ±10% is loose enough never to flake on a
+            // fixed seed and tight enough to catch a systematic lean.
+            XCTAssertEqual(Double(count), 4_285.7, accuracy: 430, "outcome \(outcome)")
+        }
     }
 
     func testRandBetweenSpreadsAcrossItsRange() throws {

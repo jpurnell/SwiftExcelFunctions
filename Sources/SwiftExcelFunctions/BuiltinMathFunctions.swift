@@ -58,9 +58,11 @@ public enum BuiltinMathFunctions {
         let top = Int(topValue.rounded(.down))
         guard bottom <= top else { return .error(.num) }
 
+        // An integer draw rather than a scaled double. Scaling is modulo bias in
+        // another form — some outcomes would come from a wider band of doubles
+        // than others, and a range that does not divide evenly would lean.
         let span = top - bottom + 1
-        let offset = Int(random.nextUniform() * Double(span))
-        return .number(Double(bottom + Swift.min(offset, span - 1)))
+        return .number(Double(bottom + random.nextInteger(below: span)))
     }
 
     // MARK: - Type coercion
