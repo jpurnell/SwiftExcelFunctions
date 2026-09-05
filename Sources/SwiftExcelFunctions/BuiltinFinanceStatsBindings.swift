@@ -29,11 +29,33 @@ public enum BuiltinBindingFunctions {
     ///
     /// | Basis | Convention | Available |
     /// |---|---|---|
-    /// | 0 (default) | US 30/360 | yes |
+    /// | 0 (default) | US 30/360 | yes, but see below |
     /// | 1 | actual/actual | **not yet** |
     /// | 2 | actual/360 | yes |
     /// | 3 | actual/365 | yes |
     /// | 4 | European 30/360 | **not yet** |
+    ///
+    /// ## Basis 0 is a day out for a February month end
+    ///
+    /// `DayCountConvention.thirty360` in BusinessMath 2.9.0 does not apply the NASD
+    /// February rule, so a start date on the last day of February counts one day too
+    /// many. `YEARFRAC(2020-02-29, 2020-12-31)` answers 302/360 where Excel answers
+    /// 301/360.
+    ///
+    /// Two parts to the rule, and the second is the one that is easy to get
+    /// backwards: the last day of February counts as a 30th, and the pull-back of an
+    /// end date on the 31st tests the start day *before* that adjustment. Adjusting
+    /// first gives 300 days; not adjusting at all gives 302; only the documented
+    /// ordering gives Excel's 301.
+    ///
+    /// Not worked around here. The convention belongs to BusinessMath, which is
+    /// where a second implementation could disagree with the first, and it is fixed
+    /// there awaiting a release. `testTheFebruaryEndOfMonthRule` holds Excel's own
+    /// value for a corpus cell and reports an unexpected pass when the pin moves.
+    ///
+    /// In the measured corpus this reaches **five cells** — 49 calls take a February
+    /// month end as their start date, but 48 sit behind an `IF(YEAR(a)=YEAR(b), …)`
+    /// guard and only five show a cached value proving the call ran.
     ///
     /// The two missing ones answer `#NUM!` rather than being approximated by a
     /// neighbouring convention. A day count that is wrong by a few days is wrong
@@ -48,6 +70,10 @@ public enum BuiltinBindingFunctions {
     /// therefore takes basis 0, which is present. The gap is real but reaches
     /// nothing — a fact worth recording next to the gap, so nobody spends a day on
     /// it thinking it unblocks a workbook.
+    ///
+    /// The same measurement is why the February defect above matters more than the
+    /// two missing conventions do: everything the corpus asks for goes through
+    /// basis 0.
     public static let yearfrac = ExcelFunction(name: "YEARFRAC", minArgs: 2, maxArgs: 3) { args in
         guard case .number(let startSerial) = args[0],
               case .number(let endSerial) = args[1] else { return .error(.value) }
