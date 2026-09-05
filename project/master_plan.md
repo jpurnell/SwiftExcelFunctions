@@ -41,8 +41,8 @@ Excel uses, without knowing or caring which package computes it.
 - **Build System:** Swift Package Manager
 - **Dependencies:** SwiftExcelCore (vocabulary), BusinessMath (mathematics), Foundation
 
-`SwiftExcelCore` resolves by path until it is tagged; both dependencies become pinned versions at
-first release.
+All three are pinned: SwiftExcelCore `0.3.0`, BusinessMath `2.9.0`, and SwiftXLSX `0.15.0` for
+tests only.
 
 ### The seam
 
@@ -63,6 +63,7 @@ A caller sees one registry. Underneath there are four sources, and the boundary 
 |---|---|---|
 | This package | `IF`, `IFERROR`, `ISERROR`, coercion, arity | Excel's evaluation semantics. Not arithmetic |
 | This package, via `CellValueProvider` | `VLOOKUP`, `INDEX`, `MATCH`, `OFFSET` | they compute an address and read it |
+| This package, on shape alone | `TRANSPOSE`, `COUNTBLANK` | the rectangle is the subject, not its values |
 | Foundation, swift-numerics | trigonometry, logs, rounding, dates, text, complex | primitives |
 | **BusinessMath** | distributions, statistics, financial, Risk Solver | where a second implementation could disagree |
 
@@ -73,9 +74,22 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
+**v0.3.0 — released 2026-09-05.** Coverage, and shape.
+
+- [x] Corpus function calls the registry can answer: **99.93%** (869,307 of 869,908)
+- [x] `VLOOKUP`, `HLOOKUP` and `INDEX` corrected — they were guessing their table's dimensions
+- [x] `TRANSPOSE` and `COUNTBLANK`, in a new Array group
+- [x] 646 tests, gate 45/45 at 0/0
+
+The correction is the part worth recording. Three positional functions were wrong, and all three
+for one reason: the value they read from could not say what shape it was, so each re-derived it
+and two derived it wrongly. `VLOOKUP` inferred its table's width by testing divisors;
+`INDEX`'s own comment read *"this doesn't work without knowing dimensions."* SwiftExcelCore 0.3.0
+gave arrays their dimensions, which is what let all of it be deleted rather than patched. See
+`BusinessMathExcel/project/plans/proposals/PROPOSAL_shaped_arrays.md`.
+
 **v0.1.0 — released 2026-09-04.** The 73 functions, the registry and the evaluator arrived by
-extraction from SwiftXLSX. 546 tests, gate 45/45 at 0/0. Dependencies pinned: SwiftExcelCore
-0.1.0, BusinessMath 2.9.0, and SwiftXLSX 0.13.0 for tests only.
+extraction from SwiftXLSX. 546 tests, gate 45/45 at 0/0.
 
 Against Microsoft's 519 documented worksheet functions:
 
@@ -94,25 +108,35 @@ functions, 232 unreviewed.
 
 ## Priorities
 
-1. **Extract the 73 unchanged**, with their tests, before adding anything. A working baseline
-   makes every later diff readable.
-2. **Bind the statistical block.** 51 functions, no new mathematics, and it includes the dotted
-   spellings every workbook saved since Excel 2010 uses. `STDEV.S` alone is 86,410 calls in the
-   measured corpus and is reachable from no formula today.
-3. **Bind the financial 11 and the Psi distributions**, each with a fixed-seed signature test.
-   This is where a wrong binding does real damage.
+1. ~~**Extract the 73 unchanged**, with their tests, before adding anything.~~ **Done** in 0.1.0.
+2. ~~**Bind the statistical block.**~~ **Done.** The dotted spellings landed; `STDEV.S`, 86,410
+   corpus calls and reachable from no formula at the time, now resolves.
+3. **Bind the Psi distributions**, each with a fixed-seed signature test. This is where a wrong
+   binding does real damage, and it is the only block left outside the registry.
 4. **Review the 347 unreviewed** before treating any of it as new work. Most is math, engineering
    and text — largely Foundation, libm and swift-numerics — so a large share should resolve to
    near-free.
+5. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
+   coverage number said 99.93%. A function that is registered and wrong scores the same as one
+   that is registered and right, so the count is not the measure it looks like.
 
 ---
 
 ## Roadmap
 
 - **v0.1.0** — the 73, extracted, tests passing, gate clean.
-- **v0.2.0** — the statistical block bound.
-- **v0.3.0** — financial and Psi distributions, fixed-seed tested.
-- **v0.4.0** — the unreviewed bucket resolved into `have` / `bindable` / `new`.
+- ~~**v0.2.0** — the statistical block bound.~~ Shipped.
+- ~~**v0.3.0** — financial and Psi distributions, fixed-seed tested.~~ **Half shipped, and the
+  half that landed was not the half planned.** The financial bindings arrived, along with the
+  shape correction — which was not on this roadmap at all, because nobody knew the lookups were
+  wrong until the corpus made someone look. Psi remains.
+- **v0.4.0** — the Psi distributions, fixed-seed tested.
+- **v0.5.0** — the unreviewed bucket resolved into `have` / `bindable` / `new`.
+
+Not planned: **spilling**, the mechanism that would write a multi-cell result back across cells.
+`TRANSPOSE` is the only shipped function that would want it, and every corpus use of it is a
+top-level spill — so the feature is real but reaches almost nothing, and it is a large change to
+the evaluator's contract. Worth revisiting if a second function needs it.
 
 **The gate that is not corpus-shaped:** for any function, evaluating it must agree with the value
 Excel itself recorded. Excel stores a cached result for every formula cell, so a workbook is a
@@ -141,3 +165,10 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 **Last Updated:** 2026-09-04 — created. Scope and counts from the coverage matrix; nothing
 implemented yet.
+
+---
+
+**Last Updated:** 2026-09-05 — reconciled for v0.3.0. Recorded the lookup corrections and why
+they happened, added the Array group to the source table, struck the shipped roadmap lines while
+noting where 0.3.0 diverged from what was planned, pinned versions corrected, and added
+"correctness over coverage" as a priority because this release is the argument for it.
