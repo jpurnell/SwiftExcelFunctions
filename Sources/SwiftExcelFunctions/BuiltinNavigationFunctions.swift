@@ -16,7 +16,93 @@ import SwiftExcelCore
 public enum BuiltinNavigationFunctions {
 
     /// All lookup functions for registration in a ``FunctionRegistry``.
-    public static let all: [ExcelFunction] = [vlookup, hlookup, index, match]
+    public static let all: [ExcelFunction] = [vlookup, hlookup, index, match, address]
+
+    // MARK: - Building a reference
+
+    /// `ADDRESS(row, column, [abs], [a1], [sheet])` — a reference, as text.
+    ///
+    /// Numbers in, a string out. It builds a reference rather than reading one,
+    /// which is why it needs no evaluation context: nothing here has to know
+    /// where it was called from or what any cell holds.
+    ///
+    /// In the corpus it is always paired with `INDIRECT` — a sheet computes a row
+    /// and a column, asks `ADDRESS` for the reference, and hands the text to
+    /// `INDIRECT` to read. 20,978 calls across 32 sheets, every one with five
+    /// arguments and the fourth left empty.
+    public static let address = ExcelFunction(name: "ADDRESS", minArgs: 2, maxArgs: 5) { args in
+        catching {
+            let row = Int(try toNumber(args[0]))
+            let column = Int(try toNumber(args[1]))
+            guard (1...1_048_576).contains(row), (1...16_384).contains(column) else {
+                return .error(.value)
+            }
+
+            // An omitted argument arrives as `.blank` and means "use the default",
+            // which is not the same as a zero. The corpus writes
+            // `ADDRESS(r, c, 1, , "Sheet")` 20,978 times, and reading that blank
+            // as a value would ask for R1C1 every time.
+            let style = try defaulted(args, 2, to: 1) { Int(try toNumber($0)) }
+            let useA1 = try defaulted(args, 3, to: true) { value in
+                if case .bool(let flag) = value { return flag }
+                return try toNumber(value) != 0
+            }
+            guard (1...4).contains(style) else { return .error(.value) }
+
+            let absoluteRow = style == 1 || style == 2
+            let absoluteColumn = style == 1 || style == 3
+            let reference = useA1
+                ? "\(absoluteColumn ? "$" : "")\(columnLetters(column))"
+                    + "\(absoluteRow ? "$" : "")\(row)"
+                : (absoluteRow ? "R\(row)" : "R[\(row)]")
+                    + (absoluteColumn ? "C\(column)" : "C[\(column)]")
+
+            guard args.count > 4, case .text(let sheet) = args[4], !sheet.isEmpty else {
+                return .text(reference)
+            }
+            return .text("\(quoted(sheet))!\(reference)")
+        }
+    }
+
+    /// An argument's value, or a default when it was omitted.
+    ///
+    /// `.blank` is how an omitted argument arrives, and it is distinct from any
+    /// value the caller could have written.
+    private static func defaulted<T>(
+        _ args: [CellValue],
+        _ index: Int,
+        to fallback: T,
+        read: (CellValue) throws -> T
+    ) rethrows -> T {
+        guard args.count > index else { return fallback }
+        if case .blank = args[index] { return fallback }
+        return try read(args[index])
+    }
+
+    /// A column number as Excel's letters: 1 is `A`, 26 is `Z`, 27 is `AA`.
+    ///
+    /// Bijective base-26, which is why the usual base conversion is wrong here —
+    /// there is no zero digit, so 26 is `Z` rather than `A0`.
+    static func columnLetters(_ column: Int) -> String {
+        var remaining = column
+        var letters = ""
+        while remaining > 0 {
+            let digit = (remaining - 1) % 26
+            letters = String(UnicodeScalar(UInt8(65 + digit))) + letters
+            remaining = (remaining - 1) / 26
+        }
+        return letters
+    }
+
+    /// A sheet name, quoted only if it needs to be.
+    ///
+    /// Excel quotes a name containing anything but letters, digits and
+    /// underscores, and doubles any apostrophe inside it.
+    static func quoted(_ sheet: String) -> String {
+        let plain = sheet.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+        guard !plain || sheet.isEmpty else { return sheet }
+        return "'\(sheet.replacingOccurrences(of: "'", with: "''"))'"
+    }
 
     // MARK: - Type coercion
 

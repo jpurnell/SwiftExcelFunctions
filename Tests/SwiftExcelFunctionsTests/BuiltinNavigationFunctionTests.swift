@@ -32,8 +32,13 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
 
     // MARK: - Registration count
 
-    func testAllContainsFourFunctions() {
-        XCTAssertEqual(BuiltinNavigationFunctions.all.count, 4)
+    /// The group's inventory, by name rather than by count — a count says
+    /// something changed without saying what, and fails the same way whether a
+    /// function arrived or went missing.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinNavigationFunctions.all.map(\.name)),
+            ["VLOOKUP", "HLOOKUP", "INDEX", "MATCH", "ADDRESS"])
     }
 
     // MARK: - VLOOKUP (exact match)

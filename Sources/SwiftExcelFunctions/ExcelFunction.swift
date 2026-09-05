@@ -28,6 +28,16 @@ public struct ExcelFunction: Sendable {
     /// The evaluation closure that computes the result from input arguments.
     public let evaluate: @Sendable ([CellValue]) throws -> CellValue
 
+    /// An alternative closure for a function that needs more than its arguments.
+    ///
+    /// `nil` for almost every function, and deliberately so: adding the context to
+    /// the one signature would have changed all 75 existing functions to serve
+    /// five. The evaluator prefers this closure where a function supplies one.
+    ///
+    /// See ``EvaluationContext`` for what "more than its arguments" means — the
+    /// calling cell, a way to read other cells, and the unevaluated argument trees.
+    public let evaluateInContext: (@Sendable (EvaluationContext, [CellValue]) throws -> CellValue)?
+
     /// Creates an Excel function definition.
     ///
     /// - Parameters:
@@ -41,10 +51,35 @@ public struct ExcelFunction: Sendable {
         maxArgs: Int?,
         evaluate: @escaping @Sendable ([CellValue]) throws -> CellValue
     ) {
+        self.evaluateInContext = nil
         self.name = name
         self.minArgs = minArgs
         self.maxArgs = maxArgs
         self.evaluate = evaluate
+    }
+    /// `ROW`, `INDIRECT`, `OFFSET`. The plain ``evaluate`` closure is still
+    /// supplied, and answers as well as it can without a context: outside a sheet
+    /// there is no calling cell and no provider, so it reports that rather than
+    /// guessing a position.
+    ///
+    /// - Parameters:
+    ///   - name: The function name (uppercase).
+    ///   - minArgs: Minimum required argument count.
+    ///   - maxArgs: Maximum argument count, or `nil` for variadic.
+    ///   - withoutContext: The result when no context is available.
+    ///   - evaluate: A closure taking the context and the evaluated arguments.
+    public init(
+        name: String,
+        minArgs: Int,
+        maxArgs: Int?,
+        withoutContext: CellValue = .error(.value),
+        evaluate: @escaping @Sendable (EvaluationContext, [CellValue]) throws -> CellValue
+    ) {
+        self.name = name
+        self.minArgs = minArgs
+        self.maxArgs = maxArgs
+        self.evaluate = { _ in withoutContext }
+        self.evaluateInContext = evaluate
     }
 }
 
@@ -58,4 +93,8 @@ public enum ExcelFunctionError: Error, Sendable, Equatable {
 
     /// A generic evaluation error with a message.
     case evaluationError(String) // LIVE: public API for consumers
+
+    /// Creates a function that needs its evaluation context.
+    ///
+    /// For the few that cannot answer from their arguments alone — `COLUMN`,
 }
