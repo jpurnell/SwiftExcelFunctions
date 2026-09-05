@@ -87,6 +87,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinNavigationFunctions.all,
             BuiltinDateTimeFunctions.all,
             BuiltinAggregationFunctions.all,
+            BuiltinArrayFunctions.all,
             BuiltinBindingFunctions.all,
         ]
         for category in allCategories {
