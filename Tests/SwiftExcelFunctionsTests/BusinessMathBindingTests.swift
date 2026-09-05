@@ -1,0 +1,112 @@
+import XCTest
+@testable import SwiftExcelFunctions
+import SwiftExcelCore
+
+/// The functions whose mathematics belongs to BusinessMath.
+///
+/// Every one of these delegates. Reimplementing a covariance or a day count here
+/// would put a second answer in the same dependency chain, which is the failure
+/// this arrangement exists to prevent — so these tests check the *binding*: that
+/// Excel's argument order, conventions and edge behaviour reach the right
+/// function, not that the arithmetic is correct. BusinessMath tests that.
+final class BusinessMathBindingTests: XCTestCase {
+
+    private let registry = FunctionRegistry.builtin
+
+    private func call(_ name: String, _ args: [CellValue]) throws -> CellValue {
+        let function = try XCTUnwrap(registry.function(named: name), "\(name) is not registered")
+        return try function.evaluate(args)
+    }
+
+    private func number(_ name: String, _ args: [CellValue]) throws -> Double {
+        guard case .number(let value) = try call(name, args) else {
+            throw XCTSkip("\(name) did not return a number")
+        }
+        return value
+    }
+
+    // MARK: - YEARFRAC
+
+    /// 2026-01-01 to 2026-07-01 is half a year on a 30/360 basis: six months of
+    /// thirty days each, over 360.
+    func testYearFracOnThirtyThreeSixtyIsHalfAYear() throws {
+        let start = CellValue.number(46023)   // 2026-01-01
+        let end = CellValue.number(46204)     // 2026-07-01
+        XCTAssertEqual(try number("YEARFRAC", [start, end, .number(0)]), 0.5, accuracy: 0.001)
+    }
+
+    /// Basis 3 is actual/365, so the same span is 181/365 rather than a clean half.
+    func testYearFracOnActual365CountsRealDays() throws {
+        let start = CellValue.number(46023)
+        let end = CellValue.number(46204)
+        XCTAssertEqual(
+            try number("YEARFRAC", [start, end, .number(3)]), 181.0 / 365.0, accuracy: 0.001)
+    }
+
+    /// An omitted basis means 0, which is what the corpus writes.
+    func testYearFracDefaultsToThirtyThreeSixty() throws {
+        let start = CellValue.number(46023)
+        let end = CellValue.number(46204)
+        XCTAssertEqual(try number("YEARFRAC", [start, end]), 0.5, accuracy: 0.001)
+    }
+
+    /// Bases 1 and 4 are refused rather than approximated.
+    ///
+    /// BusinessMath has actual/365, actual/360 and 30/360. It does not have
+    /// actual/actual or the European 30/360, and answering with a neighbouring
+    /// convention would be wrong by a few days in a way nobody would notice until
+    /// it priced something.
+    func testYearFracRefusesTheConventionsBusinessMathLacks() throws {
+        let start = CellValue.number(46023)
+        let end = CellValue.number(46204)
+        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(1)]), .error(.num))
+        XCTAssertEqual(try call("YEARFRAC", [start, end, .number(4)]), .error(.num))
+    }
+
+    // MARK: - Covariance
+
+    /// Population and sample differ by their divisor, and Excel spells the
+    /// difference in the name. Getting the pair backwards is invisible until
+    /// somebody compares against a spreadsheet.
+    func testCovariancePopulationAndSampleDiffer() throws {
+        let x = CellValue.array([.number(1), .number(2), .number(3), .number(4)])
+        let y = CellValue.array([.number(2), .number(4), .number(5), .number(8)])
+
+        let population = try number("COVARIANCE.P", [x, y])
+        let sample = try number("COVARIANCE.S", [x, y])
+        XCTAssertEqual(population, sample * 3.0 / 4.0, accuracy: 1e-9,
+                       "population divides by n where sample divides by n-1")
+    }
+
+    /// `COVAR` is the legacy name for the population form, not the sample one.
+    func testCovarIsThePopulationForm() throws {
+        let x = CellValue.array([.number(1), .number(2), .number(3), .number(4)])
+        let y = CellValue.array([.number(2), .number(4), .number(5), .number(8)])
+        XCTAssertEqual(
+            try number("COVAR", [x, y]), try number("COVARIANCE.P", [x, y]), accuracy: 1e-12)
+    }
+
+    func testCovarianceRejectsMismatchedLengths() throws {
+        let x = CellValue.array([.number(1), .number(2)])
+        let y = CellValue.array([.number(1), .number(2), .number(3)])
+        XCTAssertEqual(try call("COVARIANCE.P", [x, y]), .error(.na))
+    }
+
+    // MARK: - NORM.S.INV
+
+    /// The median of the standard normal is zero, and the quartiles are
+    /// symmetric about it.
+    func testStandardNormalInverse() throws {
+        XCTAssertEqual(try number("NORM.S.INV", [.number(0.5)]), 0, accuracy: 1e-6)
+        let upper = try number("NORM.S.INV", [.number(0.975)])
+        let lower = try number("NORM.S.INV", [.number(0.025)])
+        XCTAssertEqual(upper, -lower, accuracy: 1e-6)
+        XCTAssertEqual(upper, 1.959964, accuracy: 1e-4, "the familiar 95% z")
+    }
+
+    /// A probability outside (0, 1) has no answer.
+    func testStandardNormalInverseRejectsImpossibleProbabilities() throws {
+        XCTAssertEqual(try call("NORM.S.INV", [.number(0)]), .error(.num))
+        XCTAssertEqual(try call("NORM.S.INV", [.number(1)]), .error(.num))
+    }
+}

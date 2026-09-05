@@ -158,6 +158,24 @@ public enum BuiltinDateTimeFunctions {
         (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
     }
 
+    /// An Excel serial as a `Date`.
+    ///
+    /// The bridge to anything that speaks in dates rather than serials —
+    /// BusinessMath's day-count and XIRR work among them. It goes through
+    /// ``serialToComponents`` so that Excel's phantom 29 February 1900 is handled
+    /// in exactly one place.
+    ///
+    /// - Parameter serial: The Excel serial number.
+    /// - Returns: The date, or `nil` if the serial names none.
+    static func serialToDate(_ serial: Int) -> Date? {
+        let (year, month, day) = serialToComponents(serial)
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        return calendar.date(from: components)
+    }
+
     /// The Excel serial for a year, month and day.
     static func componentsToSerial(year: Int, month: Int, day: Int) -> Double {
         var components = DateComponents()
