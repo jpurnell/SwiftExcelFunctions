@@ -17,6 +17,7 @@ import SwiftExcelCore
 ///     let values: [CellRef: CellValue]
 ///     func value(at ref: CellRef) -> CellValue? { values[ref] }
 ///     func value(at ref: CellRef, inSheet: String) -> CellValue? { values[ref] }
+///     // matrix(in:) comes free from the protocol's default, derived from value(at:).
 ///     func values(in range: CellRange) -> [CellValue] { range.cells.compactMap { values[$0] } }
 ///     func values(in range: CellRange, inSheet: String) -> [CellValue] { self.values(in: range) }
 /// }
@@ -136,7 +137,8 @@ public enum FormulaEvaluator {
             return cells.value(at: ref) ?? .blank
 
         case .cellRange(let range):
-            return .array(cells.values(in: range))
+            guard let matrix = cells.matrix(in: range) else { return .error(.value) }
+            return .array(matrix)
 
         case .sheetRef(let sheetRef):
             let range = sheetRef.range
@@ -144,7 +146,10 @@ public enum FormulaEvaluator {
                 // Single cell reference
                 return cells.value(at: range.start, inSheet: sheetRef.sheetName) ?? .blank
             } else {
-                return .array(cells.values(in: range, inSheet: sheetRef.sheetName))
+                guard let matrix = cells.matrix(in: range, inSheet: sheetRef.sheetName) else {
+                    return .error(.value)
+                }
+                return .array(matrix)
             }
 
         case .namedRange(let name):
@@ -299,11 +304,15 @@ public enum FormulaEvaluator {
         case .cell(let ref):
             return cells.value(at: ref) ?? .blank
         case .range(let range):
-            return .array(cells.values(in: range))
+            guard let matrix = cells.matrix(in: range) else { return .error(.value) }
+            return .array(matrix)
         case .sheetCell(let sheetRef):
             return cells.value(at: sheetRef.range.start, inSheet: sheetRef.sheetName) ?? .blank
         case .sheetRange(let sheetRef):
-            return .array(cells.values(in: sheetRef.range, inSheet: sheetRef.sheetName))
+            guard let matrix = cells.matrix(in: sheetRef.range, inSheet: sheetRef.sheetName) else {
+                return .error(.value)
+            }
+            return .array(matrix)
         case .formula(let ast):
             return try evaluateNode(
                 ast, cells: cells, names: names, functions: functions,

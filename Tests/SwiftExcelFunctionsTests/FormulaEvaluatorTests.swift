@@ -132,10 +132,15 @@ final class FormulaEvaluatorTests: XCTestCase {
         let range = CellRange(from: "A1", to: "A3")
         let result = try eval(.cellRange(range), cells: cells)
 
-        XCTAssertEqual(result, .array([.number(1), .number(2), .number(3)]))
+        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2), .number(3)])))
     }
 
-    func testCellRangeSkipsEmpty() throws {
+    /// An empty cell inside a range is a blank in its own place.
+    ///
+    /// This test previously asserted the opposite — that the gap closed up — and
+    /// that was the defect: `INDEX(A1:A3, 3)` then reached past the end of its
+    /// own range and answered with whatever had shuffled into third place.
+    func testCellRangeKeepsEmptyCellsInPlace() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(1)
         // A2 is empty
@@ -144,7 +149,7 @@ final class FormulaEvaluatorTests: XCTestCase {
         let range = CellRange(from: "A1", to: "A3")
         let result = try eval(.cellRange(range), cells: cells)
 
-        XCTAssertEqual(result, .array([.number(1), .number(3)]))
+        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .blank, .number(3)])))
     }
 
     // MARK: - Sheet Reference Lookup
@@ -175,7 +180,7 @@ final class FormulaEvaluatorTests: XCTestCase {
         let sheetRef = SheetReference(sheet: "Sheet2", range: range)
         let result = try eval(.sheetRef(sheetRef), cells: cells)
 
-        XCTAssertEqual(result, .array([.number(10), .number(20)]))
+        XCTAssertEqual(result, .array(CellMatrix(column: [.number(10), .number(20)])))
     }
 
     // MARK: - Arithmetic: Add
@@ -482,7 +487,7 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["data"] = .range(CellRange(from: "A1", to: "A2"))
 
         let result = try eval(.namedRange("data"), cells: cells, names: names)
-        XCTAssertEqual(result, .array([.number(1), .number(2)]))
+        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2)])))
     }
 
     func testNamedRangeResolvesToFormula() throws {
@@ -522,7 +527,7 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["sheetrange"] = .sheetRange(sheetRef)
 
         let result = try eval(.namedRange("sheetrange"), cells: cells, names: names)
-        XCTAssertEqual(result, .array([.number(1), .number(2)]))
+        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2)])))
     }
 
     // MARK: - Function Dispatch

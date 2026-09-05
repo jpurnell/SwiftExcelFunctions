@@ -154,7 +154,8 @@ public enum BuiltinNavigationFunctions {
         let range = CellRange(
             from: CellRef(column: startColumn, row: startRow),
             to: CellRef(column: startColumn + width - 1, row: startRow + height - 1))
-        return .array(context.cells.values(in: range))
+        guard let matrix = context.cells.matrix(in: range) else { return .error(.value) }
+        return .array(matrix)
     }
 
     // MARK: - Reading a reference out of text
@@ -325,8 +326,8 @@ public enum BuiltinNavigationFunctions {
     ///
     /// If the value is `.array(...)`, returns the elements. Otherwise returns a single-element array.
     private static func toArray(_ value: CellValue) -> [CellValue] {
-        if case .array(let elements) = value {
-            return elements
+        if case .array(let matrix) = value {
+            return matrix.elements
         }
         return [value]
     }

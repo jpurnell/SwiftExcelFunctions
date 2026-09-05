@@ -83,7 +83,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testAVERAGEWithArray() throws {
         let result = try eval("AVERAGE",
-                              .array([.number(10), .number(20), .number(30)]))
+                              .array(CellMatrix(row: [.number(10), .number(20), .number(30)])))
         assertNumber(result, 20)
     }
 
@@ -112,8 +112,8 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testSTDEVWithArray() throws {
         let expected = (32.0 / 7.0).squareRoot()
         let result = try eval("STDEV",
-                              .array([.number(2), .number(4), .number(4), .number(4),
-                                      .number(5), .number(5), .number(7), .number(9)]))
+                              .array(CellMatrix(row: [.number(2), .number(4), .number(4), .number(4),
+                                      .number(5), .number(5), .number(7), .number(9)])))
         assertNumber(result, expected, accuracy: 1e-10)
     }
 
@@ -176,7 +176,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testMEDIANWithArray() throws {
         let result = try eval("MEDIAN",
-                              .array([.number(5), .number(1), .number(3)]))
+                              .array(CellMatrix(row: [.number(5), .number(1), .number(3)])))
         assertNumber(result, 3)
     }
 
@@ -204,7 +204,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testMINWithArray() throws {
         let result = try eval("MIN",
-                              .array([.number(5), .number(2), .number(8)]))
+                              .array(CellMatrix(row: [.number(5), .number(2), .number(8)])))
         assertNumber(result, 2)
     }
 
@@ -238,7 +238,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testMAXWithArray() throws {
         let result = try eval("MAX",
-                              .array([.number(5), .number(2), .number(8)]))
+                              .array(CellMatrix(row: [.number(5), .number(2), .number(8)])))
         assertNumber(result, 8)
     }
 
@@ -283,7 +283,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testCOUNTWithArray() throws {
         let result = try eval("COUNT",
-                              .array([.number(1), .text("hi"), .number(3), .blank]))
+                              .array(CellMatrix(row: [.number(1), .text("hi"), .number(3), .blank])))
         assertNumber(result, 2)
     }
 
@@ -316,7 +316,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
 
     func testCOUNTAWithArray() throws {
         let result = try eval("COUNTA",
-                              .array([.number(1), .blank, .text("hi"), .error(.na)]))
+                              .array(CellMatrix(row: [.number(1), .blank, .text("hi"), .error(.na)])))
         assertNumber(result, 3)
     }
 
@@ -325,7 +325,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testPERCENTILEMin() throws {
         // k=0 returns the minimum
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(2), .number(3), .number(4)]),
+                              .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(0))
         assertNumber(result, 1)
     }
@@ -333,7 +333,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testPERCENTILEMax() throws {
         // k=1 returns the maximum
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(2), .number(3), .number(4)]),
+                              .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(1))
         assertNumber(result, 4)
     }
@@ -341,7 +341,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testPERCENTILEMedian() throws {
         // k=0.5 returns the median
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(2), .number(3), .number(4)]),
+                              .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(0.5))
         assertNumber(result, 2.5)
     }
@@ -352,35 +352,35 @@ final class BuiltinStatsFunctionTests: XCTestCase {
         // intPart = 0, fracPart = 0.75
         // result = sorted[0] + 0.75 * (sorted[1] - sorted[0]) = 1 + 0.75 * 2 = 2.5
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(3), .number(5), .number(7)]),
+                              .array(CellMatrix(row: [.number(1), .number(3), .number(5), .number(7)])),
                               .number(0.25))
         assertNumber(result, 2.5)
     }
 
     func testPERCENTILEKOutOfRange() throws {
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(1.5))
         assertError(result, .num)
     }
 
     func testPERCENTILEKNegative() throws {
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(-0.1))
         assertError(result, .num)
     }
 
     func testPERCENTILEEmptyArray() throws {
         let result = try eval("PERCENTILE",
-                              .array([.blank, .text("abc")]),
+                              .array(CellMatrix(row: [.blank, .text("abc")])),
                               .number(0.5))
         assertError(result, .num)
     }
 
     func testPERCENTILEErrorPropagation() throws {
         let result = try eval("PERCENTILE",
-                              .array([.number(1), .error(.ref)]),
+                              .array(CellMatrix(row: [.number(1), .error(.ref)])),
                               .number(0.5))
         assertError(result, .ref)
     }
@@ -390,7 +390,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testLARGEFirst() throws {
         // k=1 returns the largest
         let result = try eval("LARGE",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(1))
         assertNumber(result, 5)
     }
@@ -398,7 +398,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testLARGESecond() throws {
         // k=2 returns the second largest
         let result = try eval("LARGE",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(2))
         assertNumber(result, 3)
     }
@@ -406,28 +406,28 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testLARGELast() throws {
         // k=n returns the smallest
         let result = try eval("LARGE",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(4))
         assertNumber(result, 1)
     }
 
     func testLARGEKOutOfRange() throws {
         let result = try eval("LARGE",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(3))
         assertError(result, .num)
     }
 
     func testLARGEKZero() throws {
         let result = try eval("LARGE",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(0))
         assertError(result, .num)
     }
 
     func testLARGEErrorPropagation() throws {
         let result = try eval("LARGE",
-                              .array([.number(1), .error(.div0)]),
+                              .array(CellMatrix(row: [.number(1), .error(.div0)])),
                               .number(1))
         assertError(result, .div0)
     }
@@ -437,7 +437,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testSMALLFirst() throws {
         // k=1 returns the smallest
         let result = try eval("SMALL",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(1))
         assertNumber(result, 1)
     }
@@ -445,7 +445,7 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testSMALLSecond() throws {
         // k=2 returns the second smallest
         let result = try eval("SMALL",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(2))
         assertNumber(result, 2)
     }
@@ -453,28 +453,28 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testSMALLLast() throws {
         // k=n returns the largest
         let result = try eval("SMALL",
-                              .array([.number(3), .number(1), .number(5), .number(2)]),
+                              .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(4))
         assertNumber(result, 5)
     }
 
     func testSMALLKOutOfRange() throws {
         let result = try eval("SMALL",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(3))
         assertError(result, .num)
     }
 
     func testSMALLKZero() throws {
         let result = try eval("SMALL",
-                              .array([.number(1), .number(2)]),
+                              .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(0))
         assertError(result, .num)
     }
 
     func testSMALLErrorPropagation() throws {
         let result = try eval("SMALL",
-                              .array([.error(.na), .number(2)]),
+                              .array(CellMatrix(row: [.error(.na), .number(2)])),
                               .number(1))
         assertError(result, .na)
     }
@@ -498,8 +498,8 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testVARWithArray() throws {
         let expected = 32.0 / 7.0
         let result = try eval("VAR",
-                              .array([.number(2), .number(4), .number(4), .number(4),
-                                      .number(5), .number(5), .number(7), .number(9)]))
+                              .array(CellMatrix(row: [.number(2), .number(4), .number(4), .number(4),
+                                      .number(5), .number(5), .number(7), .number(9)])))
         assertNumber(result, expected, accuracy: 1e-10)
     }
 
@@ -539,19 +539,22 @@ final class BuiltinStatsFunctionTests: XCTestCase {
     func testAVERAGENestedArrays() throws {
         // Nested arrays should be flattened
         let result = try eval("AVERAGE",
-                              .array([.number(10), .array([.number(20), .number(30)])]))
+                              .array(CellMatrix(row: [
+                                  .number(10),
+                                  .array(CellMatrix(row: [.number(20), .number(30)])),
+                              ])))
         assertNumber(result, 20)
     }
 
     func testMINMixedArrayAndScalar() throws {
         let result = try eval("MIN",
-                              .number(5), .array([.number(3), .number(7)]))
+                              .number(5), .array(CellMatrix(row: [.number(3), .number(7)])))
         assertNumber(result, 3)
     }
 
     func testMAXMixedArrayAndScalar() throws {
         let result = try eval("MAX",
-                              .number(5), .array([.number(3), .number(7)]))
+                              .number(5), .array(CellMatrix(row: [.number(3), .number(7)])))
         assertNumber(result, 7)
     }
 

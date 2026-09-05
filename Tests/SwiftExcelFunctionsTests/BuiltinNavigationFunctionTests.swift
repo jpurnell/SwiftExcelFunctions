@@ -30,6 +30,25 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         XCTAssertEqual(err, expectedError, file: file, line: line)
     }
 
+    /// A table with the shape the test means, instead of one the callee has to
+    /// guess. Guessing is what `VLOOKUP` used to do, and what it got wrong.
+    private func grid(_ rows: [[CellValue]],
+                      file: StaticString = #filePath, line: UInt = #line) -> CellValue {
+        let width = rows.first?.count ?? 0
+        guard rows.allSatisfy({ $0.count == width }),
+              let matrix = CellMatrix(elements: rows.flatMap { $0 },
+                                      rows: rows.count, columns: width) else {
+            XCTFail("ragged table", file: file, line: line)
+            return .error(.value)
+        }
+        return .array(matrix)
+    }
+
+    /// A lookup vector — one column, which is what `MATCH` and 1-D `INDEX` read.
+    private func column(_ values: [CellValue]) -> CellValue {
+        .array(CellMatrix(column: values))
+    }
+
     // MARK: - Registration count
 
     /// The group's inventory, by name rather than by count — a count says
@@ -49,59 +68,47 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         // 1 "A"
         // 2 "B"
         // 3 "C"
-        let table: CellValue = .array([
-            .number(1), .text("A"),
-            .number(2), .text("B"),
-            .number(3), .text("C"),
-        ])
+        let table = grid([[.number(1), .text("A")],
+                          [.number(2), .text("B")],
+                          [.number(3), .text("C")]])
         let result = try eval("VLOOKUP", .number(2), table, .number(2), .bool(false))
         XCTAssertEqual(result, .text("B"))
     }
 
     func testVLOOKUPExactMatchNotFound() throws {
-        let table: CellValue = .array([
-            .number(1), .text("A"),
-            .number(2), .text("B"),
-        ])
+        let table = grid([[.number(1), .text("A")],
+                          [.number(2), .text("B")]])
         let result = try eval("VLOOKUP", .number(5), table, .number(2), .bool(false))
         assertError(result, .na)
     }
 
     func testVLOOKUPExactMatchCaseInsensitive() throws {
-        let table: CellValue = .array([
-            .text("apple"), .number(1),
-            .text("banana"), .number(2),
-        ])
+        let table = grid([[.text("apple"), .number(1)],
+                          [.text("banana"), .number(2)]])
         let result = try eval("VLOOKUP", .text("APPLE"), table, .number(2), .bool(false))
         XCTAssertEqual(result, .number(1))
     }
 
     func testVLOOKUPApproximateMatch() throws {
         // Sorted ascending table
-        let table: CellValue = .array([
-            .number(10), .text("Low"),
-            .number(20), .text("Mid"),
-            .number(30), .text("High"),
-        ])
+        let table = grid([[.number(10), .text("Low")],
+                          [.number(20), .text("Mid")],
+                          [.number(30), .text("High")]])
         // Looking for 25 should find 20 (largest <= 25)
         let result = try eval("VLOOKUP", .number(25), table, .number(2), .bool(true))
         XCTAssertEqual(result, .text("Mid"))
     }
 
     func testVLOOKUPApproximateMatchExact() throws {
-        let table: CellValue = .array([
-            .number(10), .text("Ten"),
-            .number(20), .text("Twenty"),
-        ])
+        let table = grid([[.number(10), .text("Ten")],
+                          [.number(20), .text("Twenty")]])
         let result = try eval("VLOOKUP", .number(20), table, .number(2), .bool(true))
         XCTAssertEqual(result, .text("Twenty"))
     }
 
     func testVLOOKUPDefaultIsApproximate() throws {
-        let table: CellValue = .array([
-            .number(10), .text("Low"),
-            .number(20), .text("High"),
-        ])
+        let table = grid([[.number(10), .text("Low")],
+                          [.number(20), .text("High")]])
         // No fourth argument: default is approximate (TRUE)
         let result = try eval("VLOOKUP", .number(15), table, .number(2))
         XCTAssertEqual(result, .text("Low"))
@@ -113,19 +120,15 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         // Table: 3 columns, 2 rows (row-major)
         // Row 1: 1, 2, 3
         // Row 2: A, B, C
-        let table: CellValue = .array([
-            .number(1), .number(2), .number(3),
-            .text("A"), .text("B"), .text("C"),
-        ])
+        let table = grid([[.number(1), .number(2), .number(3)],
+                          [.text("A"), .text("B"), .text("C")]])
         let result = try eval("HLOOKUP", .number(2), table, .number(2), .bool(false))
         XCTAssertEqual(result, .text("B"))
     }
 
     func testHLOOKUPNotFound() throws {
-        let table: CellValue = .array([
-            .number(1), .number(2),
-            .text("A"), .text("B"),
-        ])
+        let table = grid([[.number(1), .number(2)],
+                          [.text("A"), .text("B")]])
         let result = try eval("HLOOKUP", .number(5), table, .number(2), .bool(false))
         assertError(result, .na)
     }
@@ -133,25 +136,25 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
     // MARK: - INDEX
 
     func testINDEX1D() throws {
-        let arr: CellValue = .array([.text("A"), .text("B"), .text("C"), .text("D")])
+        let arr = column([.text("A"), .text("B"), .text("C"), .text("D")])
         let result = try eval("INDEX", arr, .number(3))
         XCTAssertEqual(result, .text("C"))
     }
 
     func testINDEXFirstElement() throws {
-        let arr: CellValue = .array([.number(10), .number(20), .number(30)])
+        let arr = column([.number(10), .number(20), .number(30)])
         let result = try eval("INDEX", arr, .number(1))
         XCTAssertEqual(result, .number(10))
     }
 
     func testINDEXOutOfBounds() throws {
-        let arr: CellValue = .array([.number(10), .number(20)])
+        let arr = column([.number(10), .number(20)])
         let result = try eval("INDEX", arr, .number(5))
         assertError(result, .ref)
     }
 
     func testINDEXZeroReturnsError() throws {
-        let arr: CellValue = .array([.number(10)])
+        let arr = column([.number(10)])
         let result = try eval("INDEX", arr, .number(0))
         assertError(result, .value)
     }
@@ -160,10 +163,8 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         // 2x3 array (row-major):
         // 1  2  3
         // 4  5  6
-        let arr: CellValue = .array([
-            .number(1), .number(2), .number(3),
-            .number(4), .number(5), .number(6),
-        ])
+        let arr = grid([[.number(1), .number(2), .number(3)],
+                        [.number(4), .number(5), .number(6)]])
         let result = try eval("INDEX", arr, .number(2), .number(3))
         XCTAssertEqual(result, .number(6))
     }
@@ -171,52 +172,52 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
     // MARK: - MATCH
 
     func testMATCHExact() throws {
-        let arr: CellValue = .array([.text("A"), .text("B"), .text("C")])
+        let arr = column([.text("A"), .text("B"), .text("C")])
         let result = try eval("MATCH", .text("B"), arr, .number(0))
         XCTAssertEqual(result, .number(2))
     }
 
     func testMATCHExactNotFound() throws {
-        let arr: CellValue = .array([.text("A"), .text("B")])
+        let arr = column([.text("A"), .text("B")])
         let result = try eval("MATCH", .text("D"), arr, .number(0))
         assertError(result, .na)
     }
 
     func testMATCHExactCaseInsensitive() throws {
-        let arr: CellValue = .array([.text("apple"), .text("banana"), .text("cherry")])
+        let arr = column([.text("apple"), .text("banana"), .text("cherry")])
         let result = try eval("MATCH", .text("BANANA"), arr, .number(0))
         XCTAssertEqual(result, .number(2))
     }
 
     func testMATCHSortedAscending() throws {
-        let arr: CellValue = .array([.number(10), .number(20), .number(30)])
+        let arr = column([.number(10), .number(20), .number(30)])
         // Find largest <= 25
         let result = try eval("MATCH", .number(25), arr, .number(1))
         XCTAssertEqual(result, .number(2)) // Position of 20
     }
 
     func testMATCHSortedAscendingExact() throws {
-        let arr: CellValue = .array([.number(10), .number(20), .number(30)])
+        let arr = column([.number(10), .number(20), .number(30)])
         let result = try eval("MATCH", .number(20), arr, .number(1))
         XCTAssertEqual(result, .number(2))
     }
 
     func testMATCHSortedDescending() throws {
-        let arr: CellValue = .array([.number(30), .number(20), .number(10)])
+        let arr = column([.number(30), .number(20), .number(10)])
         // Find smallest >= 15
         let result = try eval("MATCH", .number(15), arr, .number(-1))
         XCTAssertEqual(result, .number(2)) // Position of 20
     }
 
     func testMATCHDefaultIsAscending() throws {
-        let arr: CellValue = .array([.number(1), .number(2), .number(3)])
+        let arr = column([.number(1), .number(2), .number(3)])
         // No match_type argument: default is 1 (sorted ascending)
         let result = try eval("MATCH", .number(2), arr)
         XCTAssertEqual(result, .number(2))
     }
 
     func testMATCHEmptyArray() throws {
-        let arr: CellValue = .array([])
+        let arr = column([])
         let result = try eval("MATCH", .number(1), arr, .number(0))
         assertError(result, .na)
     }
@@ -244,13 +245,13 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
     // MARK: - Error propagation
 
     func testVLOOKUPErrorInColIndex() throws {
-        let table: CellValue = .array([.number(1), .text("A")])
+        let table = grid([[.number(1), .text("A")]])
         let result = try eval("VLOOKUP", .number(1), table, .error(.ref), .bool(false))
         assertError(result, .ref)
     }
 
     func testMATCHErrorInLookupValue() throws {
-        let arr: CellValue = .array([.number(1)])
+        let arr = column([.number(1)])
         let result = try eval("MATCH", .error(.na), arr, .number(0))
         // Error in lookup value: won't match any cell, returns #N/A
         assertError(result, .na)

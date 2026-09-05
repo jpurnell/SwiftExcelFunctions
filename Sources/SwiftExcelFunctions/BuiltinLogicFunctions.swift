@@ -155,8 +155,8 @@ public enum BuiltinLogicFunctions {
     private static func flatten(_ args: [CellValue]) -> [CellValue] {
         var result: [CellValue] = []
         for arg in args {
-            if case .array(let elements) = arg {
-                result.append(contentsOf: flatten(elements))
+            if case .array(let matrix) = arg {
+                result.append(contentsOf: flatten(matrix.elements))
             } else {
                 result.append(arg)
             }

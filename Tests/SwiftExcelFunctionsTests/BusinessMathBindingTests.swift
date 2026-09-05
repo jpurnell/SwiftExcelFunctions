@@ -82,16 +82,16 @@ final class BusinessMathBindingTests: XCTestCase {
     /// Dates arrive as Excel serials and have to become `Date`s before
     /// BusinessMath's `xirr` will speak to them; that conversion is the binding.
     func testXirrOnASingleYearIsTheSimpleReturn() throws {
-        let values = CellValue.array([.number(-1000), .number(1100)])
-        let dates = CellValue.array([.number(46023), .number(46388)])   // 2026-01-01, 2027-01-01
+        let values = CellValue.array(CellMatrix(row: [.number(-1000), .number(1100)]))
+        let dates = CellValue.array(CellMatrix(row: [.number(46023), .number(46388)]))   // 2026-01-01, 2027-01-01
         XCTAssertEqual(try number("XIRR", [values, dates]), 0.10, accuracy: 0.001)
     }
 
     /// Irregular spacing is the whole point of XIRR over IRR: the dates carry
     /// the timing rather than the positions.
     func testXirrHonoursIrregularSpacing() throws {
-        let values = CellValue.array([.number(-1000), .number(500), .number(700)])
-        let dates = CellValue.array([.number(46023), .number(46114), .number(46388)])
+        let values = CellValue.array(CellMatrix(row: [.number(-1000), .number(500), .number(700)]))
+        let dates = CellValue.array(CellMatrix(row: [.number(46023), .number(46114), .number(46388)]))
         let rate = try number("XIRR", [values, dates])
         XCTAssertGreaterThan(rate, 0.15, "front-loaded return beats a flat 20%")
         XCTAssertLessThan(rate, 0.35)
@@ -99,15 +99,15 @@ final class BusinessMathBindingTests: XCTestCase {
 
     /// Mismatched counts have no answer.
     func testXirrRejectsMismatchedValuesAndDates() throws {
-        let values = CellValue.array([.number(-100), .number(110)])
-        let dates = CellValue.array([.number(46023)])
+        let values = CellValue.array(CellMatrix(row: [.number(-100), .number(110)]))
+        let dates = CellValue.array(CellMatrix(row: [.number(46023)]))
         XCTAssertEqual(try call("XIRR", [values, dates]), .error(.num))
     }
 
     /// Cash flows that never change sign have no rate of return.
     func testXirrNeedsASignChange() throws {
-        let values = CellValue.array([.number(100), .number(110)])
-        let dates = CellValue.array([.number(46023), .number(46388)])
+        let values = CellValue.array(CellMatrix(row: [.number(100), .number(110)]))
+        let dates = CellValue.array(CellMatrix(row: [.number(46023), .number(46388)]))
         XCTAssertEqual(try call("XIRR", [values, dates]), .error(.num))
     }
 
@@ -117,8 +117,8 @@ final class BusinessMathBindingTests: XCTestCase {
     /// difference in the name. Getting the pair backwards is invisible until
     /// somebody compares against a spreadsheet.
     func testCovariancePopulationAndSampleDiffer() throws {
-        let x = CellValue.array([.number(1), .number(2), .number(3), .number(4)])
-        let y = CellValue.array([.number(2), .number(4), .number(5), .number(8)])
+        let x = CellValue.array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)]))
+        let y = CellValue.array(CellMatrix(row: [.number(2), .number(4), .number(5), .number(8)]))
 
         let population = try number("COVARIANCE.P", [x, y])
         let sample = try number("COVARIANCE.S", [x, y])
@@ -128,15 +128,15 @@ final class BusinessMathBindingTests: XCTestCase {
 
     /// `COVAR` is the legacy name for the population form, not the sample one.
     func testCovarIsThePopulationForm() throws {
-        let x = CellValue.array([.number(1), .number(2), .number(3), .number(4)])
-        let y = CellValue.array([.number(2), .number(4), .number(5), .number(8)])
+        let x = CellValue.array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)]))
+        let y = CellValue.array(CellMatrix(row: [.number(2), .number(4), .number(5), .number(8)]))
         XCTAssertEqual(
             try number("COVAR", [x, y]), try number("COVARIANCE.P", [x, y]), accuracy: 1e-12)
     }
 
     func testCovarianceRejectsMismatchedLengths() throws {
-        let x = CellValue.array([.number(1), .number(2)])
-        let y = CellValue.array([.number(1), .number(2), .number(3)])
+        let x = CellValue.array(CellMatrix(row: [.number(1), .number(2)]))
+        let y = CellValue.array(CellMatrix(row: [.number(1), .number(2), .number(3)]))
         XCTAssertEqual(try call("COVARIANCE.P", [x, y]), .error(.na))
     }
 

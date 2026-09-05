@@ -229,7 +229,7 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
             .number(-1000), .number(300), .number(420), .number(680),
         ]
         let result = try BuiltinFinancialFunctions.irr.evaluate([
-            .array(cashFlows),
+            .array(CellMatrix(column: cashFlows)),
         ])
         let irrValue = number(result)
         // Should be some positive rate
@@ -253,7 +253,7 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
             .number(3000), .number(3000), .number(3000),
         ]
         let result = try BuiltinFinancialFunctions.irr.evaluate([
-            .array(cashFlows),
+            .array(CellMatrix(column: cashFlows)),
         ])
         let irrValue = number(result)
         // Excel: IRR({-10000,3000,3000,3000,3000,3000}) ≈ 0.15238 (15.24%)
@@ -266,7 +266,7 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
             .number(-5000), .number(1000), .number(2000), .number(3000),
         ]
         let result = try BuiltinFinancialFunctions.irr.evaluate([
-            .array(cashFlows), .number(0.05),
+            .array(CellMatrix(column: cashFlows)), .number(0.05),
         ])
         let irrValue = number(result)
         XCTAssertGreaterThan(irrValue, 0)
@@ -285,7 +285,7 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
             .number(100), .number(200), .number(300),
         ]
         let result = try BuiltinFinancialFunctions.irr.evaluate([
-            .array(cashFlows),
+            .array(CellMatrix(column: cashFlows)),
         ])
         XCTAssertEqual(result, .error(.num))
     }
@@ -294,7 +294,7 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
         // Need at least 2 cash flows
         let cashFlows: [CellValue] = [.number(-100)]
         let result = try BuiltinFinancialFunctions.irr.evaluate([
-            .array(cashFlows),
+            .array(CellMatrix(column: cashFlows)),
         ])
         XCTAssertEqual(result, .error(.num))
     }

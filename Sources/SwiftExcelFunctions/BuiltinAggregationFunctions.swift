@@ -142,8 +142,8 @@ public enum BuiltinAggregationFunctions {
     private static func flatten(_ args: [CellValue]) -> [CellValue] {
         var result: [CellValue] = []
         for arg in args {
-            if case .array(let elements) = arg {
-                result.append(contentsOf: flatten(elements))
+            if case .array(let matrix) = arg {
+                result.append(contentsOf: flatten(matrix.elements))
             } else {
                 result.append(arg)
             }
@@ -153,8 +153,8 @@ public enum BuiltinAggregationFunctions {
 
     /// Extracts the flat array of values from a `CellValue`.
     private static func toArray(_ value: CellValue) -> [CellValue] {
-        if case .array(let elements) = value {
-            return elements
+        if case .array(let matrix) = value {
+            return matrix.elements
         }
         return [value]
     }

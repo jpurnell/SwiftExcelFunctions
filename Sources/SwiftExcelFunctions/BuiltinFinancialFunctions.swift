@@ -283,8 +283,8 @@ public enum BuiltinFinancialFunctions {
     /// Handles both single numeric values and ``.array`` values containing multiple cash flows.
     private static func extractCashFlows(from value: CellValue) throws -> [Double] {
         switch value {
-        case .array(let values):
-            return try values.map { v in
+        case .array(let matrix):
+            return try matrix.elements.map { v in
                 guard let n = toNumber(v) else {
                     throw FinancialError.excelError(.value)
                 }

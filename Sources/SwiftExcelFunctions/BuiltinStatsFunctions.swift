@@ -37,8 +37,8 @@ public enum BuiltinStatsFunctions {
             switch arg {
             case .number(let n):
                 result.append(n)
-            case .array(let items):
-                result.append(contentsOf: flattenNumbers(items))
+            case .array(let matrix):
+                result.append(contentsOf: flattenNumbers(matrix.elements))
             case .bool(let b):
                 result.append(b ? 1.0 : 0.0)
             case .blank, .text, .error, .formula, .date:
@@ -59,8 +59,8 @@ public enum BuiltinStatsFunctions {
             switch arg {
             case .error(let e):
                 return e
-            case .array(let items):
-                if let e = findFirstError(items) {
+            case .array(let matrix):
+                if let e = findFirstError(matrix.elements) {
                     return e
                 }
             case .formula(_, let cached):
@@ -85,8 +85,8 @@ public enum BuiltinStatsFunctions {
         var count = 0.0
         for arg in args {
             switch arg {
-            case .array(let items):
-                count += flatCount(items, where: predicate)
+            case .array(let matrix):
+                count += flatCount(matrix.elements, where: predicate)
             default:
                 if predicate(arg) {
                     count += 1

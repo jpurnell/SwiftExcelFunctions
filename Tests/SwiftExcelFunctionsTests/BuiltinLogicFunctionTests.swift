@@ -117,12 +117,12 @@ final class BuiltinLogicFunctionTests: XCTestCase {
     }
 
     func testANDFlattensArrays() throws {
-        let result = try eval("AND", .array([.bool(true), .bool(true)]), .bool(true))
+        let result = try eval("AND", .array(CellMatrix(row: [.bool(true), .bool(true)])), .bool(true))
         XCTAssertEqual(result, .bool(true))
     }
 
     func testANDFlattensArraysWithFalse() throws {
-        let result = try eval("AND", .array([.bool(true), .bool(false)]))
+        let result = try eval("AND", .array(CellMatrix(row: [.bool(true), .bool(false)])))
         XCTAssertEqual(result, .bool(false))
     }
 
@@ -154,7 +154,7 @@ final class BuiltinLogicFunctionTests: XCTestCase {
     }
 
     func testORFlattensArrays() throws {
-        let result = try eval("OR", .array([.bool(false), .bool(true)]))
+        let result = try eval("OR", .array(CellMatrix(row: [.bool(false), .bool(true)])))
         XCTAssertEqual(result, .bool(true))
     }
 

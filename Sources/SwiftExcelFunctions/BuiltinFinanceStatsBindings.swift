@@ -117,8 +117,8 @@ public enum BuiltinBindingFunctions {
     /// The numbers in a value, skipping anything that is not one.
     private static func numbers(in value: CellValue) -> [Double] {
         switch value {
-        case .array(let values):
-            return values.compactMap { if case .number(let n) = $0 { return n } else { return nil } }
+        case .array(let matrix):
+            return matrix.elements.compactMap { if case .number(let n) = $0 { return n } else { return nil } }
         case .number(let n):
             return [n]
         default:

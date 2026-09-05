@@ -145,10 +145,14 @@ final class ReferenceFunctionTests: XCTestCase {
         cells.values["A1"] = .number(1)
         cells.values["A2"] = .number(2)
         cells.values["A3"] = .number(3)
-        guard case .array(let values) = try evaluate("OFFSET(A1,0,0,3,1)", cells: cells) else {
+        guard case .array(let matrix) = try evaluate("OFFSET(A1,0,0,3,1)", cells: cells) else {
             return XCTFail("expected an array")
         }
-        XCTAssertEqual(values, [.number(1), .number(2), .number(3)])
+        XCTAssertEqual(matrix.elements, [.number(1), .number(2), .number(3)])
+        // Height 3, width 1 — the shape OFFSET was asked for, which the result
+        // can now actually state.
+        XCTAssertEqual(matrix.rows, 3)
+        XCTAssertEqual(matrix.columns, 1)
     }
 
     /// Displacing off the top of the sheet is `#REF!`, as in Excel.
