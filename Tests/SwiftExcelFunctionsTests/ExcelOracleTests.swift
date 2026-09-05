@@ -50,6 +50,27 @@ final class ExcelOracleTests: XCTestCase {
         "INFO", "CELL",
     ]
 
+    /// Whether a function's cached value is a draw rather than an answer.
+    ///
+    /// Risk Solver's `Psi*` family is Monte Carlo. A cached `PsiTriangular(…)` is
+    /// one sample from one simulation run, and `PsiMean(…)` or `PsiPercentile(…)`
+    /// are statistics *of* that run — with no seed anybody published, so nothing can
+    /// reproduce them. Excel writes the names as `_xll.PsiTriangular` when the
+    /// add-in is not loaded, which is how they reach us.
+    ///
+    /// Counting these as disagreements would hold the agreement number down by
+    /// something no amount of work could fix, which is the fastest way to make a
+    /// measurement worth ignoring. They are excluded, and what they *can* tell us —
+    /// which functions appear, with which argument shapes — is structural and is
+    /// measured separately.
+    ///
+    /// - Parameter name: The function name, uppercased.
+    /// - Returns: `true` when its value cannot be reproduced.
+    private static func isStochastic(_ name: String) -> Bool {
+        let bare = name.hasPrefix("_XLL.") ? String(name.dropFirst(5)) : name
+        return bare.hasPrefix("PSI")
+    }
+
     // MARK: - Reading Excel's answers
 
     /// A provider whose references resolve to the value Excel recorded.
@@ -116,6 +137,9 @@ final class ExcelOracleTests: XCTestCase {
         let named = Set(OracleFinding.functionNames(in: ast))
         if let volatile = named.first(where: { Self.volatile.contains($0) }) {
             return .notComparable("volatile: \(volatile)")
+        }
+        if let stochastic = named.first(where: { Self.isStochastic($0) }) {
+            return .notComparable("stochastic: \(stochastic)")
         }
         guard let excel = cached else { return .notComparable("no cached value") }
 
