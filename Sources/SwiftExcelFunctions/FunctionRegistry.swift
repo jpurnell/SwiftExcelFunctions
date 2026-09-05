@@ -93,8 +93,34 @@ public struct FunctionRegistry: Sendable {
                 registry.register(fn)
             }
         }
+        for (modern, legacy) in FunctionRegistry.modernSpellings {
+            guard let function = registry.function(named: legacy) else { continue }
+            registry.register(ExcelFunction(
+                name: modern,
+                minArgs: function.minArgs,
+                maxArgs: function.maxArgs,
+                evaluate: function.evaluate))
+        }
         return registry
     }
+
+    /// Names Excel 2010 gave to functions that already existed.
+    ///
+    /// Both spellings are live. Excel renamed `STDEV` to `STDEV.S` and kept the
+    /// old name working, so a workbook saved this decade writes the dotted form
+    /// and one saved before it writes the bare one — and the measured corpus
+    /// contains both. `STDEV.S` alone is called 86,410 times across 79 workbooks.
+    ///
+    /// Registered as an alias rather than reimplemented. The pair must never be
+    /// able to disagree, and the only way to guarantee that is for them to be the
+    /// same function under two names.
+    static let modernSpellings: [(modern: String, legacy: String)] = [
+        ("STDEV.S", "STDEV"),
+        ("STDEV.P", "STDEVP"),
+        ("VAR.S", "VAR"),
+        ("VAR.P", "VARP"),
+        ("PERCENTILE.INC", "PERCENTILE"),
+    ]
 
     // MARK: - Factory
 
