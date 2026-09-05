@@ -24,8 +24,24 @@ public enum BuiltinLogicFunctions {
     /// All logical functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         ifFunc, and, or, not, iferror, ifna,
-        isError, isErr, isNA, isBlank, isNumber, isText, na,
+        isError, isErr, isNA, isBlank, isNumber, isText, na, isRef,
     ]
+
+    /// `ISREF(value)` — true when the argument is a reference.
+    ///
+    /// The odd one out among the predicates. The others ask about a *value*, and
+    /// a value is what a function is handed; this asks whether the argument was a
+    /// reference at all, which is a fact about the formula rather than about
+    /// anything in the sheet. `ISREF(A1)` is true whatever A1 holds, and
+    /// `ISREF("A1")` is false however much the text looks like one.
+    ///
+    /// So it reads the argument tree, the same way `COLUMN(B5)` does — and is the
+    /// only predicate here that needs an evaluation context at all.
+    public static let isRef = ExcelFunction(
+        name: "ISREF", minArgs: 1, maxArgs: 1, withoutContext: .bool(false)
+    ) { context, _ in
+        .bool(context.referencedCell(at: 0) != nil)
+    }
 
     // MARK: - Predicates
     //

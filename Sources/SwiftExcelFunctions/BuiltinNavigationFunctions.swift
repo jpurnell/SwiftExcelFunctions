@@ -18,7 +18,46 @@ public enum BuiltinNavigationFunctions {
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         vlookup, hlookup, index, match, address, column, row, indirect, offset,
+        choose, lookup,
     ]
+
+    // MARK: - Choosing among values
+
+    /// `CHOOSE(index, value1, …)` — the value at a one-based position.
+    ///
+    /// Excel evaluates only the chosen argument. This evaluates all of them, which
+    /// gives the same answer here because an error is a value rather than a
+    /// thrown failure: an unchosen `1/0` becomes `#DIV/0!` and is discarded.
+    public static let choose = ExcelFunction(name: "CHOOSE", minArgs: 2, maxArgs: nil) { args in
+        catching {
+            let index = Int(try toNumber(args[0]))
+            guard index >= 1, index < args.count else { return .error(.value) }
+            return args[index]
+        }
+    }
+
+    /// `LOOKUP(value, lookupVector, [resultVector])` — the vector form.
+    ///
+    /// Finds the **last** entry not greater than the target, which is Excel's
+    /// rule and assumes the vector is sorted. Below everything there is no match,
+    /// and the answer is `#N/A` rather than the first entry.
+    ///
+    /// With no result vector the lookup vector supplies the answer.
+    public static let lookup = ExcelFunction(name: "LOOKUP", minArgs: 2, maxArgs: 3) { args in
+        catching {
+            let target = try toNumber(args[0])
+            let haystack = toArray(args[1])
+            let results = args.count > 2 ? toArray(args[2]) : haystack
+
+            var match: Int?
+            for (index, entry) in haystack.enumerated() {
+                guard case .number(let value) = entry else { continue }
+                if value <= target { match = index } else { break }
+            }
+            guard let found = match, found < results.count else { return .error(.na) }
+            return results[found]
+        }
+    }
 
     // MARK: - Asking about a position
 

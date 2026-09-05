@@ -60,6 +60,8 @@ final class ReferenceFunctionTests: XCTestCase {
         case "OFFSET(A1,0,0,3,1)":
             return .function("OFFSET", [.cellRef(CellRef("A1")), .number(0), .number(0),
                                         .number(3), .number(1)])
+        case "ISREF(A1)": return .function("ISREF", [.cellRef(CellRef("A1"))])
+        case "ISREF(\"A1\")": return .function("ISREF", [.text("A1")])
         case "OFFSET(A1,-5,0)":
             return .function("OFFSET", [.cellRef(CellRef("A1")), .number(-5), .number(0)])
         default: throw XCTSkip("unbuilt formula \(formula)")
@@ -115,6 +117,15 @@ final class ReferenceFunctionTests: XCTestCase {
     /// return a plausible value for a different cell.
     func testIndirectRefusesR1C1RatherThanMisreadingIt() throws {
         XCTAssertEqual(try evaluate("INDIRECT(\"B2\",FALSE)"), .error(.ref))
+    }
+
+    // MARK: - ISREF
+
+    /// `ISREF` asks about the *formula*, not the sheet: whether the argument was
+    /// written as a reference. Text that looks like one is not one.
+    func testIsRefDistinguishesAReferenceFromTextThatLooksLikeOne() throws {
+        XCTAssertEqual(try evaluate("ISREF(A1)"), .bool(true))
+        XCTAssertEqual(try evaluate("ISREF(\"A1\")"), .bool(false))
     }
 
     // MARK: - OFFSET

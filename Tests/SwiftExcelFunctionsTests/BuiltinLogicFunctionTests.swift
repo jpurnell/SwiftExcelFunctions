@@ -42,7 +42,8 @@ final class BuiltinLogicFunctionTests: XCTestCase {
     func testAllContainsEveryFunctionInTheGroup() {
         XCTAssertEqual(
             Set(BuiltinLogicFunctions.all.map(\.name)),
-            Set("IF, AND, OR, NOT, IFERROR, IFNA, ISERROR, ISERR, ISNA, ISBLANK, ISNUMBER, ISTEXT, NA".split(separator: ", ").map(String.init)))
+            ["IF", "AND", "OR", "NOT", "IFERROR", "IFNA",
+             "ISERROR", "ISERR", "ISNA", "ISBLANK", "ISNUMBER", "ISTEXT", "NA", "ISREF"])
     }
 
     // MARK: - IF

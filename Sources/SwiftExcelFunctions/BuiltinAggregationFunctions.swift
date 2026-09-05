@@ -16,7 +16,61 @@ import SwiftExcelCore
 public enum BuiltinAggregationFunctions {
 
     /// All aggregation functions for registration in a ``FunctionRegistry``.
-    public static let all: [ExcelFunction] = [sum, sumif, sumifs, countif, countifs, averageif]
+    public static let all: [ExcelFunction] = [
+        sum, sumif, sumifs, countif, countifs, averageif, sumproduct, sumsq,
+    ]
+
+    // MARK: - Products
+
+    /// `SUMPRODUCT(array1, [array2], …)` — multiply element by element, then sum.
+    ///
+    /// A dot product, which is how a spreadsheet writes an objective function or
+    /// a constraint row. Only 805 calls in the corpus but spread over **134
+    /// sheets** — wider than any other function this package lacked, because
+    /// almost every optimisation model has one.
+    ///
+    /// Non-numeric entries count as zero rather than erroring. That is Excel's
+    /// rule and it matters: a label at the head of a row would otherwise poison
+    /// the whole product.
+    ///
+    /// Arrays of different lengths are `#VALUE!`. Pairing them off by position
+    /// and ignoring the tail would answer a question nobody asked.
+    public static let sumproduct = ExcelFunction(
+        name: "SUMPRODUCT", minArgs: 1, maxArgs: nil
+    ) { args in
+        let arrays = args.map { toArray($0) }
+        guard let width = arrays.first?.count else { return .number(0) }
+        guard arrays.allSatisfy({ $0.count == width }) else { return .error(.value) }
+
+        var total = 0.0
+        for index in 0..<width {
+            var product = 1.0
+            for array in arrays {
+                // Anything that is not a number contributes zero, so the whole
+                // term drops out rather than the whole sum failing.
+                guard case .number(let value) = array[index] else {
+                    product = 0
+                    break
+                }
+                product *= value
+            }
+            total += product
+        }
+        return .number(total)
+    }
+
+    /// `SUMSQ(number1, …)` — the sum of squares.
+    public static let sumsq = ExcelFunction(name: "SUMSQ", minArgs: 1, maxArgs: nil) { args in
+        catching {
+            var total = 0.0
+            for value in flatten(args) {
+                if case .error(let error) = value { throw EvalError.excelError(error) }
+                guard case .number(let number) = value else { continue }
+                total += number * number
+            }
+            return .number(total)
+        }
+    }
 
     // MARK: - Type coercion
 

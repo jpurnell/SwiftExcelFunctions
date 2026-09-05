@@ -46,8 +46,13 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
 
     // MARK: - Registration count
 
-    func testAllContainsSixFunctions() {
-        XCTAssertEqual(BuiltinAggregationFunctions.all.count, 6)
+    /// By name rather than by count: a count says something changed without
+    /// saying what, and fails the same way whether a function arrived or went.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinAggregationFunctions.all.map(\.name)),
+            ["SUM", "SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF",
+             "SUMPRODUCT", "SUMSQ"])
     }
 
     // MARK: - SUM
