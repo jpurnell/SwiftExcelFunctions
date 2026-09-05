@@ -39,6 +39,12 @@ public struct EvaluationContext: Sendable {
     /// The unevaluated argument trees, in order, alongside the evaluated values.
     public let arguments: [FormulaAST]
 
+    /// Where randomness comes from, when a formula asks for any.
+    ///
+    /// `nil` means none was supplied, and `RAND()` answers `#VALUE!` rather than
+    /// reaching for system entropy. See ``RandomSource``.
+    public let random: (any RandomSource)?
+
     /// Creates an evaluation context.
     ///
     /// - Parameters:
@@ -46,12 +52,15 @@ public struct EvaluationContext: Sendable {
     ///   - currentSheet: The sheet an unqualified reference belongs to.
     ///   - cells: The provider to read cells through.
     ///   - arguments: The unevaluated argument trees.
+    ///   - random: Where `RAND()` draws from, or `nil` for none.
     public init(
         callingCell: CellAddress?,
         currentSheet: String,
         cells: any CellValueProvider,
-        arguments: [FormulaAST]
+        arguments: [FormulaAST],
+        random: (any RandomSource)? = nil
     ) {
+        self.random = random
         self.callingCell = callingCell
         self.currentSheet = currentSheet
         self.cells = cells

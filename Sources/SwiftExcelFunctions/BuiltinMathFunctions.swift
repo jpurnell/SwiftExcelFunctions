@@ -20,7 +20,48 @@ public enum BuiltinMathFunctions {
     public static let all: [ExcelFunction] = [
         abs, round, roundUp, roundDown, sqrt, ln, log, exp,
         power, mod, intFunc, ceiling, floor, sign, pi,
+        rand, randbetween,
     ]
+
+    // MARK: - Randomness
+
+    /// `RAND()` — a uniform value in `[0, 1)`.
+    ///
+    /// The value comes from the caller's ``RandomSource``; this package has none
+    /// of its own. With no source the answer is `#VALUE!`, on the same principle
+    /// as `COLUMN()` outside a sheet: report rather than invent.
+    ///
+    /// Excel is not imitated, because it cannot be — it exposes no seed, so there
+    /// is no sequence to match. Only the contract is observable, and only the
+    /// contract is promised. With a seeded source `RAND()` also stops being
+    /// volatile, which is a real difference from Excel and the better behaviour
+    /// for a translation layer.
+    public static let rand = ExcelFunction(name: "RAND", minArgs: 0, maxArgs: 0) { context, _ in
+        guard let random = context.random else { return .error(.value) }
+        return .number(random.nextUniform())
+    }
+
+    /// `RANDBETWEEN(bottom, top)` — a uniform integer, both bounds inclusive.
+    ///
+    /// Inclusive at both ends is the part worth testing: scaling a draw from
+    /// `[0, 1)` across `top - bottom + 1` values reaches `top` exactly when the
+    /// draw approaches one, and never overshoots because the interval is
+    /// half-open.
+    public static let randbetween = ExcelFunction(
+        name: "RANDBETWEEN", minArgs: 2, maxArgs: 2
+    ) { context, args in
+        guard let random = context.random else { return .error(.value) }
+        guard case .number(let bottomValue) = args[0],
+              case .number(let topValue) = args[1] else { return .error(.value) }
+
+        let bottom = Int(bottomValue.rounded(.up))
+        let top = Int(topValue.rounded(.down))
+        guard bottom <= top else { return .error(.num) }
+
+        let span = top - bottom + 1
+        let offset = Int(random.nextUniform() * Double(span))
+        return .number(Double(bottom + Swift.min(offset, span - 1)))
+    }
 
     // MARK: - Type coercion
 

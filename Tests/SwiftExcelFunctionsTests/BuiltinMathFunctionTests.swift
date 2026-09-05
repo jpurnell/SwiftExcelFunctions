@@ -50,8 +50,14 @@ final class BuiltinMathFunctionTests: XCTestCase {
 
     // MARK: - Registration count
 
-    func testAllContainsFifteenFunctions() {
-        XCTAssertEqual(BuiltinMathFunctions.all.count, 15)
+    /// By name rather than by count: a count says something changed without
+    /// saying what, and fails identically whether a function arrived or went.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinMathFunctions.all.map(\.name)),
+            ["ABS", "ROUND", "ROUNDUP", "ROUNDDOWN", "SQRT", "LN", "LOG", "EXP",
+             "POWER", "MOD", "INT", "CEILING", "FLOOR", "SIGN", "PI",
+             "RAND", "RANDBETWEEN"])
     }
 
     // MARK: - ABS

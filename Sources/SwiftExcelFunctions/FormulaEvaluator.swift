@@ -74,6 +74,9 @@ public enum FormulaEvaluator {
     ///     them report that there is no position rather than invent one.
     ///   - currentSheet: The sheet an unqualified reference belongs to, used by
     ///     `INDIRECT` when the text it is given does not name a sheet itself.
+    ///   - random: Where `RAND()` and `RANDBETWEEN()` draw from. `nil` — the
+    ///     default — means they answer `#VALUE!`, because this package supplies
+    ///     no randomness of its own and will not invent any.
     /// - Returns: The resulting `CellValue`.
     /// - Throws: ``EvaluationError`` if evaluation fails.
     public static func evaluate(
@@ -82,11 +85,13 @@ public enum FormulaEvaluator {
         names: NameResolver,
         functions: FunctionRegistry = .builtin,
         at callingCell: CellAddress? = nil,
-        inSheet currentSheet: String = ""
+        inSheet currentSheet: String = "",
+        random: (any RandomSource)? = nil
     ) throws -> CellValue {
         try evaluateNode(
             ast, cells: cells, names: names, functions: functions,
-            callingCell: callingCell, currentSheet: currentSheet, depth: 0)
+            callingCell: callingCell, currentSheet: currentSheet,
+            random: random, depth: 0)
     }
 
     // MARK: - Private Recursive Evaluator
@@ -98,6 +103,7 @@ public enum FormulaEvaluator {
         functions: FunctionRegistry,
         callingCell: CellAddress?,
         currentSheet: String,
+        random: (any RandomSource)?,
         depth: Int
     ) throws -> CellValue {
         guard depth < maxDepth else {
@@ -146,98 +152,98 @@ public enum FormulaEvaluator {
                 return .error(.name)
             }
             return try evaluateNamedTarget(
-                target, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth
+                target, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth
             )
 
         // MARK: Arithmetic
         case .add(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return try addValues(left, right)
 
         case .subtract(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return try subtractValues(left, right)
 
         case .multiply(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return try multiplyValues(left, right)
 
         case .divide(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return try divideValues(left, right)
 
         case .power(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return try powerValues(left, right)
 
         case .negate(let expr):
-            let value = try evaluateNode(expr, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let value = try evaluateNode(expr, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = value { return value }
             return try negateValue(value)
 
         case .concatenate(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return .text(coerceToString(left) + coerceToString(right))
 
         // MARK: Comparison
         case .equal(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return .bool(compareValues(left, right) == .orderedSame)
 
         case .notEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return .bool(compareValues(left, right) != .orderedSame)
 
         case .greaterThan(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return .bool(compareValues(left, right) == .orderedDescending)
 
         case .lessThan(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             return .bool(compareValues(left, right) == .orderedAscending)
 
         case .greaterOrEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             let cmp = compareValues(left, right)
             return .bool(cmp == .orderedDescending || cmp == .orderedSame)
 
         case .lessOrEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth)
+            let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth)
             if case .error = right { return right }
             let cmp = compareValues(left, right)
             return .bool(cmp == .orderedAscending || cmp == .orderedSame)
@@ -258,7 +264,7 @@ public enum FormulaEvaluator {
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {
                 let val = try evaluateNode(
-                    arg, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, depth: nextDepth
+                    arg, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, depth: nextDepth
                 )
                 evaluatedArgs.append(val)
             }
@@ -269,7 +275,8 @@ public enum FormulaEvaluator {
                     callingCell: callingCell,
                     currentSheet: currentSheet,
                     cells: cells,
-                    arguments: args)
+                    arguments: args,
+                    random: random)
                 return try inContext(context, evaluatedArgs)
             }
             return try fn.evaluate(evaluatedArgs)
@@ -285,6 +292,7 @@ public enum FormulaEvaluator {
         functions: FunctionRegistry,
         callingCell: CellAddress?,
         currentSheet: String,
+        random: (any RandomSource)?,
         depth: Int
     ) throws -> CellValue {
         switch target {
@@ -299,7 +307,7 @@ public enum FormulaEvaluator {
         case .formula(let ast):
             return try evaluateNode(
                 ast, cells: cells, names: names, functions: functions,
-                callingCell: callingCell, currentSheet: currentSheet, depth: depth)
+                callingCell: callingCell, currentSheet: currentSheet, random: random, depth: depth)
         }
     }
 
