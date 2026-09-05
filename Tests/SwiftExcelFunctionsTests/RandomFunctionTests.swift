@@ -16,6 +16,9 @@ final class RandomFunctionTests: XCTestCase {
     private struct Cells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
         func value(at ref: CellRef, inSheet: String) -> CellValue? { nil }
+        // Holds nothing, and says so — RAND takes no range anyway.
+        func lastPopulatedCell() -> CellRef? { nil }
+        func lastPopulatedCell(inSheet: String) -> CellRef? { nil }
         func values(in range: CellRange) -> [CellValue] { [] }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
     }

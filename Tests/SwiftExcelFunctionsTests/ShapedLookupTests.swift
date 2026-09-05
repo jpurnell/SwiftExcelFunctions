@@ -15,6 +15,13 @@ final class ShapedLookupTests: XCTestCase {
     private struct Cells: CellValueProvider {
         var stored: [CellRef: CellValue] = [:]
         func value(at ref: CellRef) -> CellValue? { stored[ref] }
+        func lastPopulatedCell() -> CellRef? {
+            guard let column = stored.keys.map(\.column).max(),
+                  let row = stored.keys.map(\.row).max() else { return nil }
+            return CellRef(column: column, row: row)
+        }
+
+        func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
         func value(at ref: CellRef, inSheet: String) -> CellValue? { stored[ref] }
         func values(in range: CellRange) -> [CellValue] { range.cells.compactMap { stored[$0] } }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
@@ -174,6 +181,67 @@ final class ShapedLookupTests: XCTestCase {
             ]),
             cells: cells, names: NamedRangeCollection())
         XCTAssertEqual(result, .blank)
+    }
+
+    // MARK: - Whole-column references
+
+    // `$A:$A` names 1,048,576 cells and the corpus writes that notation 87,773
+    // times in VLOOKUP alone. It reads as far as the sheet's data goes — which
+    // 0.3.0 answered `#VALUE!` to, having bounded the read with a constant.
+
+    private func wholeColumn(_ column: Int) -> CellRange {
+        CellRange(from: CellRef(column: column, row: 1),
+                  to: CellRef(column: column, row: 1_048_576))
+    }
+
+    func testSumOverAWholeColumn() throws {
+        var cells = Cells()
+        cells.stored[CellRef("A1")] = .number(10)
+        cells.stored[CellRef("A2")] = .number(20)
+        cells.stored[CellRef("A3")] = .number(30)
+
+        let result = try FormulaEvaluator.evaluate(
+            .function("SUM", [.cellRange(wholeColumn(1))]),
+            cells: cells, names: NamedRangeCollection())
+        XCTAssertEqual(result, .number(60))
+    }
+
+    /// And positions still count from row 1, which is what clipping only the far
+    /// corner buys.
+    func testIndexOverAWholeColumnCountsFromRowOne() throws {
+        var cells = Cells()
+        cells.stored[CellRef("A1")] = .number(10)
+        cells.stored[CellRef("A2")] = .number(20)
+        cells.stored[CellRef("A3")] = .number(30)
+
+        let result = try FormulaEvaluator.evaluate(
+            .function("INDEX", [.cellRange(wholeColumn(1)), .number(3)]),
+            cells: cells, names: NamedRangeCollection())
+        XCTAssertEqual(result, .number(30))
+    }
+
+    func testVlookupOverAWholeColumnPair() throws {
+        var cells = Cells()
+        for (index, name) in ["a", "b", "c"].enumerated() {
+            cells.stored[CellRef(column: 1, row: index + 1)] = .text(name)
+            cells.stored[CellRef(column: 2, row: index + 1)] = .number(Double(index + 1))
+        }
+        let table = CellRange(from: CellRef(column: 1, row: 1),
+                              to: CellRef(column: 2, row: 1_048_576))
+        let result = try FormulaEvaluator.evaluate(
+            .function("VLOOKUP", [
+                .text("b"), .cellRange(table), .number(2), .bool(false),
+            ]),
+            cells: cells, names: NamedRangeCollection())
+        XCTAssertEqual(result, .number(2))
+    }
+
+    /// A whole column of an empty sheet sums to zero rather than erroring.
+    func testSumOverAWholeColumnOfAnEmptySheet() throws {
+        let result = try FormulaEvaluator.evaluate(
+            .function("SUM", [.cellRange(wholeColumn(1))]),
+            cells: Cells(), names: NamedRangeCollection())
+        XCTAssertEqual(result, .number(0))
     }
 
     // MARK: - MATCH

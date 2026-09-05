@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-05
+
+### Fixed
+
+- **Whole-column references evaluate instead of erroring.**
+
+  `SUM($A:$A)`, `VLOOKUP(x, $A:$B, 2, FALSE)` and `INDEX($A:$A, 3)` all answered
+  `#VALUE!` in 0.3.0, which bounded a range read at 262,144 cells. The corpus writes
+  that notation 87,773 times in `VLOOKUP` alone. SwiftExcelCore 0.4.0 replaced the
+  bound with a clip to the sheet's own data, so the read is affordable and the
+  answer is right. Positions still count from row 1, so `INDEX($A:$A, 3)` is the
+  third row.
+
+### Changed
+
+- Depends on SwiftExcelCore `0.4.0` and SwiftXLSX `0.17.0`.
+- The four evaluator sites that turned a refused range into `#VALUE!` are gone —
+  `matrix(in:)` no longer refuses anything.
+
+### Breaking
+
+- A `CellValueProvider` must now answer `lastPopulatedCell()`. A dictionary-backed
+  provider does it in three lines from its own keys; a provider that does not know
+  says so with `CellRef.lastOnSheet`, which clips nothing.
+
 ## [0.3.0] - 2026-09-05
 
 Two things at once: the function coverage that closes the corpus, and the shape
@@ -123,6 +148,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...HEAD
+[0.4.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jpurnell/SwiftExcelFunctions/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jpurnell/SwiftExcelFunctions/releases/tag/v0.1.0

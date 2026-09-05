@@ -16,6 +16,20 @@ private struct MockCells: CellValueProvider {
         sheetData[sheet]?[ref.reference]
     }
 
+    func lastPopulatedCell() -> CellRef? {
+        let refs = data.keys.map { CellRef($0) }
+        guard let column = refs.map(\.column).max(),
+              let row = refs.map(\.row).max() else { return nil }
+        return CellRef(column: column, row: row)
+    }
+
+    func lastPopulatedCell(inSheet sheet: String) -> CellRef? {
+        let refs = (sheetData[sheet] ?? [:]).keys.map { CellRef($0) }
+        guard let column = refs.map(\.column).max(),
+              let row = refs.map(\.row).max() else { return nil }
+        return CellRef(column: column, row: row)
+    }
+
     func values(in range: CellRange) -> [CellValue] {
         range.cells.compactMap { value(at: $0) }
     }

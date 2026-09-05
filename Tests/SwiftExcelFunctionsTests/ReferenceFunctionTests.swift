@@ -23,6 +23,20 @@ final class ReferenceFunctionTests: XCTestCase {
         func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
             sheets[sheet]?[ref.reference] ?? (sheet.isEmpty ? values[ref.reference] : nil)
         }
+        func lastPopulatedCell() -> CellRef? { Self.corner(of: values) }
+
+        func lastPopulatedCell(inSheet sheet: String) -> CellRef? {
+            Self.corner(of: sheets[sheet] ?? [:])
+        }
+
+        /// The far corner of a dictionary of cells.
+        private static func corner(of cells: [String: CellValue]) -> CellRef? {
+            let refs = cells.keys.map { CellRef($0) }
+            guard let column = refs.map(\.column).max(),
+                  let row = refs.map(\.row).max() else { return nil }
+            return CellRef(column: column, row: row)
+        }
+
         func values(in range: CellRange) -> [CellValue] {
             range.cells.compactMap { values[$0.reference] }
         }

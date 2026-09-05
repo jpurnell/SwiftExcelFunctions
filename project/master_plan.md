@@ -74,6 +74,18 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
+**v0.4.0 — released 2026-09-05.** Whole-column references work.
+
+- [x] `SUM($A:$A)` and friends evaluate instead of answering `#VALUE!`
+- [x] The four refusal branches deleted along with the bound that caused them
+- [x] 650 tests, gate 45/45 at 0/0
+
+0.3.0's read bound turned the corpus's most common range notation into an error —
+87,773 `VLOOKUP` calls' worth. The fix belonged in Core, and this release is mostly
+deleting what the bound made necessary here.
+
+---
+
 **v0.3.0 — released 2026-09-05.** Coverage, and shape.
 
 - [x] Corpus function calls the registry can answer: **99.93%** (869,307 of 869,908)
@@ -168,7 +180,7 @@ implemented yet.
 
 ---
 
-**Last Updated:** 2026-09-05 — reconciled for v0.3.0. Recorded the lookup corrections and why
+**Last Updated:** 2026-09-05 — reconciled for v0.4.0; the v0.3.0 note stands. Earlier, reconciled for v0.3.0. Recorded the lookup corrections and why
 they happened, added the Array group to the source table, struck the shipped roadmap lines while
 noting where 0.3.0 diverged from what was planned, pinned versions corrected, and added
 "correctness over coverage" as a priority because this release is the argument for it.

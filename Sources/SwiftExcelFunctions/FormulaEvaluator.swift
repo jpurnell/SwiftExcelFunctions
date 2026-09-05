@@ -17,7 +17,16 @@ import SwiftExcelCore
 ///     let values: [CellRef: CellValue]
 ///     func value(at ref: CellRef) -> CellValue? { values[ref] }
 ///     func value(at ref: CellRef, inSheet: String) -> CellValue? { values[ref] }
-///     // matrix(in:) comes free from the protocol's default, derived from value(at:).
+///
+///     // Where the data stops. Answering this is what lets `$A:$A` be read at all,
+///     // and `matrix(in:)` then comes free from the protocol's own default.
+///     func lastPopulatedCell() -> CellRef? {
+///         guard let column = values.keys.map(\.column).max(),
+///               let row = values.keys.map(\.row).max() else { return nil }
+///         return CellRef(column: column, row: row)
+///     }
+///     func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
+///
 ///     func values(in range: CellRange) -> [CellValue] { range.cells.compactMap { values[$0] } }
 ///     func values(in range: CellRange, inSheet: String) -> [CellValue] { self.values(in: range) }
 /// }
@@ -137,8 +146,7 @@ public enum FormulaEvaluator {
             return cells.value(at: ref) ?? .blank
 
         case .cellRange(let range):
-            guard let matrix = cells.matrix(in: range) else { return .error(.value) }
-            return .array(matrix)
+            return .array(cells.matrix(in: range))
 
         case .sheetRef(let sheetRef):
             let range = sheetRef.range
@@ -146,10 +154,7 @@ public enum FormulaEvaluator {
                 // Single cell reference
                 return cells.value(at: range.start, inSheet: sheetRef.sheetName) ?? .blank
             } else {
-                guard let matrix = cells.matrix(in: range, inSheet: sheetRef.sheetName) else {
-                    return .error(.value)
-                }
-                return .array(matrix)
+                return .array(cells.matrix(in: range, inSheet: sheetRef.sheetName))
             }
 
         case .namedRange(let name):
@@ -304,15 +309,11 @@ public enum FormulaEvaluator {
         case .cell(let ref):
             return cells.value(at: ref) ?? .blank
         case .range(let range):
-            guard let matrix = cells.matrix(in: range) else { return .error(.value) }
-            return .array(matrix)
+            return .array(cells.matrix(in: range))
         case .sheetCell(let sheetRef):
             return cells.value(at: sheetRef.range.start, inSheet: sheetRef.sheetName) ?? .blank
         case .sheetRange(let sheetRef):
-            guard let matrix = cells.matrix(in: sheetRef.range, inSheet: sheetRef.sheetName) else {
-                return .error(.value)
-            }
-            return .array(matrix)
+            return .array(cells.matrix(in: sheetRef.range, inSheet: sheetRef.sheetName))
         case .formula(let ast):
             return try evaluateNode(
                 ast, cells: cells, names: names, functions: functions,

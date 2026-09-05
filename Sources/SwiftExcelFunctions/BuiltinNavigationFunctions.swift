@@ -154,8 +154,7 @@ public enum BuiltinNavigationFunctions {
         let range = CellRange(
             from: CellRef(column: startColumn, row: startRow),
             to: CellRef(column: startColumn + width - 1, row: startRow + height - 1))
-        guard let matrix = context.cells.matrix(in: range) else { return .error(.value) }
-        return .array(matrix)
+        return .array(context.cells.matrix(in: range))
     }
 
     // MARK: - Reading a reference out of text

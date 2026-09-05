@@ -10,6 +10,13 @@ final class BuiltinArrayFunctionTests: XCTestCase {
     private struct Cells: CellValueProvider {
         var stored: [CellRef: CellValue] = [:]
         func value(at ref: CellRef) -> CellValue? { stored[ref] }
+        func lastPopulatedCell() -> CellRef? {
+            guard let column = stored.keys.map(\.column).max(),
+                  let row = stored.keys.map(\.row).max() else { return nil }
+            return CellRef(column: column, row: row)
+        }
+
+        func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
         func value(at ref: CellRef, inSheet: String) -> CellValue? { stored[ref] }
         func values(in range: CellRange) -> [CellValue] { range.cells.compactMap { stored[$0] } }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
