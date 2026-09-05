@@ -15,7 +15,7 @@ let package = Package(
         // this package's evaluator. 0.13.0 is the release that removed these
         // functions from SwiftXLSX — anything earlier would import a second
         // FormulaEvaluator and make every reference ambiguous.
-        .package(url: "https://github.com/jpurnell/SwiftXLSX", exact: "0.21.0")
+        .package(url: "https://github.com/jpurnell/SwiftXLSX", exact: "0.22.0")
     ],
     targets: [
         .target(

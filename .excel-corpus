@@ -1,0 +1,14 @@
+# Roots for the Excel oracle — see ExcelOracleTests.
+#
+# Paths only. The workbooks are teaching material and employer models; they are
+# private and none of them is in this repository. Recorded here for the same
+# reason `.quality-gate.yml` records `consistency.corpusPath`: so nobody has to
+# rediscover where they live.
+#
+# Not in `.quality-gate.yml` because that file is the gate binary's own schema and
+# rejects keys it does not know — "advisory in this release and will become an
+# error". A config file with an owner is not a config file to borrow.
+#
+# One path per line. `BUSINESSMATHEXCEL_CORPUS` overrides this;
+# `BUSINESSMATHEXCEL_ORACLE=1` runs against it.
+/Users/jpurnell/Documents
