@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-05
+
+### Added
+
+- **`FormulaEvaluator.spill(_:over:cells:names:…)`** — evaluates one formula and
+  distributes its result across a span.
+
+  An array formula is entered over a range, evaluates once, and its result fills
+  the whole rectangle. `evaluate` answers with a value — for an array formula, a
+  whole `CellMatrix` — and something still had to say which cell gets which
+  element. This does, reconciling the shapes through
+  `CellMatrix.spilled(toRows:columns:)`.
+
+  It returns an **assignment**, not a mutation: this package has no workbook to
+  write into and takes no dependency on one. `Worksheet.apply(_:)` in SwiftXLSX
+  consumes exactly this shape, so the two halves meet without either library
+  knowing the other exists.
+
+  A scalar result is a 1×1 rectangle, so broadcasting handles it with no special
+  case — including an error, which Excel shows in every cell of a failed array
+  formula rather than only the first.
+
+### Changed
+
+- Depends on SwiftExcelCore `0.5.0` and SwiftXLSX `0.21.0`.
+
 ## [0.4.0] - 2026-09-05
 
 ### Fixed
@@ -148,6 +174,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...HEAD
+[0.5.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jpurnell/SwiftExcelFunctions/releases/tag/v0.2.0

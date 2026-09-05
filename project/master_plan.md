@@ -74,6 +74,19 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
+**v0.5.0 — released 2026-09-05.** Spilling.
+
+- [x] `FormulaEvaluator.spill` — one formula, evaluated once, filling a span
+- [x] Four integration tests carrying an array formula out to a file and back
+- [x] 662 tests, gate 45/45 at 0/0
+
+The last piece, and it needed no new dependency: evaluation produces an assignment,
+SwiftXLSX applies one. Writing the integration test found three gaps that neither
+package's own tests could — the two halves did not compose, array formulas were not
+discoverable from outside, and a cached error vanished on save.
+
+---
+
 **v0.4.0 — released 2026-09-05.** Whole-column references work.
 
 - [x] `SUM($A:$A)` and friends evaluate instead of answering `#VALUE!`
@@ -128,7 +141,11 @@ functions, 232 unreviewed.
 4. **Review the 347 unreviewed** before treating any of it as new work. Most is math, engineering
    and text — largely Foundation, libm and swift-numerics — so a large share should resolve to
    near-free.
-5. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
+5. **Test the seams.** Three real bugs in one afternoon lived exactly where two
+   packages meet, where each half was self-consistent and neither suite could see the
+   other. `SpillIntegrationTests` is the only place that holds both, and it earned its
+   keep on the day it was written.
+6. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
    coverage number said 99.93%. A function that is registered and wrong scores the same as one
    that is registered and right, so the count is not the measure it looks like.
 
@@ -180,7 +197,7 @@ implemented yet.
 
 ---
 
-**Last Updated:** 2026-09-05 — reconciled for v0.4.0; the v0.3.0 note stands. Earlier, reconciled for v0.3.0. Recorded the lookup corrections and why
+**Last Updated:** 2026-09-05 — reconciled for v0.5.0; earlier for v0.4.0; the v0.3.0 note stands. Earlier, reconciled for v0.3.0. Recorded the lookup corrections and why
 they happened, added the Array group to the source table, struck the shipped roadmap lines while
 noting where 0.3.0 diverged from what was planned, pinned versions corrected, and added
 "correctness over coverage" as a priority because this release is the argument for it.

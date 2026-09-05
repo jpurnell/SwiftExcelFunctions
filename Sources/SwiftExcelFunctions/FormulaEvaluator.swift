@@ -71,6 +71,71 @@ public enum FormulaEvaluator {
         case evaluationDepthExceeded
     }
 
+    /// Evaluates one formula and distributes its result across a span.
+    ///
+    /// An array formula is entered over a range, evaluates **once**, and its result
+    /// fills the whole rectangle. That is the piece ``evaluate(_:cells:names:functions:at:inSheet:random:)``
+    /// leaves undone: it answers with a value, which for an array formula is a
+    /// whole `CellMatrix`, and something still has to say which
+    /// cell gets which element.
+    ///
+    /// The result is an *assignment* rather than a mutation. This package has no
+    /// workbook to write into and takes no dependency on one, so it returns the
+    /// mapping and lets the caller apply it — `Worksheet.spill(_:over:)` in
+    /// SwiftXLSX does exactly that. Neither package needs to know about the other.
+    ///
+    /// Shapes are reconciled by `CellMatrix.spilled(toRows:columns:)`: a vector
+    /// broadcasts, cells the result cannot reach become `#N/A`, and anything past
+    /// the span is dropped. A scalar result fills every cell, which is why a lone
+    /// value entered as an array formula appears everywhere at once.
+    ///
+    /// - Parameters:
+    ///   - ast: The formula to evaluate.
+    ///   - range: The span it fills. The result is placed from this range's origin.
+    ///   - cells: The cell values available to the formula.
+    ///   - names: The named ranges available to the formula.
+    ///   - functions: The function registry to dispatch through.
+    ///   - callingCell: The cell the formula belongs to, for functions that ask.
+    ///   - currentSheet: The sheet unqualified references resolve against.
+    ///   - random: The source for `RAND` and `RANDBETWEEN`, if the formula needs one.
+    /// - Returns: One entry per cell of `range`.
+    /// - Throws: Whatever evaluating the formula throws.
+    public static func spill(
+        _ ast: FormulaAST,
+        over range: CellRange,
+        cells: CellValueProvider,
+        names: NameResolver,
+        functions: FunctionRegistry = .builtin,
+        at callingCell: CellAddress? = nil,
+        inSheet currentSheet: String = "",
+        random: (any RandomSource)? = nil
+    ) throws -> [CellRef: CellValue] {
+        let result = try evaluate(
+            ast, cells: cells, names: names, functions: functions,
+            at: callingCell, inSheet: currentSheet, random: random)
+
+        // A scalar result is a 1×1 rectangle, so broadcasting handles it without a
+        // special case — including an error, which Excel shows in every cell of a
+        // failed array formula rather than only the first.
+        let matrix: CellMatrix
+        if case .array(let evaluated) = result {
+            matrix = evaluated
+        } else {
+            matrix = CellMatrix(single: result)
+        }
+
+        let filled = matrix.spilled(toRows: range.rowCount, columns: range.columnCount)
+        var assignment: [CellRef: CellValue] = [:]
+        assignment.reserveCapacity(filled.count)
+        for row in 0..<filled.rows {
+            for column in 0..<filled.columns {
+                assignment[CellRef(column: range.start.column + column,
+                                   row: range.start.row + row)] = filled[row, column]
+            }
+        }
+        return assignment
+    }
+
     /// Evaluates a formula AST to a concrete cell value.
     ///
     /// - Parameters:
