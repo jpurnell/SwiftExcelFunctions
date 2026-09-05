@@ -157,4 +157,42 @@ final class BusinessMathBindingTests: XCTestCase {
         XCTAssertEqual(try call("NORM.S.INV", [.number(0)]), .error(.num))
         XCTAssertEqual(try call("NORM.S.INV", [.number(1)]), .error(.num))
     }
+    // MARK: - The February end-of-month rule
+
+    /// **Known gap, upstream.** `YEARFRAC(2020-02-29, 2020-12-31)` is 301/360.
+    ///
+    /// Taken from a corpus workbook — `Long Acre Team 2013 Probabilistic All.xlsx`,
+    /// `Lease Renewal!L77` — where Excel's own cached answer is
+    /// `0.83611111111111114`. Ours is `0.8388888888888889`, which is 302/360: one
+    /// day out.
+    ///
+    /// `DayCountConvention.thirty360` in BusinessMath 2.9.0 does not apply the NASD
+    /// February rule. The last day of February counts as a 30th, and — the part
+    /// that decides this case — the pull-back of an end date on the 31st tests the
+    /// start day *before* that adjustment rather than after. Adjusting first gives
+    /// 300 days, not adjusting at all gives 302, and only the documented ordering
+    /// gives Excel's 301.
+    ///
+    /// The BusinessMath session found and fixed this on
+    /// `feature/excel-financial-ten`; this build pins `exact: "2.9.0"`, so the test
+    /// is expected to fail until they tag. It will report an unexpected pass on the
+    /// day it is fixed, which is the point of writing it now.
+    ///
+    /// Every one of the corpus's 3,425 `YEARFRAC` calls uses this convention, and
+    /// 49 of them have a February month end as their start date.
+    func testTheFebruaryEndOfMonthRule() throws {
+        XCTExpectFailure("BusinessMath 2.9.0 lacks the NASD February rule; fixed upstream, untagged")
+        guard let yearfrac = BuiltinBindingFunctions.all.first(where: { $0.name == "YEARFRAC" })
+        else {
+            return XCTFail("YEARFRAC is not registered")
+        }
+        // 2020-02-29 and 2020-12-31 as Excel serials.
+        let result = try yearfrac.evaluate([.number(43890), .number(44196)])
+        guard case .number(let fraction) = result else {
+            return XCTFail("expected a number, got \(result)")
+        }
+        XCTAssertEqual(fraction, 0.83611111111111114, accuracy: 1e-12,
+                       "Excel's own cached value for this cell")
+    }
+
 }
