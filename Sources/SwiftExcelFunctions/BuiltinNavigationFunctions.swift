@@ -16,7 +16,145 @@ import SwiftExcelCore
 public enum BuiltinNavigationFunctions {
 
     /// All lookup functions for registration in a ``FunctionRegistry``.
-    public static let all: [ExcelFunction] = [vlookup, hlookup, index, match, address]
+    public static let all: [ExcelFunction] = [
+        vlookup, hlookup, index, match, address, column, row, indirect, offset,
+    ]
+
+    // MARK: - Asking about a position
+
+    /// `COLUMN([reference])` — the column number of a reference, or of this cell.
+    ///
+    /// With no argument it answers about the cell the formula was written in,
+    /// which is how 86,400 of the corpus's 86,620 calls are written. With one, it
+    /// answers about the address it was *handed* rather than the value inside it:
+    /// `COLUMN(B5)` is 2 whatever B5 holds.
+    public static let column = ExcelFunction(name: "COLUMN", minArgs: 0, maxArgs: 1) { context, _ in
+        guard !context.arguments.isEmpty else {
+            guard let cell = context.callingCell else { return .error(.value) }
+            return .number(Double(cell.cell.column))
+        }
+        guard let referenced = context.referencedCell(at: 0) else { return .error(.value) }
+        return .number(Double(referenced.column))
+    }
+
+    /// `ROW([reference])` — the row number of a reference, or of this cell.
+    public static let row = ExcelFunction(name: "ROW", minArgs: 0, maxArgs: 1) { context, _ in
+        guard !context.arguments.isEmpty else {
+            guard let cell = context.callingCell else { return .error(.value) }
+            return .number(Double(cell.cell.row))
+        }
+        guard let referenced = context.referencedCell(at: 0) else { return .error(.value) }
+        return .number(Double(referenced.row))
+    }
+
+    // MARK: - Reading a reference built while the formula runs
+
+    /// `INDIRECT(text, [a1])` — read the cell that text names.
+    ///
+    /// The reference is decided during evaluation, which is what makes this
+    /// function useful and also what makes it opaque: nothing reading the formula
+    /// beforehand can know which cell it depends on. Recognition reports that
+    /// separately as a dynamic reference, and should keep doing so even though
+    /// the evaluator can now compute the value — *what it reads* and *what can be
+    /// known about what it reads* are different questions.
+    ///
+    /// R1C1 style is refused rather than guessed at. Reading `R2C3` as an A1
+    /// reference would return a plausible value for the wrong cell, which is
+    /// worse than an error.
+    public static let indirect = ExcelFunction(name: "INDIRECT", minArgs: 1, maxArgs: 2) { context, args in
+        guard case .text(let reference) = args[0] else { return .error(.ref) }
+
+        if args.count > 1 {
+            let wantsA1: Bool
+            if case .bool(let flag) = args[1] { wantsA1 = flag } else { wantsA1 = true }
+            guard wantsA1 else { return .error(.ref) }
+        }
+
+        let (sheet, cellPart) = splitSheet(from: reference)
+        guard let cell = parseReference(cellPart) else { return .error(.ref) }
+
+        // An unqualified reference belongs to the sheet the provider is already
+        // pointed at — that is what `value(at:)` means. Asking by name instead
+        // would make the provider resolve a sheet it is standing on.
+        let value = sheet.isEmpty
+            ? context.cells.value(at: cell)
+            : context.cells.value(at: cell, inSheet: sheet)
+        return value ?? .blank
+    }
+
+    /// `OFFSET(reference, rows, columns, [height], [width])` — a reference
+    /// displaced from another.
+    ///
+    /// Needs the *address* of its first argument, which is why it takes a context:
+    /// by the time a function is called its arguments are values, and the address
+    /// has gone.
+    ///
+    /// Three arguments name a single cell and the value comes back. Five name a
+    /// block and the values come back as an array, which is what `SUM(OFFSET(…))`
+    /// needs — so a reference never has to become a value for this to work. Every
+    /// one of the corpus's 9,798 calls uses the three-argument form.
+    public static let offset = ExcelFunction(name: "OFFSET", minArgs: 3, maxArgs: 5) { context, args in
+        guard let base = context.referencedCell(at: 0) else { return .error(.ref) }
+        let rows = Int(try toNumber(args[1]))
+        let columns = Int(try toNumber(args[2]))
+
+        let startRow = base.row + rows
+        let startColumn = base.column + columns
+        guard startRow >= 1, startColumn >= 1,
+              startRow <= 1_048_576, startColumn <= 16_384 else { return .error(.ref) }
+
+        let height = args.count > 3 ? Int(try toNumber(args[3])) : 1
+        let width = args.count > 4 ? Int(try toNumber(args[4])) : 1
+        guard height >= 1, width >= 1 else { return .error(.ref) }
+
+        if height == 1 && width == 1 {
+            let cell = CellRef(column: startColumn, row: startRow)
+            return context.cells.value(at: cell) ?? .blank
+        }
+
+        let range = CellRange(
+            from: CellRef(column: startColumn, row: startRow),
+            to: CellRef(column: startColumn + width - 1, row: startRow + height - 1))
+        return .array(context.cells.values(in: range))
+    }
+
+    // MARK: - Reading a reference out of text
+
+    /// Splits `'Other Sheet'!A1` into its sheet and its cell.
+    ///
+    /// - Parameter reference: The reference as written.
+    /// - Returns: The sheet name, empty when none was given, and the rest.
+    static func splitSheet(from reference: String) -> (sheet: String, cell: String) {
+        guard let bang = reference.lastIndex(of: "!") else { return ("", reference) }
+        var sheet = String(reference[reference.startIndex..<bang])
+        if sheet.hasPrefix("'") && sheet.hasSuffix("'") && sheet.count >= 2 {
+            sheet = String(sheet.dropFirst().dropLast()).replacingOccurrences(of: "''", with: "'")
+        }
+        return (sheet, String(reference[reference.index(after: bang)...]))
+    }
+
+    /// Reads `A1`, `$A$1` and the like into a reference.
+    ///
+    /// Returns `nil` for anything that is not one, so `INDIRECT("nonsense")` can
+    /// answer `#REF!` rather than a cell nobody named. `CellRef` does the parsing;
+    /// this only decides whether the text was a reference at all.
+    static func parseReference(_ text: String) -> CellRef? {
+        let bare = text.replacingOccurrences(of: "$", with: "")
+        guard !bare.isEmpty else { return nil }
+
+        let letters = bare.prefix { $0.isLetter }
+        let digits = bare.dropFirst(letters.count)
+        guard !letters.isEmpty, !digits.isEmpty, digits.allSatisfy(\.isNumber) else { return nil }
+        guard let rowValue = Int(digits), (1...1_048_576).contains(rowValue) else { return nil }
+
+        var columnValue = 0
+        for character in letters {
+            guard let scalar = character.uppercased().unicodeScalars.first?.value else { return nil }
+            columnValue = columnValue * 26 + Int(scalar - 64)
+        }
+        guard (1...16_384).contains(columnValue) else { return nil }
+        return CellRef(column: columnValue, row: rowValue)
+    }
 
     // MARK: - Building a reference
 
