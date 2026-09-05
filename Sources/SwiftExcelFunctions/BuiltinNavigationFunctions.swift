@@ -325,11 +325,26 @@ public enum BuiltinNavigationFunctions {
     /// Extracts the flat array of values from a `CellValue`.
     ///
     /// If the value is `.array(...)`, returns the elements. Otherwise returns a single-element array.
+    ///
+    /// For anything that indexes by position — the lookups, `INDEX` — use
+    /// ``asMatrix(_:)`` instead: flattening is what made those wrong.
     private static func toArray(_ value: CellValue) -> [CellValue] {
         if case .array(let matrix) = value {
             return matrix.elements
         }
         return [value]
+    }
+
+    /// A shaped view of an argument.
+    ///
+    /// A lone value is a 1×1 table, which is what makes `VLOOKUP(x, A1, 1)` behave
+    /// like the degenerate case it is rather than a special one.
+    ///
+    /// - Parameter value: The argument.
+    /// - Returns: The rectangle it stands for.
+    private static func asMatrix(_ value: CellValue) -> CellMatrix {
+        if case .array(let matrix) = value { return matrix }
+        return CellMatrix(single: value)
     }
 
     /// Determines whether range_lookup is exact match (false) or approximate (true).
@@ -401,9 +416,9 @@ public enum BuiltinNavigationFunctions {
     /// Searches for `lookup_value` in the first column of the table and returns
     /// a value from the same row in the specified column.
     ///
-    /// The `table_array` should be a flat `.array(...)` organized row-major.
-    /// The number of columns is inferred from `col_index_num` (minimum column count).
-    /// Rows = total elements / columns.
+    /// The table's width comes from the table, not from `col_index_num`. It used to
+    /// be inferred by testing which divisors of the element count came out even,
+    /// which returned `#N/A` for a four-column table asked for its third column.
     ///
     /// - `range_lookup` = `FALSE` (or 0): exact match
     /// - `range_lookup` = `TRUE` (or 1, default): approximate match (data must be sorted ascending)
@@ -411,64 +426,42 @@ public enum BuiltinNavigationFunctions {
     /// Returns `#N/A` if not found, `#REF!` if `col_index_num` is out of bounds.
     static let vlookup = ExcelFunction(name: "VLOOKUP", minArgs: 3, maxArgs: 4) { args in
         catching {
-            let lookupValue = args[0]
-            let tableData = toArray(args[1])
+            let table = asMatrix(args[1])
             let colIndex = Int(try toNumber(args[2]))
             let approximate = args.count > 3 ? isApproximate(args[3]) : true
 
             guard colIndex >= 1 else { return .error(.value) }
-            guard tableData.count >= colIndex else { return .error(.ref) }
+            guard colIndex <= table.columns else { return .error(.ref) }
+            guard table.rows > 0 else { return .error(.na) }
 
-            // Infer number of columns: at least colIndex
-            let numCols = colIndex
-            // But the actual table might have more columns. We need to figure this out.
-            // If the total count is divisible by colIndex, use colIndex as the column count.
-            // Otherwise try to find the best fit.
-            let inferredCols: Int
-            if tableData.count % numCols == 0 {
-                inferredCols = numCols
-            } else {
-                // Try to find the smallest number >= colIndex that divides evenly
-                var cols = numCols
-                while cols <= tableData.count {
-                    if tableData.count % cols == 0 {
-                        break
-                    }
-                    cols += 1
-                }
-                inferredCols = cols <= tableData.count ? cols : numCols
-            }
-
-            let numRows = tableData.count / inferredCols
-            guard numRows > 0 else { return .error(.na) }
-            guard colIndex <= inferredCols else { return .error(.ref) }
-
-            if approximate {
-                // Approximate match: find largest value <= lookup_value
-                var bestRow: Int?
-                for row in 0..<numRows {
-                    let cellValue = tableData[row * inferredCols]
-                    if let cmp = compareValues(cellValue, lookupValue) {
-                        if cmp <= 0 {
-                            bestRow = row
-                        } else {
-                            break // Data is sorted, so stop when we pass the value
-                        }
-                    }
-                }
-                guard let foundRow = bestRow else { return .error(.na) }
-                return tableData[foundRow * inferredCols + (colIndex - 1)]
-            } else {
-                // Exact match
-                for row in 0..<numRows {
-                    let cellValue = tableData[row * inferredCols]
-                    if valuesEqual(cellValue, lookupValue) {
-                        return tableData[row * inferredCols + (colIndex - 1)]
-                    }
-                }
-                return .error(.na)
-            }
+            let lookupValue = args[0]
+            guard let match = firstRow(in: table, matching: lookupValue, approximate: approximate)
+            else { return .error(.na) }
+            return table[match, colIndex - 1]
         }
+    }
+
+    /// The row whose first cell answers the lookup, or `nil`.
+    ///
+    /// - Parameters:
+    ///   - table: The table to search.
+    ///   - lookupValue: The value to find.
+    ///   - approximate: Whether to take the largest key not exceeding the value,
+    ///     which requires the keys be sorted ascending — Excel's rule, and the
+    ///     reason this may stop early.
+    /// - Returns: The row index, or `nil` when nothing matches.
+    private static func firstRow(
+        in table: CellMatrix, matching lookupValue: CellValue, approximate: Bool
+    ) -> Int? {
+        guard approximate else {
+            return (0..<table.rows).first { valuesEqual(table[$0, 0], lookupValue) }
+        }
+        var best: Int?
+        for row in 0..<table.rows {
+            guard let comparison = compareValues(table[row, 0], lookupValue) else { continue }
+            if comparison <= 0 { best = row } else { break }
+        }
+        return best
     }
 
     // MARK: - HLOOKUP
@@ -486,105 +479,74 @@ public enum BuiltinNavigationFunctions {
     /// Returns `#N/A` if not found, `#REF!` if `row_index_num` is out of bounds.
     static let hlookup = ExcelFunction(name: "HLOOKUP", minArgs: 3, maxArgs: 4) { args in
         catching {
-            let lookupValue = args[0]
-            let tableData = toArray(args[1])
+            let table = asMatrix(args[1])
             let rowIndex = Int(try toNumber(args[2]))
             let approximate = args.count > 3 ? isApproximate(args[3]) : true
 
             guard rowIndex >= 1 else { return .error(.value) }
-            guard !tableData.isEmpty else { return .error(.na) }
+            guard rowIndex <= table.rows else { return .error(.ref) }
+            guard table.columns > 0 else { return .error(.na) }
 
-            // For HLOOKUP, we need to know the number of columns.
-            // We infer: numRows = rowIndex (minimum), numCols = total / numRows
-            let numRows = rowIndex
-            guard tableData.count >= numRows else { return .error(.ref) }
-
-            let inferredRows: Int
-            if tableData.count % numRows == 0 {
-                inferredRows = numRows
-            } else {
-                var rows = numRows
-                while rows <= tableData.count {
-                    if tableData.count % rows == 0 {
-                        break
-                    }
-                    rows += 1
-                }
-                inferredRows = rows <= tableData.count ? rows : numRows
-            }
-
-            let numCols = tableData.count / inferredRows
-            guard numCols > 0 else { return .error(.na) }
-            guard rowIndex <= inferredRows else { return .error(.ref) }
-
-            if approximate {
-                var bestCol: Int?
-                for col in 0..<numCols {
-                    let cellValue = tableData[col] // First row
-                    if let cmp = compareValues(cellValue, lookupValue) {
-                        if cmp <= 0 {
-                            bestCol = col
-                        } else {
-                            break
-                        }
-                    }
-                }
-                guard let foundCol = bestCol else { return .error(.na) }
-                return tableData[(rowIndex - 1) * numCols + foundCol]
-            } else {
-                for col in 0..<numCols {
-                    let cellValue = tableData[col] // First row
-                    if valuesEqual(cellValue, lookupValue) {
-                        return tableData[(rowIndex - 1) * numCols + col]
-                    }
-                }
-                return .error(.na)
-            }
+            let lookupValue = args[0]
+            guard let match = firstColumn(in: table, matching: lookupValue,
+                                          approximate: approximate)
+            else { return .error(.na) }
+            return table[rowIndex - 1, match]
         }
+    }
+
+    /// The column whose first cell answers the lookup, or `nil`.
+    ///
+    /// - Parameters:
+    ///   - table: The table to search.
+    ///   - lookupValue: The value to find.
+    ///   - approximate: Whether to take the largest key not exceeding the value.
+    /// - Returns: The column index, or `nil` when nothing matches.
+    private static func firstColumn(
+        in table: CellMatrix, matching lookupValue: CellValue, approximate: Bool
+    ) -> Int? {
+        guard approximate else {
+            return (0..<table.columns).first { valuesEqual(table[0, $0], lookupValue) }
+        }
+        var best: Int?
+        for column in 0..<table.columns {
+            guard let comparison = compareValues(table[0, column], lookupValue) else { continue }
+            if comparison <= 0 { best = column } else { break }
+        }
+        return best
     }
 
     // MARK: - INDEX
 
     /// `INDEX(array, row_num, [col_num])` -- returns the value at a position in an array.
     ///
-    /// With just `row_num`: treats array as 1D and returns the element at that 1-based position.
-    /// With both `row_num` and `col_num`: requires 2D indexing (not fully supported for flat arrays).
+    /// With just `row_num`: counts along a vector, or returns a whole row of a block.
+    /// With both: reads the position directly, since the array knows its own width.
     ///
     /// Returns `#REF!` if the index is out of bounds.
     static let index = ExcelFunction(name: "INDEX", minArgs: 2, maxArgs: 3) { args in
         catching {
-            let data = toArray(args[0])
+            let array = asMatrix(args[0])
             let rowNum = Int(try toNumber(args[1]))
-
             guard rowNum >= 1 else { return .error(.value) }
 
-            if args.count == 2 {
-                // 1D access
-                guard rowNum <= data.count else { return .error(.ref) }
-                return data[rowNum - 1]
-            } else {
-                // 2D access: col_num provided
-                let colNum = Int(try toNumber(args[2]))
-                guard colNum >= 1 else { return .error(.value) }
-                // Without knowing dimensions, treat as: index = (rowNum - 1) * colNum_count + (colNum - 1)
-                // But we don't know colNum_count. Use colNum as the stride hint.
-                // Best effort: assume square-ish or use colNum as the total column count
-                let index = (rowNum - 1) * colNum + (colNum - 1)
-                // Actually, this doesn't work without knowing dimensions.
-                // More practical: if col == 1, just do 1D access by row
-                // For now, treat as flat: index = (rowNum - 1) when col is provided,
-                // we need the number of columns. Let's use a simple heuristic:
-                // find smallest cols >= colNum that divides evenly
-                let numCols: Int
-                if data.count % colNum == 0 && colNum <= data.count {
-                    numCols = Swift.max(colNum, 1)
-                } else {
-                    numCols = colNum
+            guard args.count == 3 else {
+                // One index. Along a vector it counts cells; across a block Excel
+                // means the whole row, which is now a value this can return.
+                if array.isVector {
+                    guard rowNum <= array.count else { return .error(.ref) }
+                    return array.elements[rowNum - 1]
                 }
-                let flatIndex = (rowNum - 1) * numCols + (colNum - 1)
-                guard flatIndex >= 0, flatIndex < data.count else { return .error(.ref) }
-                return data[flatIndex]
+                guard let row = array.row(rowNum - 1) else { return .error(.ref) }
+                return .array(CellMatrix(row: row))
             }
+
+            let colNum = Int(try toNumber(args[2]))
+            guard colNum >= 1 else { return .error(.value) }
+            guard let value = array.element(row: rowNum - 1, column: colNum - 1) else {
+                return .error(.ref)
+            }
+            return value
         }
     }
 
