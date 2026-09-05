@@ -9,11 +9,11 @@ import SwiftExcelCore
 /// Register all functions at once via ``all``:
 /// ```swift
 /// var registry = FunctionRegistry()
-/// for fn in BuiltinLookupFunctions.all {
+/// for fn in BuiltinNavigationFunctions.all {
 ///     registry.register(fn)
 /// }
 /// ```
-public enum BuiltinLookupFunctions {
+public enum BuiltinNavigationFunctions {
 
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [vlookup, hlookup, index, match]

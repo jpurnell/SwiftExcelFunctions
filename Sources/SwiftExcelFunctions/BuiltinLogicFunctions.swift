@@ -1,22 +1,92 @@
 import Foundation
 import SwiftExcelCore
 
-/// Logical category built-in Excel functions.
+/// Logic: what a formula branches on, and the predicates that decide.
 ///
-/// Provides implementations of 6 standard Excel logical functions:
-/// `IF`, `AND`, `OR`, `NOT`, `IFERROR`, and `IFNA`.
+/// `IF`, `AND`, `OR`, `NOT`, `IFERROR` and `IFNA` choose a path. `ISERROR`,
+/// `ISERR`, `ISNA`, `ISBLANK`, `ISNUMBER`, `ISTEXT` and `NA` answer questions
+/// about a value, which is what the choosing is usually based on — a formula
+/// guarding a division writes `IF(ISERROR(...))`, and without both halves neither
+/// is any use.
+///
+/// Every function here asks about a *value*. None needs to know which cell it was
+/// called from, which is what separates them from ``BuiltinNavigationFunctions``.
 ///
 /// Register all functions at once via ``all``:
 /// ```swift
 /// var registry = FunctionRegistry()
-/// for fn in BuiltinLogicalFunctions.all {
+/// for fn in BuiltinLogicFunctions.all {
 ///     registry.register(fn)
 /// }
 /// ```
-public enum BuiltinLogicalFunctions {
+public enum BuiltinLogicFunctions {
 
     /// All logical functions for registration in a ``FunctionRegistry``.
-    public static let all: [ExcelFunction] = [ifFunc, and, or, not, iferror, ifna]
+    public static let all: [ExcelFunction] = [
+        ifFunc, and, or, not, iferror, ifna,
+        isError, isErr, isNA, isBlank, isNumber, isText, na,
+    ]
+
+    // MARK: - Predicates
+    //
+    // A predicate answers about its argument rather than propagating it. That is
+    // the entire point: `ISERROR(1/0)` is TRUE, not `#DIV/0!`, or it could never
+    // be used to guard anything.
+
+    /// `ISERROR(value)` — true for any Excel error, `#N/A` included.
+    public static let isError = ExcelFunction(name: "ISERROR", minArgs: 1, maxArgs: 1) { args in
+        if case .error = args[0] { return .bool(true) }
+        return .bool(false)
+    }
+
+    /// `ISERR(value)` — true for any Excel error **except** `#N/A`.
+    ///
+    /// The distinction is deliberate in Excel and worth keeping: `#N/A` means "no
+    /// value here yet", while the others mean the arithmetic went wrong. A lookup
+    /// that has not matched is not the same as a division by zero.
+    public static let isErr = ExcelFunction(name: "ISERR", minArgs: 1, maxArgs: 1) { args in
+        if case .error(let error) = args[0] { return .bool(error != .na) }
+        return .bool(false)
+    }
+
+    /// `ISNA(value)` — true only for `#N/A`.
+    public static let isNA = ExcelFunction(name: "ISNA", minArgs: 1, maxArgs: 1) { args in
+        if case .error(.na) = args[0] { return .bool(true) }
+        return .bool(false)
+    }
+
+    /// `ISBLANK(value)` — true only for an empty cell.
+    ///
+    /// An empty *string* is not blank. A cell holding `""` was written to, and a
+    /// sheet that distinguishes the two is usually doing so on purpose.
+    public static let isBlank = ExcelFunction(name: "ISBLANK", minArgs: 1, maxArgs: 1) { args in
+        if case .blank = args[0] { return .bool(true) }
+        return .bool(false)
+    }
+
+    /// `ISNUMBER(value)` — true for numbers, and for nothing else.
+    ///
+    /// Text that looks like a number is not a number, and a boolean is not one
+    /// either, even though Excel will coerce both in arithmetic. The predicate
+    /// reports the type the cell actually holds.
+    public static let isNumber = ExcelFunction(name: "ISNUMBER", minArgs: 1, maxArgs: 1) { args in
+        if case .number = args[0] { return .bool(true) }
+        return .bool(false)
+    }
+
+    /// `ISTEXT(value)` — true for text, and for nothing else.
+    public static let isText = ExcelFunction(name: "ISTEXT", minArgs: 1, maxArgs: 1) { args in
+        if case .text = args[0] { return .bool(true) }
+        return .bool(false)
+    }
+
+    /// `NA()` — the `#N/A` error, as a value.
+    ///
+    /// How a sheet says "deliberately absent" rather than "zero", so that anything
+    /// reading it propagates the absence instead of averaging in a nought.
+    public static let na = ExcelFunction(name: "NA", minArgs: 0, maxArgs: 0) { _ in
+        .error(.na)
+    }
 
     // MARK: - Truthiness
 

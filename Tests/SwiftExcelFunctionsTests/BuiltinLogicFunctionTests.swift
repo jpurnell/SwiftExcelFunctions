@@ -2,14 +2,14 @@ import XCTest
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinLogicalFunctionTests: XCTestCase {
+final class BuiltinLogicFunctionTests: XCTestCase {
 
     // MARK: - Helpers
 
     /// Look up a function by name from the built-in logical set.
     private func function(named name: String) -> ExcelFunction {
-        guard let fn = BuiltinLogicalFunctions.all.first(where: { $0.name == name }) else {
-            fatalError("Function \(name) not found in BuiltinLogicalFunctions.all")
+        guard let fn = BuiltinLogicFunctions.all.first(where: { $0.name == name }) else {
+            fatalError("Function \(name) not found in BuiltinLogicFunctions.all")
         }
         return fn
     }
@@ -35,8 +35,14 @@ final class BuiltinLogicalFunctionTests: XCTestCase {
 
     // MARK: - Registration count
 
-    func testAllContainsSixFunctions() {
-        XCTAssertEqual(BuiltinLogicalFunctions.all.count, 6)
+    /// The group's inventory, asserted by name rather than only by count.
+    ///
+    /// A count alone says a function was added but not which, and it fails the
+    /// same way whether something arrived or something was lost.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinLogicFunctions.all.map(\.name)),
+            Set("IF, AND, OR, NOT, IFERROR, IFNA, ISERROR, ISERR, ISNA, ISBLANK, ISNUMBER, ISTEXT, NA".split(separator: ", ").map(String.init)))
     }
 
     // MARK: - IF

@@ -3,8 +3,8 @@ import SwiftExcelCore
 
 /// Date category built-in Excel functions.
 ///
-/// Provides implementations of 6 standard Excel date functions:
-/// `TODAY`, `NOW`, `YEAR`, `MONTH`, `DAY`, and `DATE`.
+/// `TODAY`, `NOW`, `YEAR`, `MONTH`, `DAY`, `DATE`, `WEEKDAY`, `EOMONTH`, `EDATE`,
+/// `DAYS`, `HOUR`, `MINUTE` and `SECOND`.
 ///
 /// Excel date serial numbers count days since 1900-01-01, where serial 1 = Jan 1, 1900.
 /// Excel has a known bug where it treats 1900 as a leap year (serial 60 = Feb 29, 1900,
@@ -13,14 +13,160 @@ import SwiftExcelCore
 /// Register all functions at once via ``all``:
 /// ```swift
 /// var registry = FunctionRegistry()
-/// for fn in BuiltinDateFunctions.all {
+/// for fn in BuiltinDateTimeFunctions.all {
 ///     registry.register(fn)
 /// }
 /// ```
-public enum BuiltinDateFunctions {
+public enum BuiltinDateTimeFunctions {
 
     /// All date functions for registration in a ``FunctionRegistry``.
-    public static let all: [ExcelFunction] = [today, now, year, month, day, dateFunc]
+    public static let all: [ExcelFunction] = [
+        today, now, year, month, day, dateFunc,
+        weekday, eomonth, edate, days, hour, minute, second,
+    ]
+
+    // MARK: - Day of week
+
+    /// `WEEKDAY(serial, [type])` — which day of the week a date falls on.
+    ///
+    /// The type argument is the whole difficulty. Excel numbers the week three
+    /// common ways and a model picks whichever suits it, so the function cannot
+    /// simply return a calendar's own numbering:
+    ///
+    /// | Type | Week starts | Range |
+    /// |---|---|---|
+    /// | 1 (default) | Sunday | 1–7 |
+    /// | 2 | Monday | 1–7 |
+    /// | 3 | Monday | 0–6 |
+    public static let weekday = ExcelFunction(name: "WEEKDAY", minArgs: 1, maxArgs: 2) { args in
+        catching {
+            let serial = Int(try toNumber(args[0]))
+            guard serial >= 1 else { throw EvalError.numError }
+            let type = args.count > 1 ? Int(try toNumber(args[1])) : 1
+
+            // Serial 1 is 1900-01-01, a Sunday, so `serial % 7 == 1` is a Sunday.
+            let sundayBased = ((serial % 7) + 6) % 7 + 1   // 1 = Sunday … 7 = Saturday
+            switch type {
+            case 1: return .number(Double(sundayBased))
+            case 2: return .number(Double((sundayBased + 5) % 7 + 1))   // 1 = Monday
+            case 3: return .number(Double((sundayBased + 5) % 7))       // 0 = Monday
+            default: throw EvalError.numError
+            }
+        }
+    }
+
+    // MARK: - Month arithmetic
+
+    /// `EOMONTH(serial, months)` — the last day of the month, `months` away.
+    ///
+    /// How a model steps to a period end: a settlement date, a quarter close, an
+    /// accrual boundary. A negative offset walks backwards.
+    public static let eomonth = ExcelFunction(name: "EOMONTH", minArgs: 2, maxArgs: 2) { args in
+        catching {
+            let serial = Int(try toNumber(args[0]))
+            guard serial >= 1 else { throw EvalError.numError }
+            let offset = Int(try toNumber(args[1]))
+            let (year, month, _) = serialToComponents(serial)
+
+            let shifted = (year * 12 + (month - 1)) + offset
+            let targetYear = shifted / 12
+            let targetMonth = shifted % 12 + 1
+            let lastDay = daysInMonth(year: targetYear, month: targetMonth)
+            return .number(componentsToSerial(year: targetYear, month: targetMonth, day: lastDay))
+        }
+    }
+
+    /// `EDATE(serial, months)` — the same day of the month, `months` away.
+    ///
+    /// Where that day does not exist in the target month — the 31st of a
+    /// thirty-day month, or a 29th outside a leap year — Excel clamps to the end
+    /// rather than rolling into the next month.
+    public static let edate = ExcelFunction(name: "EDATE", minArgs: 2, maxArgs: 2) { args in
+        catching {
+            let serial = Int(try toNumber(args[0]))
+            guard serial >= 1 else { throw EvalError.numError }
+            let offset = Int(try toNumber(args[1]))
+            let (year, month, day) = serialToComponents(serial)
+
+            let shifted = (year * 12 + (month - 1)) + offset
+            let targetYear = shifted / 12
+            let targetMonth = shifted % 12 + 1
+            let clamped = min(day, daysInMonth(year: targetYear, month: targetMonth))
+            return .number(componentsToSerial(year: targetYear, month: targetMonth, day: clamped))
+        }
+    }
+
+    /// `DAYS(end, start)` — days between two dates, end first.
+    ///
+    /// The order is Excel's and is easy to get backwards; a negative result is a
+    /// legitimate answer rather than an error.
+    public static let days = ExcelFunction(name: "DAYS", minArgs: 2, maxArgs: 2) { args in
+        catching {
+            let end = try toNumber(args[0])
+            let start = try toNumber(args[1])
+            return .number((end.rounded(.down)) - (start.rounded(.down)))
+        }
+    }
+
+    // MARK: - Time of day
+
+    /// `HOUR(serial)` — the hour, from a serial's fractional part.
+    public static let hour = ExcelFunction(name: "HOUR", minArgs: 1, maxArgs: 1) { args in
+        catching { .number(Double(try secondsIntoDay(args[0]) / 3600)) }
+    }
+
+    /// `MINUTE(serial)` — the minute, from a serial's fractional part.
+    public static let minute = ExcelFunction(name: "MINUTE", minArgs: 1, maxArgs: 1) { args in
+        catching { .number(Double((try secondsIntoDay(args[0]) % 3600) / 60)) }
+    }
+
+    /// `SECOND(serial)` — the second, from a serial's fractional part.
+    public static let second = ExcelFunction(name: "SECOND", minArgs: 1, maxArgs: 1) { args in
+        catching { .number(Double(try secondsIntoDay(args[0]) % 60)) }
+    }
+
+    /// Seconds elapsed since midnight, from a serial's fractional part.
+    ///
+    /// Rounded to the nearest second before splitting, because a time written as
+    /// a fraction of a day rarely lands exactly: 06:30:30 is 0.2711805555…, and
+    /// truncating that yields 29 seconds rather than 30.
+    private static func secondsIntoDay(_ value: CellValue) throws -> Int {
+        let serial = try toNumber(value)
+        guard serial >= 0 else { throw EvalError.numError }
+        let fraction = serial - serial.rounded(.down)
+        return Int((fraction * 86_400).rounded()) % 86_400
+    }
+
+    // MARK: - Calendar helpers
+
+    /// Days in a month, Gregorian rules.
+    ///
+    /// 1900 is deliberately not special-cased here. Excel's phantom 29 February
+    /// 1900 lives in the serial conversion, and duplicating it would apply the bug
+    /// twice.
+    static func daysInMonth(year: Int, month: Int) -> Int {
+        switch month {
+        case 1, 3, 5, 7, 8, 10, 12: return 31
+        case 4, 6, 9, 11: return 30
+        case 2: return isLeapYear(year) ? 29 : 28
+        default: return 30
+        }
+    }
+
+    /// Whether a year is a leap year, by the Gregorian rule.
+    static func isLeapYear(_ year: Int) -> Bool {
+        (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    }
+
+    /// The Excel serial for a year, month and day.
+    static func componentsToSerial(year: Int, month: Int, day: Int) -> Double {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        guard let date = calendar.date(from: components) else { return 0 }
+        return dateToSerial(date)
+    }
 
     // MARK: - Calendar and constants
 

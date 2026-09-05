@@ -2,13 +2,13 @@ import XCTest
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinDateFunctionTests: XCTestCase {
+final class BuiltinDateTimeFunctionTests: XCTestCase {
 
     // MARK: - Helpers
 
     private func function(named name: String) -> ExcelFunction {
-        guard let fn = BuiltinDateFunctions.all.first(where: { $0.name == name }) else {
-            fatalError("Function \(name) not found in BuiltinDateFunctions.all")
+        guard let fn = BuiltinDateTimeFunctions.all.first(where: { $0.name == name }) else {
+            fatalError("Function \(name) not found in BuiltinDateTimeFunctions.all")
         }
         return fn
     }
@@ -46,8 +46,14 @@ final class BuiltinDateFunctionTests: XCTestCase {
 
     // MARK: - Registration count
 
-    func testAllContainsSixFunctions() {
-        XCTAssertEqual(BuiltinDateFunctions.all.count, 6)
+    /// The group's inventory, asserted by name rather than only by count.
+    ///
+    /// A count alone says a function was added but not which, and it fails the
+    /// same way whether something arrived or something was lost.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinDateTimeFunctions.all.map(\.name)),
+            Set("TODAY, NOW, YEAR, MONTH, DAY, DATE, WEEKDAY, EOMONTH, EDATE, DAYS, HOUR, MINUTE, SECOND".split(separator: ", ").map(String.init)))
     }
 
     // MARK: - DATE

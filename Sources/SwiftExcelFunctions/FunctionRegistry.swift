@@ -64,8 +64,8 @@ public struct FunctionRegistry: Sendable {
     ///
     /// Contains all functions from ``BuiltinMathFunctions``,
     /// ``BuiltinStatsFunctions``, ``BuiltinFinancialFunctions``,
-    /// ``BuiltinLogicalFunctions``, ``BuiltinTextFunctions``,
-    /// ``BuiltinLookupFunctions``, ``BuiltinDateFunctions``,
+    /// ``BuiltinLogicFunctions``, ``BuiltinTextFunctions``,
+    /// ``BuiltinNavigationFunctions``, ``BuiltinDateTimeFunctions``,
     /// and ``BuiltinAggregationFunctions``.
     public static let builtin: FunctionRegistry = makeBuiltin()
 
@@ -82,10 +82,10 @@ public struct FunctionRegistry: Sendable {
             BuiltinMathFunctions.all,
             BuiltinStatsFunctions.all,
             BuiltinFinancialFunctions.all,
-            BuiltinLogicalFunctions.all,
+            BuiltinLogicFunctions.all,
             BuiltinTextFunctions.all,
-            BuiltinLookupFunctions.all,
-            BuiltinDateFunctions.all,
+            BuiltinNavigationFunctions.all,
+            BuiltinDateTimeFunctions.all,
             BuiltinAggregationFunctions.all,
         ]
         for category in allCategories {

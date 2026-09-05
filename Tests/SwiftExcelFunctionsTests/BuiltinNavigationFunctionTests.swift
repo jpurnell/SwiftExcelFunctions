@@ -2,13 +2,13 @@ import XCTest
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinLookupFunctionTests: XCTestCase {
+final class BuiltinNavigationFunctionTests: XCTestCase {
 
     // MARK: - Helpers
 
     private func function(named name: String) -> ExcelFunction {
-        guard let fn = BuiltinLookupFunctions.all.first(where: { $0.name == name }) else {
-            fatalError("Function \(name) not found in BuiltinLookupFunctions.all")
+        guard let fn = BuiltinNavigationFunctions.all.first(where: { $0.name == name }) else {
+            fatalError("Function \(name) not found in BuiltinNavigationFunctions.all")
         }
         return fn
     }
@@ -33,7 +33,7 @@ final class BuiltinLookupFunctionTests: XCTestCase {
     // MARK: - Registration count
 
     func testAllContainsFourFunctions() {
-        XCTAssertEqual(BuiltinLookupFunctions.all.count, 4)
+        XCTAssertEqual(BuiltinNavigationFunctions.all.count, 4)
     }
 
     // MARK: - VLOOKUP (exact match)
