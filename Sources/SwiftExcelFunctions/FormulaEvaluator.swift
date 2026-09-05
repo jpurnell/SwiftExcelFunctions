@@ -68,6 +68,12 @@ public enum FormulaEvaluator {
     ///   - cells: A provider for looking up cell values.
     ///   - names: A resolver for named range identifiers.
     ///   - functions: The function registry (defaults to ``FunctionRegistry/builtin``).
+    ///   - callingCell: The cell this formula was written in. `COLUMN()` and
+    ///     `ROW()` answer about it, so leaving it `nil` — which is right when a
+    ///     formula is evaluated on its own rather than out of a sheet — makes
+    ///     them report that there is no position rather than invent one.
+    ///   - currentSheet: The sheet an unqualified reference belongs to, used by
+    ///     `INDIRECT` when the text it is given does not name a sheet itself.
     /// - Returns: The resulting `CellValue`.
     /// - Throws: ``EvaluationError`` if evaluation fails.
     public static func evaluate(
