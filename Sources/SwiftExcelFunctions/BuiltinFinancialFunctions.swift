@@ -190,23 +190,62 @@ public enum BuiltinFinancialFunctions {
 
     /// `NPV(rate, value1, [value2], ...)` — Net present value of a series of cash flows.
     ///
-    /// Cash flows are assumed to occur at the end of each period, with the first value
-    /// discounted at period 1 (not period 0).
+    /// Microsoft's formula, and the period numbering is the whole of it:
+    ///
+    /// ```
+    /// NPV = Σ  valuesᵢ / (1 + rate)ⁱ      for i = 1…n
+    /// ```
+    ///
+    /// `value1` is discounted one period, not held at present value — "the NPV
+    /// investment begins one period before the date of the value1 cash flow." An
+    /// outlay made today therefore sits *outside* the call, which is why worksheets
+    /// write `NPV(rate, B4:B8) + B3`.
+    ///
+    /// ## Arguments may be ranges, and usually are
+    ///
+    /// The period index counts across the flattened series, not across the argument
+    /// list: `NPV(r, A1:A4)` is four periods, not one. Getting that wrong is not a
+    /// rounding error, it is a different investment.
+    ///
+    /// Inside an array or reference, Microsoft counts **only numbers** — "empty
+    /// cells, logical values, text, or error values in the array or reference are
+    /// ignored." Ignored, not zero: a blank that consumed a period would discount
+    /// every later cash flow one period too far. A value passed directly is coerced
+    /// as usual, which is the documented asymmetry.
     ///
     /// - Parameters:
     ///   - rate: The discount rate per period.
-    ///   - values: One or more cash flow values.
+    ///   - values: Cash flows, as values or as ranges.
     /// - Returns: The net present value.
     public static let npv = ExcelFunction(
         name: "NPV", minArgs: 2, maxArgs: nil
     ) { args in
-        let r = try requireNumber(args[0])
+        let rate = try requireNumber(args[0])
+        var period = 0
         var total = 0.0
-        for i in 1..<args.count {
-            let cf = try requireNumber(args[i])
-            total += cf / pow(1.0 + r, Double(i))
+        for argument in args.dropFirst() {
+            for cashFlow in try npvCashFlows(in: argument) {
+                period += 1
+                total += cashFlow / pow(1.0 + rate, Double(period))
+            }
         }
         return .number(total)
+    }
+
+    /// The cash flows one `NPV` argument contributes, in order.
+    ///
+    /// - Parameter value: The argument.
+    /// - Returns: Its numbers; an array contributes only its numeric elements, and a
+    ///   scalar contributes itself.
+    private static func npvCashFlows(in value: CellValue) throws -> [Double] {
+        guard case .array(let matrix) = value else {
+            return [try requireNumber(value)]
+        }
+        return matrix.elements.compactMap { element in
+            if case .number(let number) = element { return number }
+            if case .date = element { return toNumber(element) }
+            return nil
+        }
     }
 
     // MARK: - IRR
