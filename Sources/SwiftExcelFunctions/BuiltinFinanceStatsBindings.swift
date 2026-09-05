@@ -17,7 +17,7 @@ public enum BuiltinBindingFunctions {
 
     /// All bound functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
-        yearfrac, covariancePopulation, covarianceSample, covar, normSInverse,
+        yearfrac, covariancePopulation, covarianceSample, covar, normSInverse, xirrFunction,
     ]
 
     // MARK: - Day counts
@@ -39,6 +39,15 @@ public enum BuiltinBindingFunctions {
     /// neighbouring convention. A day count that is wrong by a few days is wrong
     /// in a way nobody notices until it has priced something, so refusing is the
     /// only honest option until BusinessMath gains them.
+    ///
+    /// ## What the corpus asks for
+    ///
+    /// Measured rather than assumed, because the answer decided whether the two
+    /// missing conventions were urgent: **all 3,425 `YEARFRAC` calls across the
+    /// corpus pass two arguments**, omitting the basis entirely. Every one of them
+    /// therefore takes basis 0, which is present. The gap is real but reaches
+    /// nothing — a fact worth recording next to the gap, so nobody spends a day on
+    /// it thinking it unblocks a workbook.
     public static let yearfrac = ExcelFunction(name: "YEARFRAC", minArgs: 2, maxArgs: 3) { args in
         guard case .number(let startSerial) = args[0],
               case .number(let endSerial) = args[1] else { return .error(.value) }
@@ -130,5 +139,49 @@ public enum BuiltinBindingFunctions {
         guard case .number(let probability) = args[0] else { return .error(.value) }
         guard probability > 0, probability < 1 else { return .error(.num) }
         return .number(normSInv(probability: probability))
+    }
+
+    // MARK: - Dated cash flows
+
+    /// `XIRR(values, dates, [guess])` — the internal rate of return on cash flows
+    /// that are not evenly spaced.
+    ///
+    /// Bound to BusinessMath's `xirr`. The binding is the date conversion: Excel
+    /// carries dates as serials and BusinessMath speaks in `Date`, so every entry
+    /// crosses through the same internal serial conversion the date functions use,
+    /// and therefore through the one place Excel's phantom 29 February 1900 is
+    /// handled.
+    ///
+    /// Excel's argument order is values first, dates second — the reverse of
+    /// BusinessMath's, which is exactly the kind of thing a binding exists to get
+    /// right once.
+    ///
+    /// Every failure BusinessMath can raise becomes `#NUM!`, which is what Excel
+    /// gives: mismatched counts, fewer than two flows, and cash flows that never
+    /// change sign. That last one is not an edge case but the definition — a
+    /// series that only ever pays out has no rate of return.
+    public static let xirrFunction = ExcelFunction(name: "XIRR", minArgs: 2, maxArgs: 3) { args in
+        let cashFlows = numbers(in: args[0])
+        let serials = numbers(in: args[1])
+        guard !cashFlows.isEmpty, cashFlows.count == serials.count else { return .error(.num) }
+
+        var dates: [Date] = []
+        dates.reserveCapacity(serials.count)
+        for serial in serials {
+            guard let date = BuiltinDateTimeFunctions.serialToDate(Int(serial)) else {
+                return .error(.value)
+            }
+            dates.append(date)
+        }
+
+        var guess: Double?
+        if args.count > 2, case .number(let value) = args[2] { guess = value }
+
+        do {
+            let rate: Double = try xirr(dates: dates, cashFlows: cashFlows, guess: guess)
+            return .number(rate)
+        } catch {
+            return .error(.num)
+        }
     }
 }

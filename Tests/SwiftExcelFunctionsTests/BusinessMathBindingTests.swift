@@ -63,6 +63,54 @@ final class BusinessMathBindingTests: XCTestCase {
         XCTAssertEqual(try call("YEARFRAC", [start, end, .number(4)]), .error(.num))
     }
 
+    /// Measured: every one of the corpus's 3,425 YEARFRAC calls passes two
+    /// arguments and none passes a basis, so all of them take the default.
+    /// The two conventions BusinessMath lacks are reached by nothing.
+    func testTheDefaultBasisIsTheOneRealWorkbooksUse() throws {
+        let start = CellValue.number(46023)
+        let end = CellValue.number(46204)
+        XCTAssertEqual(
+            try number("YEARFRAC", [start, end]),
+            try number("YEARFRAC", [start, end, .number(0)]),
+            accuracy: 1e-12)
+    }
+
+    // MARK: - XIRR
+
+    /// A year apart, out 1000 and back 1100, is 10%.
+    ///
+    /// Dates arrive as Excel serials and have to become `Date`s before
+    /// BusinessMath's `xirr` will speak to them; that conversion is the binding.
+    func testXirrOnASingleYearIsTheSimpleReturn() throws {
+        let values = CellValue.array([.number(-1000), .number(1100)])
+        let dates = CellValue.array([.number(46023), .number(46388)])   // 2026-01-01, 2027-01-01
+        XCTAssertEqual(try number("XIRR", [values, dates]), 0.10, accuracy: 0.001)
+    }
+
+    /// Irregular spacing is the whole point of XIRR over IRR: the dates carry
+    /// the timing rather than the positions.
+    func testXirrHonoursIrregularSpacing() throws {
+        let values = CellValue.array([.number(-1000), .number(500), .number(700)])
+        let dates = CellValue.array([.number(46023), .number(46114), .number(46388)])
+        let rate = try number("XIRR", [values, dates])
+        XCTAssertGreaterThan(rate, 0.15, "front-loaded return beats a flat 20%")
+        XCTAssertLessThan(rate, 0.35)
+    }
+
+    /// Mismatched counts have no answer.
+    func testXirrRejectsMismatchedValuesAndDates() throws {
+        let values = CellValue.array([.number(-100), .number(110)])
+        let dates = CellValue.array([.number(46023)])
+        XCTAssertEqual(try call("XIRR", [values, dates]), .error(.num))
+    }
+
+    /// Cash flows that never change sign have no rate of return.
+    func testXirrNeedsASignChange() throws {
+        let values = CellValue.array([.number(100), .number(110)])
+        let dates = CellValue.array([.number(46023), .number(46388)])
+        XCTAssertEqual(try call("XIRR", [values, dates]), .error(.num))
+    }
+
     // MARK: - Covariance
 
     /// Population and sample differ by their divisor, and Excel spells the
