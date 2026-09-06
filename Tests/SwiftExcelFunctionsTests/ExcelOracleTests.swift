@@ -154,7 +154,12 @@ final class ExcelOracleTests: XCTestCase {
                 }
                 return .differed(ours: ours, excel: excel)
             }
-            if OracleTolerance.agree(ours, excel) { return .agreed }
+            // An iterative solver is compared against the band Excel documents for
+            // itself, not against the general float tolerance.
+            let tolerance = named.contains(where: {
+                OracleTolerance.iterativeFunctions.contains($0)
+            }) ? OracleTolerance.iterative : nil
+            if OracleTolerance.agree(ours, excel, tolerance: tolerance) { return .agreed }
             if case .error(let kind) = ours { return .refused(kind) }
             return .differed(ours: ours, excel: excel)
         } catch {

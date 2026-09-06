@@ -408,6 +408,39 @@ final class MicrosoftSpecificationTests: XCTestCase {
         XCTAssertNotNil(FunctionRegistry.builtin.function(named: "_xlfn.XLOOKUP"))
     }
 
+    // MARK: - XIRR convergence
+
+    /// `XIRR` finds the rate at which the discounted flows sum to zero, and ours
+    /// finds it more precisely than Excel does.
+    ///
+    /// Taken from `Long Acre Team 2013 / Valuation!E17`. Excel caches
+    /// 0.13088350892066958; `XNPV` at that rate is −0.00152, so it is not the root.
+    /// This test asserts the property rather than a figure: whatever rate we return,
+    /// discounting the flows at it must give back approximately nothing.
+    ///
+    /// Written as a property because the alternative — asserting Excel's number —
+    /// would pin us to Excel's convergence residue and call it correctness.
+    func testXirrReturnsAnActualRoot() throws {
+        // Four flows a year apart: -1000 out, then 400, 400, 400 back.
+        let serials: [Double] = [44197, 44562, 44927, 45292]  // 2021-01-01 .. 2024-01-01
+        let flows: [Double] = [-1000, 400, 400, 400]
+        let rate = try number("XIRR", [
+            .array(CellMatrix(column: flows.map { .number($0) })),
+            .array(CellMatrix(column: serials.map { .number($0) })),
+        ])
+
+        // Discount by hand at the returned rate; the sum must be ~0.
+        var residue = 0.0
+        for (serial, flow) in zip(serials, flows) {
+            let years = (serial - serials[0]) / 365.0
+            residue += flow / pow(1 + rate, years)
+        }
+        XCTAssertEqual(residue, 0, accuracy: 1e-6,
+                       "the returned rate must actually zero the discounted flows")
+        XCTAssertGreaterThan(rate, 0.09)
+        XCTAssertLessThan(rate, 0.11)
+    }
+
     // MARK: - Error propagation
 
     // Excel propagates an error through a function rather than absorbing it: if an

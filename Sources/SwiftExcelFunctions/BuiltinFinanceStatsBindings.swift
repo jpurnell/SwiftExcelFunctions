@@ -218,7 +218,17 @@ public enum BuiltinBindingFunctions {
         if args.count > 2, case .number(let value) = args[2] { guess = value }
 
         do {
-            let rate: Double = try xirr(dates: dates, cashFlows: cashFlows, guess: guess)
+            // BusinessMath's convergence test is `abs(npv) < tolerance` — absolute,
+            // in currency units — and defaults to 1e-4. On a model whose flows run
+            // to millions that stops while the rate is still wrong in the eighth
+            // significant figure, which is looser than the 0.000001% Excel documents
+            // for its own iteration. Scaling the tolerance to the size of the flows
+            // makes the test effectively relative, so the rate converges to the same
+            // precision whatever the model is denominated in.
+            let scale = Swift.max(cashFlows.map { Swift.abs($0) }.max() ?? 1, 1)
+            let rate: Double = try xirr(
+                dates: dates, cashFlows: cashFlows, guess: guess,
+                tolerance: scale * 1e-12)
             return .number(rate)
         } catch {
             return .error(.num)

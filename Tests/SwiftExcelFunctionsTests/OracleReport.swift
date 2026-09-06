@@ -176,19 +176,50 @@ enum OracleTolerance {
     static let relative = 1e-9
     static let floor = 1e-12
 
+    /// The band inside which an iterative solver's answer counts as agreement.
+    ///
+    /// Microsoft on `XIRR`: "Excel uses an iterative technique… cycles through the
+    /// calculation until the result is accurate within 0.000001 percent" — 1e-8
+    /// relative. Observation says that figure is Excel's ambition rather than its
+    /// guarantee.
+    ///
+    /// A corpus cell, `Long Acre Team 2013 / Valuation!E17`, settles it. Excel
+    /// caches 0.13088350892066958; we answer 0.13088350377871114, 3.9e-8 apart —
+    /// four times Excel's stated accuracy. Evaluating `XNPV` at both rates says
+    /// which is the root:
+    ///
+    /// ```
+    /// XNPV at ours  =  2.18e-11
+    /// XNPV at Excel = -0.00152
+    /// ```
+    ///
+    /// So the difference is Excel's stopping point, not our error, and no amount of
+    /// work here would close it — matching would mean reproducing a convergence rule
+    /// Microsoft has not published. This is ADR-001's second case: Excel doing
+    /// something documented, matched within the accuracy it documents.
+    ///
+    /// 1e-6 rather than the stated 1e-8, because the stated figure demonstrably does
+    /// not hold. It is still four orders tighter than any real disagreement, which
+    /// would show up in the second or third significant figure rather than the
+    /// eighth.
+    static let iterative = 1e-6
+
+    /// Functions whose answer is found by iterating rather than by evaluating.
+    static let iterativeFunctions: Set<String> = ["XIRR", "IRR", "MIRR", "RATE", "YIELD"]
+
     /// Whether two numbers agree.
     ///
     /// - Parameters:
     ///   - ours: What we computed.
     ///   - excel: What Excel recorded.
     /// - Returns: `true` when the difference is below both thresholds' allowance.
-    static func agree(_ ours: Double, _ excel: Double) -> Bool {
+    static func agree(_ ours: Double, _ excel: Double, tolerance: Double? = nil) -> Bool {
         if ours == excel { return true }
         guard ours.isFinite, excel.isFinite else { return false }
         let difference = abs(ours - excel)
         if difference <= floor { return true }
         let scale = Swift.max(abs(ours), abs(excel))
-        return difference <= relative * scale
+        return difference <= (tolerance ?? relative) * scale
     }
 
     /// Whether two cell values agree, across the coercions Excel treats as equal.
@@ -202,10 +233,17 @@ enum OracleTolerance {
     ///   - ours: What we computed.
     ///   - excel: What Excel recorded.
     /// - Returns: `true` when they are the same answer.
-    static func agree(_ ours: CellValue, _ excel: CellValue) -> Bool {
+    static func agree(_ ours: CellValue, _ excel: CellValue, tolerance: Double? = nil) -> Bool {
         switch (ours, excel) {
         case (.number(let a), .number(let b)):
-            return agree(a, b)
+            return agree(a, b, tolerance: tolerance)
+        case (.array(let matrix), _):
+            // One formula filling a span evaluates once, and each cell shows its own
+            // element. Only the span's top-left cell carries the formula, so that is
+            // the element to compare — the rest of the rectangle lives in other
+            // cells and is checked when those cells are.
+            guard let first = matrix.elements.first else { return false }
+            return agree(first, excel, tolerance: tolerance)
         case (.text(let a), .text(let b)):
             return a == b
         case (.bool(let a), .bool(let b)):
