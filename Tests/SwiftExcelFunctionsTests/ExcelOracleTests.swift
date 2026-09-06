@@ -231,6 +231,52 @@ final class ExcelOracleTests: XCTestCase {
         }
     }
 
+    /// What the corpus calls that we cannot answer.
+    ///
+    /// The oracle says how often we are *right*; this says what we are *missing*,
+    /// which is the other half and the one that decides what to build next. A
+    /// function absent from the registry answers `#NAME?` — so it never disagrees
+    /// about a value, it just quietly fails, and the agreement number barely
+    /// notices.
+    ///
+    /// Ordered by calls, because a name appearing four thousand times and a name
+    /// appearing once are not the same piece of work. Workbook counts are printed
+    /// beside them: something used once in forty workbooks is a different kind of
+    /// important from something used four thousand times in one.
+    func testWhatTheCorpusCallsThatWeCannotAnswer() throws {
+        let workbooks = try Self.corpusWorkbooks()
+        let registry = FunctionRegistry.builtin
+
+        var calls: [String: Int] = [:]
+        var books: [String: Set<String>] = [:]
+        var read = 0
+
+        for url in workbooks {
+            guard let workbook = try? Workbook(contentsOf: url) else { continue }
+            read += 1
+            let name = url.lastPathComponent
+            for sheet in workbook.sheets {
+                for reference in sheet.cellReferences {
+                    guard let ast = sheet.formulaAST(at: reference) else { continue }
+                    for function in OracleFinding.functionNames(in: ast) {
+                        guard registry.function(named: function) == nil else { continue }
+                        guard !function.hasPrefix("_") else { continue }   // our own markers
+                        calls[function, default: 0] += 1
+                        books[function, default: []].insert(name)
+                    }
+                }
+            }
+        }
+
+        print("ORACLE  workbooks read: \(read)")
+        print("ORACLE  unanswerable function names: \(calls.count)")
+        print("ORACLE  \("name".padding(toLength: 26, withPad: " ", startingAt: 0)) calls  books")
+        for (function, count) in calls.sorted(by: { $0.value > $1.value }).prefix(40) {
+            let padded = function.padding(toLength: 26, withPad: " ", startingAt: 0)
+            print("ORACLE  \(padded) \(count)  \(books[function]?.count ?? 0)")
+        }
+    }
+
     // MARK: - Configuration
 
     /// Where the workbooks are, and whether we were asked to look.
