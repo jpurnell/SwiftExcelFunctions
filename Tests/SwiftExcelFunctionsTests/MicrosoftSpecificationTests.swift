@@ -298,6 +298,172 @@ final class MicrosoftSpecificationTests: XCTestCase {
             [.number(10), table, .number(0), .bool(false)]), .error(.value))
     }
 
+    // MARK: - XLOOKUP
+
+    // Microsoft: "The XLOOKUP function searches a range or an array, and then
+    // returns the item corresponding to the first match it finds. If no match
+    // exists, then XLOOKUP can return the closest (approximate) match."
+    //
+    // It supersedes VLOOKUP and HLOOKUP by separating the keys from the results:
+    // two ranges rather than one table and an offset into it. The consequences are
+    // what these tests pin.
+
+    private func row(_ values: [CellValue]) -> CellValue {
+        .array(CellMatrix(row: values))
+    }
+
+    func testXlookupFindsAnExactMatch() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .text("b"),
+            row([.text("a"), .text("b"), .text("c")]),
+            row([.number(1), .number(2), .number(3)]),
+        ]), .number(2))
+    }
+
+    /// **The default is exact**, the reverse of `VLOOKUP`. A near miss is `#N/A`
+    /// rather than the next smallest, which is the single most consequential
+    /// difference between them.
+    func testXlookupDefaultsToExact() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .number(25),
+            row([.number(10), .number(20), .number(30)]),
+            row([.text("ten"), .text("twenty"), .text("thirty")]),
+        ]), .error(.na))
+    }
+
+    /// `if_not_found` replaces the `IFERROR` wrapper VLOOKUP needed.
+    func testXlookupReturnsWhatYouAskForWhenNothingMatches() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .number(25),
+            row([.number(10), .number(20)]),
+            row([.text("ten"), .text("twenty")]),
+            .text("none"),
+        ]), .text("none"))
+    }
+
+    /// `match_mode` −1 is exact or next smaller, 1 is exact or next larger.
+    func testXlookupApproximateModes() throws {
+        let keys = row([.number(10), .number(20), .number(30)])
+        let results = row([.text("ten"), .text("twenty"), .text("thirty")])
+        XCTAssertEqual(try function("XLOOKUP").evaluate(
+            [.number(25), keys, results, .text("none"), .number(-1)]), .text("twenty"))
+        XCTAssertEqual(try function("XLOOKUP").evaluate(
+            [.number(25), keys, results, .text("none"), .number(1)]), .text("thirty"))
+    }
+
+    /// **The result may sit before the key.** `VLOOKUP` cannot do this at all: its
+    /// offset counts rightwards from the key column, so a leftward answer needs
+    /// `INDEX`/`MATCH`. Here the two ranges are independent.
+    func testXlookupReturnsAColumnLeftOfTheKey() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .text("b"),
+            row([.text("a"), .text("b")]),      // keys, notionally column B
+            row([.number(1), .number(2)]),      // results, notionally column A
+        ]), .number(2))
+    }
+
+    /// `search_mode` −1 searches last to first, so a duplicated key answers with the
+    /// later of the two.
+    func testXlookupCanSearchBackwards() throws {
+        let keys = row([.text("a"), .text("b"), .text("a")])
+        let results = row([.number(1), .number(2), .number(3)])
+        XCTAssertEqual(try function("XLOOKUP").evaluate(
+            [.text("a"), keys, results, .text("none"), .number(0), .number(1)]), .number(1))
+        XCTAssertEqual(try function("XLOOKUP").evaluate(
+            [.text("a"), keys, results, .text("none"), .number(0), .number(-1)]), .number(3))
+    }
+
+    /// Mismatched ranges are `#VALUE!`: there is no answer to give.
+    func testXlookupRefusesMismatchedRanges() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .text("a"),
+            row([.text("a"), .text("b"), .text("c")]),
+            row([.number(1), .number(2)]),
+        ]), .error(.value))
+    }
+
+    /// Wildcard matching is refused rather than silently treated as exact, which
+    /// would find the wrong row and say nothing about it.
+    func testXlookupRefusesWildcardMode() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .text("a*"),
+            row([.text("abc")]), row([.number(1)]),
+            .text("none"), .number(2),
+        ]), .error(.value))
+    }
+
+    /// An error in the lookup propagates — but not one in `if_not_found`, whose
+    /// whole purpose is to be produced when the lookup fails.
+    func testXlookupPropagatesButHonoursIfNotFound() throws {
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .error(.name), row([.text("a")]), row([.number(1)]),
+        ]), .error(.name))
+        XCTAssertEqual(try function("XLOOKUP").evaluate([
+            .text("z"), row([.text("a")]), row([.number(1)]), .error(.na),
+        ]), .error(.na), "an error is a legitimate thing to ask for on failure")
+    }
+
+    /// It resolves through `_xlfn.`, which is how an older `.xlsx` carries it.
+    func testXlookupResolvesThroughTheModernPrefix() {
+        XCTAssertNotNil(FunctionRegistry.builtin.function(named: "_xlfn.XLOOKUP"))
+    }
+
+    // MARK: - Error propagation
+
+    // Excel propagates an error through a function rather than absorbing it: if an
+    // argument is `#NAME?`, the result is `#NAME?`. Only the functions built to trap
+    // errors — `IFERROR`, `ISERROR`, `IFNA` — see one and carry on. That is what
+    // makes an error traceable to where it started instead of turning into a
+    // different error somewhere downstream.
+    //
+    // Found in the corpus: `HLOOKUP(AA40, Efficiency!$E$3:$DA$6, $D$2)` where `AA40`
+    // is itself cached `#NAME?` — one of 337 such cells on that sheet. Excel caches
+    // `#NAME?`; we answered `#N/A`, which says "looked and did not find" about a
+    // lookup that never happened.
+
+    func testTheLookupsPropagateAnErrorLookupValue() throws {
+        let table = grid([[.number(1), .text("a")], [.number(2), .text("b")]])
+        for name in ["VLOOKUP", "HLOOKUP"] {
+            XCTAssertEqual(
+                try function(name).evaluate([.error(.name), table, .number(2), .bool(false)]),
+                .error(.name), name)
+        }
+        XCTAssertEqual(try function("MATCH").evaluate([.error(.name), table, .number(0)]),
+                       .error(.name))
+    }
+
+    func testTheLookupsPropagateAnErrorTable() throws {
+        for name in ["VLOOKUP", "HLOOKUP"] {
+            XCTAssertEqual(
+                try function(name).evaluate([.number(1), .error(.div0), .number(2), .bool(false)]),
+                .error(.div0), name)
+        }
+    }
+
+    func testTheLookupsPropagateAnErrorIndex() throws {
+        let table = grid([[.number(1), .text("a")], [.number(2), .text("b")]])
+        for name in ["VLOOKUP", "HLOOKUP"] {
+            XCTAssertEqual(
+                try function(name).evaluate([.number(1), table, .error(.value), .bool(false)]),
+                .error(.value), name)
+        }
+    }
+
+    /// The first error wins, so the result names the failure nearest the start of
+    /// the argument list rather than whichever the implementation happened to test.
+    func testTheFirstErrorArgumentIsTheOneReturned() throws {
+        XCTAssertEqual(
+            try function("VLOOKUP").evaluate([.error(.na), .error(.div0), .number(2)]),
+            .error(.na))
+    }
+
+    /// `INDEX` already did this, and must keep doing it.
+    func testIndexPropagatesAnError() throws {
+        let table = grid([[.number(1), .text("a")]])
+        XCTAssertEqual(try function("INDEX").evaluate([.error(.ref), .number(1)]), .error(.ref))
+        XCTAssertEqual(try function("INDEX").evaluate([table, .error(.ref)]), .error(.ref))
+    }
+
     // MARK: - EOMONTH
 
     // Microsoft: "Returns the serial number for the last day of the month that is

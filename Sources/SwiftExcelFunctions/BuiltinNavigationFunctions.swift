@@ -17,8 +17,8 @@ public enum BuiltinNavigationFunctions {
 
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
-        vlookup, hlookup, index, match, address, column, row, indirect, offset,
-        choose, lookup,
+        vlookup, hlookup, xlookup, index, match, address, column, row, indirect,
+        offset, choose, lookup,
     ]
 
     // MARK: - Choosing among values
@@ -334,6 +334,30 @@ public enum BuiltinNavigationFunctions {
         return [value]
     }
 
+    /// The first argument that is an error, if any.
+    ///
+    /// Excel propagates an error through a function rather than absorbing it: an
+    /// argument of `#NAME?` makes the result `#NAME?`. Only functions built to trap
+    /// errors — `IFERROR`, `ISERROR`, `IFNA` — see one and carry on.
+    ///
+    /// It matters most where a function has an error of its own to return. A lookup
+    /// handed `#NAME?` used to answer `#N/A`, which says "looked and did not find"
+    /// about a lookup that never happened, and loses the only clue to where the
+    /// trouble started. One corpus sheet has 337 cells cached `#NAME?`; every lookup
+    /// reading them reported `#N/A` instead.
+    ///
+    /// The *first* error wins, so the answer names the failure nearest the start of
+    /// the argument list rather than whichever the implementation happened to test.
+    ///
+    /// - Parameter args: The arguments as evaluated.
+    /// - Returns: The error to propagate, or `nil`.
+    private static func propagatedError(_ args: [CellValue]) -> CellValue? {
+        for argument in args {
+            if case .error = argument { return argument }
+        }
+        return nil
+    }
+
     /// A shaped view of an argument.
     ///
     /// A lone value is a 1×1 table, which is what makes `VLOOKUP(x, A1, 1)` behave
@@ -425,6 +449,7 @@ public enum BuiltinNavigationFunctions {
     /// Returns `#N/A` if not found, `#REF!` if `col_index_num` is out of bounds.
     static let vlookup = ExcelFunction(name: "VLOOKUP", minArgs: 3, maxArgs: 4) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let table = asMatrix(args[1])
             let colIndex = Int(try toNumber(args[2]))
             let approximate = args.count > 3 ? isApproximate(args[3]) : true
@@ -478,6 +503,7 @@ public enum BuiltinNavigationFunctions {
     /// Returns `#N/A` if not found, `#REF!` if `row_index_num` is out of bounds.
     static let hlookup = ExcelFunction(name: "HLOOKUP", minArgs: 3, maxArgs: 4) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let table = asMatrix(args[1])
             let rowIndex = Int(try toNumber(args[2]))
             let approximate = args.count > 3 ? isApproximate(args[3]) : true
@@ -549,6 +575,92 @@ public enum BuiltinNavigationFunctions {
         }
     }
 
+    // MARK: - XLOOKUP
+
+    /// `XLOOKUP(lookup, lookup_array, return_array, [if_not_found], [match_mode], [search_mode])`
+    ///
+    /// The generalisation of `VLOOKUP` and `HLOOKUP`, and the reason it supersedes
+    /// them is that it stops conflating three things they had to share. Where they
+    /// take one table and an offset *into* it — so the key must be its first row or
+    /// column, and the answer must be to the right or below — this takes the keys
+    /// and the answers as separate ranges. They need not touch, and neither has to
+    /// come first.
+    ///
+    /// | | `VLOOKUP` | `XLOOKUP` |
+    /// |---|---|---|
+    /// | key and result | one table, an offset | two ranges |
+    /// | result before key | impossible | ordinary |
+    /// | not found | `#N/A` | `#N/A`, or what you say |
+    /// | default match | approximate | **exact** |
+    /// | search direction | forwards | either |
+    ///
+    /// The default reversal is the one to notice: `VLOOKUP`'s fourth argument
+    /// defaults to *approximate*, which is why so many spreadsheets carry a
+    /// `FALSE` nobody remembers adding. `XLOOKUP` defaults to exact.
+    ///
+    /// `match_mode`: `0` exact (default), `-1` exact or next smaller, `1` exact or
+    /// next larger, `2` wildcard — not supported here, and answers `#VALUE!` rather
+    /// than pretending.
+    ///
+    /// `search_mode`: `1` first to last (default), `-1` last to first, `2` and `-2`
+    /// binary search on sorted data. The binary modes are accepted and searched
+    /// linearly: on a sorted range that finds the same element, and on an unsorted
+    /// one Excel's own result is undefined, so the difference is not observable in a
+    /// well-formed workbook.
+    ///
+    /// The lookup and return ranges must be the same length; anything else is
+    /// `#VALUE!`, as in Excel.
+    static let xlookup = ExcelFunction(name: "XLOOKUP", minArgs: 3, maxArgs: 6) { args in
+        catching {
+            // `if_not_found` is exempt: it is the argument whose whole purpose is to
+            // be produced when something fails, so an error there is a value.
+            var checked = args
+            if checked.count > 3 { checked.remove(at: 3) }
+            if let error = propagatedError(checked) { return error }
+
+            let keys = asMatrix(args[1])
+            let results = asMatrix(args[2])
+            guard keys.count > 0, keys.count == results.count else { return .error(.value) }
+
+            let matchMode = args.count > 4 ? Int(try toNumber(args[4])) : 0
+            let searchMode = args.count > 5 ? Int(try toNumber(args[5])) : 1
+            guard [0, -1, 1, 2].contains(matchMode) else { return .error(.value) }
+            guard [1, -1, 2, -2].contains(searchMode) else { return .error(.value) }
+            // Wildcard matching is not implemented; refusing is honest, and
+            // answering an exact match instead would silently find the wrong row.
+            guard matchMode != 2 else { return .error(.value) }
+
+            let order = searchMode < 0
+                ? Array((0..<keys.count).reversed())
+                : Array(0..<keys.count)
+            let lookupValue = args[0]
+
+            if let hit = order.first(where: { valuesEqual(keys.elements[$0], lookupValue) }) {
+                return results.elements[hit]
+            }
+            if matchMode != 0 {
+                // Nearest smaller (-1) or nearest larger (1), by value rather than by
+                // position, so an unsorted range still answers what Excel answers.
+                var best: (index: Int, key: CellValue)?
+                for index in order {
+                    let key = keys.elements[index]
+                    guard let comparison = compareValues(key, lookupValue) else { continue }
+                    let wanted = matchMode < 0 ? comparison < 0 : comparison > 0
+                    guard wanted else { continue }
+                    guard let current = best,
+                          let better = compareValues(key, current.key) else {
+                        best = (index, key)
+                        continue
+                    }
+                    if matchMode < 0 ? better > 0 : better < 0 { best = (index, key) }
+                }
+                if let best { return results.elements[best.index] }
+            }
+            if args.count > 3 { return args[3] }
+            return .error(.na)
+        }
+    }
+
     // MARK: - MATCH
 
     /// `MATCH(lookup_value, lookup_array, [match_type])` -- finds the position of a value in an array.
@@ -560,6 +672,7 @@ public enum BuiltinNavigationFunctions {
     /// Returns a 1-based position. Returns `#N/A` if not found.
     static let match = ExcelFunction(name: "MATCH", minArgs: 2, maxArgs: 3) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let lookupValue = args[0]
             let lookupArray = toArray(args[1])
             let matchType: Int

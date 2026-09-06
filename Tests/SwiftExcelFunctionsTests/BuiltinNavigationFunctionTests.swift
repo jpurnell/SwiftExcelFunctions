@@ -57,7 +57,7 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
     func testAllContainsEveryFunctionInTheGroup() {
         XCTAssertEqual(
             Set(BuiltinNavigationFunctions.all.map(\.name)),
-            ["VLOOKUP", "HLOOKUP", "INDEX", "MATCH", "ADDRESS",
+            ["VLOOKUP", "HLOOKUP", "XLOOKUP", "INDEX", "MATCH", "ADDRESS",
              "COLUMN", "ROW", "INDIRECT", "OFFSET", "CHOOSE", "LOOKUP"])
     }
 
