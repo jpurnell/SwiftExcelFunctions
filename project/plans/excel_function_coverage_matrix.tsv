@@ -1,87 +1,88 @@
-EXCEL	ABS	math	have	SwiftXLSX	208	32	number
-EXCEL	ACOS	math	unreviewed		0	0	number
+source	function	category	status	provider	calls	books	returns
+EXCEL	ABS	math	have	math	208	32	number
+EXCEL	ACOS	math	have	math	0	0	number
 EXCEL	ACOSH	math	unreviewed		0	0	number
 EXCEL	ACOT	math	unreviewed		0	0	number
 EXCEL	ACOTH	math	unreviewed		0	0	number
 EXCEL	AGGREGATE	math	unreviewed		0	0	function_num, options, ref1, [ref2], ...
 EXCEL	ARABIC	math	unreviewed		0	0	text
-EXCEL	ASIN	math	unreviewed		0	0	number
+EXCEL	ASIN	math	have	math	0	0	number
 EXCEL	ASINH	math	unreviewed		0	0	number
-EXCEL	ATAN	math	unreviewed		0	0	number
-EXCEL	ATAN2	math	unreviewed		0	0	x_num, y_num
+EXCEL	ATAN	math	have	math	0	0	number
+EXCEL	ATAN2	math	have	math	0	0	x_num, y_num
 EXCEL	ATANH	math	unreviewed		0	0	number
-EXCEL	BASE	math	unreviewed		0	0	Number, Radix [Min_length]
+EXCEL	BASE	math	have	math	0	0	Number, Radix [Min_length]
 EXCEL	CEILING.MATH	math	unreviewed		0	0	number, [significance], [mode]
 EXCEL	CEILING.PRECISE	math	unreviewed		0	0	number, [significance]
 EXCEL	COMBIN	math	bindable	combination	0	0	number, number_chosen
 EXCEL	COMBINA	math	unreviewed		0	0	number, number_chosen
-EXCEL	COS	math	unreviewed		0	0	number
+EXCEL	COS	math	have	math	0	0	number
 EXCEL	COSH	math	unreviewed		0	0	number
 EXCEL	COT	math	unreviewed		0	0	number
 EXCEL	COTH	math	unreviewed		0	0	number
 EXCEL	CSC	math	unreviewed		0	0	number
 EXCEL	CSCH	math	unreviewed		0	0	number
-EXCEL	DECIMAL	math	unreviewed		0	0	text, radix
+EXCEL	DECIMAL	math	have	math	0	0	text, radix
 EXCEL	DEGREES	math	unreviewed		0	0	angle
 EXCEL	EVEN	math	unreviewed		0	0	number
-EXCEL	EXP	math	have	SwiftXLSX	41	2	number
+EXCEL	EXP	math	have	math	41	2	number
 EXCEL	FACT	math	bindable	factorial	0	0	number
 EXCEL	FACTDOUBLE	math	unreviewed		0	0	number
 EXCEL	FLOOR.MATH	math	unreviewed		0	0	number, [significance], [mode]
 EXCEL	FLOOR.PRECISE	math	unreviewed		0	0	number, [significance]
-EXCEL	GCD	math	unreviewed		0	0	number1, [number2], ...
-EXCEL	INT	math	have	SwiftXLSX	0	0	number
+EXCEL	GCD	math	have	math	0	0	number1, [number2], ...
+EXCEL	INT	math	have	math	0	0	number
 EXCEL	ISO.CEILING	math	unreviewed		0	0	number, [significance]
-EXCEL	LCM	math	unreviewed		0	0	number1, [number2], ...
-EXCEL	LN	math	have	SwiftXLSX	0	0	number
-EXCEL	LOG	math	have	SwiftXLSX	41	2	number, [base]
-EXCEL	LOG10	math	unreviewed		0	0	number
+EXCEL	LCM	math	have	math	0	0	number1, [number2], ...
+EXCEL	LN	math	have	math	0	0	number
+EXCEL	LOG	math	have	math	41	2	number, [base]
+EXCEL	LOG10	math	have	math	0	0	number
 EXCEL	MDETERM	math	unreviewed		0	0	array
 EXCEL	MINVERSE	math	bindable	choleskyInverse	0	0	array
 EXCEL	MMULT	math	bindable	multiply	0	0	array1, array2
-EXCEL	MOD	math	have	SwiftXLSX	2924	3	number, divisor
+EXCEL	MOD	math	have	math	2924	3	number, divisor
 EXCEL	MROUND	math	unreviewed		0	0	number, multiple
 EXCEL	MULTINOMIAL	math	unreviewed		0	0	number1, [number2], ...
 EXCEL	MUNIT	math	unreviewed		0	0	dimension
 EXCEL	ODD	math	unreviewed		0	0	number
 EXCEL	PERCENTOF	math	unreviewed		0	0	data_subset,data_all
-EXCEL	PI	math	have	SwiftXLSX	0	0	(no arguments)
-EXCEL	POWER	math	have	SwiftXLSX	0	0	number, power
-EXCEL	PRODUCT	math	bindable	ExpressionArray.product	0	0	number1, [number2], ...
+EXCEL	PI	math	have	math	0	0	(no arguments)
+EXCEL	POWER	math	have	math	0	0	number, power
+EXCEL	PRODUCT	math	have	math	0	0	number1, [number2], ...
 EXCEL	QUOTIENT	math	unreviewed		0	0	numerator, denominator
 EXCEL	RADIANS	math	unreviewed		0	0	angle
-EXCEL	RAND	math	bindable	uniform	44	1	(no arguments)
+EXCEL	RAND	math	have	math	44	1	(no arguments)
 EXCEL	RANDARRAY	math	unreviewed		0	0	[rows],[columns],[min],[max],[whole_number]
-EXCEL	RANDBETWEEN	math	unreviewed		150	2	bottom, top
+EXCEL	RANDBETWEEN	math	have	math	150	2	bottom, top
 EXCEL	ROMAN	math	unreviewed		0	0	number, [form]
-EXCEL	ROUND	math	have	SwiftXLSX	154	24	number, num_digits
-EXCEL	ROUNDDOWN	math	have	SwiftXLSX	0	0	number, num_digits
-EXCEL	ROUNDUP	math	have	SwiftXLSX	2	2	number, num_digits
+EXCEL	ROUND	math	have	math	154	24	number, num_digits
+EXCEL	ROUNDDOWN	math	have	math	0	0	number, num_digits
+EXCEL	ROUNDUP	math	have	math	2	2	number, num_digits
 EXCEL	SEC	math	unreviewed		0	0	number
 EXCEL	SECH	math	unreviewed		0	0	number
 EXCEL	SERIESSUM	math	unreviewed		0	0	x, n, m, coefficients
 EXCEL	SEQUENCE	math	bindable	linearSpace	0	0	rows,[columns],[start],[step]
-EXCEL	SIGN	math	have	SwiftXLSX	0	0	number
-EXCEL	SIN	math	unreviewed		0	0	number
+EXCEL	SIGN	math	have	math	0	0	number
+EXCEL	SIN	math	have	math	0	0	number
 EXCEL	SINH	math	unreviewed		0	0	number
-EXCEL	SQRT	math	have	SwiftXLSX	153	7	number
+EXCEL	SQRT	math	have	math	153	7	number
 EXCEL	SQRTPI	math	unreviewed		0	0	number
 EXCEL	SUBTOTAL	math	unreviewed		0	0	function_num,ref1,[ref2],...
-EXCEL	SUM	math	have	SwiftXLSX	69194	338	number1,[number2],...
-EXCEL	SUMIF	math	have	SwiftXLSX	38	4	range, criteria, [sum_range]
-EXCEL	SUMIFS	math	have	SwiftXLSX	78816	4	sum_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
-EXCEL	SUMPRODUCT	math	bindable	weightedAverage	805	134	array1, [array2], [array3], ...
-EXCEL	SUMSQ	math	bindable	sigma	4	4	number1, [number2], ...
+EXCEL	SUM	math	have	aggregation	69194	338	number1,[number2],...
+EXCEL	SUMIF	math	have	aggregation	38	4	range, criteria, [sum_range]
+EXCEL	SUMIFS	math	have	aggregation	78816	4	sum_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
+EXCEL	SUMPRODUCT	math	have	aggregation	805	134	array1, [array2], [array3], ...
+EXCEL	SUMSQ	math	have	aggregation	4	4	number1, [number2], ...
 EXCEL	SUMX2MY2	math	unreviewed		0	0	array_x, array_y
 EXCEL	SUMX2PY2	math	unreviewed		0	0	array_x, array_y
 EXCEL	SUMXMY2	math	bindable	NelsonSiegelYieldCurve.sumSquaredErrors	0	0	array_x, array_y
-EXCEL	TAN	math	unreviewed		0	0	number
+EXCEL	TAN	math	have	math	0	0	number
 EXCEL	TANH	math	unreviewed		0	0	number
-EXCEL	TRUNC	math	unreviewed		0	0	number, [num_digits]
+EXCEL	TRUNC	math	have	math	0	0	number, [num_digits]
 EXCEL	AVEDEV	statistical	unreviewed		0	0	number1, [number2], ...
-EXCEL	AVERAGE	statistical	have	SwiftXLSX	67	18	number1, [number2], ...
+EXCEL	AVERAGE	statistical	have	stats	67	18	number1, [number2], ...
 EXCEL	AVERAGEA	statistical	unreviewed		0	0	value1, [value2], ...
-EXCEL	AVERAGEIF	statistical	have	SwiftXLSX	0	0	range, criteria, [average_range]
+EXCEL	AVERAGEIF	statistical	have	aggregation	0	0	range, criteria, [average_range]
 EXCEL	AVERAGEIFS	statistical	bindable	PeriodSequence.aggregate	0	0	average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	unreviewed		0	0	probability,alpha,beta,[A],[B]
@@ -96,13 +97,13 @@ EXCEL	CHISQ.TEST	statistical	unreviewed		0	0	actual_range,expected_range
 EXCEL	CONFIDENCE.NORM	statistical	bindable	confidence	0	0	alpha,standard_dev,size
 EXCEL	CONFIDENCE.T	statistical	bindable	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
 EXCEL	CORREL	statistical	bindable	correlationCoefficient	0	0	array1, array2
-EXCEL	COUNT	statistical	have	SwiftXLSX	43316	45	value1, [value2], ...
-EXCEL	COUNTA	statistical	have	SwiftXLSX	35	5	value1, [value2], ...
-EXCEL	COUNTBLANK	statistical	unreviewed		0	0	range
-EXCEL	COUNTIF	statistical	have	SwiftXLSX	60	1	range, criteria
-EXCEL	COUNTIFS	statistical	have	SwiftXLSX	0	0	criteria_range1, criteria1, [criteria_range2, criteria2]...
-EXCEL	COVARIANCE.P	statistical	bindable	covariance	124	4	array1,array2
-EXCEL	COVARIANCE.S	statistical	bindable	covariance	0	0	array1,array2
+EXCEL	COUNT	statistical	have	stats	43316	45	value1, [value2], ...
+EXCEL	COUNTA	statistical	have	stats	35	5	value1, [value2], ...
+EXCEL	COUNTBLANK	statistical	have	array	0	0	range
+EXCEL	COUNTIF	statistical	have	aggregation	60	1	range, criteria
+EXCEL	COUNTIFS	statistical	have	aggregation	0	0	criteria_range1, criteria1, [criteria_range2, criteria2]...
+EXCEL	COVARIANCE.P	statistical	have	bindings	124	4	array1,array2
+EXCEL	COVARIANCE.S	statistical	have	bindings	0	0	array1,array2
 EXCEL	DEVSQ	statistical	bindable	sumOfSquaredAvgDiff	0	0	number1, [number2], ...
 EXCEL	EXPON.DIST	statistical	bindable	exponentialCDF	0	0	x,lambda,cumulative
 EXCEL	F.DIST	statistical	bindable	fCDF	0	0	x,deg_freedom1,deg_freedom2,cumulative
@@ -129,30 +130,30 @@ EXCEL	GEOMEAN	statistical	bindable	geometricMean	0	0	number1, [number2], ...
 EXCEL	GROWTH	statistical	bindable	TimeSeries.exponential	0	0	known_y's, [known_x's], [new_x's], [const]
 EXCEL	HARMEAN	statistical	bindable	harmonicMean	0	0	number1, [number2], ...
 EXCEL	HYPGEOM.DIST	statistical	bindable	hypergeometric	0	0	sample_s,number_sample,population_s,number_pop,cumulative
-EXCEL	INTERCEPT	statistical	bindable	intercept	0	0	known_y's, known_x's
+EXCEL	INTERCEPT	statistical	have	bindings	0	0	known_y's, known_x's
 EXCEL	KURT	statistical	bindable	kurtosis	0	0	number1, [number2], ...
-EXCEL	LARGE	statistical	have	SwiftXLSX	0	0	array, k
+EXCEL	LARGE	statistical	have	stats	0	0	array, k
 EXCEL	LINEST	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGEST	statistical	bindable	ExponentialTrend	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGNORM.DIST	statistical	bindable	logNormalCDF	0	0	x,mean,standard_dev,cumulative
 EXCEL	LOGNORM.INV	statistical	unreviewed		0	0	probability, mean, standard_dev
-EXCEL	MAX	statistical	have	SwiftXLSX	992	114	number1, [number2], ...
+EXCEL	MAX	statistical	have	stats	992	114	number1, [number2], ...
 EXCEL	MAXA	statistical	unreviewed		0	0	value1,[value2],...
 EXCEL	MAXIFS	statistical	unreviewed		0	0	max_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
-EXCEL	MEDIAN	statistical	have	SwiftXLSX	0	0	number1, [number2], ...
-EXCEL	MIN	statistical	have	SwiftXLSX	1973	33	number1, [number2], ...
+EXCEL	MEDIAN	statistical	have	stats	0	0	number1, [number2], ...
+EXCEL	MIN	statistical	have	stats	1973	33	number1, [number2], ...
 EXCEL	MINA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	MINIFS	statistical	unreviewed		0	0	min_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	MODE.MULT	statistical	unreviewed		0	0	number1,[number2],...
 EXCEL	MODE.SNGL	statistical	unreviewed		0	0	number1,[number2],...
 EXCEL	NEGBINOM.DIST	statistical	unreviewed		0	0	number_f,number_s,probability_s,cumulative
-EXCEL	NORM.DIST	statistical	bindable	normalCDF	0	0	x,mean,standard_dev,cumulative
-EXCEL	NORM.INV	statistical	bindable	inverseNormalCDF	0	0	probability,mean,standard_dev
-EXCEL	NORM.S.DIST	statistical	unreviewed		0	0	z,cumulative
-EXCEL	NORM.S.INV	statistical	bindable	NewsvendorModel.optimalQuantity	2	1	probability
+EXCEL	NORM.DIST	statistical	have	bindings	0	0	x,mean,standard_dev,cumulative
+EXCEL	NORM.INV	statistical	have	bindings	0	0	probability,mean,standard_dev
+EXCEL	NORM.S.DIST	statistical	have	bindings	0	0	z,cumulative
+EXCEL	NORM.S.INV	statistical	have	bindings	2	1	probability
 EXCEL	PEARSON	statistical	bindable	correlationCoefficient	0	0	array1, array2
 EXCEL	PERCENTILE.EXC	statistical	unreviewed		0	0	array,k
-EXCEL	PERCENTILE.INC	statistical	bindable	quantile	0	0	array,k
+EXCEL	PERCENTILE.INC	statistical	have	stats	0	0	array,k
 EXCEL	PERCENTRANK.EXC	statistical	unreviewed		0	0	array,x,[significance]
 EXCEL	PERCENTRANK.INC	statistical	unreviewed		0	0	array,x,[significance]
 EXCEL	PERMUT	statistical	bindable	permutation	0	0	number, number_chosen
@@ -162,16 +163,16 @@ EXCEL	POISSON.DIST	statistical	bindable	poissonCDF	0	0	x,mean,cumulative
 EXCEL	PROB	statistical	unreviewed		0	0	x_range, prob_range, [lower_limit], [upper_limit]
 EXCEL	QUARTILE.EXC	statistical	unreviewed		0	0	array, quart
 EXCEL	QUARTILE.INC	statistical	unreviewed		0	0	array,quart
-EXCEL	RANK.AVG	statistical	bindable	Array.rank	0	0	number,ref,[order]
-EXCEL	RANK.EQ	statistical	unreviewed		0	0	number,ref,[order]
+EXCEL	RANK.AVG	statistical	have	bindings	0	0	number,ref,[order]
+EXCEL	RANK.EQ	statistical	have	bindings	0	0	number,ref,[order]
 EXCEL	RSQ	statistical	bindable	rSquared	0	0	known_y's,known_x's
 EXCEL	SKEW	statistical	bindable	skew	0	0	number1, [number2], ...
 EXCEL	SKEW.P	statistical	bindable	skewP	0	0	number 1, [number 2],...
-EXCEL	SLOPE	statistical	bindable	slope	0	0	known_y's, known_x's
-EXCEL	SMALL	statistical	have	SwiftXLSX	0	0	array, k
+EXCEL	SLOPE	statistical	have	bindings	0	0	known_y's, known_x's
+EXCEL	SMALL	statistical	have	stats	0	0	array, k
 EXCEL	STANDARDIZE	statistical	bindable	standardize	0	0	x, mean, standard_dev
-EXCEL	STDEV.P	statistical	bindable	stdDevP	0	0	number1,[number2],...
-EXCEL	STDEV.S	statistical	bindable	stdDevS	86410	42	number1,[number2],...
+EXCEL	STDEV.P	statistical	have	stats	0	0	number1,[number2],...
+EXCEL	STDEV.S	statistical	have	stats	86410	42	number1,[number2],...
 EXCEL	STDEVA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	STDEVPA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	STEYX	statistical	unreviewed		0	0	known_y's, known_x's
@@ -183,8 +184,8 @@ EXCEL	T.INV.2T	statistical	unreviewed		0	0	probability,deg_freedom
 EXCEL	T.TEST	statistical	unreviewed		0	0	array1,array2,tails,type
 EXCEL	TREND	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [new_x's], [const]
 EXCEL	TRIMMEAN	statistical	unreviewed		0	0	array, percent
-EXCEL	VAR.P	statistical	bindable	varianceP	0	0	number1,[number2],...
-EXCEL	VAR.S	statistical	bindable	varianceS	0	0	number1,[number2],...
+EXCEL	VAR.P	statistical	have	stats	0	0	number1,[number2],...
+EXCEL	VAR.S	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	VARA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	VARPA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	WEIBULL.DIST	statistical	unreviewed		0	0	x,alpha,beta,cumulative
@@ -201,203 +202,203 @@ EXCEL	COUPNUM	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
 EXCEL	COUPPCD	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
 EXCEL	CUMIPMT	financial	bindable	AmortizationSchedule.totalInterest	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	CUMPRINC	financial	bindable	AmortizationSchedule.totalPrincipal	0	0	rate, nper, pv, start_period, end_period, type
-EXCEL	DB	financial	have	SwiftXLSX	0	0	cost, salvage, life, period, [month]
+EXCEL	DB	financial	have	financial	0	0	cost, salvage, life, period, [month]
 EXCEL	DDB	financial	new	verified absent	0	0	cost, salvage, life, period, [factor]
 EXCEL	DISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	DOLLARDE	financial	unreviewed		0	0	fractional_dollar, fraction
 EXCEL	DOLLARFR	financial	unreviewed		0	0	decimal_dollar, fraction
 EXCEL	DURATION	financial	bindable	macaulayDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	EFFECT	financial	bindable	DebtInstrument.effectiveAnnualRate	0	0	nominal_rate, npery
-EXCEL	FV	financial	have	SwiftXLSX	0	0	rate, nper, pmt, [pv], [type]
+EXCEL	FV	financial	have	financial	0	0	rate, nper, pmt, [pv], [type]
 EXCEL	FVSCHEDULE	financial	unreviewed		0	0	principal, schedule
 EXCEL	INTRATE	financial	unreviewed		0	0	settlement, maturity, investment, redemption, [basis]
-EXCEL	IPMT	financial	have	SwiftXLSX	0	0	rate, per, nper, pv, [fv], [type]
-EXCEL	IRR	financial	have	SwiftXLSX	13	12	values, [guess]
+EXCEL	IPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
+EXCEL	IRR	financial	have	financial	13	12	values, [guess]
 EXCEL	ISPMT	financial	unreviewed		0	0	rate, per, nper, pv
 EXCEL	MDURATION	financial	bindable	modifiedDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	MIRR	financial	bindable	mirr	0	0	values, finance_rate, reinvest_rate
 EXCEL	NOMINAL	financial	new	verified absent	0	0	effect_rate, npery
-EXCEL	NPER	financial	have	SwiftXLSX	0	0	rate, pmt, pv, [fv], [type]
-EXCEL	NPV	financial	have	SwiftXLSX	169	78	rate, value1, [value2], ...
+EXCEL	NPER	financial	have	financial	0	0	rate, pmt, pv, [fv], [type]
+EXCEL	NPV	financial	have	financial	169	78	rate, value1, [value2], ...
 EXCEL	ODDFPRICE	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]
 EXCEL	ODDFYIELD	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis]
 EXCEL	ODDLPRICE	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis]
 EXCEL	ODDLYIELD	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis]
 EXCEL	PDURATION	financial	new	verified absent	0	0	rate, pv, fv
-EXCEL	PMT	financial	have	SwiftXLSX	1352	48	rate, nper, pv, [fv], [type]
-EXCEL	PPMT	financial	have	SwiftXLSX	0	0	rate, per, nper, pv, [fv], [type]
+EXCEL	PMT	financial	have	financial	1352	48	rate, nper, pv, [fv], [type]
+EXCEL	PPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
 EXCEL	PRICE	financial	bindable	price	0	0	settlement, maturity, rate, yld, redemption, frequency, [basis]
 EXCEL	PRICEDISC	financial	unreviewed		0	0	settlement, maturity, discount, redemption, [basis]
 EXCEL	PRICEMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, yld, [basis]
-EXCEL	PV	financial	have	SwiftXLSX	39	13	rate, nper, pmt, [fv], [type]
-EXCEL	RATE	financial	have	SwiftXLSX	10	2	nper, pmt, pv, [fv], [type], [guess]
+EXCEL	PV	financial	have	financial	39	13	rate, nper, pmt, [fv], [type]
+EXCEL	RATE	financial	have	financial	10	2	nper, pmt, pv, [fv], [type], [guess]
 EXCEL	RECEIVED	financial	unreviewed		0	0	settlement, maturity, investment, discount, [basis]
 EXCEL	RRI	financial	bindable	cagr	0	0	nper, pv, fv
-EXCEL	SLN	financial	have	SwiftXLSX	0	0	cost, salvage, life
+EXCEL	SLN	financial	have	financial	0	0	cost, salvage, life
 EXCEL	SYD	financial	new	verified absent	0	0	cost, salvage, life, per
 EXCEL	TBILLEQ	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLPRICE	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLYIELD	financial	unreviewed		0	0	settlement, maturity, pr
 EXCEL	VDB	financial	new	verified absent	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
-EXCEL	XIRR	financial	bindable	xirr	2	2	values, dates, [guess]
+EXCEL	XIRR	financial	have	bindings	2	2	values, dates, [guess]
 EXCEL	XNPV	financial	bindable	xnpv	0	0	rate, values, dates
 EXCEL	YIELD	financial	bindable	yieldToMaturity	0	0	settlement, maturity, rate, pr, redemption, frequency, [basis]
 EXCEL	YIELDDISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	YIELDMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, pr, [basis]
-EXCEL	DATE	datetime	have	SwiftXLSX	171	6	year,month,day
+EXCEL	DATE	datetime	have	datetime	171	6	year,month,day
 EXCEL	DATEDIF	datetime	unreviewed		0	0	start_date,end_date,unit
-EXCEL	DATEVALUE	datetime	unreviewed		0	0	date_text
-EXCEL	DAY	datetime	have	SwiftXLSX	5906	16	serial_number
-EXCEL	DAYS	datetime	unreviewed		0	0	end_date, start_date
+EXCEL	DATEVALUE	datetime	have	datetime	0	0	date_text
+EXCEL	DAY	datetime	have	datetime	5906	16	serial_number
+EXCEL	DAYS	datetime	have	datetime	0	0	end_date, start_date
 EXCEL	DAYS360	datetime	bindable	DayCountConvention.days	0	0	start_date,end_date,[method]
-EXCEL	EDATE	datetime	unreviewed		0	0	start_date, months
-EXCEL	EOMONTH	datetime	unreviewed		1723	22	start_date, months
-EXCEL	HOUR	datetime	unreviewed		0	0	serial_number
+EXCEL	EDATE	datetime	have	datetime	0	0	start_date, months
+EXCEL	EOMONTH	datetime	have	datetime	1723	22	start_date, months
+EXCEL	HOUR	datetime	have	datetime	0	0	serial_number
 EXCEL	ISOWEEKNUM	datetime	unreviewed		0	0	date
-EXCEL	MINUTE	datetime	unreviewed		0	0	serial_number
-EXCEL	MONTH	datetime	have	SwiftXLSX	9686	19	serial_number
+EXCEL	MINUTE	datetime	have	datetime	0	0	serial_number
+EXCEL	MONTH	datetime	have	datetime	9686	19	serial_number
 EXCEL	NETWORKDAYS	datetime	unreviewed		0	0	start_date, end_date, [holidays]
 EXCEL	NETWORKDAYS.INTL	datetime	unreviewed		0	0	start_date, end_date, [weekend], [holidays]
-EXCEL	NOW	datetime	have	SwiftXLSX	37	13	(no arguments)
-EXCEL	SECOND	datetime	unreviewed		0	0	serial_number
-EXCEL	TIME	datetime	unreviewed		0	0	hour, minute, second
+EXCEL	NOW	datetime	have	datetime	37	13	(no arguments)
+EXCEL	SECOND	datetime	have	datetime	0	0	serial_number
+EXCEL	TIME	datetime	have	datetime	0	0	hour, minute, second
 EXCEL	TIMEVALUE	datetime	unreviewed		0	0	time_text
-EXCEL	TODAY	datetime	have	SwiftXLSX	37	7	(no arguments)
-EXCEL	WEEKDAY	datetime	unreviewed		5477	6	serial_number,[return_type]
+EXCEL	TODAY	datetime	have	datetime	37	7	(no arguments)
+EXCEL	WEEKDAY	datetime	have	datetime	5477	6	serial_number,[return_type]
 EXCEL	WEEKNUM	datetime	unreviewed		0	0	serial_number,[return_type]
-EXCEL	WORKDAY	datetime	unreviewed		0	0	start_date, days, [holidays]
+EXCEL	WORKDAY	datetime	have	datetime	0	0	start_date, days, [holidays]
 EXCEL	WORKDAY.INTL	datetime	unreviewed		0	0	start_date, days, [weekend], [holidays]
-EXCEL	YEAR	datetime	have	SwiftXLSX	21589	36	serial_number
-EXCEL	YEARFRAC	datetime	bindable	DayCountConvention.yearFraction	3425	9	start_date, end_date, [basis]
-EXCEL	AND	logical	have	SwiftXLSX	4629	50	logical1, [logical2], ...
+EXCEL	YEAR	datetime	have	datetime	21589	36	serial_number
+EXCEL	YEARFRAC	datetime	have	bindings	3425	9	start_date, end_date, [basis]
+EXCEL	AND	logical	have	logic	4629	50	logical1, [logical2], ...
 EXCEL	BYCOL	logical	unreviewed		0	0	array, lambda(column)
 EXCEL	BYROW	logical	unreviewed		0	0	array, lambda(row)
-EXCEL	FALSE	logical	have	SwiftXLSX	0	0	(no arguments)
-EXCEL	IF	logical	have	SwiftXLSX	93526	239	logical_test, value_if_true, [value_if_false]
-EXCEL	IFERROR	logical	have	SwiftXLSX	168779	130	value, value_if_error
-EXCEL	IFNA	logical	have	SwiftXLSX	0	0	value, value_if_na
+EXCEL	FALSE	logical	have	logic	0	0	(no arguments)
+EXCEL	IF	logical	have	logic	93526	239	logical_test, value_if_true, [value_if_false]
+EXCEL	IFERROR	logical	have	logic	168779	130	value, value_if_error
+EXCEL	IFNA	logical	have	logic	0	0	value, value_if_na
 EXCEL	IFS	logical	unreviewed		0	0	logical_test1, value_if_true1, [logical_test2, value_if_true2], [logical_test3, value_if_true3],...
 EXCEL	LAMBDA	logical	unreviewed		0	0	[parameter1, parameter2, ...,] calculation
 EXCEL	LET	logical	unreviewed		0	0	name1, name_value1, calculation_or_name2, [name_value2, calculation_or_name3...]
 EXCEL	MAKEARRAY	logical	unreviewed		0	0	rows, cols, lambda(row, col)
 EXCEL	MAP	logical	unreviewed		0	0	array1, lambda_or_array<#>
-EXCEL	NOT	logical	have	SwiftXLSX	51	6	logical
-EXCEL	OR	logical	have	SwiftXLSX	21055	25	logical1, [logical2], ...
+EXCEL	NOT	logical	have	logic	51	6	logical
+EXCEL	OR	logical	have	logic	21055	25	logical1, [logical2], ...
 EXCEL	REDUCE	logical	unreviewed		0	0	[initial_value], array, lambda(accumulator, value, body)
 EXCEL	SCAN	logical	unreviewed		0	0	[initial_value], array, lambda(accumulator, value, body)
 EXCEL	SWITCH	logical	unreviewed		0	0	expression, value1, result1, [default or value2, result2],...[default or value3, result3]
-EXCEL	TRUE	logical	have	SwiftXLSX	0	0	(no arguments)
+EXCEL	TRUE	logical	have	logic	0	0	(no arguments)
 EXCEL	XOR	logical	unreviewed		0	0	logical1, [logical2],...
-EXCEL	CELL	information	unreviewed		0	0	info_type, [reference]
+EXCEL	CELL	information	have	navigation	0	0	info_type, [reference]
 EXCEL	ERROR.TYPE	information	unreviewed		0	0	error_val
 EXCEL	INFO	information	unreviewed		0	0	type_text
-EXCEL	ISBLANK	information	unreviewed		386	11	value
-EXCEL	ISERR	information	unreviewed		3	3	value
-EXCEL	ISERROR	information	unreviewed		2462	35	value
+EXCEL	ISBLANK	information	have	logic	386	11	value
+EXCEL	ISERR	information	have	logic	3	3	value
+EXCEL	ISERROR	information	have	logic	2462	35	value
 EXCEL	ISEVEN	information	unreviewed		0	0	number
 EXCEL	ISFORMULA	information	unreviewed		0	0	reference
 EXCEL	ISLOGICAL	information	unreviewed		0	0	value
-EXCEL	ISNA	information	unreviewed		272	8	value
+EXCEL	ISNA	information	have	logic	272	8	value
 EXCEL	ISNONTEXT	information	unreviewed		0	0	value
-EXCEL	ISNUMBER	information	unreviewed		493	1	value
+EXCEL	ISNUMBER	information	have	logic	493	1	value
 EXCEL	ISODD	information	unreviewed		0	0	number
 EXCEL	ISOMITTED	information	unreviewed		0	0	argument
-EXCEL	ISREF	information	unreviewed		12	12	value
-EXCEL	ISTEXT	information	unreviewed		35	5	value
+EXCEL	ISREF	information	have	logic	12	12	value
+EXCEL	ISTEXT	information	have	logic	35	5	value
 EXCEL	N	information	unreviewed		0	0	value
-EXCEL	NA	information	unreviewed		124	23	(no arguments)
+EXCEL	NA	information	have	logic	124	23	(no arguments)
 EXCEL	SHEET	information	unreviewed		0	0	value
 EXCEL	SHEETS	information	unreviewed		0	0	reference
 EXCEL	STOCKHISTORY	information	unreviewed		0	0	stock, start_date, [end_date], [interval], [headers], [property0], [property1], [property2], [property3], [property4], [property5]
 EXCEL	TYPE	information	unreviewed		0	0	value
-EXCEL	ADDRESS	lookup	unreviewed		21017	32	row_num, column_num, [abs_num], [a1], [sheet_text]
+EXCEL	ADDRESS	lookup	have	navigation	21017	32	row_num, column_num, [abs_num], [a1], [sheet_text]
 EXCEL	AREAS	lookup	unreviewed		0	0	reference
-EXCEL	CHOOSE	lookup	unreviewed		40	21	index_num, value1, [value2], ...
+EXCEL	CHOOSE	lookup	have	navigation	40	21	index_num, value1, [value2], ...
 EXCEL	CHOOSECOLS	lookup	unreviewed		0	0	array,col_num1,[col_num2],...
 EXCEL	CHOOSEROWS	lookup	unreviewed		0	0	array,row_num1,[row_num2],...
-EXCEL	COLUMN	lookup	unreviewed		86620	45	[reference]
-EXCEL	COLUMNS	lookup	unreviewed		0	0	array
+EXCEL	COLUMN	lookup	have	navigation	86620	45	[reference]
+EXCEL	COLUMNS	lookup	have	navigation	0	0	array
 EXCEL	DROP	lookup	unreviewed		0	0	array, rows,[columns]
 EXCEL	EXPAND	lookup	unreviewed		0	0	array, rows, [columns], [pad_with]
 EXCEL	FILTER	lookup	unreviewed		0	0	array,include,[if_empty]
 EXCEL	FORMULATEXT	lookup	unreviewed		0	0	reference
-EXCEL	GETPIVOTDATA	lookup	unreviewed		0	0	data_field, pivot_table, [field1, item1, field2, item2], ...
+EXCEL	GETPIVOTDATA	lookup	have	navigation	0	0	data_field, pivot_table, [field1, item1, field2, item2], ...
 EXCEL	GROUPBY	lookup	unreviewed		0	0	row_fields,values,function,[field_headers],[total_depth],[sort_order],[filter_array],[field_relationship]
-EXCEL	HLOOKUP	lookup	have	SwiftXLSX	797	16	lookup_value, table_array, row_index_num, [range_lookup]
+EXCEL	HLOOKUP	lookup	have	navigation	797	16	lookup_value, table_array, row_index_num, [range_lookup]
 EXCEL	HSTACK	lookup	unreviewed		0	0	array1,[array2],...
-EXCEL	HYPERLINK	lookup	unreviewed		0	0	link_location, [friendly_name]
+EXCEL	HYPERLINK	lookup	have	navigation	0	0	link_location, [friendly_name]
 EXCEL	IMAGE	lookup	unreviewed		0	0	source, [alt_text], [sizing], [height], [width]
-EXCEL	INDEX	lookup	have	SwiftXLSX	605	43	array, row_num, [column_num]
-EXCEL	INDIRECT	lookup	unreviewed		21017	32	ref_text, [a1]
-EXCEL	LOOKUP	lookup	bindable	PreviousValueInterpolator	8	5	lookup_value, lookup_vector, [result_vector]
-EXCEL	MATCH	lookup	have	SwiftXLSX	380	18	lookup_value, lookup_array, [match_type]
-EXCEL	OFFSET	lookup	unreviewed		9798	32	reference, rows, cols, [height], [width]
+EXCEL	INDEX	lookup	have	navigation	605	43	array, row_num, [column_num]
+EXCEL	INDIRECT	lookup	have	navigation	21017	32	ref_text, [a1]
+EXCEL	LOOKUP	lookup	have	navigation	8	5	lookup_value, lookup_vector, [result_vector]
+EXCEL	MATCH	lookup	have	navigation	380	18	lookup_value, lookup_array, [match_type]
+EXCEL	OFFSET	lookup	have	navigation	9798	32	reference, rows, cols, [height], [width]
 EXCEL	PIVOTBY	lookup	unreviewed		0	0	row_fields,col_fields,values,function,[field_headers],[row_total_depth],[row_sort_order],[col_total_depth],[col_sort_order],[filter_array],[relative_to]
-EXCEL	ROW	lookup	unreviewed		1222	2	[reference]
-EXCEL	ROWS	lookup	unreviewed		0	0	array
+EXCEL	ROW	lookup	have	navigation	1222	2	[reference]
+EXCEL	ROWS	lookup	have	navigation	0	0	array
 EXCEL	RTD	lookup	unreviewed		0	0	ProgID, server, topic1, [topic2], ...
 EXCEL	SORT	lookup	unreviewed		0	0	array,[sort_index],[sort_order],[by_col]
 EXCEL	SORTBY	lookup	unreviewed		0	0	array, by_array1, [sort_order1], [by_array2, sort_order2],...
 EXCEL	TAKE	lookup	unreviewed		0	0	array, rows,[columns]
 EXCEL	TOCOL	lookup	unreviewed		0	0	array, [ignore], [scan_by_column]
 EXCEL	TOROW	lookup	unreviewed		0	0	array, [ignore], [scan_by_column]
-EXCEL	TRANSPOSE	lookup	bindable	transposed	1	1	array
+EXCEL	TRANSPOSE	lookup	have	array	1	1	array
 EXCEL	TRIMRANGE	lookup	unreviewed		0	0	range,[trim_rows],[trim_cols]
 EXCEL	UNIQUE	lookup	unreviewed		0	0	array,[by_col],[exactly_once]
-EXCEL	VLOOKUP	lookup	have	SwiftXLSX	100628	69	lookup_value, table_array, col_index_num, [range_lookup]
+EXCEL	VLOOKUP	lookup	have	navigation	100628	69	lookup_value, table_array, col_index_num, [range_lookup]
 EXCEL	VSTACK	lookup	unreviewed		0	0	array1,[array2],...
 EXCEL	WRAPCOLS	lookup	unreviewed		0	0	vector, wrap_count, [pad_with]
 EXCEL	WRAPROWS	lookup	unreviewed		0	0	vector, wrap_count, [pad_with]
-EXCEL	XLOOKUP	lookup	unreviewed		0	0	lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]
+EXCEL	XLOOKUP	lookup	have	navigation	0	0	lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]
 EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [search_mode]
 EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
 EXCEL	ASC	text	bindable	Lease.rightOfUseAsset	0	0	text
 EXCEL	ARRAYTOTEXT	text	unreviewed		0	0	array, [format]
 EXCEL	BAHTTEXT	text	unreviewed		0	0	number
 EXCEL	CHAR	text	unreviewed		0	0	number
-EXCEL	CLEAN	text	unreviewed		0	0	text
+EXCEL	CLEAN	text	have	text	0	0	text
 EXCEL	CODE	text	unreviewed		0	0	text
 EXCEL	CONCAT	text	unreviewed		0	0	text1, [text2],...
-EXCEL	CONCATENATE	text	have	SwiftXLSX	0	0	text1, [text2], ...
+EXCEL	CONCATENATE	text	have	text	0	0	text1, [text2], ...
 EXCEL	DBCS	text	unreviewed		0	0	text
 EXCEL	DETECTLANGUAGE	text	unreviewed		0	0	text
 EXCEL	DOLLAR	text	unreviewed		0	0	number, [decimals]
 EXCEL	EXACT	text	unreviewed		0	0	text1, text2
-EXCEL	FIND	text	unreviewed		0	0	find_text, within_text, [start_num]
+EXCEL	FIND	text	have	text	0	0	find_text, within_text, [start_num]
 EXCEL	FINDB	text	unreviewed		0	0	find_text, within_text, [start_num]
 EXCEL	FIXED	text	unreviewed		0	0	number, [decimals], [no_commas]
-EXCEL	LEFT	text	have	SwiftXLSX	17	1	text, [num_chars]
+EXCEL	LEFT	text	have	text	17	1	text, [num_chars]
 EXCEL	LEFTB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	LEN	text	have	SwiftXLSX	0	0	text
+EXCEL	LEN	text	have	text	0	0	text
 EXCEL	LENB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	LOWER	text	have	SwiftXLSX	0	0	text
-EXCEL	MID	text	have	SwiftXLSX	0	0	text, start_num, num_chars
+EXCEL	LOWER	text	have	text	0	0	text
+EXCEL	MID	text	have	text	0	0	text, start_num, num_chars
 EXCEL	MIDB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	NUMBERVALUE	text	unreviewed		0	0	Text, [Decimal_separator], [Group_separator]
+EXCEL	NUMBERVALUE	text	have	text	0	0	Text, [Decimal_separator], [Group_separator]
 EXCEL	PHONETIC	text	unreviewed		0	0	reference
-EXCEL	PROPER	text	unreviewed		0	0	text
+EXCEL	PROPER	text	have	text	0	0	text
 EXCEL	REGEXEXTRACT	text	unreviewed		0	0	text, pattern, [return_mode], [case_sensitivity]
 EXCEL	REGEXREPLACE	text	unreviewed		0	0	text, pattern, replacement, [occurrence], [case_sensitivity]
 EXCEL	REGEXTEST	text	unreviewed		0	0	text, pattern, [case_sensitivity]
 EXCEL	REPLACE	text	unreviewed		0	0	old_text, start_num, num_chars, new_text
 EXCEL	REPLACEB	text	unreviewed		0	0	UNCONFIRMED
 EXCEL	REPT	text	unreviewed		0	0	text, number_times
-EXCEL	RIGHT	text	have	SwiftXLSX	61	13	text,[num_chars]
+EXCEL	RIGHT	text	have	text	61	13	text,[num_chars]
 EXCEL	RIGHTB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	SEARCH	text	unreviewed		0	0	find_text, within_text, [start_num]
+EXCEL	SEARCH	text	have	text	0	0	find_text, within_text, [start_num]
 EXCEL	SEARCHB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	SUBSTITUTE	text	unreviewed		0	0	text, old_text, new_text, [instance_num]
+EXCEL	SUBSTITUTE	text	have	text	0	0	text, old_text, new_text, [instance_num]
 EXCEL	T	text	unreviewed		0	0	value
-EXCEL	TEXT	text	have	SwiftXLSX	51	24	value, format_text
+EXCEL	TEXT	text	have	text	51	24	value, format_text
 EXCEL	TEXTAFTER	text	unreviewed		0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
 EXCEL	TEXTBEFORE	text	unreviewed		0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
 EXCEL	TEXTJOIN	text	unreviewed		0	0	delimiter, ignore_empty, text1, [text2], ...
 EXCEL	TEXTSPLIT	text	unreviewed		0	0	text,col_delimiter,[row_delimiter],[ignore_empty], [match_mode], [pad_with]
 EXCEL	TRANSLATE	text	unreviewed		0	0	text, [source_language], [target_language]
-EXCEL	TRIM	text	have	SwiftXLSX	0	0	text
-EXCEL	UNICHAR	text	unreviewed		0	0	number
-EXCEL	UNICODE	text	unreviewed		0	0	text
-EXCEL	UPPER	text	have	SwiftXLSX	0	0	text
+EXCEL	TRIM	text	have	text	0	0	text
+EXCEL	UNICHAR	text	have	text	0	0	number
+EXCEL	UNICODE	text	have	text	0	0	text
+EXCEL	UPPER	text	have	text	0	0	text
 EXCEL	VALUE	text	unreviewed		0	0	text
 EXCEL	VALUETOTEXT	text	unreviewed		0	0	value, [format]
 EXCEL	JIS	text	unreviewed		0	0	text
@@ -427,7 +428,7 @@ EXCEL	BESSELI	engineering	unreviewed		0	0	X, N
 EXCEL	BESSELJ	engineering	unreviewed		0	0	X, N
 EXCEL	BESSELK	engineering	unreviewed		0	0	X, N
 EXCEL	BESSELY	engineering	unreviewed		0	0	X, N
-EXCEL	BIN2DEC	engineering	unreviewed		0	0	number
+EXCEL	BIN2DEC	engineering	have	math	0	0	number
 EXCEL	BIN2HEX	engineering	unreviewed		0	0	number, [places]
 EXCEL	BIN2OCT	engineering	unreviewed		0	0	number, [places]
 EXCEL	BITAND	engineering	unreviewed		0	0	number1, number2
@@ -437,9 +438,9 @@ EXCEL	BITRSHIFT	engineering	unreviewed		0	0	number, shift_amount
 EXCEL	BITXOR	engineering	unreviewed		0	0	number1, number2
 EXCEL	COMPLEX	engineering	unreviewed		0	0	real_num, i_num, [suffix]
 EXCEL	CONVERT	engineering	unreviewed		0	0	number,from_unit,to_unit
-EXCEL	DEC2BIN	engineering	unreviewed		0	0	number, [places]
-EXCEL	DEC2HEX	engineering	unreviewed		0	0	number, [places]
-EXCEL	DEC2OCT	engineering	unreviewed		0	0	number, [places]
+EXCEL	DEC2BIN	engineering	have	math	0	0	number, [places]
+EXCEL	DEC2HEX	engineering	have	math	0	0	number, [places]
+EXCEL	DEC2OCT	engineering	have	math	0	0	number, [places]
 EXCEL	DELTA	engineering	unreviewed		0	0	number1, [number2]
 EXCEL	ERF	engineering	unreviewed		0	0	lower_limit,[upper_limit]
 EXCEL	ERF.PRECISE	engineering	unreviewed		0	0	x
@@ -447,7 +448,7 @@ EXCEL	ERFC	engineering	unreviewed		0	0	x
 EXCEL	ERFC.PRECISE	engineering	unreviewed		0	0	x
 EXCEL	GESTEP	engineering	unreviewed		0	0	number, [step]
 EXCEL	HEX2BIN	engineering	unreviewed		0	0	number, [places]
-EXCEL	HEX2DEC	engineering	unreviewed		0	0	number
+EXCEL	HEX2DEC	engineering	have	math	0	0	number
 EXCEL	HEX2OCT	engineering	unreviewed		0	0	number, [places]
 EXCEL	IMABS	engineering	unreviewed		0	0	inumber
 EXCEL	IMAGINARY	engineering	unreviewed		0	0	inumber
@@ -475,22 +476,22 @@ EXCEL	IMSUB	engineering	unreviewed		0	0	inumber1, inumber2
 EXCEL	IMSUM	engineering	unreviewed		0	0	inumber1, [inumber2], ...
 EXCEL	IMTAN	engineering	unreviewed		0	0	inumber
 EXCEL	OCT2BIN	engineering	unreviewed		0	0	number, [places]
-EXCEL	OCT2DEC	engineering	unreviewed		0	0	number
+EXCEL	OCT2DEC	engineering	have	math	0	0	number
 EXCEL	OCT2HEX	engineering	unreviewed		0	0	number, [places]
 EXCEL	BETADIST	compatibility	unreviewed		0	0	x,alpha,beta,[A],[B]
 EXCEL	BETAINV	compatibility	unreviewed		0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOMDIST	compatibility	unreviewed		0	0	number_s,trials,probability_s,cumulative
-EXCEL	CEILING	compatibility	have	SwiftXLSX	2	2	number, significance
+EXCEL	CEILING	compatibility	have	math	2	2	number, significance
 EXCEL	CHIDIST	compatibility	unreviewed		0	0	x,deg_freedom
 EXCEL	CHIINV	compatibility	unreviewed		0	0	probability,deg_freedom
 EXCEL	CHITEST	compatibility	unreviewed		0	0	actual_range,expected_range
 EXCEL	CONFIDENCE	compatibility	unreviewed		0	0	alpha,standard_dev,size
-EXCEL	COVAR	compatibility	bindable	covarianceP	25	1	array1,array2
+EXCEL	COVAR	compatibility	have	bindings	25	1	array1,array2
 EXCEL	CRITBINOM	compatibility	unreviewed		0	0	trials,probability_s,alpha
 EXCEL	EXPONDIST	compatibility	unreviewed		0	0	x,lambda,cumulative
 EXCEL	FDIST	compatibility	unreviewed		0	0	x,deg_freedom1,deg_freedom2
 EXCEL	FINV	compatibility	unreviewed		0	0	probability,deg_freedom1,deg_freedom2
-EXCEL	FLOOR	compatibility	have	SwiftXLSX	0	0	number, significance
+EXCEL	FLOOR	compatibility	have	math	0	0	number, significance
 EXCEL	FTEST	compatibility	unreviewed		0	0	array1,array2
 EXCEL	GAMMADIST	compatibility	unreviewed		0	0	x,alpha,beta,cumulative
 EXCEL	GAMMAINV	compatibility	unreviewed		0	0	probability,alpha,beta
@@ -499,22 +500,22 @@ EXCEL	LOGINV	compatibility	unreviewed		0	0	probability, mean, standard_dev
 EXCEL	LOGNORMDIST	compatibility	unreviewed		0	0	x,mean,standard_dev
 EXCEL	MODE	compatibility	bindable	mode	0	0	number1,[number2],...
 EXCEL	NEGBINOMDIST	compatibility	unreviewed		0	0	number_f,number_s,probability_s
-EXCEL	NORMDIST	compatibility	bindable	normDist	0	0	x,mean,standard_dev,cumulative
-EXCEL	NORMINV	compatibility	bindable	normInv	0	0	probability,mean,standard_dev
-EXCEL	NORMSDIST	compatibility	bindable	normSDist	0	0	z
-EXCEL	NORMSINV	compatibility	bindable	normSInv	0	0	probability
-EXCEL	PERCENTILE	compatibility	have	SwiftXLSX	0	0	array,k
+EXCEL	NORMDIST	compatibility	have	bindings	0	0	x,mean,standard_dev,cumulative
+EXCEL	NORMINV	compatibility	have	bindings	0	0	probability,mean,standard_dev
+EXCEL	NORMSDIST	compatibility	have	bindings	0	0	z
+EXCEL	NORMSINV	compatibility	have	bindings	0	0	probability
+EXCEL	PERCENTILE	compatibility	have	stats	0	0	array,k
 EXCEL	PERCENTRANK	compatibility	unreviewed		0	0	array,x,[significance]
 EXCEL	POISSON	compatibility	unreviewed		0	0	x,mean,cumulative
 EXCEL	QUARTILE	compatibility	unreviewed		0	0	array,quart
-EXCEL	RANK	compatibility	bindable	ConsolidatedStatements.ranked	0	0	number,ref,[order]
-EXCEL	STDEV	compatibility	have	SwiftXLSX	5	1	number1,[number2],...
-EXCEL	STDEVP	compatibility	have	SwiftXLSX	0	0	number1,[number2],...
+EXCEL	RANK	compatibility	have	bindings	0	0	number,ref,[order]
+EXCEL	STDEV	compatibility	have	stats	5	1	number1,[number2],...
+EXCEL	STDEVP	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	TDIST	compatibility	unreviewed		0	0	x,deg_freedom,tails
 EXCEL	TINV	compatibility	unreviewed		0	0	probability,deg_freedom
 EXCEL	TTEST	compatibility	unreviewed		0	0	array1,array2,tails,type
-EXCEL	VAR	compatibility	have	SwiftXLSX	0	0	number1,[number2],...
-EXCEL	VARP	compatibility	have	SwiftXLSX	0	0	number1,[number2],...
+EXCEL	VAR	compatibility	have	stats	0	0	number1,[number2],...
+EXCEL	VARP	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	WEIBULL	compatibility	unreviewed		0	0	x,alpha,beta,cumulative
 EXCEL	ZTEST	compatibility	unreviewed		0	0	array,x,[sigma]
 PSI	PsiAbsDev	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
@@ -523,7 +524,7 @@ PSI	PsiAR1	distribution	unreviewed		0	0	mean, volatility, coef1, val0|confirmed
 PSI	PsiAR2	distribution	unreviewed		0	0	mean, volatility, coef1, coef2, val0, val1|confirmed
 PSI	PsiARCH1	distribution	unreviewed		0	0	mean, volatility, err_coef, val0|confirmed
 PSI	PsiARMA11	distribution	unreviewed		0	0	mean, volatility, ar_coef, ma_coef, val0, err0|confirmed
-PSI	PsiBaseCase	property	unreviewed		95	7	value|confirmed
+PSI	PsiBaseCase	property	have	risksolver	95	7	value|confirmed
 PSI	PsiBernoulli	distribution	unreviewed		45	2	p|confirmed
 PSI	PsiBeta	distribution	bindable	DistributionBeta	0	0	alpha1, alpha2|confirmed
 PSI	PsiBetaGen	distribution	bindable	DistributionBeta	0	0	alpha1, alpha2, a, b|confirmed
@@ -678,7 +679,7 @@ PSI	PsiMVNormal	distribution	unreviewed		0	0	mu, sigma|confirmed
 PSI	PsiMVResample	distribution	unreviewed		0	0	data|confirmed
 PSI	PsiMVShuffle	distribution	unreviewed		0	0	data|confirmed
 PSI	PsiMyerson	distribution	unreviewed		0	0	a, b, c, t|confirmed
-PSI	PsiName	property	unreviewed		25	7	name|confirmed
+PSI	PsiName	property	have	risksolver	25	7	name|confirmed
 PSI	PsiNegBinomial	distribution	unreviewed		0	0	s, p|confirmed
 PSI	PsiNormal	distribution	bindable	boxMuller	12	4	mu (mean), sigma (stdev)|confirmed
 PSI	PsiNormalAlt	distribution	bindable	boxMuller	0	0	2 parameters: 2 different percentiles, or percentile and mean, or percentile and stdev|confirmed
@@ -689,7 +690,7 @@ PSI	PsiOption	annotation	not ours	role declaration, belongs with solver_adj	0	0	
 PSI	PsiOptParam	annotation	not ours	role declaration, belongs with solver_adj	14	11	values_or_lower, upper, base_case|confirmed
 PSI	PsiOptStatus	other	unreviewed		0	0	UNCONFIRMED|inferred
 PSI	PsiOptValue	other	unreviewed		0	0	cell_or_name, optimization, model|confirmed
-PSI	PsiOutput	annotation	not ours	role declaration, belongs with solver_adj	24	11	cell_or_name, [instance], [PsiSixSigma]|confirmed
+PSI	PsiOutput	annotation	have	risksolver	24	11	cell_or_name, [instance], [PsiSixSigma]|confirmed
 PSI	PsiParamDim	other	unreviewed		0	0	name, range_or_array|confirmed
 PSI	PsiPareto	distribution	bindable	DistributionPareto	0	0	theta, a|confirmed
 PSI	PsiPareto2	distribution	bindable	DistributionPareto	0	0	b, q|confirmed

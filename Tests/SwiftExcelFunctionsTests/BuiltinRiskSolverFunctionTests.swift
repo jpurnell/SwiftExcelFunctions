@@ -14,7 +14,8 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
     }
 
     func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)), ["PSIOUTPUT"])
+        XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)),
+                       ["PSIOUTPUT", "PSIBASECASE", "PSINAME"])
     }
 
     /// `PsiOutput()` marks a cell as a simulation result. It contributes nothing to
@@ -37,6 +38,39 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
             cells: EmptyCells(), names: NamedRangeCollection())
         XCTAssertEqual(marked, plain)
         XCTAssertEqual(marked, .number(42))
+    }
+
+    // MARK: - Property functions
+
+    /// `PsiBaseCase(v)` is `v`. It is what a distribution shows when nothing is
+    /// simulating, and it is deterministic — the one part of the family that is.
+    func testPsiBaseCaseIsItsArgument() throws {
+        XCTAssertEqual(try eval("PSIBASECASE", .number(42)), .number(42))
+        XCTAssertEqual(try eval("PSIBASECASE", .text("x")), .text("x"))
+    }
+
+    func testPsiNameIsItsLabel() throws {
+        XCTAssertEqual(try eval("PSINAME", .text("Aggressive Launch")),
+                       .text("Aggressive Launch"))
+    }
+
+    /// The reason they are implemented before the distributions are: they are
+    /// *arguments*, so the evaluator evaluates them regardless, and an unregistered
+    /// one is `#NAME?` that propagation then carries outward — failing a distribution
+    /// that is otherwise correct.
+    func testAPropertyFunctionDoesNotPoisonItsEnclosingCall() throws {
+        let result = try FormulaEvaluator.evaluate(
+            .function("SUM", [.number(10),
+                              .function("_xll.PsiBaseCase", [.number(5)])]),
+            cells: EmptyCells(), names: NamedRangeCollection())
+        XCTAssertEqual(result, .number(15))
+    }
+
+    /// They resolve through the add-in prefix, as the corpus writes them.
+    func testThePropertyFunctionsResolveThroughThePrefix() {
+        let registry = FunctionRegistry.builtin
+        XCTAssertNotNil(registry.function(named: "_xll.PsiBaseCase"))
+        XCTAssertNotNil(registry.function(named: "_xll.PsiName"))
     }
 
     // MARK: - Excel's "not my name" prefixes

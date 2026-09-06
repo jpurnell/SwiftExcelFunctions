@@ -137,14 +137,23 @@ Against Microsoft's 519 documented worksheet functions:
 
 | Marking | Count | Meaning |
 |---|---|---|
-| `have` | **72** | implemented in SwiftXLSX today; moves here unchanged |
-| `bindable` | **84** | BusinessMath computes it; needs an Excel-facing binding |
+| `have` | **160** | registered and answering; verified against the live registry |
+| `bindable` | **57** | BusinessMath computes it; needs an Excel-facing binding |
 | `new` | 6 | verified absent everywhere |
 | `out of scope` | 10 | cube and web — need an OLAP connection or the network |
-| `unreviewed` | 347 | no evidence either way; **not** the same as absent |
+| `unreviewed` | 286 | no evidence either way; **not** the same as absent |
 
-Risk Solver's 295 PSI functions: **50 bindable**, 13 that are role declarations rather than
-functions, 232 unreviewed.
+Risk Solver's 295 PSI functions: **3 have** (`PsiOutput`, `PsiBaseCase`, `PsiName` — the markers),
+**50 bindable**, 12 that are role declarations rather than functions, 230 unreviewed.
+
+`have` is not self-reported. The matrix is reconciled against `FunctionRegistry` itself —
+every group's `all`, plus the alias table, which is why `STDEV.S` counts as covered by whatever
+covers `STDEVS`. A function is `have` when the registry answers to its name and nothing else.
+
+Two columns are **not** maintained that way. `calls` and `books` are the scaffold-time corpus
+scan, and the recent census disagrees with them — `PsiBaseCase` reads 95/7 here and 129/6 there.
+Treat them as an ordering hint for what to do next, not as a measurement. Refreshing them needs a
+full-corpus census, which currently traps partway through.
 
 ---
 
@@ -212,7 +221,9 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-04 — created. Scope and counts from the coverage matrix; nothing
+**Last Updated:** 2026-09-06 — coverage table reconciled against the live `FunctionRegistry`:
+`have` 72 → 160 as the Excel-facing bindings landed, `bindable` 84 → 57, `unreviewed` 347 → 286.
+Earlier: created 2026-09-04. Scope and counts from the coverage matrix; nothing
 implemented yet.
 
 ---

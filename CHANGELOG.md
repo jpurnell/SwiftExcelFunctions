@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The coverage matrix is reconciled against the registry rather than by hand.**
+
+  `project/plans/excel_function_coverage_matrix.tsv` had not moved since it was
+  scaffolded, so it still described the pre-extraction package: 72 functions, all
+  of them attributed to SwiftXLSX. 163 rows were wrong.
+
+  It is now generated against `FunctionRegistry` itself — every group's `all`,
+  plus the alias table, so `STDEV.S` is covered by whatever covers `STDEVS`. Of
+  Excel's 519 documented functions, **160 `have`** (was 72), 57 bindable, 286
+  unreviewed; of Risk Solver's 295, three markers implemented and 50 bindable.
+  Nothing previously claimed has been lost — the check runs both directions.
+
+  The `provider` column now names the group that registers a function instead of
+  a scaffold-time guess at which BusinessMath symbol might supply it. Several of
+  those guesses were wrong (`NORM.S.INV` was attributed to
+  `NewsvendorModel.optimalQuantity`), and the real call is in the binding's own
+  source, where it cannot drift from the code.
+
+  A header row names the eight columns, which were previously positional.
+
+  `calls` and `books` are **not** reconciled and are flagged as such in the
+  master plan: they are the original corpus scan, and the recent census disagrees
+  with them. Refreshing them needs a full-corpus run, which currently traps
+  partway through.
+
 ## [0.5.0] - 2026-09-05
 
 ### Added
