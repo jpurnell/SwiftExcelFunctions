@@ -59,7 +59,9 @@ final class BuiltinMathFunctionTests: XCTestCase {
              "POWER", "MOD", "INT", "CEILING", "FLOOR", "SIGN", "PI",
              "RAND", "RANDBETWEEN",
              "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN", "ATAN2",
-             "LOG10", "TRUNC", "PRODUCT", "GCD", "LCM"])
+             "LOG10", "TRUNC", "PRODUCT", "GCD", "LCM",
+             "DEC2HEX", "DEC2BIN", "DEC2OCT", "HEX2DEC", "BIN2DEC", "OCT2DEC",
+             "BASE", "DECIMAL"])
     }
 
     // MARK: - ABS

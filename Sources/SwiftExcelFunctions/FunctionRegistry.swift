@@ -96,10 +96,10 @@ public struct FunctionRegistry: Sendable {
                 registry.register(fn)
             }
         }
-        for (modern, legacy) in FunctionRegistry.modernSpellings {
-            guard let function = registry.function(named: legacy) else { continue }
+        for (alias, existing) in FunctionRegistry.alternateSpellings {
+            guard let function = registry.function(named: existing) else { continue }
             registry.register(ExcelFunction(
-                name: modern,
+                name: alias,
                 minArgs: function.minArgs,
                 maxArgs: function.maxArgs,
                 evaluate: function.evaluate))
@@ -107,6 +107,13 @@ public struct FunctionRegistry: Sendable {
         return registry
     }
 
+    /// A second name for a function that is already implemented.
+    ///
+    /// The pair is `(alias, existing)`: the second must be registered and the first
+    /// is added beside it. Written the other way round the entry silently does
+    /// nothing, because the lookup finds no function to copy — which is exactly what
+    /// four entries here did before the direction was named in the field labels.
+    ///
     /// Names Excel 2010 gave to functions that already existed.
     ///
     /// Both spellings are live. Excel renamed `STDEV` to `STDEV.S` and kept the
@@ -117,12 +124,20 @@ public struct FunctionRegistry: Sendable {
     /// Registered as an alias rather than reimplemented. The pair must never be
     /// able to disagree, and the only way to guarantee that is for them to be the
     /// same function under two names.
-    static let modernSpellings: [(modern: String, legacy: String)] = [
+    static let alternateSpellings: [(alias: String, existing: String)] = [
         ("STDEV.S", "STDEV"),
         ("STDEV.P", "STDEVP"),
         ("VAR.S", "VAR"),
         ("VAR.P", "VARP"),
         ("PERCENTILE.INC", "PERCENTILE"),
+        // And the reverse case: here the *dotted* name is what is implemented and
+        // the older spelling is what workbooks still write. `NORMSINV` is 34 corpus
+        // calls across six workbooks, and would otherwise be `#NAME?` for the sake
+        // of a full stop.
+        ("NORMSINV", "NORM.S.INV"),
+        ("NORMSDIST", "NORM.S.DIST"),
+        ("NORMDIST", "NORM.DIST"),
+        ("NORMINV", "NORM.INV"),
     ]
 
     // MARK: - Factory

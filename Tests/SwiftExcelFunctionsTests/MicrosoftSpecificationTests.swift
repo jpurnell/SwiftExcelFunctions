@@ -853,6 +853,179 @@ final class MicrosoftSpecificationTests: XCTestCase {
             [.error(.name), .text("$A$3")]), .error(.name))
     }
 
+    // MARK: - Legacy spellings
+
+    /// Excel renamed the statistical functions and kept the old names working. A
+    /// workbook saved before the rename still writes `NORMSINV`, and 34 corpus cells
+    /// do — which would be `#NAME?` over a full stop.
+    func testLegacySpellingsResolve() {
+        let registry = FunctionRegistry.builtin
+        for (legacy, modern) in [("NORMSINV", "NORM.S.INV"), ("NORMSDIST", "NORM.S.DIST"),
+                                 ("NORMDIST", "NORM.DIST"), ("NORMINV", "NORM.INV"),
+                                 ("STDEV", "STDEV.S")] {
+            XCTAssertNotNil(registry.function(named: legacy), legacy)
+            XCTAssertNotNil(registry.function(named: modern), modern)
+        }
+    }
+
+    /// An alias exists only in the registry, not in any group's `all`, so it is
+    /// looked up the way a formula would reach it.
+    func testLegacyAndModernAgree() throws {
+        let registry = FunctionRegistry.builtin
+        let legacy = try XCTUnwrap(registry.function(named: "NORMSINV"))
+        let modern = try XCTUnwrap(registry.function(named: "NORM.S.INV"))
+        let probability = CellValue.number(0.9087887802741321)
+        XCTAssertEqual(try legacy.evaluate([probability]),
+                       try modern.evaluate([probability]))
+    }
+
+    // MARK: - TRUE() and FALSE()
+
+    /// Excel accepts the booleans with parentheses, and a workbook writing
+    /// `IF(ISTEXT(B2)=TRUE(), …)` is doing something ordinary.
+    func testTheBooleansAreCallable() throws {
+        XCTAssertEqual(try function("TRUE").evaluate([]), .bool(true))
+        XCTAssertEqual(try function("FALSE").evaluate([]), .bool(false))
+    }
+
+    // MARK: - Character codes
+
+    /// `UNICODE` gives the whole code point, where `CODE` gives only the first byte
+    /// of the legacy set. They agree on ASCII and part company above it.
+    func testUnicodeReadsTheCodePoint() throws {
+        XCTAssertEqual(try number("UNICODE", [.text("A")]), 65)
+        XCTAssertEqual(try number("UNICODE", [.text("€")]), 8364)
+        XCTAssertEqual(try number("UNICODE", [.text("Abc")]), 65, "the first character only")
+    }
+
+    func testUnicodeOfNothingIsAValueError() throws {
+        XCTAssertEqual(try function("UNICODE").evaluate([.text("")]), .error(.value))
+    }
+
+    func testUnicharRoundTripsWithUnicode() throws {
+        XCTAssertEqual(try function("UNICHAR").evaluate([.number(65)]), .text("A"))
+        XCTAssertEqual(try function("UNICHAR").evaluate([.number(8364)]), .text("€"))
+        XCTAssertEqual(try number("UNICODE", [try function("UNICHAR").evaluate([.number(233)])]),
+                       233)
+    }
+
+    /// Zero, the surrogate block and anything past the range name no character.
+    func testUnicharRefusesWhatIsNotACharacter() throws {
+        for value in [0.0, 55_296.0, 1_114_112.0] {
+            XCTAssertEqual(try function("UNICHAR").evaluate([.number(value)]),
+                           .error(.value), "\(value)")
+        }
+    }
+
+    // MARK: - Base conversion
+
+    // Excel's engineering conversions work in two's complement over a fixed window,
+    // which is why DEC2HEX(-1) is all Fs rather than a signed literal.
+
+    func testDecimalToOtherBases() throws {
+        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255)]), .text("FF"))
+        XCTAssertEqual(try function("DEC2BIN").evaluate([.number(9)]), .text("1001"))
+        XCTAssertEqual(try function("DEC2OCT").evaluate([.number(8)]), .text("10"))
+    }
+
+    func testNegativesWrapIntoTheWindow() throws {
+        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(-1)]),
+                       .text("FFFFFFFFFF"), "ten hex digits of two's complement")
+        XCTAssertEqual(try function("DEC2BIN").evaluate([.number(-1)]),
+                       .text("1111111111"), "ten binary digits")
+    }
+
+    /// The `places` argument pads, and Microsoft: "If places is negative, DEC2HEX
+    /// returns the #NUM! error value."
+    func testPlacesPadsAndValidates() throws {
+        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255), .number(4)]),
+                       .text("00FF"))
+        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255), .number(1)]),
+                       .error(.num), "too few places for the value")
+    }
+
+    func testConversionsRoundTrip() throws {
+        XCTAssertEqual(try number("HEX2DEC", [.text("FF")]), 255)
+        XCTAssertEqual(try number("BIN2DEC", [.text("1001")]), 9)
+        XCTAssertEqual(try number("OCT2DEC", [.text("10")]), 8)
+        XCTAssertEqual(try number("HEX2DEC", [.text("FFFFFFFFFF")]), -1,
+                       "the top bit is the sign, matching DEC2HEX")
+    }
+
+    /// `BASE` is unsigned and has no wrapping, which is what separates it from the
+    /// `DEC2*` family.
+    func testBaseIsUnsigned() throws {
+        XCTAssertEqual(try function("BASE").evaluate([.number(255), .number(16)]),
+                       .text("FF"))
+        XCTAssertEqual(try function("BASE").evaluate([.number(7), .number(2)]), .text("111"))
+        XCTAssertEqual(try function("BASE").evaluate([.number(7), .number(2), .number(8)]),
+                       .text("00000111"))
+        XCTAssertEqual(try function("BASE").evaluate([.number(-1), .number(16)]),
+                       .error(.num), "no two's complement here")
+    }
+
+    func testDecimalInvertsBase() throws {
+        XCTAssertEqual(try number("DECIMAL", [.text("FF"), .number(16)]), 255)
+        XCTAssertEqual(try number("DECIMAL", [.text("111"), .number(2)]), 7)
+        XCTAssertEqual(try function("DECIMAL").evaluate([.text("ZZ"), .number(16)]),
+                       .error(.num))
+    }
+
+    // MARK: - CELL
+
+    /// `CELL("contents"| "type", ref)` follows from the value.
+    func testCellReadsContentsAndType() throws {
+        // CELL needs the calling context to answer positional questions, so it is
+        // reached through the evaluator rather than called directly.
+        func cell(_ info: String, _ argument: FormulaAST) throws -> CellValue {
+            try FormulaEvaluator.evaluate(
+                .function("CELL", [.text(info), argument]),
+                cells: NoCells(), names: NamedRangeCollection())
+        }
+        XCTAssertEqual(try cell("contents", .number(42)), .number(42))
+        XCTAssertEqual(try cell("type", .text("hello")), .text("l"), "l for label")
+        XCTAssertEqual(try cell("type", .number(1)), .text("v"))
+        XCTAssertEqual(try cell("type", .text("")), .text("b"))
+    }
+
+    /// `"address"`, `"row"` and `"col"` read the reference as written, so they answer
+    /// about where it points rather than about the value inside it.
+    func testCellAnswersPositionalQuestions() throws {
+        func cell(_ info: String) throws -> CellValue {
+            try FormulaEvaluator.evaluate(
+                .function("CELL", [.text(info), .cellRef(CellRef("D7"))]),
+                cells: NoCells(), names: NamedRangeCollection())
+        }
+        XCTAssertEqual(try cell("row"), .number(7))
+        XCTAssertEqual(try cell("col"), .number(4))
+        XCTAssertEqual(try cell("address"), .text("$D$7"), "Excel reports it absolute")
+    }
+
+    /// The environment-dependent info types are refused rather than guessed.
+    ///
+    /// `"filename"` is what the corpus writes — 185 calls across nine workbooks — and
+    /// it names where the file sits on disk, which no formula's value can depend on
+    /// here. An empty string would be a plausible-looking lie.
+    func testCellRefusesWhatItCannotKnow() throws {
+        for info in ["filename", "format", "color", "width", "protect", "prefix"] {
+            let result = try FormulaEvaluator.evaluate(
+                .function("CELL", [.text(info), .number(1)]),
+                cells: NoCells(), names: NamedRangeCollection())
+            XCTAssertEqual(result, .error(.value), info)
+        }
+    }
+
+    /// A provider holding nothing, for the functions that ask about position rather
+    /// than about content.
+    private struct NoCells: CellValueProvider {
+        func value(at ref: CellRef) -> CellValue? { nil }
+        func value(at ref: CellRef, inSheet: String) -> CellValue? { nil }
+        func lastPopulatedCell() -> CellRef? { nil }
+        func lastPopulatedCell(inSheet: String) -> CellRef? { nil }
+        func values(in range: CellRange) -> [CellValue] { [] }
+        func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
+    }
+
     // MARK: - Error propagation
 
     // Excel propagates an error through a function rather than absorbing it: if an

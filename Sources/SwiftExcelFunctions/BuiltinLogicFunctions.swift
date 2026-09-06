@@ -25,6 +25,7 @@ public enum BuiltinLogicFunctions {
     public static let all: [ExcelFunction] = [
         ifFunc, and, or, not, iferror, ifna,
         isError, isErr, isNA, isBlank, isNumber, isText, na, isRef,
+        trueFunc, falseFunc,
     ]
 
     /// `ISREF(value)` — true when the argument is a reference.
@@ -248,5 +249,21 @@ public enum BuiltinLogicFunctions {
             return args[1]
         }
         return args[0]
+    }
+
+    // MARK: - The boolean literals, called
+
+    /// `TRUE()` — the boolean, written as a call.
+    ///
+    /// `TRUE` is usually a literal, but Excel also accepts it with parentheses and a
+    /// workbook that writes `IF(ISTEXT(B2)=TRUE(), …)` is not doing anything unusual.
+    /// Without this the whole formula is `#NAME?` over a pair of brackets.
+    public static let trueFunc = ExcelFunction(name: "TRUE", minArgs: 0, maxArgs: 0) { _ in
+        .bool(true)
+    }
+
+    /// `FALSE()` — the other one.
+    public static let falseFunc = ExcelFunction(name: "FALSE", minArgs: 0, maxArgs: 0) { _ in
+        .bool(false)
     }
 }

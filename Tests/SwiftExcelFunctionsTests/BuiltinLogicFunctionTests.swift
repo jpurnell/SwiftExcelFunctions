@@ -43,7 +43,8 @@ final class BuiltinLogicFunctionTests: XCTestCase {
         XCTAssertEqual(
             Set(BuiltinLogicFunctions.all.map(\.name)),
             ["IF", "AND", "OR", "NOT", "IFERROR", "IFNA",
-             "ISERROR", "ISERR", "ISNA", "ISBLANK", "ISNUMBER", "ISTEXT", "NA", "ISREF"])
+             "ISERROR", "ISERR", "ISNA", "ISBLANK", "ISNUMBER", "ISTEXT", "NA", "ISREF",
+             "TRUE", "FALSE"])
     }
 
     // MARK: - IF

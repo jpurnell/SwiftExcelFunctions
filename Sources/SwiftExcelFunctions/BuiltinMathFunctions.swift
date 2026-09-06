@@ -22,6 +22,7 @@ public enum BuiltinMathFunctions {
         power, mod, intFunc, ceiling, floor, sign, pi,
         rand, randbetween,
         sin, cos, tan, asin, acos, atan, atan2, log10, trunc, product, gcd, lcm,
+        dec2hex, dec2bin, dec2oct, hex2dec, bin2dec, oct2dec, baseFunc, decimalFunc,
     ]
 
     // MARK: - Randomness
@@ -508,5 +509,121 @@ public enum BuiltinMathFunctions {
             if case .error = argument { return argument }
         }
         return nil
+    }
+
+    // MARK: - Base conversion
+
+    // Excel's engineering conversions work in two's complement over ten digits, so
+    // `DEC2HEX(-1)` is `FFFFFFFFFF` rather than `-1`. The range that fits is
+    // −2³⁹ … 2³⁹−1, and anything outside it is `#NUM!`.
+
+    /// The width Excel's DEC2* functions work in: ten digits of the target base's
+    /// nibble, which is forty bits.
+    private static let engineeringBits = 40
+
+    /// `DEC2HEX(number, [places])` — a decimal as hexadecimal.
+    public static let dec2hex = toBase("DEC2HEX", radix: 16)
+
+    /// `DEC2BIN(number, [places])` — a decimal as binary. Excel's range here is only
+    /// −512…511, ten binary digits rather than ten hex ones.
+    public static let dec2bin = toBase("DEC2BIN", radix: 2, bits: 10)
+
+    /// `DEC2OCT(number, [places])` — a decimal as octal.
+    public static let dec2oct = toBase("DEC2OCT", radix: 8, bits: 30)
+
+    /// `HEX2DEC(number)` — hexadecimal back to decimal, reading the top bit as sign.
+    public static let hex2dec = fromBase("HEX2DEC", radix: 16, digits: 10)
+
+    /// `BIN2DEC(number)` — binary back to decimal.
+    public static let bin2dec = fromBase("BIN2DEC", radix: 2, digits: 10)
+
+    /// `OCT2DEC(number)` — octal back to decimal.
+    public static let oct2dec = fromBase("OCT2DEC", radix: 8, digits: 10)
+
+    /// `BASE(number, radix, [min_length])` — a number in any base from 2 to 36.
+    ///
+    /// Unlike the `DEC2*` family this is unsigned and has no two's-complement
+    /// wrapping: a negative number is `#NUM!` rather than a large positive one.
+    public static let baseFunc = ExcelFunction(name: "BASE", minArgs: 2, maxArgs: 3) { args in
+        if let error = firstError(args) { return error }
+        let value = try toNumber(args[0])
+        let radix = Int(try toNumber(args[1]))
+        guard value >= 0, (2...36).contains(radix) else { return .error(.num) }
+        var digits = String(Int(value.rounded(.towardZero)), radix: radix).uppercased()
+        if args.count > 2 {
+            let minimum = Int(try toNumber(args[2]))
+            guard minimum >= 0 else { return .error(.num) }
+            while digits.count < minimum { digits = "0" + digits }
+        }
+        return .text(digits)
+    }
+
+    /// `DECIMAL(text, radix)` — the inverse of ``baseFunc``.
+    public static let decimalFunc = ExcelFunction(
+        name: "DECIMAL", minArgs: 2, maxArgs: 2
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .text(let digits) = args[0].resolved else { return .error(.value) }
+        let radix = Int(try toNumber(args[1]))
+        guard (2...36).contains(radix),
+              let value = Int(digits.trimmingCharacters(in: .whitespaces), radix: radix)
+        else { return .error(.num) }
+        return .number(Double(value))
+    }
+
+    /// A `DEC2*` conversion.
+    ///
+    /// - Parameters:
+    ///   - name: The Excel name.
+    ///   - radix: The target base.
+    ///   - bits: How wide the two's-complement window is.
+    /// - Returns: The registered function.
+    private static func toBase(_ name: String, radix: Int, bits: Int? = nil) -> ExcelFunction {
+        let width = bits ?? engineeringBits
+        return ExcelFunction(name: name, minArgs: 1, maxArgs: 2) { args in
+            if let error = firstError(args) { return error }
+            let value = Int(try toNumber(args[0]).rounded(.towardZero))
+            let limit = 1 << (width - 1)
+            guard value >= -limit, value < limit else { return .error(.num) }
+            // Negatives wrap into the window, which is what makes DEC2HEX(-1) read
+            // as all Fs rather than as a signed literal.
+            let unsigned = value < 0 ? (1 << width) + value : value
+            var digits = String(unsigned, radix: radix).uppercased()
+            if args.count > 1 {
+                let places = Int(try toNumber(args[1]))
+                guard places >= 0, places >= digits.count, value >= 0 else {
+                    return .error(.num)
+                }
+                while digits.count < places { digits = "0" + digits }
+            }
+            return .text(digits)
+        }
+    }
+
+    /// A `*2DEC` conversion.
+    ///
+    /// - Parameters:
+    ///   - name: The Excel name.
+    ///   - radix: The source base.
+    ///   - digits: How many digits the window holds.
+    /// - Returns: The registered function.
+    private static func fromBase(_ name: String, radix: Int, digits: Int) -> ExcelFunction {
+        ExcelFunction(name: name, minArgs: 1, maxArgs: 1) { args in
+            if let error = firstError(args) { return error }
+            let text: String
+            switch args[0].resolved {
+            case .text(let value): text = value.trimmingCharacters(in: .whitespaces)
+            case .number(let value): text = String(Int(value))
+            case .blank: text = "0"
+            default: return .error(.value)
+            }
+            guard text.count <= digits, let raw = Int(text, radix: radix) else {
+                return .error(.num)
+            }
+            // The top digit carries the sign, the same window the DEC2* side writes.
+            let width = digits * Int(log2(Double(radix)).rounded())
+            let limit = 1 << (width - 1)
+            return .number(Double(raw >= limit ? raw - (1 << width) : raw))
+        }
     }
 }

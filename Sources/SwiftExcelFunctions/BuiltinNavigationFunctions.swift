@@ -18,7 +18,7 @@ public enum BuiltinNavigationFunctions {
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         vlookup, hlookup, xlookup, index, match, address, column, row, indirect,
-        offset, choose, lookup, rows, columns, hyperlink, getPivotData,
+        offset, choose, lookup, rows, columns, hyperlink, getPivotData, cell,
     ]
 
     // MARK: - Choosing among values
@@ -785,5 +785,85 @@ public enum BuiltinNavigationFunctions {
     ) { args in
         if let error = propagatedError(args) { return error }
         return .error(.ref)
+    }
+
+    // MARK: - Asking about a cell
+
+    /// `CELL(info_type, [reference])` — a fact about a cell.
+    ///
+    /// Excel's `info_type` argument spans two different kinds of question, and this
+    /// answers one of them.
+    ///
+    /// **Answerable**, because they follow from the reference itself:
+    /// `"address"`, `"row"`, `"col"`, `"contents"`, `"type"`. The first three read
+    /// the argument as written rather than as evaluated, through the same seam
+    /// ``column`` and ``row`` use — asking an evaluated number where it came from
+    /// would get no answer.
+    ///
+    /// **Refused with `#VALUE!`**, because they describe the file or the display
+    /// rather than the data: `"filename"` is where the workbook sits on disk,
+    /// `"format"`, `"color"`, `"parentheses"` and `"prefix"` are number formatting,
+    /// `"width"` is column width, and `"protect"` is a sheet setting. Evaluation sees
+    /// values and positions; none of those is either.
+    ///
+    /// `"filename"` is the one the corpus actually writes — 185 calls across nine
+    /// workbooks, essentially all of them `CELL("filename", …)` — so in practice this
+    /// refuses most of what it is asked. That is the honest answer: the path a file
+    /// was loaded from is not something a formula's value can depend on here, and
+    /// returning an empty string would be a plausible-looking lie.
+    ///
+    /// `"type"` reports `"b"` for an empty cell, `"l"` for text (a *label*), and
+    /// `"v"` for anything else.
+    static let cell = ExcelFunction(name: "CELL", minArgs: 1, maxArgs: 2) { context, args in
+        if let error = propagatedError(args) { return error }
+        guard case .text(let requested) = args[0].resolved else { return .error(.value) }
+        let info = requested.lowercased()
+
+        // `address`, `row` and `col` are about where the reference *points*, not
+        // what is in it, so they read the argument as written — the same seam
+        // `COLUMN` and `ROW` use. Reading the evaluated value instead would answer
+        // about a number that no longer knows where it came from.
+        if ["address", "row", "col"].contains(info) {
+            guard let referenced = context.referencedCell(at: 1) else {
+                guard let calling = context.callingCell, args.count == 1 else {
+                    return .error(.value)
+                }
+                return positional(info, of: calling.cell)
+            }
+            return positional(info, of: referenced)
+        }
+
+        guard args.count > 1 else { return .error(.value) }
+        switch info {
+        case "contents":
+            return args[1].resolved
+        case "type":
+            switch args[1].resolved {
+            case .blank: return .text("b")
+            case .text(let value): return .text(value.isEmpty ? "b" : "l")
+            default: return .text("v")
+            }
+        default:
+            return .error(.value)
+        }
+    }
+
+    /// One of `CELL`'s positional answers about a reference.
+    ///
+    /// - Parameters:
+    ///   - info: `"address"`, `"row"` or `"col"`.
+    ///   - reference: The cell being asked about.
+    /// - Returns: The answer, or `#VALUE!`.
+    private static func positional(_ info: String, of reference: CellRef) -> CellValue {
+        switch info {
+        case "row": return .number(Double(reference.row))
+        case "col": return .number(Double(reference.column))
+        case "address":
+            // Excel reports an absolute address, whatever form the reference took.
+            let absolute = CellRef(column: reference.column, row: reference.row,
+                                   absoluteColumn: true, absoluteRow: true)
+            return .text(absolute.reference)
+        default: return .error(.value)
+        }
     }
 }

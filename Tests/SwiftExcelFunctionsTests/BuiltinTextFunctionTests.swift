@@ -39,7 +39,8 @@ final class BuiltinTextFunctionTests: XCTestCase {
         XCTAssertEqual(
             Set(BuiltinTextFunctions.all.map(\.name)),
             ["LEN", "LEFT", "RIGHT", "MID", "TRIM", "UPPER", "LOWER", "CONCATENATE",
-             "TEXT", "FIND", "SEARCH", "SUBSTITUTE", "PROPER", "CLEAN", "NUMBERVALUE"])
+             "TEXT", "FIND", "SEARCH", "SUBSTITUTE", "PROPER", "CLEAN", "NUMBERVALUE",
+             "UNICODE", "UNICHAR"])
     }
 
     // MARK: - LEN

@@ -18,7 +18,7 @@ public enum BuiltinTextFunctions {
     /// All text functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         len, left, right, mid, trim, upper, lower, concatenate, text,
-        find, search, substitute, proper, clean, numbervalue,
+        find, search, substitute, proper, clean, numbervalue, unicode, unichar,
     ]
 
     // MARK: - Type coercion
@@ -527,5 +527,33 @@ public enum BuiltinTextFunctions {
             if case .error = argument { return argument }
         }
         return nil
+    }
+
+    // MARK: - Character codes
+
+    /// `UNICODE(text)` — the code point of the first character.
+    ///
+    /// The whole code point, where `CODE` gives only the first byte of the legacy
+    /// character set. For anything outside ASCII they disagree, which is the reason
+    /// Excel added this one.
+    ///
+    /// Empty text is `#VALUE!`: there is no first character to report.
+    public static let unicode = ExcelFunction(name: "UNICODE", minArgs: 1, maxArgs: 1) { args in
+        if let error = firstError(args) { return error }
+        let subject = try toString(args[0])
+        guard let first = subject.unicodeScalars.first else { return .error(.value) }
+        return .number(Double(first.value))
+    }
+
+    /// `UNICHAR(number)` — the character a code point names.
+    ///
+    /// `#VALUE!` for zero, for anything past the Unicode range, and for the surrogate
+    /// block, which names no character on its own.
+    public static let unichar = ExcelFunction(name: "UNICHAR", minArgs: 1, maxArgs: 1) { args in
+        if let error = firstError(args) { return error }
+        let value = Int(try toNumber(args[0]))
+        guard value > 0, value <= 0x10FFFF, !(0xD800...0xDFFF).contains(value),
+              let scalar = Unicode.Scalar(UInt32(value)) else { return .error(.value) }
+        return .text(String(Character(scalar)))
     }
 }

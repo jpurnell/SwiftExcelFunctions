@@ -19,7 +19,7 @@ public enum BuiltinBindingFunctions {
     public static let all: [ExcelFunction] = [
         yearfrac, covariancePopulation, covarianceSample, covar, normSInverse, xirrFunction,
         slopeFunction, interceptFunction, normInverse, normalDistribution,
-        standardNormalDistribution, rankFunction, rankEq,
+        standardNormalDistribution, rankFunction, rankEq, rankAvg,
     ]
 
     // MARK: - Day counts
@@ -353,6 +353,27 @@ public enum BuiltinBindingFunctions {
         name: "RANK.EQ", minArgs: 2, maxArgs: 3
     ) { args in
         try rank(args)
+    }
+
+    /// `RANK.AVG(number, ref, [order])` — ties share the average of their places.
+    ///
+    /// The reason Excel split `RANK` in two. Where ``rankEq`` gives every tied value
+    /// the top place and skips the ones below, this shares them out: in
+    /// `{30, 30, 20}` both 30s are rank 1.5, not 1, and the total of all ranks stays
+    /// what it would have been without the tie.
+    public static let rankAvg = ExcelFunction(
+        name: "RANK.AVG", minArgs: 2, maxArgs: 3
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .number(let target) = args[0].resolved else { return .error(.value) }
+        let list = numbers(in: args[1])
+        guard !list.isEmpty, list.contains(target) else { return .error(.na) }
+        var ascending = false
+        if args.count > 2, case .number(let order) = args[2].resolved { ascending = order != 0 }
+        let better = list.filter { ascending ? $0 < target : $0 > target }.count
+        let tied = list.filter { $0 == target }.count
+        // The top place, plus half the places the tie spans beyond the first.
+        return .number(Double(better + 1) + Double(tied - 1) / 2)
     }
 
     /// The shared body of ``rankFunction`` and ``rankEq``.

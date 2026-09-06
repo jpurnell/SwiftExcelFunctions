@@ -35,7 +35,7 @@ final class BusinessMathBindingTests: XCTestCase {
             Set(BuiltinBindingFunctions.all.map(\.name)),
             ["YEARFRAC", "COVARIANCE.P", "COVARIANCE.S", "COVAR", "NORM.S.INV", "XIRR",
              "SLOPE", "INTERCEPT", "NORM.INV", "NORM.DIST", "NORM.S.DIST",
-             "RANK", "RANK.EQ"])
+             "RANK", "RANK.EQ", "RANK.AVG"])
     }
 
     // MARK: - YEARFRAC
