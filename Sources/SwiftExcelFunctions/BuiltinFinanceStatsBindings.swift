@@ -18,6 +18,8 @@ public enum BuiltinBindingFunctions {
     /// All bound functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         yearfrac, covariancePopulation, covarianceSample, covar, normSInverse, xirrFunction,
+        slopeFunction, interceptFunction, normInverse, normalDistribution,
+        standardNormalDistribution, rankFunction, rankEq,
     ]
 
     // MARK: - Day counts
@@ -233,5 +235,156 @@ public enum BuiltinBindingFunctions {
         } catch {
             return .error(.num)
         }
+    }
+
+    // MARK: - Linear regression
+
+    /// `SLOPE(known_y's, known_x's)` — the gradient of the least-squares line.
+    ///
+    /// **Excel takes y first.** BusinessMath's `slope(_:_:)` takes x first, and that
+    /// reversal is the entire job of this binding: swapped, it returns the slope of x
+    /// on y — a real number, plausibly sized, and wrong, with nothing downstream able
+    /// to tell. The same applies to ``interceptFunction``.
+    ///
+    /// Ranges of different lengths are `#N/A`, as in Excel.
+    public static let slopeFunction = ExcelFunction(
+        name: "SLOPE", minArgs: 2, maxArgs: 2
+    ) { args in
+        if let error = firstError(args) { return error }
+        let ys = numbers(in: args[0])
+        let xs = numbers(in: args[1])
+        guard ys.count == xs.count, !xs.isEmpty else { return .error(.na) }
+        do {
+            let value: Double = try slope(xs, ys)      // x first: BusinessMath's order
+            return value.isFinite ? .number(value) : .error(.div0)
+        } catch { return .error(.div0) }
+    }
+
+    /// `INTERCEPT(known_y's, known_x's)` — where that line crosses the y axis.
+    ///
+    /// Same reversed argument order as ``slopeFunction``.
+    public static let interceptFunction = ExcelFunction(
+        name: "INTERCEPT", minArgs: 2, maxArgs: 2
+    ) { args in
+        if let error = firstError(args) { return error }
+        let ys = numbers(in: args[0])
+        let xs = numbers(in: args[1])
+        guard ys.count == xs.count, !xs.isEmpty else { return .error(.na) }
+        do {
+            let value: Double = try intercept(xs, ys)
+            return value.isFinite ? .number(value) : .error(.div0)
+        } catch { return .error(.div0) }
+    }
+
+    // MARK: - The normal distribution
+
+    /// `NORM.DIST(x, mean, standard_dev, cumulative)`.
+    ///
+    /// `cumulative` TRUE gives the distribution function, FALSE the density. A
+    /// standard deviation of zero or less is `#NUM!`, since neither is defined.
+    public static let normalDistribution = ExcelFunction(
+        name: "NORM.DIST", minArgs: 4, maxArgs: 4
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .number(let x) = args[0].resolved,
+              case .number(let mean) = args[1].resolved,
+              case .number(let deviation) = args[2].resolved else { return .error(.value) }
+        guard deviation > 0 else { return .error(.num) }
+        let cumulative = isTrue(args[3])
+        let value: Double = cumulative
+            ? normalCDF(x: x, mean: mean, stdDev: deviation)
+            : normalPDF(x: x, mean: mean, stdDev: deviation)
+        return .number(value)
+    }
+
+    /// `NORM.S.DIST(z, cumulative)` — the same with mean 0 and deviation 1.
+    public static let standardNormalDistribution = ExcelFunction(
+        name: "NORM.S.DIST", minArgs: 2, maxArgs: 2
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .number(let z) = args[0].resolved else { return .error(.value) }
+        let value: Double = isTrue(args[1])
+            ? normalCDF(x: z, mean: 0, stdDev: 1)
+            : normalPDF(x: z, mean: 0, stdDev: 1)
+        return .number(value)
+    }
+
+    /// `NORM.INV(probability, mean, standard_dev)` — the inverse of ``normalDistribution``.
+    ///
+    /// Microsoft: "If probability <= 0 or if probability >= 1, NORM.INV returns the
+    /// #NUM! error value." The interval is open at both ends because the normal has
+    /// no finite value there.
+    public static let normInverse = ExcelFunction(
+        name: "NORM.INV", minArgs: 3, maxArgs: 3
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .number(let probability) = args[0].resolved,
+              case .number(let mean) = args[1].resolved,
+              case .number(let deviation) = args[2].resolved else { return .error(.value) }
+        guard probability > 0, probability < 1 else { return .error(.num) }
+        guard deviation > 0 else { return .error(.num) }
+        let value: Double = normInv(probability: probability, mean: mean, stdev: deviation)
+        return value.isFinite ? .number(value) : .error(.num)
+    }
+
+    // MARK: - Rank
+
+    /// `RANK(number, ref, [order])` — where a value sits in a list.
+    ///
+    /// Order 0 or omitted ranks descending, anything else ascending. Ties take the
+    /// **top** rank and consume the ones below: in `{30, 30, 20}` both 30s are rank 1
+    /// and 20 is rank 3, not 2.
+    ///
+    /// Implemented here rather than bound. Ranking is ordering, not mathematics —
+    /// there is nothing in it two implementations could disagree about — and
+    /// BusinessMath's `Array.rank()` ranks by magnitude, which is a different
+    /// question with a similar name.
+    public static let rankFunction = ExcelFunction(
+        name: "RANK", minArgs: 2, maxArgs: 3
+    ) { args in
+        try rank(args)
+    }
+
+    /// `RANK.EQ(number, ref, [order])` — the modern spelling of ``rankFunction``.
+    ///
+    /// Excel renamed it when it added `RANK.AVG`, which shares ties out rather than
+    /// giving each the top rank. Both spellings of the original stay live.
+    public static let rankEq = ExcelFunction(
+        name: "RANK.EQ", minArgs: 2, maxArgs: 3
+    ) { args in
+        try rank(args)
+    }
+
+    /// The shared body of ``rankFunction`` and ``rankEq``.
+    private static func rank(_ args: [CellValue]) throws -> CellValue {
+        if let error = firstError(args) { return error }
+        guard case .number(let target) = args[0].resolved else { return .error(.value) }
+        let list = numbers(in: args[1])
+        guard !list.isEmpty else { return .error(.na) }
+        var ascending = false
+        if args.count > 2, case .number(let order) = args[2].resolved { ascending = order != 0 }
+        guard list.contains(target) else { return .error(.na) }
+        // The rank is one more than the count of values that beat it, which gives
+        // ties the top rank and skips the places they consume without any special
+        // case for either.
+        let better = list.filter { ascending ? $0 < target : $0 > target }.count
+        return .number(Double(better + 1))
+    }
+
+    /// Whether an argument reads as Excel's TRUE.
+    private static func isTrue(_ value: CellValue) -> Bool {
+        switch value.resolved {
+        case .bool(let flag): return flag
+        case .number(let number): return number != 0
+        default: return false
+        }
+    }
+
+    /// The first argument that is an error, if any.
+    private static func firstError(_ args: [CellValue]) -> CellValue? {
+        for argument in args {
+            if case .error = argument { return argument }
+        }
+        return nil
     }
 }

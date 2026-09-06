@@ -689,6 +689,135 @@ final class MicrosoftSpecificationTests: XCTestCase {
         XCTAssertEqual(try number("GCD", [.number(0), .number(5)]), 5)
     }
 
+    // MARK: - Regression and the normal distribution
+
+    // Microsoft: "SLOPE(known_y's, known_x's)" — **y first**. BusinessMath's
+    // `slope(_ x:_ y:)` takes them the other way round, which is the whole of what
+    // this binding has to get right: reversed, it returns the slope of x on y, which
+    // is a real number, plausibly sized, and wrong.
+
+    func testSlopeOfAPerfectLine() throws {
+        // y = 2x + 1 through (1,3) (2,5) (3,7) (4,9): slope 2, intercept 1, exactly.
+        let ys = column([3, 5, 7, 9])
+        let xs = column([1, 2, 3, 4])
+        XCTAssertEqual(try number("SLOPE", [ys, xs]), 2, accuracy: 1e-12)
+        XCTAssertEqual(try number("INTERCEPT", [ys, xs]), 1, accuracy: 1e-12)
+    }
+
+    /// Microsoft's worked example, published as `0.305556`.
+    func testSlopeOnMicrosoftsExample() throws {
+        let ys = column([2, 3, 9, 1, 8, 7, 5])
+        let xs = column([6, 5, 11, 7, 5, 4, 4])
+        XCTAssertEqual(try number("SLOPE", [ys, xs]), 0.3055555555555556, accuracy: 1e-12)
+        // Computed from the documented formula on the same data, not quoted.
+        XCTAssertEqual(try number("INTERCEPT", [ys, xs]), 3.1666666666666665, accuracy: 1e-12)
+    }
+
+    /// Reversing the arguments must change the answer, or the binding is not doing
+    /// the one job it exists for.
+    func testSlopeIsNotSymmetric() throws {
+        let ys = column([2, 3, 9, 1, 8, 7, 5])
+        let xs = column([6, 5, 11, 7, 5, 4, 4])
+        XCTAssertNotEqual(try number("SLOPE", [ys, xs]),
+                          try number("SLOPE", [xs, ys]), accuracy: 1e-9)
+    }
+
+    func testSlopeRefusesMismatchedOrEmptyRanges() throws {
+        XCTAssertEqual(try function("SLOPE").evaluate([column([1, 2, 3]), column([1, 2])]),
+                       .error(.na), "Excel gives #N/A for different-sized ranges")
+    }
+
+    /// `NORM.DIST(x, mean, standard_dev, cumulative)`. Microsoft's example:
+    /// `NORM.DIST(42, 40, 1.5, TRUE)` is published as `0.908789`.
+    func testNormalDistributionCumulative() throws {
+        XCTAssertEqual(try number("NORM.DIST", [.number(42), .number(40), .number(1.5),
+                                                .bool(true)]),
+                       0.9087887802741321, accuracy: 1e-9)
+    }
+
+    /// With `cumulative` FALSE it is the density, which peaks at the mean.
+    func testNormalDistributionDensity() throws {
+        let atMean = try number("NORM.DIST", [.number(40), .number(40), .number(1.5),
+                                              .bool(false)])
+        let away = try number("NORM.DIST", [.number(43), .number(40), .number(1.5),
+                                            .bool(false)])
+        XCTAssertGreaterThan(atMean, away)
+        // The density at the mean is 1/(σ√2π).
+        XCTAssertEqual(atMean, 1 / (1.5 * (2 * Double.pi).squareRoot()), accuracy: 1e-9)
+    }
+
+    /// A standard deviation of zero or less is `#NUM!`.
+    func testNormalDistributionRefusesANonPositiveDeviation() throws {
+        XCTAssertEqual(try function("NORM.DIST").evaluate(
+            [.number(1), .number(0), .number(0), .bool(true)]), .error(.num))
+    }
+
+    /// `NORM.S.DIST(z, cumulative)` is the same with mean 0 and deviation 1.
+    func testStandardNormalDistribution() throws {
+        XCTAssertEqual(try number("NORM.S.DIST", [.number(0), .bool(true)]),
+                       0.5, accuracy: 1e-12)
+        XCTAssertEqual(try number("NORM.S.DIST", [.number(1.333333), .bool(true)]),
+                       0.9087887256040951, accuracy: 1e-9)
+    }
+
+    /// `NORM.INV` inverts `NORM.DIST`, so the pair must round-trip.
+    func testNormalInverseRoundTrips() throws {
+        XCTAssertEqual(try number("NORM.INV", [.number(0.5), .number(40), .number(1.5)]),
+                       40, accuracy: 1e-9, "the median of a normal is its mean")
+        let p = try number("NORM.DIST", [.number(42), .number(40), .number(1.5), .bool(true)])
+        XCTAssertEqual(try number("NORM.INV", [.number(p), .number(40), .number(1.5)]),
+                       42, accuracy: 1e-6)
+    }
+
+    /// "If probability <= 0 or if probability >= 1, NORM.INV returns #NUM!."
+    func testNormalInverseRefusesProbabilitiesOutsideTheOpenInterval() throws {
+        for p in [0.0, 1.0, -0.1, 1.1] {
+            XCTAssertEqual(try function("NORM.INV").evaluate(
+                [.number(p), .number(0), .number(1)]), .error(.num), "p = \(p)")
+        }
+    }
+
+    // MARK: - RANK
+
+    // Microsoft: "Returns the rank of a number in a list of numbers… If order is 0
+    // or omitted, Excel ranks number as if ref were a list sorted in descending
+    // order." Ties take the *top* rank, and the ranks after a tie are skipped.
+
+    func testRankDescendingByDefault() throws {
+        let list = column([10, 20, 30])
+        XCTAssertEqual(try number("RANK", [.number(30), list]), 1)
+        XCTAssertEqual(try number("RANK", [.number(20), list]), 2)
+        XCTAssertEqual(try number("RANK", [.number(10), list]), 3)
+    }
+
+    func testRankAscendingWithANonZeroOrder() throws {
+        let list = column([10, 20, 30])
+        XCTAssertEqual(try number("RANK", [.number(10), list, .number(1)]), 1)
+        XCTAssertEqual(try number("RANK", [.number(30), list, .number(1)]), 3)
+    }
+
+    /// "If two numbers have the same rank, the presence of that number affects the
+    /// ranks of subsequent numbers" — two 30s are both rank 1, and 20 is rank 3.
+    func testRankGivesTiesTheTopRankAndSkipsAfter() throws {
+        let list = column([30, 30, 20, 10])
+        XCTAssertEqual(try number("RANK", [.number(30), list]), 1)
+        XCTAssertEqual(try number("RANK", [.number(20), list]), 3, "rank 2 is consumed")
+        XCTAssertEqual(try number("RANK", [.number(10), list]), 4)
+    }
+
+    /// A number that is not in the list is `#N/A`.
+    func testRankOfSomethingAbsentIsNotAvailable() throws {
+        XCTAssertEqual(try function("RANK").evaluate([.number(99), column([1, 2, 3])]),
+                       .error(.na))
+    }
+
+    /// `RANK.EQ` is the modern spelling of exactly this behaviour.
+    func testRankEqMatchesRank() throws {
+        let list = column([30, 30, 20, 10])
+        XCTAssertEqual(try number("RANK.EQ", [.number(20), list]),
+                       try number("RANK", [.number(20), list]))
+    }
+
     // MARK: - Error propagation
 
     // Excel propagates an error through a function rather than absorbing it: if an

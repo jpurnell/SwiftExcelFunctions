@@ -25,6 +25,19 @@ final class BusinessMathBindingTests: XCTestCase {
         return value
     }
 
+    // MARK: - Registration
+
+    /// The group's inventory, by name. It was the one group without this, which is
+    /// how seven functions could be added without any test noticing the shape of the
+    /// group had changed.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinBindingFunctions.all.map(\.name)),
+            ["YEARFRAC", "COVARIANCE.P", "COVARIANCE.S", "COVAR", "NORM.S.INV", "XIRR",
+             "SLOPE", "INTERCEPT", "NORM.INV", "NORM.DIST", "NORM.S.DIST",
+             "RANK", "RANK.EQ"])
+    }
+
     // MARK: - YEARFRAC
 
     /// 2026-01-01 to 2026-07-01 is half a year on a 30/360 basis: six months of
