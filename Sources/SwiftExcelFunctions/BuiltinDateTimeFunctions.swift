@@ -23,6 +23,7 @@ public enum BuiltinDateTimeFunctions {
     public static let all: [ExcelFunction] = [
         today, now, year, month, day, dateFunc,
         weekday, eomonth, edate, days, hour, minute, second,
+        workday, datevalue, timeFunc,
     ]
 
     // MARK: - Day of week
@@ -417,5 +418,131 @@ public enum BuiltinDateTimeFunctions {
             guard serial >= 0 else { throw EvalError.numError }
             return .number(Double(serial))
         }
+    }
+
+    // MARK: - Working days
+
+    /// `WORKDAY(start_date, days, [holidays])` — a date a number of working days
+    /// away, counting Monday to Friday.
+    ///
+    /// Whole days only, and the start date is not counted: one working day after a
+    /// Thursday is the Friday, two is the following Monday. A negative count walks
+    /// backwards by the same rule. Any dates in `holidays` are skipped as well,
+    /// whichever day of the week they fall on.
+    ///
+    /// Zero days returns the start date unchanged **even on a weekend** — Excel does
+    /// not snap to the nearest workday, and a reader who assumes it does will be
+    /// wrong twice a week.
+    public static let workday = ExcelFunction(name: "WORKDAY", minArgs: 2, maxArgs: 3) { args in
+        if let error = firstError(args) { return error }
+        guard let startSerial = numericValue(args[0]),
+              let dayCount = numericValue(args[1]) else { return .error(.value) }
+
+        var holidays: Set<Int> = []
+        if args.count > 2 {
+            for value in flattened(args[2]) {
+                if let serial = numericValue(value) { holidays.insert(Int(serial)) }
+            }
+        }
+
+        var serial = Int(startSerial)
+        var remaining = Int(dayCount)
+        guard remaining != 0 else { return .number(Double(serial)) }
+        let step = remaining > 0 ? 1 : -1
+        remaining = Swift.abs(remaining)
+
+        // Bounded by the grid's own date range rather than by the loop: a caller
+        // asking for a million working days should get #NUM!, not a hang.
+        var guard_ = 0
+        while remaining > 0 && guard_ < 4_000_000 {
+            guard_ += 1
+            serial += step
+            guard let weekday = weekdayNumber(ofSerial: serial) else { return .error(.num) }
+            let isWeekend = weekday == 1 || weekday == 7      // Sunday, Saturday
+            if !isWeekend && !holidays.contains(serial) { remaining -= 1 }
+        }
+        guard remaining == 0 else { return .error(.num) }
+        return .number(Double(serial))
+    }
+
+    /// The day of the week for a serial, 1 = Sunday through 7 = Saturday.
+    ///
+    /// - Parameter serial: The Excel serial.
+    /// - Returns: The weekday number, or `nil` if the serial names no date.
+    private static func weekdayNumber(ofSerial serial: Int) -> Int? {
+        guard let date = serialToDate(serial) else { return nil }
+        return calendar.component(.weekday, from: date)
+    }
+
+    // MARK: - Reading a date out of text
+
+    /// `DATEVALUE(date_text)` — the serial for a date written as text.
+    ///
+    /// Accepts the ISO form and the common slash forms. `#VALUE!` for anything it
+    /// cannot read, rather than a guess: a date read wrongly is worse than a date
+    /// not read, because nothing downstream can tell.
+    public static let datevalue = ExcelFunction(
+        name: "DATEVALUE", minArgs: 1, maxArgs: 1
+    ) { args in
+        if let error = firstError(args) { return error }
+        guard case .text(let text) = args[0] else {
+            // A date or a serial passed straight through is already the answer.
+            if let serial = numericValue(args[0]) { return .number(serial.rounded(.down)) }
+            return .error(.value)
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        for format in ["yyyy-MM-dd", "M/d/yyyy", "d/M/yyyy", "MM/dd/yyyy", "yyyy/MM/dd",
+                       "d-MMM-yyyy", "MMMM d, yyyy", "MMM d, yyyy"] {
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.timeZone = calendar.timeZone
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = format
+            if let date = formatter.date(from: trimmed) {
+                return .number(dateToSerial(date).rounded(.down))
+            }
+        }
+        return .error(.value)
+    }
+
+    /// `TIME(hour, minute, second)` — a time as a fraction of a day.
+    ///
+    /// Noon is 0.5, because a serial's whole part is the date and its fraction is the
+    /// time. Hours past 23 wrap: Excel divides by 24 and keeps the remainder, so
+    /// `TIME(27,0,0)` is three in the morning. Minutes and seconds carry the same
+    /// way, which is what lets `TIME(0,0,7200)` mean two hours.
+    public static let timeFunc = ExcelFunction(name: "TIME", minArgs: 3, maxArgs: 3) { args in
+        if let error = firstError(args) { return error }
+        guard let hour = numericValue(args[0]),
+              let minute = numericValue(args[1]),
+              let second = numericValue(args[2]) else { return .error(.value) }
+        let seconds = Int(hour) * 3600 + Int(minute) * 60 + Int(second)
+        let inDay = ((seconds % 86_400) + 86_400) % 86_400
+        return .number(Double(inDay) / 86_400)
+    }
+
+    /// A value as a number, when it is one.
+    private static func numericValue(_ value: CellValue) -> Double? {
+        switch value {
+        case .number(let number): return number
+        case .bool(let flag): return flag ? 1 : 0
+        case .date(let date): return dateToSerial(date)
+        case .formula(_, let cached): return cached.flatMap(numericValue)
+        default: return nil
+        }
+    }
+
+    /// An argument's elements, flattened.
+    private static func flattened(_ value: CellValue) -> [CellValue] {
+        if case .array(let matrix) = value { return matrix.elements }
+        return [value]
+    }
+
+    /// The first argument that is an error, if any.
+    private static func firstError(_ args: [CellValue]) -> CellValue? {
+        for argument in args {
+            if case .error = argument { return argument }
+        }
+        return nil
     }
 }

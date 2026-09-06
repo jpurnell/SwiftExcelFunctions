@@ -58,7 +58,8 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         XCTAssertEqual(
             Set(BuiltinNavigationFunctions.all.map(\.name)),
             ["VLOOKUP", "HLOOKUP", "XLOOKUP", "INDEX", "MATCH", "ADDRESS",
-             "COLUMN", "ROW", "INDIRECT", "OFFSET", "CHOOSE", "LOOKUP"])
+             "COLUMN", "ROW", "INDIRECT", "OFFSET", "CHOOSE", "LOOKUP",
+             "ROWS", "COLUMNS", "HYPERLINK"])
     }
 
     // MARK: - VLOOKUP (exact match)

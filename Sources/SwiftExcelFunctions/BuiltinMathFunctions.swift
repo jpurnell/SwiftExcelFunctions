@@ -21,6 +21,7 @@ public enum BuiltinMathFunctions {
         abs, round, roundUp, roundDown, sqrt, ln, log, exp,
         power, mod, intFunc, ceiling, floor, sign, pi,
         rand, randbetween,
+        sin, cos, tan, asin, acos, atan, atan2, log10, trunc, product, gcd, lcm,
     ]
 
     // MARK: - Randomness
@@ -331,5 +332,181 @@ public enum BuiltinMathFunctions {
     /// `PI()` -- returns the value of pi (3.14159265358979...).
     static let pi = ExcelFunction(name: "PI", minArgs: 0, maxArgs: 0) { _ in
         .number(Double.pi)
+    }
+
+    // MARK: - Trigonometry and logs, bridged to Foundation
+
+    // These are libm's, reached through Foundation. Excel's contract is the same as
+    // C's — radians, principal values — so there is nothing to translate and a
+    // second implementation of a sine would be a liability with no upside. The
+    // bridging *is* the work: arity, coercion, and Excel's errors.
+
+    /// `SIN(number)` — the sine of an angle in radians.
+    public static let sin = unary("SIN") { Foundation.sin($0) }
+
+    /// `COS(number)` — the cosine of an angle in radians.
+    public static let cos = unary("COS") { Foundation.cos($0) }
+
+    /// `TAN(number)` — the tangent of an angle in radians.
+    public static let tan = unary("TAN") { Foundation.tan($0) }
+
+    /// `ASIN(number)` — the arcsine, in radians. `#NUM!` outside −1…1.
+    public static let asin = unary("ASIN", domain: { (-1.0...1.0).contains($0) }) {
+        Foundation.asin($0)
+    }
+
+    /// `ACOS(number)` — the arccosine, in radians. `#NUM!` outside −1…1.
+    public static let acos = unary("ACOS", domain: { (-1.0...1.0).contains($0) }) {
+        Foundation.acos($0)
+    }
+
+    /// `ATAN(number)` — the arctangent, in radians.
+    public static let atan = unary("ATAN") { Foundation.atan($0) }
+
+    /// `ATAN2(x, y)` — the arctangent of `y/x`, using both signs to place the
+    /// quadrant.
+    ///
+    /// Excel takes **x first**, which is the reverse of C's `atan2(y, x)` and of
+    /// most other languages'. Getting it backwards is a silent quadrant error, so
+    /// the argument order is the whole of what this binding has to get right.
+    public static let atan2 = ExcelFunction(name: "ATAN2", minArgs: 2, maxArgs: 2) { args in
+        if let error = firstError(args) { return error }
+        let x = try toNumber(args[0])
+        let y = try toNumber(args[1])
+        guard x != 0 || y != 0 else { return .error(.div0) }
+        return .number(Foundation.atan2(y, x))
+    }
+
+    /// `LOG10(number)` — the base-10 logarithm. `#NUM!` at or below zero.
+    public static let log10 = unary("LOG10", domain: { $0 > 0 }) { Foundation.log10($0) }
+
+    /// `TRUNC(number, [digits])` — cuts toward zero.
+    ///
+    /// Not `INT`, which rounds *down*: they agree on positives and differ on
+    /// negatives, where `TRUNC(-8.9)` is −8 and `INT(-8.9)` is −9. That difference is
+    /// the only reason Excel has both.
+    public static let trunc = ExcelFunction(name: "TRUNC", minArgs: 1, maxArgs: 2) { args in
+        if let error = firstError(args) { return error }
+        let value = try toNumber(args[0])
+        let digits = args.count > 1 ? Int(try toNumber(args[1])) : 0
+        let scale = pow(10.0, Double(digits))
+        return .number((value * scale).rounded(.towardZero) / scale)
+    }
+
+    /// `PRODUCT(number1, [number2], ...)` — everything multiplied together.
+    ///
+    /// Inside a range only numbers count; blanks and text are ignored rather than
+    /// treated as zero, which would take every product to nothing.
+    public static let product = ExcelFunction(
+        name: "PRODUCT", minArgs: 1, maxArgs: nil
+    ) { args in
+        if let error = firstError(args) { return error }
+        var total = 1.0
+        var seen = false
+        for argument in args {
+            for value in numbers(in: argument) {
+                total *= value
+                seen = true
+            }
+        }
+        return .number(seen ? total : 0)
+    }
+
+    /// `GCD(number1, [number2], ...)` — the greatest common divisor.
+    ///
+    /// Arguments are truncated to integers, as Excel does, and must not be negative.
+    public static let gcd = ExcelFunction(name: "GCD", minArgs: 1, maxArgs: nil) { args in
+        if let error = firstError(args) { return error }
+        var result = 0
+        for argument in args {
+            for value in numbers(in: argument) {
+                let whole = Int(value.rounded(.towardZero))
+                guard whole >= 0 else { return .error(.num) }
+                result = greatestCommonDivisor(result, whole)
+            }
+        }
+        return .number(Double(result))
+    }
+
+    /// `LCM(number1, [number2], ...)` — the least common multiple.
+    public static let lcm = ExcelFunction(name: "LCM", minArgs: 1, maxArgs: nil) { args in
+        if let error = firstError(args) { return error }
+        var result = 1
+        for argument in args {
+            for value in numbers(in: argument) {
+                let whole = Int(value.rounded(.towardZero))
+                guard whole >= 0 else { return .error(.num) }
+                guard whole != 0 else { return .number(0) }
+                let divisor = greatestCommonDivisor(result, whole)
+                guard divisor != 0 else { continue }
+                result = result / divisor * whole
+            }
+        }
+        return .number(Double(result))
+    }
+
+    /// Euclid's algorithm, iterative so it needs no base-case guard.
+    ///
+    /// - Parameters:
+    ///   - lhs: One number.
+    ///   - rhs: The other.
+    /// - Returns: Their greatest common divisor.
+    private static func greatestCommonDivisor(_ lhs: Int, _ rhs: Int) -> Int {
+        var a = Swift.abs(lhs)
+        var b = Swift.abs(rhs)
+        while b != 0 {
+            (a, b) = (b, a % b)
+        }
+        return a
+    }
+
+    /// The numbers inside an argument, ignoring anything that is not one.
+    ///
+    /// - Parameter value: The argument.
+    /// - Returns: Its numeric elements, or itself if it is a number.
+    private static func numbers(in value: CellValue) -> [Double] {
+        switch value {
+        case .number(let number):
+            return [number]
+        case .array(let matrix):
+            return matrix.elements.flatMap { element -> [Double] in
+                if case .number(let number) = element { return [number] }
+                return []
+            }
+        case .bool(let flag):
+            return [flag ? 1 : 0]
+        default:
+            return []
+        }
+    }
+
+    /// A one-argument numeric function, with Excel's coercion and errors.
+    ///
+    /// - Parameters:
+    ///   - name: The Excel name.
+    ///   - domain: What the function accepts; anything else is `#NUM!`.
+    ///   - body: The computation.
+    /// - Returns: The registered function.
+    private static func unary(
+        _ name: String,
+        domain: (@Sendable (Double) -> Bool)? = nil,
+        body: @escaping @Sendable (Double) -> Double
+    ) -> ExcelFunction {
+        ExcelFunction(name: name, minArgs: 1, maxArgs: 1) { args in
+            if let error = firstError(args) { return error }
+            let value = try toNumber(args[0])
+            if let domain, !domain(value) { return .error(.num) }
+            let result = body(value)
+            guard result.isFinite else { return .error(.num) }
+            return .number(result)
+        }
+    }
+
+    /// The first argument that is an error, if any.
+    private static func firstError(_ args: [CellValue]) -> CellValue? {
+        for argument in args {
+            if case .error = argument { return argument }
+        }
+        return nil
     }
 }

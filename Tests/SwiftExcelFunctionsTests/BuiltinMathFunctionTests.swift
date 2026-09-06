@@ -57,7 +57,9 @@ final class BuiltinMathFunctionTests: XCTestCase {
             Set(BuiltinMathFunctions.all.map(\.name)),
             ["ABS", "ROUND", "ROUNDUP", "ROUNDDOWN", "SQRT", "LN", "LOG", "EXP",
              "POWER", "MOD", "INT", "CEILING", "FLOOR", "SIGN", "PI",
-             "RAND", "RANDBETWEEN"])
+             "RAND", "RANDBETWEEN",
+             "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN", "ATAN2",
+             "LOG10", "TRUNC", "PRODUCT", "GCD", "LCM"])
     }
 
     // MARK: - ABS

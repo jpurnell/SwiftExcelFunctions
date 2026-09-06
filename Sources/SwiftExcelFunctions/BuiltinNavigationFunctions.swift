@@ -18,7 +18,7 @@ public enum BuiltinNavigationFunctions {
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         vlookup, hlookup, xlookup, index, match, address, column, row, indirect,
-        offset, choose, lookup,
+        offset, choose, lookup, rows, columns, hyperlink,
     ]
 
     // MARK: - Choosing among values
@@ -728,5 +728,33 @@ public enum BuiltinNavigationFunctions {
                 return .error(.na)
             }
         }
+    }
+
+    // MARK: - Counting a shape
+
+    /// `ROWS(array)` — how many rows a range or array has.
+    ///
+    /// Answerable directly now that a value carries its own dimensions; before
+    /// `CellMatrix` this would have had to guess, the way `VLOOKUP` used to.
+    static let rows = ExcelFunction(name: "ROWS", minArgs: 1, maxArgs: 1) { args in
+        if let error = propagatedError(args) { return error }
+        return .number(Double(asMatrix(args[0]).rows))
+    }
+
+    /// `COLUMNS(array)` — how many columns a range or array has.
+    static let columns = ExcelFunction(name: "COLUMNS", minArgs: 1, maxArgs: 1) { args in
+        if let error = propagatedError(args) { return error }
+        return .number(Double(asMatrix(args[0]).columns))
+    }
+
+    /// `HYPERLINK(link_location, [friendly_name])` — a link, and what it reads as.
+    ///
+    /// The jump is a thing the spreadsheet application does when someone clicks; the
+    /// *value* is the text shown, which is the friendly name when there is one and
+    /// the location otherwise. Evaluation has only the second half to answer, and
+    /// answering it is what stops a cell full of links reading as `#NAME?`.
+    static let hyperlink = ExcelFunction(name: "HYPERLINK", minArgs: 1, maxArgs: 2) { args in
+        if let error = propagatedError(args) { return error }
+        return args.count > 1 ? args[1] : args[0]
     }
 }

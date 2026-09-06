@@ -34,6 +34,9 @@ final class MicrosoftSpecificationTests: XCTestCase {
             BuiltinFinancialFunctions.all, BuiltinBindingFunctions.all,
             BuiltinNavigationFunctions.all, BuiltinDateTimeFunctions.all,
             BuiltinMathFunctions.all, BuiltinStatsFunctions.all,
+            BuiltinTextFunctions.all, BuiltinLogicFunctions.all,
+            BuiltinAggregationFunctions.all, BuiltinArrayFunctions.all,
+            BuiltinRiskSolverFunctions.all,
         ]
         for group in groups {
             if let found = group.first(where: { $0.name == name }) { return found }
@@ -439,6 +442,251 @@ final class MicrosoftSpecificationTests: XCTestCase {
                        "the returned rate must actually zero the discounted flows")
         XCTAssertGreaterThan(rate, 0.09)
         XCTAssertLessThan(rate, 0.11)
+    }
+
+    // MARK: - Text
+
+    // Microsoft on the pair that trips everyone: FIND is case-sensitive and takes no
+    // wildcards; SEARCH is case-insensitive and does. Both are 1-based, both return
+    // #VALUE! when the text is not there, and both count characters rather than bytes.
+
+    private func text(_ name: String, _ args: CellValue...) throws -> CellValue {
+        try function(name).evaluate(args)
+    }
+
+    func testFindIsOneBasedAndCaseSensitive() throws {
+        XCTAssertEqual(try text("FIND", .text("M"), .text("Miriam McGovern")), .number(1))
+        XCTAssertEqual(try text("FIND", .text("m"), .text("Miriam McGovern")), .number(6))
+        XCTAssertEqual(try text("FIND", .text("M"), .text("Miriam McGovern"), .number(3)),
+                       .number(8))
+    }
+
+    /// Microsoft: "If find_text does not appear in within_text, FIND returns the
+    /// #VALUE! error value."
+    func testFindReturnsValueErrorWhenAbsent() throws {
+        XCTAssertEqual(try text("FIND", .text("z"), .text("abc")), .error(.value))
+    }
+
+    /// "If find_text is empty, FIND matches the first character in the search
+    /// string" — so it returns start_num rather than failing.
+    func testFindWithEmptyNeedleReturnsTheStart() throws {
+        XCTAssertEqual(try text("FIND", .text(""), .text("abc")), .number(1))
+        XCTAssertEqual(try text("FIND", .text(""), .text("abc"), .number(2)), .number(2))
+    }
+
+    /// "If start_num is not greater than zero, or is greater than the length of
+    /// within_text, FIND returns #VALUE!."
+    func testFindRejectsAnOutOfRangeStart() throws {
+        XCTAssertEqual(try text("FIND", .text("a"), .text("abc"), .number(0)), .error(.value))
+        XCTAssertEqual(try text("FIND", .text("a"), .text("abc"), .number(4)), .error(.value))
+    }
+
+    func testSearchIsCaseInsensitive() throws {
+        XCTAssertEqual(try text("SEARCH", .text("m"), .text("Miriam McGovern")), .number(1))
+        XCTAssertEqual(try text("SEARCH", .text("M"), .text("Miriam McGovern")), .number(1))
+    }
+
+    /// SEARCH takes `?` for one character and `*` for any run of them.
+    func testSearchTakesWildcards() throws {
+        XCTAssertEqual(try text("SEARCH", .text("b?d"), .text("abcde")), .number(2))
+        XCTAssertEqual(try text("SEARCH", .text("a*e"), .text("abcde")), .number(1))
+        XCTAssertEqual(try text("SEARCH", .text("x*z"), .text("abcde")), .error(.value))
+    }
+
+    // Microsoft on SUBSTITUTE: "Substitutes new_text for old_text in a text string.
+    // Use SUBSTITUTE when you want to replace specific text… If instance_num is
+    // specified, only that instance is replaced."
+
+    func testSubstituteReplacesEveryInstance() throws {
+        XCTAssertEqual(try text("SUBSTITUTE", .text("Sales Data"), .text("Sales"),
+                                .text("Cost")), .text("Cost Data"))
+        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+")),
+                       .text("a+b+c"))
+    }
+
+    func testSubstituteReplacesOnlyTheNamedInstance() throws {
+        // Microsoft's own example: Quarter 1, 2011 -> Quarter 2, 2011
+        XCTAssertEqual(try text("SUBSTITUTE", .text("Quarter 1, 2011"), .text("1"),
+                                .text("2"), .number(1)), .text("Quarter 2, 2011"))
+        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+"),
+                                .number(2)), .text("a-b+c"))
+    }
+
+    /// "SUBSTITUTE is case-sensitive" — unlike REPLACE, which works by position.
+    func testSubstituteIsCaseSensitive() throws {
+        XCTAssertEqual(try text("SUBSTITUTE", .text("aAa"), .text("a"), .text("z")),
+                       .text("zAz"))
+    }
+
+    /// An instance number beyond the count changes nothing, rather than erroring.
+    func testSubstituteWithATooLargeInstanceIsUnchanged() throws {
+        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b"), .text("-"), .text("+"),
+                                .number(5)), .text("a-b"))
+    }
+
+    /// Empty old_text leaves the string alone; Excel has nothing to find.
+    func testSubstituteWithEmptyOldTextIsUnchanged() throws {
+        XCTAssertEqual(try text("SUBSTITUTE", .text("abc"), .text(""), .text("z")),
+                       .text("abc"))
+    }
+
+    func testProperCapitalisesEachWord() throws {
+        XCTAssertEqual(try text("PROPER", .text("this is a TITLE")),
+                       .text("This Is A Title"))
+        XCTAssertEqual(try text("PROPER", .text("2-cent's worth")),
+                       .text("2-Cent'S Worth"), "Excel breaks on the apostrophe too")
+    }
+
+    /// CLEAN removes the non-printing characters 0–31.
+    func testCleanRemovesControlCharacters() throws {
+        XCTAssertEqual(try text("CLEAN", .text("a\u{07}b\u{07}c")), .text("abc"))
+        XCTAssertEqual(try text("CLEAN", .text("plain")), .text("plain"))
+    }
+
+    /// NUMBERVALUE reads a number from text using explicit separators, so it does
+    /// not depend on the machine's locale.
+    func testNumberValueUsesTheSeparatorsItIsGiven() throws {
+        XCTAssertEqual(try text("NUMBERVALUE", .text("2.500,27"), .text(","), .text(".")),
+                       .number(2500.27))
+        XCTAssertEqual(try text("NUMBERVALUE", .text("3.5")), .number(3.5))
+    }
+
+    /// "If empty, an empty string is used" — an empty argument is 0, not an error.
+    func testNumberValueOfEmptyIsZero() throws {
+        XCTAssertEqual(try text("NUMBERVALUE", .text("")), .number(0))
+    }
+
+    func testNumberValueRefusesWhatIsNotANumber() throws {
+        XCTAssertEqual(try text("NUMBERVALUE", .text("abc")), .error(.value))
+    }
+
+    // MARK: - Dates and references
+
+    /// `WORKDAY(start, days, [holidays])` — a date a number of working days away,
+    /// counting Monday to Friday and skipping any holidays given.
+    ///
+    /// Microsoft's own example: 2008-10-01 plus 151 working days is 2009-04-30, and
+    /// with the four holidays listed it becomes 2009-05-06.
+    func testWorkdaySkipsWeekends() throws {
+        // 2026-01-01 is a Thursday; one working day on is Friday the 2nd,
+        // two is Monday the 5th.
+        let jan1 = 46023.0
+        XCTAssertEqual(try number("WORKDAY", [.number(jan1), .number(1)]), jan1 + 1)
+        XCTAssertEqual(try number("WORKDAY", [.number(jan1), .number(2)]), jan1 + 4)
+    }
+
+    func testWorkdayCountsBackwards() throws {
+        // 2026-01-05 is a Monday; one working day back is Friday the 2nd.
+        let jan5 = 46027.0
+        XCTAssertEqual(try number("WORKDAY", [.number(jan5), .number(-1)]), jan5 - 3)
+    }
+
+    func testWorkdaySkipsHolidays() throws {
+        let jan1 = 46023.0    // Thursday
+        // With Friday the 2nd a holiday, one working day on is Monday the 5th.
+        XCTAssertEqual(
+            try number("WORKDAY", [.number(jan1), .number(1),
+                                   .array(CellMatrix(column: [.number(jan1 + 1)]))]),
+            jan1 + 4)
+    }
+
+    /// Zero days stays put, even on a weekend — Excel does not snap to a workday.
+    func testWorkdayWithZeroDaysStaysPut() throws {
+        let jan3 = 46025.0   // Saturday
+        XCTAssertEqual(try number("WORKDAY", [.number(jan3), .number(0)]), jan3)
+    }
+
+    /// `DATEVALUE(text)` — the serial for a date written as text.
+    func testDateValueReadsATextDate() throws {
+        XCTAssertEqual(try number("DATEVALUE", [.text("2026-01-01")]), 46023)
+        XCTAssertEqual(try number("DATEVALUE", [.text("1/1/2026")]), 46023)
+    }
+
+    func testDateValueRefusesWhatIsNotADate() throws {
+        XCTAssertEqual(try function("DATEVALUE").evaluate([.text("not a date")]),
+                       .error(.value))
+    }
+
+    /// `TIME(hour, minute, second)` — a fraction of a day, so noon is 0.5.
+    func testTimeIsAFractionOfADay() throws {
+        XCTAssertEqual(try number("TIME", [.number(12), .number(0), .number(0)]),
+                       0.5, accuracy: 1e-12)
+        XCTAssertEqual(try number("TIME", [.number(6), .number(0), .number(0)]),
+                       0.25, accuracy: 1e-12)
+    }
+
+    /// "If hour is greater than 23, it is divided by 24 and the remainder is
+    /// treated as the hour value."
+    func testTimeWrapsPastMidnight() throws {
+        XCTAssertEqual(try number("TIME", [.number(27), .number(0), .number(0)]),
+                       0.125, accuracy: 1e-12)
+    }
+
+    /// `ROWS` and `COLUMNS` count a range's shape — which the value now carries.
+    func testRowsAndColumnsCountTheShape() throws {
+        let block = grid([[.number(1), .number(2), .number(3)],
+                          [.number(4), .number(5), .number(6)]])
+        XCTAssertEqual(try number("ROWS", [block]), 2)
+        XCTAssertEqual(try number("COLUMNS", [block]), 3)
+        XCTAssertEqual(try number("ROWS", [.number(1)]), 1, "a lone value is 1x1")
+        XCTAssertEqual(try number("COLUMNS", [.number(1)]), 1)
+    }
+
+    /// `HYPERLINK(location, [friendly_name])` displays the friendly name, or the
+    /// location when there is none. The jump is a UI act; the value is text.
+    func testHyperlinkShowsItsFriendlyName() throws {
+        XCTAssertEqual(try function("HYPERLINK").evaluate(
+            [.text("https://example.com"), .text("Example")]), .text("Example"))
+        XCTAssertEqual(try function("HYPERLINK").evaluate([.text("https://example.com")]),
+                       .text("https://example.com"))
+    }
+
+    // MARK: - Foundation maths
+
+    // Bridged rather than reimplemented: these are libm's, and a second
+    // implementation of a sine would be a liability with no upside.
+
+    func testTrigonometryIsInRadians() throws {
+        XCTAssertEqual(try number("SIN", [.number(0)]), 0, accuracy: 1e-12)
+        XCTAssertEqual(try number("COS", [.number(0)]), 1, accuracy: 1e-12)
+        let pi = try number("PI", [])
+        XCTAssertEqual(try number("SIN", [.number(pi / 2)]), 1, accuracy: 1e-12)
+        XCTAssertEqual(try number("COS", [.number(pi)]), -1, accuracy: 1e-12)
+        XCTAssertEqual(try number("TAN", [.number(0)]), 0, accuracy: 1e-12)
+    }
+
+    func testLogBaseTen() throws {
+        XCTAssertEqual(try number("LOG10", [.number(1000)]), 3, accuracy: 1e-12)
+        XCTAssertEqual(try number("LOG10", [.number(1)]), 0, accuracy: 1e-12)
+    }
+
+    /// `TRUNC` cuts toward zero; `INT` rounds down. They differ on negatives, which
+    /// is the only reason both exist.
+    func testTruncCutsTowardZero() throws {
+        XCTAssertEqual(try number("TRUNC", [.number(8.9)]), 8)
+        XCTAssertEqual(try number("TRUNC", [.number(-8.9)]), -8, "TRUNC toward zero")
+        XCTAssertEqual(try number("INT", [.number(-8.9)]), -9, "INT rounds down")
+        XCTAssertEqual(try number("TRUNC", [.number(3.14159), .number(2)]), 3.14,
+                       accuracy: 1e-12)
+    }
+
+    func testProductMultipliesEverything() throws {
+        XCTAssertEqual(try number("PRODUCT", [.number(2), .number(3), .number(4)]), 24)
+        XCTAssertEqual(try number("PRODUCT", [column([2, 3, 4])]), 24)
+        XCTAssertEqual(try number("PRODUCT", [.number(5)]), 5)
+    }
+
+    /// Text and blanks inside a range are ignored, as with the other aggregates.
+    func testProductIgnoresNonNumbersInARange() throws {
+        XCTAssertEqual(try number("PRODUCT", [
+            .array(CellMatrix(column: [.number(2), .blank, .text("x"), .number(3)])),
+        ]), 6)
+    }
+
+    func testGreatestCommonDivisor() throws {
+        XCTAssertEqual(try number("GCD", [.number(24), .number(36)]), 12)
+        XCTAssertEqual(try number("GCD", [.number(7), .number(13)]), 1)
+        XCTAssertEqual(try number("GCD", [.number(0), .number(5)]), 5)
     }
 
     // MARK: - Error propagation

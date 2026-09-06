@@ -53,7 +53,9 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     func testAllContainsEveryFunctionInTheGroup() {
         XCTAssertEqual(
             Set(BuiltinDateTimeFunctions.all.map(\.name)),
-            Set("TODAY, NOW, YEAR, MONTH, DAY, DATE, WEEKDAY, EOMONTH, EDATE, DAYS, HOUR, MINUTE, SECOND".split(separator: ", ").map(String.init)))
+            Set(("TODAY, NOW, YEAR, MONTH, DAY, DATE, WEEKDAY, EOMONTH, EDATE, DAYS, "
+                 + "HOUR, MINUTE, SECOND, WORKDAY, DATEVALUE, TIME")
+                .split(separator: ", ").map(String.init)))
     }
 
     // MARK: - DATE

@@ -30,10 +30,16 @@ final class BuiltinTextFunctionTests: XCTestCase {
         XCTAssertEqual(err, expectedError, file: file, line: line)
     }
 
-    // MARK: - Registration count
+    // MARK: - Registration
 
-    func testAllContainsNineFunctions() {
-        XCTAssertEqual(BuiltinTextFunctions.all.count, 9)
+    /// The group's inventory, by name rather than by count — a count says something
+    /// changed without saying what, and fails the same way whether a function
+    /// arrived or went missing.
+    func testAllContainsEveryFunctionInTheGroup() {
+        XCTAssertEqual(
+            Set(BuiltinTextFunctions.all.map(\.name)),
+            ["LEN", "LEFT", "RIGHT", "MID", "TRIM", "UPPER", "LOWER", "CONCATENATE",
+             "TEXT", "FIND", "SEARCH", "SUBSTITUTE", "PROPER", "CLEAN", "NUMBERVALUE"])
     }
 
     // MARK: - LEN
