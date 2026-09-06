@@ -87,6 +87,23 @@ discoverable from outside, and a cached error vanished on save.
 
 ---
 
+**Unreleased — the oracle, and what it found.**
+
+- [x] `ExcelOracleTests` — every formula checked against Excel's own cached value.
+      **99.60%** agreement over 155,897 comparable cells
+- [x] `MicrosoftSpecificationTests` — the same rules from the published reference,
+      runnable in the gate without the corpus
+- [x] ADR-001 recorded: Excel is the specification, standards sit beside it
+- [x] `NPV` took ranges, `PsiOutput` answers, `_xll.`/`_xlfn.` resolve
+- [x] BusinessMath `from: "2.11.0"` — all five `YEARFRAC` bases compute
+
+Three defects nobody had listed, all found by comparing against Excel rather than against
+ourselves: every absolute reference resolved to an empty cell, `NPV(rate, B4:B8)` answered
+`#VALUE!`, and the actual/* day counts gain an hour across a daylight-saving boundary. The
+last is upstream and documented rather than patched.
+
+---
+
 **v0.4.0 — released 2026-09-05.** Whole-column references work.
 
 - [x] `SUM($A:$A)` and friends evaluate instead of answering `#VALUE!`
@@ -141,11 +158,14 @@ functions, 232 unreviewed.
 4. **Review the 347 unreviewed** before treating any of it as new work. Most is math, engineering
    and text — largely Foundation, libm and swift-numerics — so a large share should resolve to
    near-free.
-5. **Test the seams.** Three real bugs in one afternoon lived exactly where two
+5. **Compare against Excel, not against ourselves.** ADR-001. A test whose expected value came
+   from reading a specification proves only that we read it the same way twice. Every expected
+   value is quoted from a published example or computed from a documented formula.
+6. **Test the seams.** Three real bugs in one afternoon lived exactly where two
    packages meet, where each half was self-consistent and neither suite could see the
    other. `SpillIntegrationTests` is the only place that holds both, and it earned its
    keep on the day it was written.
-6. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
+7. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
    coverage number said 99.93%. A function that is registered and wrong scores the same as one
    that is registered and right, so the count is not the measure it looks like.
 
@@ -197,7 +217,7 @@ implemented yet.
 
 ---
 
-**Last Updated:** 2026-09-05 — reconciled for v0.5.0; earlier for v0.4.0; the v0.3.0 note stands. Earlier, reconciled for v0.3.0. Recorded the lookup corrections and why
+**Last Updated:** 2026-09-05 — added the oracle, the specification suite and ADR-001; earlier for v0.5.0; earlier for v0.4.0; the v0.3.0 note stands. Earlier, reconciled for v0.3.0. Recorded the lookup corrections and why
 they happened, added the Array group to the source table, struck the shipped roadmap lines while
 noting where 0.3.0 diverged from what was planned, pinned versions corrected, and added
 "correctness over coverage" as a priority because this release is the argument for it.
