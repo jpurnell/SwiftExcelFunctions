@@ -18,7 +18,7 @@ public enum BuiltinNavigationFunctions {
     /// All lookup functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         vlookup, hlookup, xlookup, index, match, address, column, row, indirect,
-        offset, choose, lookup, rows, columns, hyperlink,
+        offset, choose, lookup, rows, columns, hyperlink, getPivotData,
     ]
 
     // MARK: - Choosing among values
@@ -756,5 +756,34 @@ public enum BuiltinNavigationFunctions {
     static let hyperlink = ExcelFunction(name: "HYPERLINK", minArgs: 1, maxArgs: 2) { args in
         if let error = propagatedError(args) { return error }
         return args.count > 1 ? args[1] : args[0]
+    }
+
+    // MARK: - Pivot tables
+
+    /// `GETPIVOTDATA(data_field, pivot_table, [field, item]…)` — a value from a
+    /// PivotTable report.
+    ///
+    /// Answers `#REF!`. The number is not computed from the arguments: it is looked
+    /// up in a pivot cache, which lives in `xl/pivotCache/` in the file and which
+    /// this family does not read. Pivot caches are out of scope — a decision, not an
+    /// omission.
+    ///
+    /// `#REF!` because that is what Excel answers when the PivotTable being pointed
+    /// at is not available, which is exactly our situation: the pivot table really is
+    /// not here. It is the honest report rather than a stand-in.
+    ///
+    /// Deliberately **not** `#NAME?`. The function exists and its name is known; what
+    /// is missing is the data behind it, and a caller debugging a sheet needs to be
+    /// able to tell those apart. Registering it is what makes that distinction
+    /// available at all.
+    ///
+    /// The corpus writes it 1,398 times across six workbooks. Every one of those
+    /// cells would need the cache to answer correctly, so none of them is a near
+    /// miss.
+    static let getPivotData = ExcelFunction(
+        name: "GETPIVOTDATA", minArgs: 2, maxArgs: nil
+    ) { args in
+        if let error = propagatedError(args) { return error }
+        return .error(.ref)
     }
 }

@@ -818,6 +818,41 @@ final class MicrosoftSpecificationTests: XCTestCase {
                        try number("RANK", [.number(20), list]))
     }
 
+    // MARK: - GETPIVOTDATA
+
+    // `GETPIVOTDATA(data_field, pivot_table, [field, item]…)` reads a value out of a
+    // PivotTable report. The number is not computed from the arguments — it is looked
+    // up in a pivot cache, which lives in `xl/pivotCache/` and which this family does
+    // not read. Pivot caches are out of scope.
+    //
+    // So it answers `#REF!`, which is what Excel itself answers when the PivotTable
+    // being pointed at is not available. That is the honest report of our situation
+    // rather than a stand-in: the pivot table really is not here.
+    //
+    // Deliberately not `#NAME?`. The function exists and its name is known; what is
+    // missing is the data it reads, and those are different failures. A caller
+    // debugging a sheet needs to know which.
+
+    func testGetPivotDataReportsAMissingPivotTable() throws {
+        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
+            [.text("Sales"), .text("$A$3")]), .error(.ref))
+        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
+            [.text("Sales"), .text("$A$3"), .text("Region"), .text("North")]),
+            .error(.ref))
+    }
+
+    /// It is registered, so a workbook full of it reads as a known function that
+    /// cannot resolve rather than an unknown name.
+    func testGetPivotDataIsRegistered() {
+        XCTAssertNotNil(FunctionRegistry.builtin.function(named: "GETPIVOTDATA"))
+    }
+
+    /// An error argument still propagates, so the first failure is the one reported.
+    func testGetPivotDataPropagatesAnError() throws {
+        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
+            [.error(.name), .text("$A$3")]), .error(.name))
+    }
+
     // MARK: - Error propagation
 
     // Excel propagates an error through a function rather than absorbing it: if an
