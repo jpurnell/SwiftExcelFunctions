@@ -88,6 +88,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinDateTimeFunctions.all,
             BuiltinAggregationFunctions.all,
             BuiltinArrayFunctions.all,
+            BuiltinRiskSolverFunctions.all,
             BuiltinBindingFunctions.all,
         ]
         for category in allCategories {
@@ -177,7 +178,30 @@ public struct FunctionRegistry: Sendable {
     /// - Parameter named: The function name to look up.
     /// - Returns: The ``ExcelFunction`` if found, or `nil`.
     public func function(named: String) -> ExcelFunction? {
-        storage.functions[named.uppercased()]
+        storage.functions[FunctionRegistry.canonical(named)]
+    }
+
+    /// A function name with Excel's "not mine" prefixes removed, uppercased.
+    ///
+    /// Excel marks two kinds of name it did not define itself. `_xll.` is an add-in
+    /// function — `_xll.PsiOutput` is Risk Solver's. `_xlfn.` is a function newer
+    /// than the file format it is being saved into, which is how `XLOOKUP` reaches
+    /// an older `.xlsx`.
+    ///
+    /// Neither prefix is part of the function's identity: Excel itself displays both
+    /// without it, and a workbook opened in a version that has the function shows the
+    /// plain name. So a lookup resolves through them, and `_xlfn.SUMIFS` finds
+    /// `SUMIFS` — which it must, or every modern spelling saved by an older Excel is
+    /// unknown to us for a reason that is purely clerical.
+    ///
+    /// - Parameter name: The name as written in the formula.
+    /// - Returns: The name to look up.
+    static func canonical(_ name: String) -> String {
+        let upper = name.uppercased()
+        for prefix in ["_XLL.", "_XLFN."] where upper.hasPrefix(prefix) {
+            return String(upper.dropFirst(prefix.count))
+        }
+        return upper
     }
 
     // MARK: - Properties
