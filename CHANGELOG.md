@@ -7,32 +7,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The Excel oracle.** Every formula in a real workbook is checked against the
+  value Excel itself cached for it — the strongest oracle this project has, since
+  it was produced by the specification, on files nobody wrote for us. Precedents
+  resolve to *Excel's* cached values rather than ours, so one wrong cell is one
+  finding instead of a cascade.
+
+  Opt-in via `BUSINESSMATHEXCEL_ORACLE=1` or `BUSINESSMATHEXCEL_CORPUS`, because
+  it reads private workbooks and takes minutes; the gate runs `swift test`, and a
+  suite that takes ten minutes is a suite that gets skipped.
+
+  Agreement over 155,897 comparable cells moved **46.6% → 99.62%** across this
+  release. Volatile functions and the Monte Carlo family are excluded rather than
+  compared — a cached `RAND()` records an afternoon in 2013.
+
+- **`MicrosoftSpecificationTests`** — ~105 tests taking the same rules from the
+  published function reference, runnable on a clean checkout by someone who has
+  never seen the corpus. The oracle answers "how often do we agree", which is a
+  number you either trust or you do not; these say what the rule *is*. Every
+  expected value is quoted from a published worked example or computed from the
+  documented formula, and none is taken from what this package currently returns.
+
+- **A corpus census** — what we *cannot* answer, which the oracle cannot see. An
+  unregistered function answers `#NAME?`, never disagrees about a value, and
+  barely moves the agreement number. It walks the parsed AST rather than the
+  formula text: a first pass done with a regex reported nine sheet names
+  containing parentheses as unknown functions, and missed `STDEV.S` — 2.2 million
+  calls — by taking the registry from a grep that never saw the alias table.
+
+- **Text, date and reference functions**, chosen by what the corpus calls rather
+  than by what a matrix lists: `SUBSTITUTE` (230,092 calls), `FIND` (102,168),
+  `SEARCH` with a real wildcard matcher, `PROPER`, `CLEAN`, `NUMBERVALUE`,
+  `WORKDAY`, `DATEVALUE`, `TIME`, `ROWS`, `COLUMNS`, `HYPERLINK`.
+
+- **Maths bridged to Foundation** rather than rewritten: `SIN`, `COS`, `TAN`,
+  `ASIN`, `ACOS`, `ATAN`, `ATAN2`, `LOG10`, `TRUNC`, `PRODUCT`, `GCD`, `LCM`.
+  These are libm's and Excel's contract is C's, so the bridging is the whole job.
+  Note `ATAN2` takes **x first**, the reverse of C and most languages.
+
+- **Statistics bridged to BusinessMath**: `SLOPE`, `INTERCEPT`, `NORM.DIST`,
+  `NORM.S.DIST`, `NORM.INV`, `COVARIANCE.P/S`, `PERCENTILE.INC`, `STDEV.P/S`,
+  `VAR.P/S`, `XIRR`, `YEARFRAC`. Excel takes `SLOPE(known_y, known_x)` and
+  BusinessMath takes `slope(x, y)` — reversed it returns a real, plausibly-sized,
+  wrong number, which is what the bindings exist to prevent.
+
+- **`XLOOKUP`**, the generalisation of `VLOOKUP`/`HLOOKUP`: keys and results as
+  separate ranges, which is what lets the result sit *left* of the key. Its
+  default is exact where `VLOOKUP`'s is approximate.
+
+- **`YEARFRAC`** computing every documented basis, and the legacy statistical
+  spellings, `TRUE()`/`FALSE()`, `UNICODE`/`UNICHAR`, the base conversions,
+  `RANK`/`RANK.EQ`/`RANK.AVG`, and `CELL`.
+
+- **Risk Solver markers** — `PsiOutput`, `PsiBaseCase`, `PsiName`. The rest of the
+  family is Monte Carlo; `PROPOSAL_psi_bindings.md` records the measured
+  signatures and why the cached values are not oracles.
+
+- **`GETPIVOTDATA`** answering `#REF!`. Its result is looked up in a pivot cache
+  this family does not read. Deliberately not `#NAME?`: the function exists and
+  its name is known — what is missing is the data behind it, and someone
+  debugging a sheet needs to tell those apart.
+
+- **ADR-001** (`project/decisions/architecture_decisions.md`) — Excel is the
+  specification. Where Excel departs from a published standard we match Excel
+  under the Excel-facing name and expose the standard beside it, named for the
+  standard. Records what it rules out, which is the part that decays first.
+
 ### Changed
 
-- **The coverage matrix is reconciled against the registry rather than by hand.**
+- **The registry resolves through `_xll.` and `_xlfn.`.** Neither is part of a
+  function's identity — one marks an add-in, the other a function newer than the
+  file format it was saved into — and Excel displays both without the prefix.
+  Without this, `_xlfn.SUMIFS` was unknown to us for a purely clerical reason.
 
+- **The coverage matrix is reconciled against the registry rather than by hand.**
   `project/plans/excel_function_coverage_matrix.tsv` had not moved since it was
   scaffolded, so it still described the pre-extraction package: 72 functions, all
-  of them attributed to SwiftXLSX. 163 rows were wrong.
+  attributed to SwiftXLSX. 163 rows were wrong — which for the document that
+  scopes the work understates what exists and points effort at things already
+  done.
 
-  It is now generated against `FunctionRegistry` itself — every group's `all`,
-  plus the alias table, so `STDEV.S` is covered by whatever covers `STDEVS`. Of
-  Excel's 519 documented functions, **160 `have`** (was 72), 57 bindable, 286
-  unreviewed; of Risk Solver's 295, three markers implemented and 50 bindable.
-  Nothing previously claimed has been lost — the check runs both directions.
+  Of Excel's 519 documented functions, **160 `have`** (was 72), 57 bindable, 286
+  unreviewed; of Risk Solver's 295, three markers and 50 bindable. The check runs
+  both directions, so nothing previously claimed has been lost. `provider` now
+  names the registering group instead of a scaffold-time guess at which
+  BusinessMath symbol might supply it — several guesses were wrong. A header row
+  names the eight previously-positional columns.
 
-  The `provider` column now names the group that registers a function instead of
-  a scaffold-time guess at which BusinessMath symbol might supply it. Several of
-  those guesses were wrong (`NORM.S.INV` was attributed to
-  `NewsvendorModel.optimalQuantity`), and the real call is in the binding's own
-  source, where it cannot drift from the code.
+  `calls` and `books` are deliberately **not** reconciled and are marked as an
+  ordering hint rather than a measurement: the recent census disagrees with them,
+  and refreshing needs a full-corpus run that currently traps partway through.
 
-  A header row names the eight columns, which were previously positional.
+- **The alias table's fields say which direction they run.** It reads
+  `(alias, existing)` and was labelled `(modern, legacy)`, which describes the
+  original five and misleads on every entry since. Four new entries silently did
+  nothing until this was corrected.
 
-  `calls` and `books` are **not** reconciled and are flagged as such in the
-  master plan: they are the original corpus scan, and the recent census disagrees
-  with them. Refreshing them needs a full-corpus run, which currently traps
-  partway through.
+- **Inventory tests assert membership, not a count.** A count says something
+  changed without saying what, and fails identically whether a function arrived
+  or vanished.
+
+### Fixed
+
+- **`VLOOKUP`, `HLOOKUP` and `MATCH` propagate an error argument.** All 40 of
+  `HLOOKUP`'s corpus disagreements were `ours #N/A, Excel #NAME?` — a lookup
+  whose *key* was already an error. Answering `#N/A` says "looked and did not
+  find" about a lookup that never happened, and loses the only clue to where the
+  trouble started.
+
+- **`NPV` accepts ranges.** It required a number per argument, so any range
+  answered `#VALUE!` — 126 corpus disagreements.
+
+- **`XIRR` converges to a tolerance scaled to the model.** BusinessMath's test is
+  absolute in currency units, defaulting to 1e-4, so its meaning changed with the
+  size of the model and the binding never overrode it.
+
+  That did not move the answer, which turned out to be the finding. On the corpus
+  cell, `XNPV` at our rate is `2.18e-11` and at Excel's is `-0.00152`: **ours is
+  the root and Excel stopped early**, 3.9e-8 away — four times the accuracy it
+  documents for itself. The comparison band for iterative functions is therefore
+  1e-6 rather than the documented 1e-8, and says why.
+
+- **The oracle compares a spilled anchor correctly.** One formula filling a span
+  evaluates once and each cell shows its own element; only the top-left carries
+  the formula, so a whole matrix was being compared against a single cached value.
+
+### Known upstream
+
+Day-count bases 0–3 are wrong and are documented as wrong rather than patched
+here — a second implementation of a day count is what the package split exists to
+prevent. `thirty360` misses the NASD February rule (Excel 301/360, ours 302/360),
+and `actual365`/`actual360`/`actualActual` gain an hour across a daylight-saving
+boundary. BusinessMath 2.11.0 shipped the new conventions but neither fix. These
+are the remaining corpus disagreements: 260 `IF`, 202 `YEARFRAC`, 142 `YEAR`,
+140 `AND` — all the same two defects and their wrappers.
 
 ## [0.5.0] - 2026-09-05
 
