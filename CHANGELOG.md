@@ -77,6 +77,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BusinessMath 2.11.0 → 2.14.0, and three known defects closed with it.**
+
+  2.14.0 closed BusinessMath's Risk Solver work list, and the pin was `from:`, so
+  `Package.resolved` still held 2.11.0 and nothing could see it.
+
+  The bump made three tests fail by *passing*: `actual/360`, `actual/365` and
+  `actual/actual` had each carried an `XCTExpectFailure` for a daylight-saving
+  hour — BusinessMath measured elapsed time through a calendar in the machine's
+  local zone, so an interval crossing a DST boundary gained an hour, moving every
+  such accrual by two parts in ten thousand. Fixed upstream; the three guards are
+  removed. Their date pairs are deliberately kept, because a test that never
+  crosses a boundary cannot see the defect come back.
+
+  **The NASD February rule is still open** — Excel says 301/360 for
+  2020-02-29 → 2020-12-31 and BusinessMath says 302/360. That is basis 0, which
+  every one of the corpus's 3,425 `YEARFRAC` calls uses, so it remains the whole
+  of the outstanding disagreement list.
+
+- **The PSI half of the coverage matrix is reconciled against BusinessMath
+  2.14.0.** All 113 distribution rows are now resolved — **56 bindable, 57 absent
+  upstream** — where 230 of the 295 PSI rows had been `unreviewed`. Rows with no
+  mathematics upstream are marked `new`, with `provider` reading `absent from
+  BusinessMath 2.14.0`, so the file says what was checked rather than what was
+  assumed.
+
+  The nine distributions the corpus actually calls are **all bindable**, covering
+  1,166 of the family's 1,950 corpus calls. What is absent is not reached by the
+  corpus at all: 28 percentile-fit `*Alt` parameterisations needing a fitting
+  solve rather than a sampler, 7 time-series beyond the `AR1`/`GARCH11` pair, 10
+  data-source functions, and 12 genuinely missing distributions.
+
+  **None of them is bound yet.** Three Psi functions are registered — the markers.
+
 - **The registry resolves through `_xll.` and `_xlfn.`.** Neither is part of a
   function's identity — one marks an add-in, the other a function newer than the
   file format it was saved into — and Excel displays both without the prefix.

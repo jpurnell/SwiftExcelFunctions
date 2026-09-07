@@ -143,8 +143,30 @@ Against Microsoft's 519 documented worksheet functions:
 | `out of scope` | 10 | cube and web — need an OLAP connection or the network |
 | `unreviewed` | 286 | no evidence either way; **not** the same as absent |
 
-Risk Solver's 295 PSI functions: **3 have** (`PsiOutput`, `PsiBaseCase`, `PsiName` — the markers),
-**50 bindable**, 12 that are role declarations rather than functions, 230 unreviewed.
+Risk Solver's 295 PSI functions, reconciled against **BusinessMath 2.14.0**:
+
+| Marking | Count | Meaning |
+|---|---|---|
+| `have` | 3 | `PsiOutput`, `PsiBaseCase`, `PsiName` — the markers |
+| `bindable` | **72** | BusinessMath 2.14.0 has the mathematics; needs an Excel-facing binding |
+| `new` | 57 | no mathematics upstream — `provider` says `absent from BusinessMath 2.14.0` |
+| `not ours` | 12 | role declarations rather than functions |
+| `unreviewed` | 151 | statistics and run-reporting, which need a simulation engine, not a distribution |
+
+**All 113 distribution rows are now resolved: 56 bindable, 57 absent.** None is unreviewed, which
+is the part that matters — the distribution surface is the mathematics, and it is now known
+either way.
+
+The nine distributions the corpus actually calls — `PsiBernoulli`, `PsiNormal`, `PsiLogNormal`,
+`PsiTriangular`, `PsiDiscrete`, `PsiUniform`, `PsiBinomial`, `PsiIntUniform`, `PsiPoisson` — are
+**all bindable**, covering 1,166 of the family's 1,950 corpus calls. Nothing upstream blocks the
+first pass.
+
+What is absent upstream falls in four groups, and none of it is reached by the corpus:
+28 percentile-fit `*Alt` parameterisations (which need a fitting solve, not a sampler), 7
+time-series beyond the `AR1`/`GARCH11` pair, 10 data-source and elicitation functions
+(`PsiSip`, `PsiSlurp`, `PsiCertified`, …), and 12 genuinely missing distributions —
+`PsiPert`, `PsiNormalSkew`, `PsiBetaGen`, `PsiTriangGen`, `PsiMVNormal` among them.
 
 `have` is not self-reported. The matrix is reconciled against `FunctionRegistry` itself —
 every group's `all`, plus the alias table, which is why `STDEV.S` counts as covered by whatever
@@ -221,7 +243,12 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-06 — coverage table reconciled against the live `FunctionRegistry`:
+**Last Updated:** 2026-09-07 — PSI rows reconciled against BusinessMath 2.14.0, which closed its
+Risk Solver work list: all 113 distribution rows now resolved (56 bindable, 57 absent upstream),
+`bindable` 50 → 72. The dependency moved 2.11.0 → 2.14.0, which fixed the daylight-saving hour in
+`actual/360`, `actual/365` and `actual/actual`; three `XCTExpectFailure` guards were removed
+because the defect they pinned is gone. The NASD February rule is still open.
+Earlier: 2026-09-06 — coverage table reconciled against the live `FunctionRegistry`:
 `have` 72 → 160 as the Excel-facing bindings landed, `bindable` 84 → 57, `unreviewed` 347 → 286.
 Earlier: created 2026-09-04. Scope and counts from the coverage matrix; nothing
 implemented yet.

@@ -158,25 +158,23 @@ final class MicrosoftSpecificationTests: XCTestCase {
 
     /// Basis 3 counts real days over 365: 1 January to 1 July 2026 is 181 days.
     ///
-    /// **Known upstream defect.** We answer 181.0417/365. The extra 1/24 of a day is
-    /// an hour, and it is daylight saving: the two dates are exact UTC midnights and
-    /// the interval between them is exactly 181.0 days, but BusinessMath's
-    /// actual/365 measures elapsed time through a calendar in the machine's local
-    /// zone, so an interval crossing a DST boundary gains or loses an hour.
+    /// This interval crosses a daylight-saving boundary, which is the whole reason it
+    /// is the one being asserted. BusinessMath once measured elapsed time through a
+    /// calendar in the machine's local zone, so the answer was 181.0417 days — an
+    /// extra hour, invisible in UTC and invisible in a zone with no DST, which is how
+    /// it survived long enough to move every actual/360 and actual/365 accrual by two
+    /// parts in ten thousand. Fixed in BusinessMath 2.14.0.
     ///
-    /// It is invisible in UTC and invisible in a zone with no DST, which is why it
-    /// has survived — and it moves every actual/360 and actual/365 accrual by about
-    /// two parts in ten thousand. Reported to the BusinessMath session.
+    /// Keep the date pair. A test that never crosses a boundary cannot see this
+    /// defect come back.
     func testYearFracActual365CountsRealDays() throws {
-        XCTExpectFailure("BusinessMath actual/365 measures elapsed time in the local zone")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
                                                .number(Self.jul1_2026), .number(3)]),
                        181.0 / 365.0, accuracy: 1e-12)
     }
 
-    /// Basis 2 is the same day count over 360, and carries the same hour.
+    /// Basis 2 is the same day count over 360, and carried the same hour.
     func testYearFracActual360() throws {
-        XCTExpectFailure("BusinessMath actual/360 measures elapsed time in the local zone")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
                                                .number(Self.jul1_2026), .number(2)]),
                        181.0 / 360.0, accuracy: 1e-12)
@@ -203,7 +201,7 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// `testTheFebruaryEndOfMonthRule`, which holds the same case with its
     /// provenance.
     func testYearFracFebruaryMonthEndIsThirty() throws {
-        XCTExpectFailure("BusinessMath 2.9.0 lacks the NASD February rule")
+        XCTExpectFailure("BusinessMath 2.14.0 still lacks the NASD February rule")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb29_2020),
                                                .number(Self.dec31_2020), .number(0)]),
                        301.0 / 360.0, accuracy: 1e-12)
@@ -212,7 +210,7 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// The common-year half of the same rule: 28 February is the month end too.
     /// 2021-02-28 to 2021-07-31 is 30·5 + (30−30) = 150 days.
     func testYearFracCommonYearFebruaryMonthEnd() throws {
-        XCTExpectFailure("BusinessMath 2.9.0 lacks the NASD February rule")
+        XCTExpectFailure("BusinessMath 2.14.0 still lacks the NASD February rule")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb28_2021),
                                                .number(Self.jul31_2021), .number(0)]),
                        150.0 / 360.0, accuracy: 1e-12)
@@ -231,10 +229,10 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// Basis 1 within a single calendar year divides by that year's length. 2026 is
     /// not a leap year, so 1 January to 1 July is 181/365.
     ///
-    /// Carries the same daylight-saving hour as bases 2 and 3 — `actualActual` was
-    /// added in BusinessMath 2.11.0 on top of the same elapsed-time measurement.
+    /// Carried the same daylight-saving hour as bases 2 and 3 — `actualActual` was
+    /// added in BusinessMath 2.11.0 on top of the same elapsed-time measurement, and
+    /// was fixed with them in 2.14.0.
     func testYearFracActualActualWithinOneYear() throws {
-        XCTExpectFailure("BusinessMath's actual/actual inherits the local-zone measurement")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
                                                .number(Self.jul1_2026), .number(1)]),
                        181.0 / 365.0, accuracy: 1e-12)
