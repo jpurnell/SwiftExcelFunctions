@@ -162,11 +162,18 @@ The nine distributions the corpus actually calls — `PsiBernoulli`, `PsiNormal`
 **all bindable**, covering 1,166 of the family's 1,950 corpus calls. Nothing upstream blocks the
 first pass.
 
-What is absent upstream falls in four groups, and none of it is reached by the corpus:
-28 percentile-fit `*Alt` parameterisations (which need a fitting solve, not a sampler), 7
-time-series beyond the `AR1`/`GARCH11` pair, 10 data-source and elicitation functions
-(`PsiSip`, `PsiSlurp`, `PsiCertified`, …), and 12 genuinely missing distributions —
-`PsiPert`, `PsiNormalSkew`, `PsiBetaGen`, `PsiTriangGen`, `PsiMVNormal` among them.
+The 57 absent rows are recorded in **`project/plans/psi_upstream_gaps.md`** and its joinable
+`psi_upstream_gaps.tsv`, because nothing upstream records them: BusinessMath's work list was
+scoped from the corpus, and of these 57 names **zero** appear in it. Not attempted and missed —
+never in scope.
+
+52 are BusinessMath's and 5 are ours (`PsiSip`, `PsiSlurp`, `PsiTSSip`, `PsiCertified`, `PsiVary`
+name a stored data object rather than computing anything — address arithmetic, which upstream's
+own proposal assigns downstream). The 52 collapse to roughly **twenty** pieces of work: one
+percentile-fitting solve covering all 28 `*Alt` rows, two process families covering 7 time-series,
+and seventeen individual distributions.
+
+**The corpus calls none of the 57.** This is a completeness list, not a blocker list.
 
 `have` is not self-reported. The matrix is reconciled against `FunctionRegistry` itself —
 every group's `all`, plus the alias table, which is why `STDEV.S` counts as covered by whatever
