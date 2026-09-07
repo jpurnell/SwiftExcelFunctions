@@ -13,12 +13,23 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
         return try fn.evaluate(args)
     }
 
-    func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)),
-                       ["PSIOUTPUT", "PSIBASECASE", "PSINAME",
-                        "PSIBERNOULLI", "PSINORMAL", "PSILOGNORMAL", "PSITRIANGULAR",
-                        "PSIDISCRETE", "PSIUNIFORM", "PSIBINOMIAL", "PSIINTUNIFORM",
-                        "PSIPOISSON"])
+    /// The group is exactly its three parts, with nothing duplicated or orphaned.
+    ///
+    /// Structural rather than a list of names: the distributions have their own
+    /// inventory tests, and a second hand-maintained copy of fifty-odd names here
+    /// would go stale rather than catch anything.
+    func testAllIsExactlyItsParts() {
+        let markers = ["PSIOUTPUT", "PSIBASECASE", "PSINAME"]
+        let expected = Set(markers)
+            .union(BuiltinRiskSolverFunctions.distributions.map(\.name))
+            .union(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name))
+        XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)), expected)
+        XCTAssertEqual(BuiltinRiskSolverFunctions.all.count, expected.count,
+                       "a name is registered twice")
+        for marker in markers {
+            XCTAssertTrue(BuiltinRiskSolverFunctions.all.contains { $0.name == marker },
+                          "\(marker) is missing")
+        }
     }
 
     /// `PsiOutput()` marks a cell as a simulation result. It contributes nothing to

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Forty-two more Risk Solver distributions**, taking the Psi distribution
+  surface to 51 of 113 — everything BusinessMath 2.14.0 can back except five whose
+  shape is not a single-cell draw.
+
+  Same machinery as the nine: inverse transform through the distribution's own
+  `quantile`, property functions read from the unevaluated AST. What is different
+  is that most of the work is *parameterisation*, because Frontline and
+  BusinessMath often name the same distribution with different parameters. Each
+  conversion is asserted exactly rather than by a range check, since a range check
+  passes with the conversion removed:
+
+  - **`PsiExponential(beta)` states the mean; `DistributionExponential` takes the
+    rate.** Un-inverted, β = 100 gives a mean of 0.01 — right sign, right shape,
+    wrong by four orders of magnitude.
+  - **`PsiLogistic(mu, s)` states the scale; the type takes the deviation**, which
+    is `s·π/√3`. Passed through, the distribution is narrowed by 1.814 at every
+    percentile except the median.
+  - **`PsiGamma` has a real shape, so it cannot use `DistributionGamma`**, which
+    takes `r: Int` and builds the draw as a sum of `r` exponentials. Rounding 2.5
+    to 2 answers a different distribution; the free `gammaQuantile` takes reals.
+  - **`PsiLogNorm2` takes log-scale parameters unconverted**, the counterpart to
+    `PsiLogNormal`, which takes arithmetic ones. Binding both alike makes one wrong.
+
+  Two suite-wide assertions cover all forty-two: every one draws a finite number at
+  three probabilities, and **every quantile is monotone** — which a binding that
+  scrambled a parameter into a shape slot would break while still returning finite
+  numbers.
+
+  `PsiShuffle` is bound and documented as approximate: sampling without replacement
+  is a property of a *sequence*, and a cell evaluation has no memory of the last
+  draw. `#NAME?` on an otherwise-readable workbook was the worse option.
+
+  Five remain bindable but unbound — `PsiAR1`, `PsiGARCH11`, `PsiMVLogNormal`,
+  `PsiMetalog`, `PsiMetalogFit` — each needing a decision about what the call means
+  rather than a mapping. Recorded in `project/plans/psi_upstream_gaps.md`.
+
 - **The nine Risk Solver distributions the corpus calls.** `PsiBernoulli`,
   `PsiNormal`, `PsiLogNormal`, `PsiTriangular`, `PsiDiscrete`, `PsiUniform`,
   `PsiBinomial`, `PsiIntUniform`, `PsiPoisson` — 1,166 of the Psi family's 1,950

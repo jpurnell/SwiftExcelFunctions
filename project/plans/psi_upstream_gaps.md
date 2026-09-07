@@ -77,6 +77,22 @@ corpus-shaped.
 
 ---
 
+## Bindable upstream, not yet bound here (5)
+
+Distinct from the 57 above: BusinessMath *has* the mathematics, but its shape is not a
+single-cell draw from scalar parameters, so a binding needs a decision rather than a mapping.
+
+| Function | Provider | What is unresolved |
+|---|---|---|
+| `PsiAR1` | `AutoregressiveOne` | Frontline passes `val0`, the previous value; the type takes `(name, persistence, longRunMean, shockVolatility)` and carries its own state. A process step is not an i.i.d. draw, and a cell has no memory of the last one. |
+| `PsiGARCH11` | `GarchOneOne` | Same, plus a two-component variance state. Zero corpus occurrences. |
+| `PsiMVLogNormal` | `DistributionMVLogNormal` | Multivariate: one call yields a *vector*, and a cell holds one value. Needs a component index that Frontline's signature does not carry. |
+| `PsiMetalog` | `DistributionMetalog` | Its leading `min`/`max` are optional **and** first, so arity alone cannot say whether argument one is a bound or a coefficient. |
+| `PsiMetalogFit` | `DistributionMetalog` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)` — which of x/y is the probability is not stated. |
+
+Each is a question about what the call *means*, not about which type to reach for. Guessing would
+produce numbers rather than errors, which is the failure mode this project is least able to detect.
+
 ## Also still open upstream
 
 **The NASD February rule.** `thirty360` gives 302/360 for 2020-02-29 → 2020-12-31 where Excel

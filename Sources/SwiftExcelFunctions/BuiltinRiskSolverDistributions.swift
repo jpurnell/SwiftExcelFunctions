@@ -68,7 +68,7 @@ extension BuiltinRiskSolverFunctions {
     /// Propagated rather than absorbed, the same rule the lookups follow: the answer
     /// names the failure nearest the start of the argument list, which is the clue
     /// to where the trouble began.
-    private static func firstError(_ values: [CellValue]) -> CellValue? {
+    static func firstError(_ values: [CellValue]) -> CellValue? {
         values.first { if case .error = $0 { return true } else { return false } }
     }
 
@@ -93,26 +93,32 @@ extension BuiltinRiskSolverFunctions {
     ///   - maxArgs: Parameters accepted, plus room for the property functions.
     ///   - quantile: Builds the inverse CDF from the parameters, or `nil` if they
     ///     are out of support.
-    private static func sampling(
+    static func sampling(
         _ name: String,
         minArgs: Int,
         maxArgs: Int?,
-        quantile: @escaping @Sendable ([CellValue]) -> (@Sendable (Double) -> Double)?
+        quantile: @escaping @Sendable ([CellValue]) -> (@Sendable (Double) throws -> Double)?
     ) -> ExcelFunction {
         ExcelFunction(name: name, minArgs: minArgs, maxArgs: maxArgs) { context, values in
             if let error = firstError(values) { return error }
             let parts = attached(context, values)
             guard parts.parameters.count >= minArgs else { return .error(.value) }
             guard let inverse = quantile(parts.parameters) else { return .error(.num) }
-            if let random = context.random {
-                return .number(inverse(random.nextUniform()))
+            guard let random = context.random else { return parts.baseCase ?? .error(.value) }
+            do {
+                return .number(try inverse(random.nextUniform()))
+            } catch {
+                // A quantile that cannot be evaluated at this probability — an
+                // iterative inverse that did not converge, or a parameter set the
+                // library rejects only on use. `#NUM!` is Excel's answer for a
+                // computation that has no result.
+                return .error(.num)
             }
-            return parts.baseCase ?? .error(.value)
         }
     }
 
     /// A finite number from a cell value, or `nil`.
-    private static func real(_ value: CellValue) -> Double? {
+    static func real(_ value: CellValue) -> Double? {
         switch value {
         case .number(let number): return number.isFinite ? number : nil
         case .bool(let flag): return flag ? 1 : 0
@@ -122,7 +128,7 @@ extension BuiltinRiskSolverFunctions {
     }
 
     /// Every number in an argument, in reading order — a range, an array, or one cell.
-    private static func series(_ value: CellValue) -> [Double] {
+    static func series(_ value: CellValue) -> [Double] {
         switch value {
         case .array(let matrix): return matrix.elements.compactMap(real)
         default: return real(value).map { [$0] } ?? []
