@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The nine Risk Solver distributions the corpus calls.** `PsiBernoulli`,
+  `PsiNormal`, `PsiLogNormal`, `PsiTriangular`, `PsiDiscrete`, `PsiUniform`,
+  `PsiBinomial`, `PsiIntUniform`, `PsiPoisson` — 1,166 of the Psi family's 1,950
+  corpus calls, and the point at which a workbook that used Risk Solver can be
+  read without it.
+
+  The mathematics is BusinessMath's. Sampling is by inverse transform: one
+  uniform from the caller's `RandomSource` through the distribution's own
+  `quantile`, so the randomness stays where this package has always kept it and
+  nothing reaches for system entropy.
+
+  **Every one is a context function**, because a property function cannot be
+  recognised by its value — `PsiBaseCase(99)` and a literal `99` both arrive as
+  `.number(99)`. Read as a parameter, a base case silently widens a support and
+  returns numbers that look entirely reasonable. They are recovered from the
+  unevaluated AST instead.
+
+  What a cell answers when nothing is simulating: a draw if a source was given,
+  else the base case, else `#VALUE!` — the same refusal `RAND()` makes.
+
+  Two places where the binding is the whole job, both with their own test:
+
+  - **`PsiLogNormal` takes the *arithmetic* mean and deviation** while
+    `DistributionLogNormal` takes the underlying normal's, on the log scale.
+    Passed through unconverted the median lands at `e^10` instead of 9.806 —
+    four orders of magnitude, from a positive and plausibly-shaped number. The
+    moments are converted here.
+  - **`PsiTriangular` is published `(a, c, b)`** — positionally
+    `(min, likely, max)`. The middle argument is the mode, and "correcting" the
+    order still produces numbers inside a plausible range.
+
+  `PsiBernoulli` and `PsiBinomial` go through `DistributionDiscrete` and
+  `binomialPMF` rather than being written out, so no second implementation of
+  anything exists. `PsiBinomial` walks its support accumulating the pmf instead
+  of materialising `n + 1` weights, which is why it needs no arbitrary cap on
+  `n`.
+
+  Not verifiable against the corpus, and deliberately so: Monte Carlo with no
+  published seed means a cached value is one draw from one run. These assert the
+  published contract — support, quantile at a known probability, and the idle
+  behaviour.
+
 - **The Excel oracle.** Every formula in a real workbook is checked against the
   value Excel itself cached for it — the strongest oracle this project has, since
   it was produced by the specification, on files nobody wrote for us. Precedents

@@ -525,12 +525,12 @@ PSI	PsiAR2	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility
 PSI	PsiARCH1	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, err_coef, val0|confirmed
 PSI	PsiARMA11	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, ar_coef, ma_coef, val0, err0|confirmed
 PSI	PsiBaseCase	property	have	risksolver	95	7	value|confirmed
-PSI	PsiBernoulli	distribution	bindable	bernoulliTrial	45	2	p|confirmed
+PSI	PsiBernoulli	distribution	have	risksolver	45	2	p|confirmed
 PSI	PsiBeta	distribution	bindable	DistributionBeta	0	0	alpha1, alpha2|confirmed
 PSI	PsiBetaGen	distribution	new	absent from BusinessMath 2.14.0	0	0	alpha1, alpha2, a, b|confirmed
 PSI	PsiBetaGenAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	4 name/value or percentile/value pairs, chosen from: percentile1, percentile2, percentile3, percentile4, shape1, shape2, min, max|confirmed
 PSI	PsiBetaSubj	distribution	new	absent from BusinessMath 2.14.0	0	0	a (min), c (likely), mean, b (max)|confirmed
-PSI	PsiBinomial	distribution	bindable	binomialPMF	0	0	n, p|confirmed
+PSI	PsiBinomial	distribution	have	risksolver	0	0	n, p|confirmed
 PSI	PsiBoxFunction	other	unreviewed		0	0	table_range, Arg1, Arg2|confirmed
 PSI	PsiBoxIterator	other	unreviewed		0	0	table_range|confirmed
 PSI	PsiBurr12	distribution	bindable	DistributionBurr12	0	0	loc, scale, shape1, shape2|confirmed
@@ -582,7 +582,7 @@ PSI	PsiDecTable	other	unreviewed		0	0	table_range, output, ret_header, input_val
 PSI	PsiDim	other	unreviewed		0	0	name, range_or_array|confirmed
 PSI	PsiDimActive	property	unreviewed		0	0	opt, sim, sen|confirmed
 PSI	PsiDimLock	property	unreviewed		0	0	elem_or_index|confirmed
-PSI	PsiDiscrete	distribution	bindable	DistributionDiscrete	20	8	{x1..xn}, {p1..pn}|confirmed
+PSI	PsiDiscrete	distribution	have	risksolver	20	8	{x1..xn}, {p1..pn}|confirmed
 PSI	PsiDistInfo	statistic	unreviewed		0	0	cell, [info]|confirmed
 PSI	PsiDisUniform	distribution	bindable	DistributionDiscreteUniform	0	0	{x1..xn}|confirmed
 PSI	PsiDualLower	other	unreviewed		0	0	cell, optimization|confirmed
@@ -629,7 +629,7 @@ PSI	PsiHypSecant	distribution	bindable	DistributionHypSecant	0	0	loc, scale|conf
 PSI	PsiHypSecantAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters: two different percentiles, or percentile and loc, or percentile and scale|confirmed
 PSI	PsiInitialValue	other	unreviewed		0	0	cell, optimization|confirmed
 PSI	PsiInput	annotation	not ours	role declaration, belongs with solver_adj	0	0	cell_or_name|confirmed
-PSI	PsiIntUniform	distribution	bindable	DistributionDiscreteUniform	6	1	a, b|confirmed
+PSI	PsiIntUniform	distribution	have	risksolver	6	1	a, b|confirmed
 PSI	PsiInvNormal	distribution	bindable	DistributionInverseGaussian	0	0	mu, lambda|confirmed
 PSI	PsiInvNormalAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters, chosen from: two different percentiles, mean, var, scale|confirmed
 PSI	PsiJohnsonSB	distribution	bindable	DistributionJohnsonSB	0	0	shape1, shape2, min, max|confirmed
@@ -649,7 +649,7 @@ PSI	PsiLogisticAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parame
 PSI	PsiLogLogistic	distribution	bindable	DistributionLogLogistic	0	0	gamma, beta, alpha|confirmed
 PSI	PsiLogLogisticAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	3 parameters, chosen from: 3 different percentiles, loc, scale, shape|confirmed
 PSI	PsiLogNorm2	distribution	bindable	DistributionLogNormal	0	0	mu, sigma (log-scale: mean/stdev of the underlying Normal)|confirmed
-PSI	PsiLogNormal	distribution	bindable	DistributionLogNormal	40	1	mu, sigma (arithmetic mean/stdev of the lognormal itself)|confirmed
+PSI	PsiLogNormal	distribution	have	risksolver	40	1	mu, sigma (arithmetic mean/stdev of the lognormal itself)|confirmed
 PSI	PsiLogNormalAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters: 2 different percentiles, or percentile and mean, or percentile and stdev|confirmed
 PSI	PsiMA1	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, coef1, err0|confirmed
 PSI	PsiMA2	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, coef1, coef2, err0, err1|confirmed
@@ -681,7 +681,7 @@ PSI	PsiMVShuffle	distribution	new	absent from BusinessMath 2.14.0	0	0	data|confi
 PSI	PsiMyerson	distribution	bindable	DistributionMyerson	0	0	a, b, c, t|confirmed
 PSI	PsiName	property	have	risksolver	25	7	name|confirmed
 PSI	PsiNegBinomial	distribution	bindable	DistributionNegativeBinomial	0	0	s, p|confirmed
-PSI	PsiNormal	distribution	bindable	DistributionNormal	12	4	mu (mean), sigma (stdev)|confirmed
+PSI	PsiNormal	distribution	have	risksolver	12	4	mu (mean), sigma (stdev)|confirmed
 PSI	PsiNormalAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters: 2 different percentiles, or percentile and mean, or percentile and stdev|confirmed
 PSI	PsiNormalSkew	distribution	new	absent from BusinessMath 2.14.0	0	0	a (lower bound), b (upper bound), c (skew)|confirmed
 PSI	PsiObj	annotation	not ours	role declaration, belongs with solver_adj	0	0	objective_cell, sense, valueof, chance_type, chance_measure, comment, model_name, critical|confirmed
@@ -708,7 +708,7 @@ PSI	PsiPert	distribution	new	absent from BusinessMath 2.14.0	0	0	a (min), c (lik
 PSI	PsiPertAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	3 parameters, chosen from: 3 different percentiles, mean, var, min, likely, max|confirmed
 PSI	PsiPivotCube	other	unreviewed		0	0	cell_within_pivot|confirmed
 PSI	PsiPivotDim	other	unreviewed		0	0	cell_within_pivot, dim_name, dim_type|confirmed
-PSI	PsiPoisson	distribution	bindable	DistributionPoisson	0	0	lambda|confirmed
+PSI	PsiPoisson	distribution	have	risksolver	0	0	lambda|confirmed
 PSI	PsiPosteriors	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiPredict	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiPredictMLR	other	unreviewed		0	0	UNCONFIRMED|confirmed
@@ -794,7 +794,7 @@ PSI	PsiTheoXtoQ	statistic	unreviewed		0	0	cell_or_name, target|confirmed
 PSI	PsiTheoXtoY	statistic	unreviewed		0	0	cell_or_name, value|confirmed
 PSI	PsiTransform	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiTriangGen	distribution	new	absent from BusinessMath 2.14.0	0	0	ap, m, br, p, r|confirmed
-PSI	PsiTriangular	distribution	bindable	DistributionTriangular	60	17	a (min), c (likely), b (max)|confirmed
+PSI	PsiTriangular	distribution	have	risksolver	60	17	a (min), c (likely), b (max)|confirmed
 PSI	PsiTriangularAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	3 parameters combining native args (min, likely, max) with percentiles, e.g. (min, percentile1, percentile2) or (percentile1, likely, percentile2)|confirmed
 PSI	PsiTruncate	property	unreviewed		0	0	[min], [max], [type]|confirmed
 PSI	PsiTruncateP	property	unreviewed		0	0	[min], [max]|confirmed
@@ -803,7 +803,7 @@ PSI	PsiTSLen	property	unreviewed		0	0	length|confirmed
 PSI	PsiTSSeasonality	property	unreviewed		0	0	order, period, terms, index|confirmed
 PSI	PsiTSSip	distribution	new	absent from BusinessMath 2.14.0	0	0	tssip|confirmed
 PSI	PsiTSTransform	property	unreviewed		0	0	type, shift|confirmed
-PSI	PsiUniform	distribution	bindable	DistributionUniform	24	16	a (min), b (max)|confirmed
+PSI	PsiUniform	distribution	have	risksolver	24	16	a (min), b (max)|confirmed
 PSI	PsiUniformAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters combining native args (lower, upper) with percentiles, e.g. (lower, percentile1) or (percentile1, upper) or (percentile1, percentile2)|confirmed
 PSI	PsiUnits	property	unreviewed		0	0	string|confirmed
 PSI	PsiVar	annotation	not ours	role declaration, belongs with solver_adj	0	0	cell_range, type, active, comment, model_name, critical|confirmed

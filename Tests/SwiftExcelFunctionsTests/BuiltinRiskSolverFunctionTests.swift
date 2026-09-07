@@ -15,7 +15,10 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
 
     func testAllContainsEveryFunctionInTheGroup() {
         XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)),
-                       ["PSIOUTPUT", "PSIBASECASE", "PSINAME"])
+                       ["PSIOUTPUT", "PSIBASECASE", "PSINAME",
+                        "PSIBERNOULLI", "PSINORMAL", "PSILOGNORMAL", "PSITRIANGULAR",
+                        "PSIDISCRETE", "PSIUNIFORM", "PSIBINOMIAL", "PSIINTUNIFORM",
+                        "PSIPOISSON"])
     }
 
     /// `PsiOutput()` marks a cell as a simulation result. It contributes nothing to
@@ -88,8 +91,14 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
 
     /// A prefix on a name nothing defines is still unknown, rather than resolving to
     /// something with a similar tail.
+    /// Resolving the prefix must not invent a function behind it.
+    ///
+    /// `PsiPert` is the example because it is a real Frontline distribution this
+    /// package genuinely cannot answer — BusinessMath has no Beta-PERT at 2.14.0,
+    /// recorded in `project/plans/psi_upstream_gaps.md`. A workbook using it should
+    /// get `#NAME?`, which says "nobody here knows this", rather than a number.
     func testAnUnknownPrefixedNameStaysUnknown() {
-        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xll.PsiTriangular"))
+        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xll.PsiPert"))
         XCTAssertNil(FunctionRegistry.builtin.function(named: "_xlfn.NOTAFUNCTION"))
     }
 
