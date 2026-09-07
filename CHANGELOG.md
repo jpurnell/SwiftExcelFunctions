@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Forty-two more Risk Solver distributions**, taking the Psi distribution
-  surface to 51 of 113 — everything BusinessMath 2.14.0 can back except five whose
-  shape is not a single-cell draw.
+- **Forty-five more Risk Solver distributions**, taking the Psi distribution
+  surface to 54 of 113 — everything BusinessMath 2.14.0 can back except two.
 
   Same machinery as the nine: inverse transform through the distribution's own
   `quantile`, property functions read from the unevaluated AST. What is different
@@ -41,9 +40,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is a property of a *sequence*, and a cell evaluation has no memory of the last
   draw. `#NAME?` on an otherwise-readable workbook was the worse option.
 
-  Five remain bindable but unbound — `PsiAR1`, `PsiGARCH11`, `PsiMVLogNormal`,
-  `PsiMetalog`, `PsiMetalogFit` — each needing a decision about what the call means
-  rather than a mapping. Recorded in `project/plans/psi_upstream_gaps.md`.
+  **`PsiAR1`, `PsiGARCH11` and `PsiMetalog` are bound**, which they nearly were not:
+  the first two looked like they needed simulation state a cell cannot carry, until
+  Frontline's signatures showed the previous state is passed *in* — `val0`, `err0`,
+  `stdev0` are arguments, supplied by the cell above, because a spreadsheet cell has
+  no memory. `PsiMetalog`'s trailing `prop_fcns` is not a parameter either; it is
+  Frontline's general property-function slot, already stripped before a distribution
+  sees its arguments.
+
+  Two remain: `PsiMVLogNormal`, which is documented and unambiguous but needs an RNG
+  bridge and an array-returning sampler because it spills a correlated vector across
+  cells; and `PsiMetalogFit`, whose signature does not say which of `x_values` and
+  `y_values` carries the probability. Recorded in
+  `project/plans/psi_upstream_gaps.md`.
 
 - **The nine Risk Solver distributions the corpus calls.** `PsiBernoulli`,
   `PsiNormal`, `PsiLogNormal`, `PsiTriangular`, `PsiDiscrete`, `PsiUniform`,

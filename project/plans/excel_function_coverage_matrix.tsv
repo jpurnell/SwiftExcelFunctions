@@ -520,7 +520,7 @@ EXCEL	WEIBULL	compatibility	unreviewed		0	0	x,alpha,beta,cumulative
 EXCEL	ZTEST	compatibility	unreviewed		0	0	array,x,[sigma]
 PSI	PsiAbsDev	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiAPARCH11	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, delta, gamma, err_coef, ar_coef, val0, stdev0|confirmed
-PSI	PsiAR1	distribution	bindable	AutoregressiveOne	0	0	mean, volatility, coef1, val0|confirmed
+PSI	PsiAR1	distribution	have	risksolver	0	0	mean, volatility, coef1, val0|confirmed
 PSI	PsiAR2	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, coef1, coef2, val0, val1|confirmed
 PSI	PsiARCH1	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, err_coef, val0|confirmed
 PSI	PsiARMA11	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, ar_coef, ma_coef, val0, err0|confirmed
@@ -620,7 +620,7 @@ PSI	PsiFrechetAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	3 name/va
 PSI	PsiFrequency	statistic	unreviewed		0	0	cell, freq_type, bin_bounds, simulation|confirmed
 PSI	PsiGamma	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiGammaAlt	distribution	new	absent from BusinessMath 2.14.0	0	0	2 parameters, chosen from: percentile1, percentile2, mean, var, shape, scale|confirmed
-PSI	PsiGARCH11	distribution	bindable	GarchOneOne	0	0	mean, volatility, err_coef, ar_coef, val0, stdev0|confirmed
+PSI	PsiGARCH11	distribution	have	risksolver	0	0	mean, volatility, err_coef, ar_coef, val0, stdev0|confirmed
 PSI	PsiGeneral	distribution	have	risksolver	0	0	a, b, {x1..xn}, {w1..wn}|confirmed
 PSI	PsiGeometric	distribution	have	risksolver	0	0	p|confirmed
 PSI	PsiHistogram	distribution	new	absent from BusinessMath 2.14.0	0	0	a, b, {w1..wn}|confirmed
@@ -661,7 +661,7 @@ PSI	PsiMean	statistic	bindable	FinancialSimulation.mean	31	13	cell, simulation, 
 PSI	PsiMeanCI	statistic	bindable	FinancialSimulation.mean	0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
 PSI	PsiMeanCIB	statistic	bindable	FinancialSimulation.mean	0	0	cell, confidence_level, [lowerbound], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiMedian	statistic	bindable	median	0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiMetalog	distribution	bindable	DistributionMetalog	0	0	min, max, coefficients, prop_fcns|confirmed
+PSI	PsiMetalog	distribution	have	risksolver	0	0	min, max, coefficients, prop_fcns|confirmed
 PSI	PsiMetalog2	distribution	new	absent from BusinessMath 2.14.0	0	0	coefficients|confirmed
 PSI	PsiMetalog2Fit	distribution	new	absent from BusinessMath 2.14.0	0	0	num_coef, x_values, y_values|confirmed
 PSI	PsiMetalogFit	distribution	bindable	DistributionMetalog	0	0	num_coef, x_values, y_values|confirmed

@@ -17,10 +17,14 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
         func value(at ref: CellRef) -> CellValue? {
             let row = ref.row - 1
             guard row >= 0, row < Self.list.count else { return nil }
+            if ref.column == 3 {
+                // Two metalog coefficients: a median term and a spread term.
+                return row < 2 ? .number([0.5, 0.2][row]) : nil
+            }
             return ref.column == 1 ? .number(Self.list[row]) : .number(0.25)
         }
         func value(at ref: CellRef, inSheet: String) -> CellValue? { value(at: ref) }
-        func lastPopulatedCell() -> CellRef? { CellRef(column: 2, row: 4) }
+        func lastPopulatedCell() -> CellRef? { CellRef(column: 3, row: 4) }
         func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
         func values(in range: CellRange) -> [CellValue] { [] }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
@@ -63,7 +67,7 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     // MARK: - The group
 
     func testEveryFurtherDistributionIsRegistered() {
-        XCTAssertEqual(BuiltinRiskSolverFunctions.furtherDistributions.count, 42)
+        XCTAssertEqual(BuiltinRiskSolverFunctions.furtherDistributions.count, 45)
         let names = Set(BuiltinRiskSolverFunctions.all.map(\.name))
         for expected in ["PSIBETA", "PSIWEIBULL", "PSIGAMMA", "PSIEXPONENTIAL", "PSIPARETO",
                          "PSILOGISTIC", "PSISTUDENT", "PSIHYPERGEO", "PSIMYERSON"] {
@@ -91,12 +95,40 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
         ("PSIPEARSON6", [2, 3, 1]), ("PSIRAYLEIGH", [1]), ("PSIRECIPROCAL", [1, 10]),
         ("PSISTUDENT", [5]), ("PSIWEIBULL", [2, 1]), ("PSIRESAMPLE", [5]),
         ("PSISHUFFLE", [5]), ("PSIMOMENTFIT", [10, 2, 0, 3]),
+        ("PSIAR1", [100, 5, 0.8, 90]), ("PSIGARCH11", [0, 0.02, 0.1, 0.85, 0.01, 0.02]),
     ]
 
     /// The table above covers every distribution bound here, and nothing else.
+    ///
+    /// `PsiMetalog` is the one exclusion: its coefficients are a *range*, which a
+    /// table of scalars cannot express, so it has its own test below.
     func testTheValidCallTableCoversTheWholeGroup() {
-        XCTAssertEqual(Set(Self.validCalls.map(\.0)),
+        let tabulated = Set(Self.validCalls.map(\.0)).union(["PSIMETALOG"])
+        XCTAssertEqual(tabulated,
                        Set(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name)))
+    }
+
+    /// `PsiMetalog(min, max, coefficients)` — bounded, and its quantile stays inside
+    /// the bounds it was given.
+    ///
+    /// Frontline documents a fourth argument, `prop_fcns`. That is the general
+    /// property-function slot — the one carrying `PsiTruncate`, `PsiBaseCase`,
+    /// `PsiName` — not a parameter, and `attached(_:_:)` removes it before the
+    /// distribution sees anything.
+    func testMetalogStaysInsideItsBounds() throws {
+        let coefficients = FormulaAST.cellRange(CellRange(from: CellRef(column: 3, row: 1),
+                                                          to: CellRef(column: 3, row: 2)))
+        for p in [0.2, 0.5, 0.8] {
+            let drawn = try FormulaEvaluator.evaluate(
+                .function("PSIMETALOG", [.number(0), .number(100), coefficients]),
+                cells: ListCells(), names: NamedRangeCollection(), random: FixedSource([p]))
+            guard case .number(let value) = drawn else {
+                return XCTFail("PSIMETALOG gave \(drawn)")
+            }
+            XCTAssertTrue(value.isFinite, "not finite at p=\(p)")
+            XCTAssertGreaterThanOrEqual(value, 0)
+            XCTAssertLessThanOrEqual(value, 100)
+        }
     }
 
     /// Given valid parameters, every one draws a finite number.

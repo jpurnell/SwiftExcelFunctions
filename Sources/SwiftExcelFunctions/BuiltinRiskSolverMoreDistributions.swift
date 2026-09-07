@@ -27,7 +27,7 @@ extension BuiltinRiskSolverFunctions {
         psiLogarithmic, psiLogistic, psiMaxExtreme, psiMinExtreme, psiMyerson,
         psiNegBinomial, psiPareto, psiPearson5, psiPearson6, psiRayleigh,
         psiReciprocal, psiStudent, psiWeibull, psiResample, psiShuffle,
-        psiMomentFit,
+        psiMomentFit, psiAR1, psiGARCH11, psiMetalog,
     ]
 
     // MARK: - Continuous, parameters passed straight through
@@ -391,6 +391,89 @@ extension BuiltinRiskSolverFunctions {
             let fitted = try DistributionMomentFit(mean: mean, standardDeviation: deviation,
                                                    skewness: skew, kurtosis: kurtosis)
             return fitted.quantile(probability)
+        }
+    }
+
+    // MARK: - Processes, which carry their previous state in the arguments
+
+    // A process draw is not i.i.d.: each value depends on the last. That looked at
+    // first like something a stateless cell evaluation could not express — but
+    // Frontline's signatures pass the previous state *in*, precisely because a
+    // spreadsheet cell has no memory either. `val0`, `err0` and `stdev0` are
+    // arguments, supplied by the cell above. So one step is fully determined, and
+    // `StochasticProcess.step(from:dt:normalDraws:)` is exactly that step.
+
+    /// `PsiAR1(mean, volatility, coef1, val0)` — one step of a mean-reverting series.
+    ///
+    /// `Xₜ = µ + φ(Xₜ₋₁ − µ) + σZ`, with `val0` supplying `Xₜ₋₁`. Stationarity needs
+    /// `|φ| < 1`; at φ = 1 the process is a random walk with no long-run mean, which
+    /// `AutoregressiveOne` refuses rather than silently modelling.
+    public static let psiAR1 = sampling("PSIAR1", minArgs: 4, maxArgs: 6) { args in
+        guard let mean = real(args[0]), let volatility = real(args[1]),
+              let phi = real(args[2]), let previous = real(args[3]),
+              let process = AutoregressiveOne(name: "PsiAR1", persistence: phi,
+                                              longRunMean: mean,
+                                              shockVolatility: volatility) else { return nil }
+        let standardNormal = DistributionNormal(0, 1)
+        return { probability in
+            process.step(from: previous, dt: 1,
+                         normalDraws: standardNormal.quantile(probability))
+        }
+    }
+
+    /// `PsiGARCH11(mean, volatility, err_coef, ar_coef, val0, stdev0)` — one step of a
+    /// GARCH(1,1) return series.
+    ///
+    /// `σ²ₜ = ω + α·r²ₜ₋₁ + β·σ²ₜ₋₁`, with `val0` and `stdev0` supplying the previous
+    /// return and its volatility.
+    ///
+    /// **One inference, stated because it is one.** `GarchOneOne` takes the constant
+    /// `ω`; Frontline states a `volatility`. Read as the *long-run* volatility — the
+    /// name it is given throughout this family, and the quantity a modeller actually
+    /// knows — it fixes `ω` through the stationary variance, `ω = σ²(1 − α − β)`.
+    /// That requires `α + β < 1`, which is also the stationarity condition, so a
+    /// parameterisation that fails it has no long-run volatility to state.
+    public static let psiGARCH11 = sampling("PSIGARCH11", minArgs: 6, maxArgs: 8) { args in
+        guard let mean = real(args[0]), let volatility = real(args[1]),
+              let alpha = real(args[2]), let beta = real(args[3]),
+              let previousValue = real(args[4]), let previousDeviation = real(args[5]),
+              volatility > 0, previousDeviation >= 0 else { return nil }
+        let persistence = alpha + beta
+        guard persistence < 1 else { return nil }
+        let constant = volatility * volatility * (1 - persistence)
+        guard let process = GarchOneOne(name: "PsiGARCH11", constant: constant,
+                                        shockWeight: alpha,
+                                        persistenceWeight: beta) else { return nil }
+        // The state holds the previous *return*, centred at zero, so the mean comes
+        // off the way in and back on the way out.
+        let state = GarchState(value: previousValue - mean,
+                               variance: previousDeviation * previousDeviation)
+        let standardNormal = DistributionNormal(0, 1)
+        return { probability in
+            mean + process.step(from: state, dt: 1,
+                                normalDraws: standardNormal.quantile(probability)).value
+        }
+    }
+
+    /// `PsiMetalog(min, max, coefficients)` — Keelin's quantile-parameterised
+    /// distribution, bounded to `[min, max]`.
+    ///
+    /// Frontline documents this as `PsiMetalog(min, max, coefficients, prop_fcns)`,
+    /// and the fourth is not a parameter: `prop_fcn` is Frontline's general
+    /// property-function slot, the one that carries `PsiTruncate`, `PsiBaseCase` and
+    /// `PsiName`. `attached(_:_:)` already removes those before a distribution sees
+    /// its arguments, so the parameters here are the three that remain — which is
+    /// also why the leading bounds being "optional" never creates an ambiguity about
+    /// whether argument one is a bound or a coefficient.
+    public static let psiMetalog = sampling("PSIMETALOG", minArgs: 3, maxArgs: 5) { args in
+        guard let low = real(args[0]), let high = real(args[1]), low < high else { return nil }
+        let coefficients = series(args[2])
+        guard coefficients.count >= 2 else { return nil }
+        return { probability in
+            let distribution = try DistributionMetalog(
+                coefficients: coefficients,
+                boundedness: .bounded(lower: low, upper: high))
+            return distribution.quantile(probability)
         }
     }
 

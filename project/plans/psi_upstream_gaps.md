@@ -77,21 +77,29 @@ corpus-shaped.
 
 ---
 
-## Bindable upstream, not yet bound here (5)
+## Bindable upstream, not yet bound here (2)
 
-Distinct from the 57 above: BusinessMath *has* the mathematics, but its shape is not a
-single-cell draw from scalar parameters, so a binding needs a decision rather than a mapping.
+Three of what were five here have since been bound, after reading Frontline's documentation
+rather than reasoning from the type signatures. Recorded because the mistake is worth keeping:
+
+- **`PsiAR1` and `PsiGARCH11`.** I had them down as needing simulation state a cell cannot carry.
+  Frontline's signatures pass the previous state *in* — `val0`, `err0`, `stdev0` are arguments,
+  supplied by the cell above, precisely because a spreadsheet cell has no memory. One step is
+  fully determined, and `StochasticProcess.step(from:dt:normalDraws:)` is exactly that step.
+- **`PsiMetalog`.** I read its trailing `prop_fcns` as an argument whose meaning was unstated.
+  It is Frontline's general **property-function slot** — the same one carrying `PsiTruncate`,
+  `PsiBaseCase` and `PsiName` — and `attached(_:_:)` already strips it. The parameters are the
+  three that remain, so the "optional leading bounds" never created an ambiguity.
+
+What remains:
 
 | Function | Provider | What is unresolved |
 |---|---|---|
-| `PsiAR1` | `AutoregressiveOne` | Frontline passes `val0`, the previous value; the type takes `(name, persistence, longRunMean, shockVolatility)` and carries its own state. A process step is not an i.i.d. draw, and a cell has no memory of the last one. |
-| `PsiGARCH11` | `GarchOneOne` | Same, plus a two-component variance state. Zero corpus occurrences. |
-| `PsiMVLogNormal` | `DistributionMVLogNormal` | Multivariate: one call yields a *vector*, and a cell holds one value. Needs a component index that Frontline's signature does not carry. |
-| `PsiMetalog` | `DistributionMetalog` | Its leading `min`/`max` are optional **and** first, so arity alone cannot say whether argument one is a bound or a coefficient. |
-| `PsiMetalogFit` | `DistributionMetalog` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)` — which of x/y is the probability is not stated. |
+| `PsiMVLogNormal` | `DistributionMVLogNormal` | Documented and unambiguous — µ a vector of means, Σ a covariance matrix, array-entered to spill across cells. Two things are missing on our side, neither of them a question about meaning: `sample(using:)` needs a `RandomNumberGenerator` where we hold a `RandomSource`, and the binding must answer a `CellMatrix` rather than one number. Sampling the marginals independently would type-check and discard the correlation, which is the entire point of the distribution. |
+| `PsiMetalogFit` | `DistributionMetalog` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)`. Which of x and y carries the probability is not stated in the signature, and getting it backwards fits a distribution to transposed data — an answer, and the wrong one. |
 
-Each is a question about what the call *means*, not about which type to reach for. Guessing would
-produce numbers rather than errors, which is the failure mode this project is least able to detect.
+`PsiMVLogNormal` is the more valuable of the two and is a known piece of work rather than an open
+question: an RNG bridge, and an array-returning variant of the sampler.
 
 ## Also still open upstream
 
