@@ -188,6 +188,48 @@ included. `probabilityBelow` *looked* right and counts strictly; `conditionalVal
 *reported* wrong by me and is exact. Only the body settles it, and when two bodies share a name,
 which one you are looking at settles it first.
 
+### The `provider` column names a *type*, and types are not unique
+
+`PsiCVaR` was not one bad row. **Every statistic the matrix names exists in more than one place**,
+and the column named the wrong family throughout:
+
+```
+valueAtRisk             FinancialSimulation:277   RiskMetrics:91
+conditionalValueAtRisk  FinancialSimulation:308   RiskMetrics:162
+percentile              FinancialSimulation:194   Percentiles:178   (+3 more)
+probabilityBelow        FinancialSimulation:378   SimulationResults:194
+probabilityAbove        FinancialSimulation:411   SimulationResults:172   (+1 more)
+mean                    FinancialSimulation:161   statistics over trial values
+```
+
+`percentile` resolves five ways; `probabilityAbove` three.
+
+The `FinancialSimulation` family takes a `metric:` closure over `[FinancialProjection]` — a
+projection model. The other reads raw trial values. **For a Psi statistic the second is always the
+right shape**, because `PsiMean(B4)` reads a cell's ten thousand trial values, not a model behind a
+closure. Seven rows repointed as a class: `PsiMean`, `PsiMeanCI`, `PsiMeanCIB`, `PsiPercentile`,
+`PsiPercentileCI`, `PsiPercentileD`, `PsiPercentiles`.
+
+For `mean` and `percentile` the mis-pointer happens not to change the answer. That is a property of
+those two functions, not of the column — anyone binding from it faced the same coin-flip that
+produced the `PsiCVaR` error, and got lucky rather than right.
+
+**So the column is weaker evidence than it looks.** A bare type name does not identify a function
+when the name is shared, and nothing in a TSV can. Where the choice matters the row now says which
+family and why; where a row still names a bare symbol, resolve it before binding.
+
+### `PsiTarget`, checked again in the second family
+
+`SimulationResults.probabilityBelow` exists too — and also counts strictly:
+
+```swift
+let countBelow = values.filter { $0 < threshold }.count
+```
+
+So there is no inclusive form in *either* family, and computing the predicate at the binding is
+necessary rather than a workaround. That conclusion survives the correction that overturned the
+one next to it.
+
 ### `PsiXtoP` is the same function under another name
 
 Frontline documents `PsiTarget(cell, target, simulation)` and `PsiXtoP(cell, target, simulation)`

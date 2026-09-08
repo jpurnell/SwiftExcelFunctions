@@ -658,9 +658,9 @@ PSI	PsiMakeInput	distribution	new	absent from BusinessMath 2.14.0	0	0	freq, expr
 PSI	PsiMax	statistic	bindable	ScenarioSet.range	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMaxExtreme	distribution	have	risksolver	0	0	m, s|confirmed
 PSI	PsiMaxExtremeAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, mean, var, mode, scale|confirmed
-PSI	PsiMean	statistic	bindable	FinancialSimulation.mean	31	13	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiMeanCI	statistic	bindable	FinancialSimulation.mean	0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
-PSI	PsiMeanCIB	statistic	bindable	FinancialSimulation.mean	0	0	cell, confidence_level, [lowerbound], [simulation], [strucformat], [paramslice]|confirmed
+PSI	PsiMean	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	31	13	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiMeanCI	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
+PSI	PsiMeanCIB	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	0	0	cell, confidence_level, [lowerbound], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiMedian	statistic	bindable	median	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMetalog	distribution	have	risksolver	0	0	min, max, coefficients, prop_fcns|confirmed
 PSI	PsiMetalog2	distribution	have	risksolver	0	0	coefficients|confirmed
@@ -701,10 +701,10 @@ PSI	PsiPearson5	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiPearson5Alt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, shape, scale|confirmed
 PSI	PsiPearson6	distribution	have	risksolver	0	0	alpha1, alpha2, beta|confirmed
 PSI	PsiPearson6Alt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, shape, scale|confirmed
-PSI	PsiPercentile	statistic	bindable	FinancialSimulation.percentile	28	4	cell, percentile, simulation, struc_format, param_slice|confirmed
-PSI	PsiPercentileCI	statistic	bindable	FinancialSimulation.percentile	0	0	cell, percentile, confidence_level, [simulation]|confirmed
-PSI	PsiPercentileD	statistic	bindable	FinancialSimulation.percentile	0	0	cell, percentile, simulation|confirmed
-PSI	PsiPercentiles	statistic	bindable	FinancialSimulation.percentile	0	0	cell, [simulation], [struc_format], [param_slice]|confirmed
+PSI	PsiPercentile	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	28	4	cell, percentile, simulation, struc_format, param_slice|confirmed
+PSI	PsiPercentileCI	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, percentile, confidence_level, [simulation]|confirmed
+PSI	PsiPercentileD	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, percentile, simulation|confirmed
+PSI	PsiPercentiles	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, [simulation], [struc_format], [param_slice]|confirmed
 PSI	PsiPert	distribution	have	risksolver	0	0	a (min), c (likely), b (max)|confirmed
 PSI	PsiPertAlt	distribution	have	risksolver	0	0	3 parameters, chosen from: 3 different percentiles, mean, var, min, likely, max|confirmed
 PSI	PsiPivotCube	other	unreviewed		0	0	cell_within_pivot|confirmed
