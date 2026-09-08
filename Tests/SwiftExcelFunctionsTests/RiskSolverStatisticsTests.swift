@@ -169,6 +169,41 @@ final class RiskSolverStatisticsTests: XCTestCase {
                        "PsiBVaR(cell, 0.95) is the negated 5th percentile")
     }
 
+    /// `PsiCVaR(cell, p)` — the mean of the tail, reported positive.
+    ///
+    /// Frontline: *"the negative of the mean value … for the trials that lie between
+    /// PsiMin(cell) and PsiPercentile(cell, 1-percentile), **inclusive**"*, and *"like
+    /// PsiBVaR, PsiCVaR returns a loss as a positive number."*
+    ///
+    /// **This case exists to prove the tail is selected by value, not by count.**
+    ///
+    /// One trial at −10 and ninety-nine at 0. The 5th percentile is 0, so Frontline's
+    /// tail — everything at or below it — is all one hundred trials, mean −0.1, reported
+    /// as 0.1. A count-based tail taking the worst `ceil(100 × 0.05) = 5` would average
+    /// `[−10, 0, 0, 0, 0]` to −2 and report 2.
+    ///
+    /// Twenty times apart, and both are numbers a reader would accept. Discrete outputs
+    /// tie at the boundary constantly — `PsiBernoulli` is 55 of the 314 Psi calls in real
+    /// workbooks — so this is the common case, not a contrived one.
+    func testConditionalValueAtRiskSelectsTheTailByValueNotByCount() throws {
+        let run = FakeRun(cell: CellRef("B4"),
+                          values: [-10.0] + Array(repeating: 0.0, count: 99))
+        guard case .number(let cvar) = try evaluate("PsiCVaR(B4, 0.95)", run: run) else {
+            return XCTFail("expected a number")
+        }
+        XCTAssertEqual(cvar, 0.1, accuracy: 1e-9,
+                       "a count-based tail would answer 2.0 here")
+    }
+
+    /// Positive, like `PsiBVaR`, where the underlying mean is negative.
+    func testConditionalValueAtRiskReportsLossesPositive() throws {
+        let losses = FakeRun(cell: CellRef("B4"), values: (-100...(-1)).map(Double.init))
+        guard case .number(let cvar) = try evaluate("PsiCVaR(B4, 0.95)", run: losses) else {
+            return XCTFail("expected a number")
+        }
+        XCTAssertGreaterThan(cvar, 0)
+    }
+
     // MARK: - Shape
 
     /// The first argument names a cell. A statistic handed a literal has been given the

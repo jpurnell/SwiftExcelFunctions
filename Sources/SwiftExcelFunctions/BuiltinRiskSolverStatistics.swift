@@ -26,7 +26,7 @@ public enum BuiltinRiskSolverStatistics {
 
     /// All statistics for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] =
-        [psiMean, psiStdDev, psiPercentile, psiTarget, psiXtoP, psiBVaR]
+        [psiMean, psiStdDev, psiPercentile, psiTarget, psiXtoP, psiBVaR, psiCVaR]
 
     // MARK: - Reading the run
 
@@ -164,5 +164,41 @@ extension BuiltinRiskSolverStatistics {
         }
         guard confidence >= 0, confidence <= 1 else { return .error(.num) }
         return .number(-results.valueAtRisk(confidenceLevel: confidence))
+    }
+}
+
+// MARK: - Conditional Value at Risk
+
+extension BuiltinRiskSolverStatistics {
+
+    /// `PsiCVaR(cell, percentile)` — the mean of the loss tail, reported positive.
+    ///
+    /// Frontline defines it as *"the negative of the mean value of the specified uncertain
+    /// function for the trials that lie between PsiMin(cell) and
+    /// PsiPercentile(cell, 1-percentile), **inclusive**"*, and *"like PsiBVaR, PsiCVaR
+    /// returns a loss as a positive number."*
+    ///
+    /// ## Why this delegates where ``psiTarget`` does not
+    ///
+    /// `SimulationResults.conditionalValueAtRisk(confidenceLevel:)` selects its tail as
+    /// `values.filter { $0 <= varThreshold }` — **by value, and inclusive** — which is
+    /// Frontline's definition exactly. A description of it as taking the worst
+    /// `ceil(n × (1 − confidence))` sorted values would imply a count-based tail that
+    /// disagrees whenever trials tie at the boundary, and discrete outputs tie constantly.
+    /// The body does not do that, so there is nothing to work around and the mathematics
+    /// stays upstream where it belongs.
+    ///
+    /// This is the opposite finding to `proportionAtOrBelow`, and both came from reading
+    /// the implementation rather than its name: one function was wrong where it looked
+    /// right, and this one is right where it was reported wrong.
+    ///
+    /// Only the sign differs, and the flip belongs here — the same rule ``psiBVaR``
+    /// follows.
+    public static let psiCVaR = statistic("PSICVAR", maxArgs: 3) { results, values in
+        guard values.count >= 2, case .number(let percentile) = values[1] else {
+            return .error(.value)
+        }
+        guard percentile >= 0, percentile <= 1 else { return .error(.num) }
+        return .number(-results.conditionalValueAtRisk(confidenceLevel: percentile))
     }
 }
