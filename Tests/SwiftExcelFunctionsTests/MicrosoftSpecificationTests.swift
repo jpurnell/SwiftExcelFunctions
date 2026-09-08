@@ -197,23 +197,33 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// testing the pull-back gives 300; applying neither gives 302. Excel's own
     /// cached value for this pair, in a corpus workbook, is 0.83611111111111114.
     ///
-    /// Expected to fail until BusinessMath ships the rule — see
-    /// `testTheFebruaryEndOfMonthRule`, which holds the same case with its
-    /// provenance.
+    /// Fixed in BusinessMath 2.15.0 — see `testTheFebruaryEndOfMonthRule`, which
+    /// holds the same case with its provenance.
     func testYearFracFebruaryMonthEndIsThirty() throws {
-        XCTExpectFailure("BusinessMath 2.14.0 still lacks the NASD February rule")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb29_2020),
                                                .number(Self.dec31_2020), .number(0)]),
                        301.0 / 360.0, accuracy: 1e-12)
     }
 
     /// The common-year half of the same rule: 28 February is the month end too.
-    /// 2021-02-28 to 2021-07-31 is 30·5 + (30−30) = 150 days.
+    ///
+    /// **151 days, not 150** — and the difference is the whole point of the rule.
+    /// February pulls the *start* day to a 30th, but Excel tests the end-date
+    /// pull-back against the day as originally written. 28 is below 30, so 31 July
+    /// stays a 31st:
+    ///
+    /// ```
+    /// 30·(7−2) + (31 − 30) = 151
+    /// ```
+    ///
+    /// Identical in structure to the leap-year case above, where 29 February to
+    /// 31 December is 30·10 + (31−30) = 301 — and that one is pinned to Excel's own
+    /// cached value in a corpus workbook. An expectation of 150 here would assume the
+    /// end date *is* pulled back, contradicting the case that has the evidence.
     func testYearFracCommonYearFebruaryMonthEnd() throws {
-        XCTExpectFailure("BusinessMath 2.14.0 still lacks the NASD February rule")
         XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb28_2021),
                                                .number(Self.jul31_2021), .number(0)]),
-                       150.0 / 360.0, accuracy: 1e-12)
+                       151.0 / 360.0, accuracy: 1e-12)
     }
 
     /// Basis 4, European 30/360: every month is thirty days, with no February rule

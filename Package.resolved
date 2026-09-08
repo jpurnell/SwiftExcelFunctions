@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/BusinessMath",
       "state" : {
-        "revision" : "51bb6316d10ee085dfefc0cdb767813d35603caa",
-        "version" : "2.14.0"
+        "revision" : "be7047955d69f051bcee790b0a49bda7ce10c7a3",
+        "version" : "2.15.0"
       }
     },
     {

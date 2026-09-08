@@ -200,13 +200,12 @@ final class BusinessMathBindingTests: XCTestCase {
     ///
     /// The BusinessMath session found and fixed this on
     /// `feature/excel-financial-ten`; this build pins `exact: "2.9.0"`, so the test
-    /// is expected to fail until they tag. It will report an unexpected pass on the
-    /// day it is fixed, which is the point of writing it now.
+    /// Fixed in BusinessMath 2.15.0. The guard is gone and the assertion stays: this
+    /// is the cell that found the defect, and it is the one that keeps it fixed.
     ///
     /// Every one of the corpus's 3,425 `YEARFRAC` calls uses this convention, and
     /// 49 of them have a February month end as their start date.
     func testTheFebruaryEndOfMonthRule() throws {
-        XCTExpectFailure("BusinessMath 2.9.0 lacks the NASD February rule; fixed upstream, untagged")
         guard let yearfrac = BuiltinBindingFunctions.all.first(where: { $0.name == "YEARFRAC" })
         else {
             return XCTFail("YEARFRAC is not registered")
