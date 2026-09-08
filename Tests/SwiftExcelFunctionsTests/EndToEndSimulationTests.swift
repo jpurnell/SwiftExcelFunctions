@@ -138,6 +138,82 @@ final class EndToEndSimulationTests: XCTestCase {
         XCTAssertGreaterThan(ran, 0, "no real model ran end to end")
     }
 
+    /// **The lowering histogram — Phase 2's deliverable, and the work list.**
+    ///
+    /// Runs `Lowerer.audit` over every output of every real model and counts why each
+    /// refuses. This is not a pass/fail: what a corpus contains is a fact to discover. The
+    /// histogram is what orders the next rules, because a rule that unblocks forty outputs
+    /// is worth more than one that unblocks two, and neither is knowable by taste.
+    ///
+    /// It is also the number that says whether the 118× is reachable at all. A fast path
+    /// that compiles nothing is a fast path in name only.
+    func testLoweringHistogramAcrossRealModels() throws {
+        let lowerer = Lowerer()
+        var lowered = 0, refused = 0
+        var reasons: [String: Int] = [:]
+        var functions: [String: Int] = [:]
+        var instructions: [Int] = []
+
+        for (name, workbook) in try workbooks() {
+            for sheet in workbook.sheets {
+                let cells = EnumerableSheet(workbook: workbook, sheet: sheet)
+                let survey = ModelSurveyor().survey(cells)
+                guard survey.isSimulable else { continue }
+
+                for output in survey.outputs {
+                    let failures = lowerer.audit(output: output, survey: survey, cells: cells)
+                    if failures.isEmpty {
+                        lowered += 1
+                        if let model = try? lowerer.lower(
+                            output: output, survey: survey, cells: cells) {
+                            instructions.append(model.instructionCount)
+                        }
+                        continue
+                    }
+                    refused += 1
+                    for failure in failures {
+                        let kind = "\(failure)".prefix(while: { $0 != "(" })
+                        reasons[String(kind), default: 0] += 1
+                        if case .unrepresentableFunction(let fn, _) = failure {
+                            functions[fn, default: 0] += 1
+                        }
+                        if case .unsupportedNode(let what, _) = failure {
+                            functions["node: \(what)", default: 0] += 1
+                        }
+                    }
+                }
+                _ = name
+            }
+        }
+
+        let total = lowered + refused
+        let pct = total > 0 ? Double(lowered) / Double(total) * 100 : 0
+        let byReason = reasons.sorted { $0.value > $1.value }
+            .map { "    \($0.key): \($0.value)" }.joined(separator: "\n")
+        let byFunction = functions.sorted { $0.value > $1.value }
+            .map { "    \($0.key): \($0.value)" }.joined(separator: "\n")
+
+        print("""
+
+        ── Lowering histogram, real models ─────────────────────────
+          outputs      \(total)
+          lower        \(lowered)  (\(Int(pct.rounded()))%)
+          refuse       \(refused)
+          instructions \(instructions.isEmpty ? "—"
+                          : "min \(instructions.min() ?? 0), max \(instructions.max() ?? 0)")
+
+          why they refuse
+        \(byReason.isEmpty ? "    (none)" : byReason)
+
+          functions with no rule yet
+        \(byFunction.isEmpty ? "    (none)" : byFunction)
+        ────────────────────────────────────────────────────────────
+
+        """)
+
+        XCTAssertGreaterThan(total, 0, "no outputs were audited")
+    }
+
     /// A seeded run of a real model reproduces exactly.
     ///
     /// The property every downstream number depends on, asserted on a real model rather
