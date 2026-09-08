@@ -89,6 +89,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinAggregationFunctions.all,
             BuiltinArrayFunctions.all,
             BuiltinRiskSolverFunctions.all,
+            BuiltinRiskSolverStatistics.all,
             BuiltinBindingFunctions.all,
         ]
         for category in allCategories {

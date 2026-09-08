@@ -45,6 +45,12 @@ public struct EvaluationContext: Sendable {
     /// reaching for system entropy. See ``RandomSource``.
     public let random: (any RandomSource)?
 
+    /// A completed simulation run, when one has been supplied.
+    ///
+    /// `nil` means nothing has been simulated, and every `Psi*` statistic answers `#N/A`
+    /// rather than a number. See ``SimulationResultProvider``.
+    public let simulation: (any SimulationResultProvider)?
+
     /// Creates an evaluation context.
     ///
     /// - Parameters:
@@ -53,14 +59,17 @@ public struct EvaluationContext: Sendable {
     ///   - cells: The provider to read cells through.
     ///   - arguments: The unevaluated argument trees.
     ///   - random: Where `RAND()` draws from, or `nil` for none.
+    ///   - simulation: A completed run for the `Psi*` statistics, or `nil` for none.
     public init(
         callingCell: CellAddress?,
         currentSheet: String,
         cells: any CellValueProvider,
         arguments: [FormulaAST],
-        random: (any RandomSource)? = nil
+        random: (any RandomSource)? = nil,
+        simulation: (any SimulationResultProvider)? = nil
     ) {
         self.random = random
+        self.simulation = simulation
         self.callingCell = callingCell
         self.currentSheet = currentSheet
         self.cells = cells
