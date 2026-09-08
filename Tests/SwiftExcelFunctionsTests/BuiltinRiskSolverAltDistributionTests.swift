@@ -216,6 +216,83 @@ final class BuiltinRiskSolverAltDistributionTests: XCTestCase {
         XCTAssertLessThan(median, 20)
     }
 
+    // MARK: - The metalog fits, and identifying the probability vector
+
+    /// Frontline does not say which of `x_values`/`y_values` is the probability, and
+    /// it does not have to: a fitting probability is strictly inside `(0, 1)` and
+    /// distinct, which `DistributionMetalog` enforces. Whichever vector satisfies
+    /// that definition, is it — in either argument position.
+    func testTheProbabilityVectorIsIdentifiedInEitherPosition() {
+        let probabilities = [0.1, 0.5, 0.9]
+        let values = [12.0, 30.0, 55.0]
+
+        let forward = BuiltinRiskSolverFunctions.probabilityPair(probabilities, values)
+        XCTAssertEqual(forward?.probabilities, probabilities)
+        XCTAssertEqual(forward?.values, values)
+
+        let reversed = BuiltinRiskSolverFunctions.probabilityPair(values, probabilities)
+        XCTAssertEqual(reversed?.probabilities, probabilities,
+                       "the same pair, written the other way round")
+        XCTAssertEqual(reversed?.values, values)
+    }
+
+    /// When **both** vectors could be probabilities the call is genuinely ambiguous —
+    /// a market-share or utilisation model does this — and it is refused.
+    ///
+    /// Refusing beats fitting the transpose: a wrong fit returns a number that looks
+    /// entirely reasonable and nothing downstream can question it.
+    func testAnAmbiguousMetalogCallIsRefusedRatherThanGuessed() {
+        XCTAssertNil(BuiltinRiskSolverFunctions.probabilityPair([0.1, 0.5, 0.9],
+                                                                [0.2, 0.4, 0.8]))
+    }
+
+    /// Neither vector being a probability is equally unusable.
+    func testAMetalogCallWithNoProbabilityVectorIsRefused() {
+        XCTAssertNil(BuiltinRiskSolverFunctions.probabilityPair([12, 30, 55],
+                                                                [1, 2, 3]))
+        // Repeated probabilities are not distinct, so they cannot be the vector.
+        XCTAssertNil(BuiltinRiskSolverFunctions.probabilityPair([0.5, 0.5, 0.9],
+                                                                [12, 30, 55]))
+    }
+
+    /// The fit runs end to end and its quantile is monotone.
+    func testTheMetalogFitProducesAMonotoneQuantile() throws {
+        let probabilities = FormulaAST.cellRange(CellRange(from: CellRef(column: 1, row: 1),
+                                                           to: CellRef(column: 1, row: 3)))
+        let values = FormulaAST.cellRange(CellRange(from: CellRef(column: 2, row: 1),
+                                                    to: CellRef(column: 2, row: 3)))
+        for name in ["PSIMETALOGFIT", "PSIMETALOG2FIT"] {
+            var previous = -Double.infinity
+            for p in [0.25, 0.5, 0.75] {
+                let result = try FormulaEvaluator.evaluate(
+                    .function(name, [.number(3), probabilities, values]),
+                    cells: MetalogCells(), names: NamedRangeCollection(),
+                    random: FixedSource([p]))
+                guard case .number(let value) = result else {
+                    return XCTFail("\(name) gave \(result)")
+                }
+                XCTAssertTrue(value.isFinite, "\(name) at p=\(p)")
+                XCTAssertGreaterThan(value, previous, "\(name) not monotone")
+                previous = value
+            }
+        }
+    }
+
+    /// Probabilities in column A, values in column B.
+    private struct MetalogCells: CellValueProvider {
+        func value(at ref: CellRef) -> CellValue? {
+            let row = ref.row - 1
+            guard row >= 0, row < 3 else { return nil }
+            return ref.column == 1 ? .number([0.1, 0.5, 0.9][row])
+                                   : .number([12.0, 30.0, 55.0][row])
+        }
+        func value(at ref: CellRef, inSheet: String) -> CellValue? { value(at: ref) }
+        func lastPopulatedCell() -> CellRef? { CellRef(column: 2, row: 3) }
+        func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
+        func values(in range: CellRange) -> [CellValue] { [] }
+        func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
+    }
+
     /// Eight values with a clear centre, for `PsiFit`.
     private struct SampleCells: CellValueProvider {
         static let sample: [Double] = [4, 6, 7, 8, 9, 10, 12, 15]

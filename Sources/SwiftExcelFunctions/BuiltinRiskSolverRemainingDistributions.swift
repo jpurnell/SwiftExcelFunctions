@@ -21,7 +21,8 @@ extension BuiltinRiskSolverFunctions {
         [psiPert, psiErf, psiPareto2, psiBetaGen, psiBetaSubj, psiHistogram,
          psiCumulD, psiNormalSkew, psiTriangGen, psiMetalog2, psiMetalogSPT,
          psiAR2, psiMA1, psiMA2, psiARMA11, psiARCH1, psiEGARCH11,
-         psiMVNormal, psiMVLogNormal, psiMVResample, psiMVShuffle, psiFit]
+         psiMVNormal, psiMVLogNormal, psiMVResample, psiMVShuffle, psiFit,
+         psiMetalogFit, psiMetalog2Fit]
         + BuiltinRiskSolverAltDistributions.all
 
     // MARK: - Ordinary distributions
@@ -256,6 +257,74 @@ extension BuiltinRiskSolverFunctions {
         }
     }
 
+    // MARK: - Metalog, fitted to points
+
+    /// Which of two vectors is the probabilities, decided by what a probability *is*.
+    ///
+    /// Frontline documents `PsiMetalogFit(num_coef, x_values, y_values)` without
+    /// saying which carries the probability, and getting it backwards fits the
+    /// distribution to transposed data — an answer, and the wrong one.
+    ///
+    /// It does not have to be guessed. A fitting probability is strictly inside
+    /// `(0, 1)` and distinct from its neighbours; `DistributionMetalog` enforces
+    /// exactly that and throws `.invalidProbability` otherwise. So the pair is
+    /// identified by the definition rather than by a convention: whichever vector
+    /// satisfies it, is it.
+    ///
+    /// - Parameters:
+    ///   - first: The `x_values` argument, as written.
+    ///   - second: The `y_values` argument.
+    /// - Returns: `(probabilities, values)`, or `nil` when neither vector can be a
+    ///   probability, or when **both** can and the call is genuinely ambiguous.
+    static func probabilityPair(_ first: [Double],
+                                _ second: [Double]) -> (probabilities: [Double],
+                                                        values: [Double])? {
+        func couldBeProbabilities(_ candidate: [Double]) -> Bool {
+            guard candidate.count >= 2 else { return false }
+            guard candidate.allSatisfy({ $0 > 0 && $0 < 1 }) else { return false }
+            return Set(candidate.map(\.bitPattern)).count == candidate.count
+        }
+        let firstCould = couldBeProbabilities(first)
+        let secondCould = couldBeProbabilities(second)
+        // Both inside (0, 1) — a market-share or utilisation model can do this, and
+        // nothing in the call distinguishes them. Refusing beats fitting the
+        // transpose and returning a number nobody can question.
+        if firstCould && secondCould { return nil }
+        if firstCould { return (first, second) }
+        if secondCould { return (second, first) }
+        return nil
+    }
+
+    /// Builds a metalog least-squares fit from `(num_coef, x_values, y_values)`.
+    private static func metalogFit(_ name: String) -> ExcelFunction {
+        sampling(name, minArgs: 3, maxArgs: 5) { args in
+            guard let requested = real(args[0]),
+                  let terms = Int(exactly: requested.rounded()), terms >= 2 else { return nil }
+            guard let pair = probabilityPair(series(args[1]), series(args[2])),
+                  pair.probabilities.count >= terms else { return nil }
+            return { probability in
+                try DistributionMetalog(fittingProbabilities: pair.probabilities,
+                                        values: pair.values, terms: terms,
+                                        boundedness: .unbounded).quantile(probability)
+            }
+        }
+    }
+
+    /// `PsiMetalogFit(num_coef, x_values, y_values)` — fit a metalog to points.
+    ///
+    /// Fewer terms than points is a least-squares fit, which is the right choice when
+    /// the points come from data rather than elicitation.
+    public static let psiMetalogFit = metalogFit("PSIMETALOGFIT")
+
+    /// `PsiMetalog2Fit(num_coef, x_values, y_values)`.
+    ///
+    /// Frontline lists this with a signature **identical** to `PsiMetalogFit`, and
+    /// nothing in either argument list distinguishes them — the difference is
+    /// internal to Risk Solver's metalog variants. Bound the same way rather than
+    /// invented differently: two names that behave alike is a smaller error than one
+    /// of them quietly fitting a different distribution.
+    public static let psiMetalog2Fit = metalogFit("PSIMETALOG2FIT")
+
     // MARK: - Multivariate, which answer a vector
 
     /// A vector result, spilled across the range the formula was array-entered over.
@@ -349,21 +418,30 @@ extension BuiltinRiskSolverFunctions {
         return try MultivariateResample(rows: block).sample(using: &rng)
     }
 
-    /// `PsiMVShuffle(data)` — draw whole rows **without** replacement.
+    /// `PsiMVShuffle(data)` — Frontline draws whole rows **without** replacement.
     ///
-    /// Approximate for the same reason ``psiShuffle`` is, and the type says so in its
-    /// shape: `MultivariateShuffle.next(using:)` is `mutating` — it removes each row
-    /// as it draws, because without-replacement is a property of a *sequence*. A cell
-    /// evaluation has no memory of the last one, so this takes the first row of a
-    /// fresh permutation: a uniformly random row, but one that can repeat across
-    /// cells where a real permutation would not.
+    /// **Bound to `MultivariateResample`, which is with replacement, and named here
+    /// as the thing it actually is.**
+    ///
+    /// Without-replacement is a property of a *sequence* of draws — `MultivariateShuffle`
+    /// says so in its shape, since `next(using:)` is `mutating` and removes each row
+    /// as it goes. A cell evaluation has no memory of the previous one, so nothing
+    /// here can hold the deck between cells.
+    ///
+    /// Taking row 0 of a fresh permutation would look like a shuffle and would in
+    /// fact be resampling: across *n* cells it gives the resample distribution
+    /// exactly. So this calls the resampler rather than dressing one up as the other.
+    ///
+    /// What that costs is precisely where a shuffle earns its keep: a full pass
+    /// reproduces the empirical joint distribution with no sampling error at all,
+    /// and independent draws do not. A workbook relying on that will differ.
     ///
     /// Bound rather than refused, because `#NAME?` on an otherwise readable workbook
-    /// is worse — and documented rather than implied, because the difference is
-    /// invisible in any single cell.
+    /// is worse — and named honestly rather than approximated, because a caller can
+    /// only account for the difference if it is stated.
     public static let psiMVShuffle = vector("PSIMVSHUFFLE", minArgs: 1, maxArgs: 3) { args, rng in
         guard let block = rows(args[0]), !block.isEmpty else { return nil }
-        return try MultivariateShuffle(rows: block).permuted(using: &rng).first
+        return try MultivariateResample(rows: block).sample(using: &rng)
     }
 
     // MARK: - Fitting to data

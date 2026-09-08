@@ -663,8 +663,8 @@ PSI	PsiMeanCIB	statistic	bindable	FinancialSimulation.mean	0	0	cell, confidence_
 PSI	PsiMedian	statistic	bindable	median	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMetalog	distribution	have	risksolver	0	0	min, max, coefficients, prop_fcns|confirmed
 PSI	PsiMetalog2	distribution	have	risksolver	0	0	coefficients|confirmed
-PSI	PsiMetalog2Fit	distribution	new	absent from BusinessMath 2.14.0	0	0	num_coef, x_values, y_values|confirmed
-PSI	PsiMetalogFit	distribution	bindable	DistributionMetalog	0	0	num_coef, x_values, y_values|confirmed
+PSI	PsiMetalog2Fit	distribution	have	risksolver	0	0	num_coef, x_values, y_values|confirmed
+PSI	PsiMetalogFit	distribution	have	risksolver	0	0	num_coef, x_values, y_values|confirmed
 PSI	PsiMetalogSPT	distribution	have	risksolver	0	0	min, max, quantiles, prob, prop_fcns|confirmed
 PSI	PsiMin	statistic	bindable	ScenarioSet.range	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMinExtreme	distribution	have	risksolver	0	0	m, s|confirmed

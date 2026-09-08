@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`PsiMetalogFit` and `PsiMetalog2Fit`**, which needed no answer after all.
+
+  Frontline does not say which of `x_values`/`y_values` carries the probability, and
+  backwards the fit is to transposed data — an answer, and the wrong one. But a
+  fitting probability is *defined* as strictly inside `(0, 1)` and distinct, and
+  `DistributionMetalog` enforces exactly that, so the vector is identified rather
+  than assumed: whichever satisfies the definition, is it, in either position.
+
+  Where both vectors could be probabilities — a market-share or utilisation model
+  does this — the call is refused rather than guessed.
+
+  The two share a signature in Frontline's own reference and nothing distinguishes
+  them, so they are bound alike: two names behaving the same is a smaller error than
+  one of them quietly fitting a different distribution.
+
+- **`PsiMVShuffle` is bound to `MultivariateResample`, and says so.**
+
+  Frontline shuffles without replacement. That is a property of a *sequence* —
+  `MultivariateShuffle.next(using:)` is `mutating` and removes each row as it draws —
+  and a cell evaluation has no memory of the previous one. Taking row 0 of a fresh
+  permutation would *look* like a shuffle and would in fact be resampling, so this
+  calls the resampler under its own name instead of dressing one up as the other.
+  What it costs is stated: a full pass reproduces the empirical joint distribution
+  with no sampling error, and independent draws do not.
+
 - **Fifty more Risk Solver distributions**, on BusinessMath 2.15.0 — which
   implemented the whole 52-row completeness delta and adopted the proposal's shape.
   **104 of 113 Psi distribution rows are now bound.**

@@ -90,28 +90,36 @@ the workbook or declares a sensitivity role; nothing is computed. Address arithm
 upstream's own proposal assigns downstream. These belong with `solver_adj` and the role
 declarations, read from the sheet rather than evaluated.
 
-### Bound nowhere, because the argument's meaning is unstated (3)
+### Bound nowhere, because the argument's meaning is unstated (1)
 
 | Function | What is unresolved |
 |---|---|
-| `PsiMetalogFit`, `PsiMetalog2Fit` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)`. Which of x and y carries the probability is not stated, and backwards it fits to transposed data — an answer, and the wrong one. |
-| `PsiMakeInput` | `(freq, expr, deduct, limit)` builds a compound frequency/severity model, and `CompoundLossModel` takes `Frequency` and `Severity` *distributions*. A cell value cannot carry a distribution, so what `freq` and `expr` denote in a formula is the open question. |
+| `PsiMakeInput` | `(freq, expr, deduct, limit)` builds a compound frequency/severity model, and `CompoundLossModel` takes `Frequency` and `Severity` *distributions*. A cell value cannot carry a distribution, so either Frontline's `freq`/`expr` are references the host resolves, or `expr` is a spreadsheet expression evaluated per occurrence. Both are host semantics rather than mathematics — BusinessMath reached the same conclusion independently. |
 
-### One where the conversion is not derivable (1)
+**`PsiMetalogFit` and `PsiMetalog2Fit` are now bound**, and did not need the answer they
+appeared to need. Frontline does not say which of `x_values`/`y_values` carries the probability
+— but a fitting probability is *defined* as strictly inside `(0, 1)` and distinct, and
+`DistributionMetalog` enforces exactly that. So the vector is identified rather than assumed:
+whichever satisfies the definition, is it, in either argument position.
 
-`PsiAPARCH11`. `AsymmetricPowerArch` takes the constant `ω`, and — unlike `ExponentialGarch` —
-has no `unconditionalVolatility:` initialiser. Frontline states a `volatility`, and under a general
-power δ the stationary relation between the two depends on the innovation distribution rather than
-following from `ω = σ²(1 − α − β)` as it does at δ = 2.
+Where **both** vectors could be probabilities — a market-share or utilisation model does this —
+the call is genuinely ambiguous and is refused. Fitting the transpose would return a number that
+looks entirely reasonable and that nothing downstream could question.
 
-`PsiEGARCH11` *is* bound, because that type does supply the unconditional initialiser. `PsiARCH1`
-is bound as GARCH(1,1) at β = 0, which is the same mathematics rather than an approximation of it.
+### One waiting on a tag (1)
 
-**An `unconditionalVolatility:` initialiser on `AsymmetricPowerArch` is the one thing that would
-close this**, and it belongs upstream: deriving it here would be a second implementation of a
-variance recursion, which is what the package split exists to prevent.
+`PsiAPARCH11`. BusinessMath added `AsymmetricPowerArch.init(name:unconditionalVolatility:…)` on
+`main` and it ships in 2.16.0; this binds the moment that tag lands.
 
-## Also still open upstream## Also still open upstream
+The derivation turned out **not** to be distribution-circular, which is what I had wrongly
+concluded: `ω = σ^δ(1 − ακ − β)` where `κ = E(|z| − γz)^δ` is an expectation over the
+*innovation*, depending on γ and δ alone and not on ω, so it is computable before the
+distribution exists. At γ = 0, δ = 2 it collapses to `ω = σ²(1 − α − β)`, which is why the GARCH
+case worked and this one looked harder than it was.
+
+So Frontline's second argument **is** a volatility and its name was accurate throughout.
+
+## Also still open upstream## Also still open upstream## Also still open upstream
 
 **The NASD February rule.** `thirty360` gives 302/360 for 2020-02-29 → 2020-12-31 where Excel
 gives 301/360. This one *is* a blocker: basis 0 is the basis every one of the corpus's 3,425
