@@ -1,0 +1,174 @@
+import Foundation
+import SwiftExcelCore
+
+/// One distribution call, at the cell that contains it, with its place in the input vector.
+public struct UncertainCell: Sendable, Equatable {
+
+    /// The cell whose formula contains this call.
+    ///
+    /// Not unique across a survey: a formula may hold several draws, and each is its own
+    /// ``UncertainCell`` at the same address.
+    public let address: CellRef
+
+    /// The distribution call itself, parameters already separated from properties.
+    public let call: DistributionCall
+
+    /// This draw's position in the `[Double]` a sampler fills, one per trial.
+    public let inputIndex: Int
+
+    /// Creates a located distribution call.
+    ///
+    /// - Parameters:
+    ///   - address: the cell whose formula contains the call.
+    ///   - call: the recognised distribution call.
+    ///   - inputIndex: its position in the sampler's input vector.
+    public init(address: CellRef, call: DistributionCall, inputIndex: Int) {
+        self.address = address
+        self.call = call
+        self.inputIndex = inputIndex
+    }
+}
+
+/// What a sheet declares about the simulation it describes.
+///
+/// The result of applying ``PsiRecognizer`` to every formula a provider holds: which draws
+/// there are and where they sit in the input vector, which cells report results, and what
+/// the recognizer met and could not model.
+///
+/// Nothing here is evaluated and nothing is ordered. This says what the model *is*, not
+/// how to run it — see ``isSimulable`` for the difference between a described model and a
+/// runnable one.
+public struct ModelSurvey: Sendable, Equatable {
+
+    /// Every distribution call on the sheet, in reading order, with indices assigned.
+    public let uncertain: [UncertainCell]
+
+    /// Cells carrying `PsiOutput()`, in reading order.
+    public let outputs: [CellRef]
+
+    /// Property functions the recognizer met and does not model, by the cell holding them.
+    ///
+    /// Empty is the healthy case. A non-empty entry means this survey describes a model
+    /// that cannot yet be simulated *faithfully*, which is different from one that cannot
+    /// be simulated at all.
+    public let unhandledProperties: [CellRef: [String]]
+
+    /// The number of uniforms one trial consumes.
+    public var inputCount: Int { uncertain.count }
+
+    /// Whether every property function encountered was one this recognizer models.
+    public var isFullyModelled: Bool { unhandledProperties.isEmpty }
+
+    /// Whether there is a simulation here to run.
+    ///
+    /// Both halves are required and neither is sufficient. Draws with no output produce
+    /// numbers nobody collects; an output with no draws upstream is a constant computed
+    /// ten thousand times. Reporting either as runnable would produce a result that is
+    /// technically a distribution and practically a mistake.
+    ///
+    /// This does **not** check that the outputs actually descend from the draws — that
+    /// needs the dependency edges, which this type deliberately does not have.
+    public var isSimulable: Bool { !uncertain.isEmpty && !outputs.isEmpty }
+
+    /// Creates a survey.
+    ///
+    /// - Parameters:
+    ///   - uncertain: every distribution call found, with indices assigned.
+    ///   - outputs: cells carrying `PsiOutput()`.
+    ///   - unhandledProperties: property functions met but not modelled, by cell.
+    public init(
+        uncertain: [UncertainCell],
+        outputs: [CellRef],
+        unhandledProperties: [CellRef: [String]]
+    ) {
+        self.uncertain = uncertain
+        self.outputs = outputs
+        self.unhandledProperties = unhandledProperties
+    }
+}
+
+/// Applies ``PsiRecognizer`` across a whole sheet and assigns input indices.
+///
+/// ```swift
+/// import SwiftExcelCore
+///
+/// func describe(_ cells: any CellValueProvider) {
+///     let survey = ModelSurveyor().survey(cells)
+///     _ = survey.inputCount     // uniforms one trial consumes
+///     _ = survey.isSimulable    // there are draws, and something reports on them
+///     _ = survey.isFullyModelled // nothing was met that cannot be modelled
+/// }
+/// ```
+///
+/// ## What this does not do
+///
+/// It does not order anything. A trial loop needs a topological evaluation order, and
+/// `SwiftXLSX.DependencyGraph` already computes one — Kahn's algorithm, with cycle
+/// detection — but it is built over `Worksheet`, a type this module depends on only in
+/// tests. Writing a second topological sort here to avoid that dependency is exactly the
+/// duplication the master plan warns about: two orders that could disagree, in a project
+/// whose evaluator already relies on the first. So ordering waits for either an upstream
+/// `DependencyGraph` initialiser over a `CellValueProvider`, or the separate simulation
+/// module the proposal describes. Recognition does not need it, and this is recognition.
+public struct ModelSurveyor: Sendable {
+
+    private let recognizer: PsiRecognizer
+
+    /// - Parameter recognizer: the per-formula recognizer to apply. Defaults to one
+    ///   reading every distribution the Risk Solver group registers.
+    public init(recognizer: PsiRecognizer = PsiRecognizer()) {
+        self.recognizer = recognizer
+    }
+
+    /// Surveys every formula cell a provider holds.
+    ///
+    /// - Parameter cells: the sheet to read. Only cells holding a formula are considered;
+    ///   a literal carries no simulation role.
+    /// - Returns: the draws, the outputs, and anything unmodelled.
+    public func survey(_ cells: any CellValueProvider) -> ModelSurvey {
+        var uncertain: [UncertainCell] = []
+        var outputs: [CellRef] = []
+        var unhandled: [CellRef: [String]] = [:]
+        var nextIndex = 0
+
+        for ref in Self.populatedRefs(of: cells) {
+            guard let ast = cells.value(at: ref)?.formulaAST else { continue }
+
+            let found = recognizer.recognize(ast)
+            if found.isOutput { outputs.append(ref) }
+
+            for call in found.distributions {
+                uncertain.append(UncertainCell(address: ref, call: call, inputIndex: nextIndex))
+                nextIndex += 1
+                if !call.unhandledProperties.isEmpty {
+                    unhandled[ref, default: []].append(contentsOf: call.unhandledProperties)
+                }
+            }
+        }
+
+        return ModelSurvey(uncertain: uncertain, outputs: outputs, unhandledProperties: unhandled)
+    }
+
+    /// The cells to consider, in reading order — row, then column.
+    ///
+    /// The order is the contract, not an incidental. Input indices address positions in a
+    /// seeded draw sequence, so an assignment that varied between runs would make a
+    /// seeded simulation irreproducible across processes — and a provider is usually
+    /// dictionary-backed, whose iteration order Swift does not promise to keep stable
+    /// between launches. Sorting is what makes the seed mean something.
+    ///
+    /// Reading order rather than any other stable order, so that the person looking at
+    /// the sheet and the person reading the input vector see the same sequence.
+    private static func populatedRefs(of cells: any CellValueProvider) -> [CellRef] {
+        guard let last = cells.lastPopulatedCell() else { return [] }
+
+        var refs: [CellRef] = []
+        for row in 1...max(last.row, 1) {
+            for column in 1...max(last.column, 1) {
+                let ref = CellRef(column: column, row: row)
+                if cells.value(at: ref) != nil { refs.append(ref) }
+            }
+        }
+        return refs
+    }
+}
