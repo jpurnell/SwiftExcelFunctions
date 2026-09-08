@@ -119,6 +119,82 @@ case worked and this one looked harder than it was.
 
 So Frontline's second argument **is** a volatility and its name was accurate throughout.
 
+## Corrections to the matrix itself, 2026-09-08
+
+Three, found by running the recognizer against real workbooks rather than by reading the file.
+Recorded because the *kind* of error matters: none would have failed a test, and two would have
+produced plausible numbers.
+
+### `PsiTarget` was recorded backwards — and the first correction was also wrong
+
+The matrix gave `FinancialSimulation.probabilityAbove`. Frontline's own page is explicit:
+
+> Both functions return the proportion of simulated values for cell that are **less than or equal
+> to target value**.
+
+So it is P(X ≤ value), not P(X ≥ value). Corrected — and then corrected again, because
+`probabilityBelow` is not right either. It counts strictly:
+
+```swift
+if try metric(projection) < threshold { belowCount += 1 }
+```
+
+Frontline says *or equal to*. On a continuous output that difference is measure-zero and
+invisible. On a discrete one it is the entire probability mass at the boundary — and
+`PsiBernoulli` is 55 of 314 measured calls, so discrete outputs are the common case here rather
+than the edge case. A run of 30 zeros and 70 ones gives `PsiTarget(B4, 0)` = 0.30 inclusive and
+**0.00** strict. Not a rounding difference; the whole answer.
+
+No inclusive form exists upstream, so the predicate is computed at the binding. That is a
+different predicate rather than a second implementation — there is nothing to delegate to. If
+BusinessMath grows a `probabilityAtOrBelow`, that is the one call site to change.
+
+**Two wrong answers in a row on the same row, and neither would have failed a test.** The first
+came from trusting the matrix; the second from reading a function's name instead of its body.
+
+### `PsiCVaR` and `PsiBVaR`: the tail agrees, the sign does not
+
+Frontline, verbatim: PsiCVaR is *"computed as the negative of the mean value of the specified
+uncertain function for the trials that lie between PsiMin(cell) and PsiPercentile(cell,
+1-percentile), **inclusive**"*, and *"Like PsiBVaR, PsiCVaR returns a loss as a positive number."*
+
+BusinessMath's `conditionalValueAtRisk` takes the worst `ceil(n(1 − confidence))` sorted values and
+returns their mean **signed**. So:
+
+- **Tail convention matches.** Both are inclusive from the worst end.
+- **Sign does not.** Frontline negates; BusinessMath does not. Negate at the binding, which is
+  where the master plan puts every sign convention. `valueAtRisk` has the same gap — its own doc
+  example prints `abs(...)`.
+
+One residue, and it is the `PsiTarget` lesson again: Frontline defines the tail by **value**
+(everything between the minimum and the percentile, inclusive) and BusinessMath by **count** (the
+first *k* sorted). Those agree except when trials tie at the boundary, where Frontline takes all of
+them and a count takes as many as fit. Discrete outputs tie constantly.
+
+### `PsiXtoP` is the same function under another name
+
+Frontline documents `PsiTarget(cell, target, simulation)` and `PsiXtoP(cell, target, simulation)`
+as interchangeable, with identical arguments. The matrix had `PsiXtoP` as `unreviewed` with no
+provider, so nothing recorded that binding one binds the other — or that getting the inclusivity
+wrong gets it wrong twice.
+
+### `PsiBVaR` was missing from the file altogether
+
+Not excluded — *absent*. It is also absent from BusinessMath's `psi_functions.tsv`, which is where
+ours came from, and that file's README already names the cause: several of Frontline's pages render
+as images, so a text-only scrape misses them silently.
+
+It is documented, and derivable from a function already being bound:
+
+> `PsiBVaR(A1, 0.95)` equals `–PsiPercentile(A1, 0.05)`
+
+`(cell, percentile, simulation)`, losses positive at the right tail. The "B" is for Basel, to
+distinguish it from `PsiVar()` in the Premium Solver Platform. Measured in 3 of 6 workbooks.
+
+**The lesson is about provenance.** Both this and the `PsiTarget` error came from a scrape treated
+as complete. A row that is absent looks identical to a row nobody needs, and the only thing that
+distinguishes them is running against real files.
+
 ## Also still open upstream## Also still open upstream## Also still open upstream
 
 **The NASD February rule.** `thirty360` gives 302/360 for 2020-02-29 → 2020-12-31 where Excel
