@@ -116,14 +116,18 @@ public extension DependencyGraph {
     ///     `CellValueProvider` has no enumeration — and because scope has to be known
     ///     before the graph is built, not filtered afterwards.
     ///   - provider: Answers the value at each address.
-    ///   - including: An optional filter, matching the existing initialisers.
-    init(
-        cells: [CellAddress],
-        provider: any CellValueProvider,
-        including: ((CellValue) -> Bool)? = nil
-    )
+    init(cells: [CellAddress], provider: any CellValueProvider)
 }
 ```
+
+**There is deliberately no `including:` filter.** The other initialisers need one because they
+*derive* the cell set from `[Worksheet]` and have no other way to narrow it. This one derives
+nothing: a caller wanting a subset passes a subset. Two ways to express scope in one initialiser
+is a question every reader has to answer before using it, and the answer would be "they are the
+same".
+
+**`any CellValueProvider` rather than `some`**, because the graph is built once per model, never
+per trial. Recorded so nobody removes the existential later without knowing the call frequency.
 
 **Workbook scope falls out for free.** `CellAddress` is `(sheet, ref)`, so a caller passing
 addresses from several sheets gets a cross-sheet graph, and one passing a single sheet's
@@ -168,10 +172,27 @@ range intersection for whole-column references, and the public surface are all u
 1. **Equivalence with the existing initialiser.** Build a `Workbook`, take
    `DependencyGraph(workbook:).evaluationOrder`, then build a provider over the same cells and
    assert the orders match. That is the assertion that says this is the same graph.
-2. **Cross-sheet precedents survive.** A cell on `Sheet2` referencing `Sheet1!A1` must order
+
+   **Both sides must be given the same scope, and this is easy to get wrong.**
+   `init(workbook:)` includes *every* cell — its own documentation says "labels included, and a
+   referenced-but-empty cell too, because you still have to visit it to learn it is zero." A
+   provider-based caller will often pass only formula cells. Hand the two sides different scopes
+   and the orders differ, and the test looks like it found a bug in the new initialiser rather
+   than in itself.
+
+2. **The order does not depend on the order the addresses arrive in.** The same addresses supplied
+   in a different sequence must produce an identical `evaluationOrder`.
+
+   This proposal is the first thing to hand the graph a container whose iteration order is
+   unspecified, so the property is newly worth pinning. It holds today —
+   `topologicalSort` sorts its in-degree-zero queue by `sortKey` and inserts each newly-freed node
+   in sorted position — and everything downstream leans on it: a nondeterministic order would
+   silently break seeded reproducibility, which for a trial loop means same seed, same numbers, or
+   the design is decoration.
+3. **Cross-sheet precedents survive.** A cell on `Sheet2` referencing `Sheet1!A1` must order
    after it — the Long Acre case in miniature, and the one a per-sheet graph gets wrong.
-3. **Cycle detection is unchanged**, including a cycle that closes across two sheets.
-4. **No `Workbook` in the test.** At least one test builds its provider from a plain in-memory
+4. **Cycle detection is unchanged**, including a cycle that closes across two sheets.
+5. **No `Workbook` in the test.** At least one test builds its provider from a plain in-memory
    type, proving the initialiser does what it exists to do.
 
 ---
@@ -181,11 +202,28 @@ range intersection for whole-column references, and the public surface are all u
 **A bounded-range parameter instead of a cell set.** Rejected — §3.1. It converts an
 expressiveness gap into a performance cliff and hides it behind a plausible-looking API.
 
-**Add enumeration to `CellValueProvider` in SwiftExcelCore.** Defensible and possibly better
-long-term, and it is the one alternative worth a reviewer's attention. Rejected *for now* because
-it changes a protocol with existing conformers outside this proposal's blast radius, where taking
-the set as a parameter changes nothing for anyone. If SwiftExcelCore later grows a
-`populatedCells()`, this initialiser becomes a convenience over it rather than being replaced.
+**Add `populatedCells()` to `CellValueProvider` in SwiftExcelCore.** The one alternative worth a
+reviewer's attention, and the obvious next thought.
+
+It is *not* rejected on blast radius. A protocol requirement with a protocol-extension default
+breaks no conformer and is source-compatible, so that argument does not distinguish the options
+and should not be offered.
+
+It is rejected because **the only default anyone could write is the rectangle scan** — probe every
+address between the origin and `lastPopulatedCell()`. Every conformer would silently inherit a
+method that compiles, returns the right answer, and is O(rows × columns) on the sparse-and-wide
+sheets real workbooks are. There would be no signal to override it, because nothing about it is
+broken.
+
+That is precisely how `ModelSurveyor` reached 34.8 seconds. The method was not missing; the
+rectangle scan was the only route available. Shipping it as a protocol default does not close the
+gap — it institutionalises it and puts a reassuring name on it.
+
+A parameter has the opposite property: **a caller supplying the set has necessarily thought about
+where it came from, and a caller inheriting a default has necessarily not.**
+
+If SwiftExcelCore later grows a `populatedCells()` that conformers implement rather than inherit,
+this initialiser becomes a convenience over it rather than being replaced.
 
 **A second topological sort in SwiftExcelFunctions.** Rejected — §2.2.
 
@@ -199,18 +237,16 @@ to get one.
 
 ## 7. Open Questions
 
-1. **Should `cells` be `[CellAddress]` or `Set<CellAddress>`?** The initialiser builds a set
-   immediately. An array preserves a caller's ordering, which is meaningless to the graph but
-   makes the equivalence test in §5.1 easier to write. Weak preference for the array; no strong
-   view.
-2. **Should the provider be `some CellValueProvider` rather than `any`?** Generic avoids the
-   existential, which matters if this is ever called per-trial rather than per-model. The current
-   consumer builds the graph once, so it does not matter here.
-3. **Is `including:` wanted at all?** It exists on the other initialisers for symmetry, but a
-   caller who already chooses the address set can filter there instead. Included for consistency;
-   easy to drop.
+1. **`[CellAddress]` or `Set<CellAddress>`?** Cosmetic, and now known to be cosmetic: the
+   initialiser builds a set immediately, and `topologicalSort` sorts its queue by `sortKey`, so
+   the input container's iteration order cannot reach the result. An array is marginally easier to
+   write the §5.2 test against. Weak preference for the array.
 
----
+Resolved during review, recorded so the reasoning is not relitigated:
+
+- **`including:` is dropped** — §3.2. The symmetry with the other initialisers is false; they need
+  a filter because they derive the set, and this one does not.
+- **`any` rather than `some`** — §3.2. Built once per model, never per trial.
 
 ## 8. The consumer
 
