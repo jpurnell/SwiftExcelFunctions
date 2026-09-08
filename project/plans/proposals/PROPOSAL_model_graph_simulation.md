@@ -78,6 +78,15 @@ Four layers. Only the middle two are new.
 topological order, and two annotations from the recognizer: which cells are uncertain (they carry
 a `Psi*` distribution) and which are outputs (they carry `PsiOutput()`).
 
+**Most of this already exists.** `SwiftXLSX.DependencyGraph` is public and built straight from a
+`Workbook`, with Kahn's topological sort, `evaluationOrder`, `inputs`, `outputs`,
+`dependents(of:)`, `precedents(of:)`, `allDependents(of:)`, `isAcyclic` and `cycles`. An earlier
+draft of this proposal listed building it as Phase 1 — the same error as §2, made the same way:
+grepping *this* repository's `Sources/`, finding nothing, and concluding absence when the answer
+was one dependency over. **`ModelGraph` wraps `DependencyGraph`; it does not replace it.** What is
+genuinely new in Layer 1 is the recognizer — which cells are uncertain, which are outputs, and
+lifting the sampler directives out of the AST.
+
 **Layer 2 — the lowering pass.** `FormulaAST` over a graph of cells → BusinessMath `Expression`,
 a scalar tree over indexed `[Double]` inputs. This is the only genuinely new algorithm.
 
@@ -486,11 +495,42 @@ product; it is "ask the host to recalculate," which loses by orders of magnitude
 |---|---|---|
 | Bytecode, CPU | target ≥ 10⁵ trials/sec on a small model | `PerformanceBenchmark` (upstream) |
 | Bytecode, Metal GPU | `enableGPU: true` already exists; unmeasured here | same |
-| Interpreted | assume 2–3 orders slower; **must be measured, not assumed** | new benchmark |
+| Interpreted | **measured 2026-09-08: 118× on marginal propagation cost** | `Phase0LoweringSpikeTests` |
 
-The interpreted ratio is the single most load-bearing unknown in this proposal. If it is 50×, the
-fast path is a nicety. If it is 5,000×, lowering coverage is the product. **The spike in §12
-measures this before anything else is built.**
+### 9.1 Phase 0 result — answered, and it moves Phase 4 up
+
+Measured with `Phase0LoweringSpikeTests`, 10,000 trials, seed 42, sweeping propagation depth so
+the shared sampling cost cancels in the slope. **Release build:**
+
+| depth | instructions | interpreted | compiled | whole-run |
+|---:|---:|---:|---:|---:|
+| 0 | 3 | 0.033s | 0.022s | 1.5× |
+| 50 | 103 | 0.287s | 0.024s | 12.0× |
+| 100 | 203 | 0.546s | 0.026s | 20.9× |
+| 500 | 1003 | 2.497s | 0.043s | **58.1×** |
+
+Marginal cost of one propagation operation per trial: **interpreted 493 ns, compiled 4.2 ns —
+118×.** The whole-run column is still climbing at depth 500; it has not plateaued.
+
+This lands on the "lowering coverage is the product" side of the question §9 posed, not the
+"fast path is a nicety" side. A 500-operation model — unremarkable for a real workbook — costs
+2.5s interpreted against 0.043s compiled at 10,000 trials, and 25s against 0.43s at 100,000.
+That is the difference between a tool someone uses and one they abandon.
+
+**The trap, recorded because it nearly produced the opposite plan.** The same sweep in a *debug*
+build reports **3.8×**. Optimization makes the bytecode path ~70× faster and the AST walk only
+~2.3× faster, so debug understates the ratio by about 31×. Had Phase 0 been run in the default
+configuration and believed, the conclusion would have been that lowering barely matters and the
+SwiftUI work should come first. Any future measurement here runs `-c release` or is not run.
+
+Two reasons 118× is a floor rather than a ceiling: the propagation step measured is `+ 1.0`,
+where a real formula dispatches through the registry and reads ranges; and the provider is a
+dictionary, where a workbook-backed one costs more. Both make the interpreted side more
+expensive.
+
+**Consequence for §13:** Phase 4 (lowering rules) moves ahead of Phase 6 (SwiftUI). §3.1 still
+stands — the interpreted path remains the correctness baseline and the differential test — but it
+is now clearly a fallback rather than a plausible shipping configuration for large models.
 
 Watch items: node-count blowup from inlining without CSE (§5.3), and `SimulationResults.values`
 holding `trials × outputs` doubles — 10⁵ trials × 20 outputs is 16 MB, fine; 10⁷ × 100 is not.
@@ -572,27 +612,80 @@ document. Excel last, base case only, or never.
 
 ---
 
-## 12. Phasing
+## 12. Writing back — reporting an error is not fixing one
+
+The pipeline above is one-way: `.xlsx` in, results out. That is enough to *report* a disagreement,
+which is already the master plan's motivating application — "read a model, recompute it, and
+report where it disagrees with itself." It is not enough to **fix** one, and the moment the
+SwiftUI app shows a user a wrong cell, the next thing they will want is a button.
+
+Those are two capabilities, and only one is expensive.
+
+**Reporting is available now.** Read-only, no new dependency, no risk. A CLI or the app pointing
+at the offending cell with the recomputed value beside the cached one needs nothing this proposal
+does not already build.
+
+**Fixing is blocked, and the block is silent.** `SwiftXLSX.Workbook.save()` regenerates the
+archive from seven part types, and `Workbook(xlsxData:)` retains only `sheets` and `namedRanges` —
+`WorkbookReader.read(from:)` builds an `entryMap` of every part, consumes six, and drops the rest
+when the function returns. So open-edit-save on a real workbook **destroys** charts, pivot tables
+and their caches, VBA, drawings, images, themes, comments, tables, conditional formatting, data
+validation, print settings, external links and document properties.
+
+That behaviour is correct for the case it was built for — a `Workbook()` composed in code and
+written out — and it is data loss for the case of opening someone's model. Nothing in the API
+distinguishes the two, which is what makes it dangerous rather than merely limited. Risk Solver
+workbooks are close to the worst case: they are business models, so charts and formatting are
+exactly what they carry.
+
+**The fix belongs upstream, and it has its own proposal.**
+`SwiftXLSX/project/plans/proposals/PROPOSAL_surgical_save.md` — retain the source archive, copy
+every unparsed part through byte-for-byte, and rewrite only what changed. It is scoped there
+rather than here for three reasons: it benefits every SwiftXLSX consumer, it is testable with no
+reference to simulation (read a workbook, change nothing, assert byte-identity), and it can be
+implemented in a separate session without touching this work.
+
+Three constraints from that proposal matter to callers here, because they shape what this project
+can promise:
+
+- **Shared-string and style indices are positional**, so a surgical save appends and never
+  compacts. A sheet this project rewrites must not renumber a table that unparsed sheets still
+  index into.
+- **`xl/calcChain.xml` is dropped** on any save that touched a formula, and `fullCalcOnLoad` is
+  set on `<calcPr>`. Without that, a corrected cell leaves its dependents' cached values stale —
+  and `ExcelOracleTests` treats those caches as ground truth, so writing a file with stale ones
+  would poison the very corpus this project tests against.
+- **Structural change is out of scope.** Adding or removing sheets in a read workbook throws
+  rather than falling back to the destructive path.
+
+**Until surgical save lands, this project writes no `.xlsx` it did not create.** Corrections are
+reported, or written to a *new* workbook alongside the original — never in place. That is a
+deliberate constraint, not an oversight, and it should be stated in the UI rather than discovered.
+
+---
+
+## 13. Phasing
 
 Each phase ends somewhere shippable.
 
 | # | Deliverable | Ends when |
 |---|---|---|
 | **0** | **Spike.** Hand-built `ModelGraph` for one arithmetic model, lower it, run 10,000 trials, print the mean. Measure the interpreted:compiled ratio (§9). | The ratio is a number, not an assumption |
-| **1** | `ModelGraph` + builder + cycle detection, tested | A corpus workbook builds a graph |
+| **1** | `ModelGraph` over `SwiftXLSX.DependencyGraph`, + the recognizer | A corpus workbook builds a graph with its uncertain cells and outputs marked |
 | **2** | `Lowerer.audit` + corpus histogram (§8.2) | The lowering work list is ordered by evidence |
 | **3** | Interpreted path, end to end, `PsiMean`/`PsiStdDev`/`PsiPercentile` bound via §6.4 | A real workbook simulates correctly, slowly |
 | **4** | Lowering rules, top-down by the phase-2 histogram, each under the §8.1 differential test | Diminishing returns on the histogram |
 | **5** | The remaining `statistic` rows | 87 rows resolved |
 | **6** | SwiftUI app | It opens a workbook and draws a histogram |
-| **7** | LibreOffice `XSolver` spike | Out of scope for this proposal; needs the optimization one |
+| **7** | Write-back, **gated on `PROPOSAL_surgical_save.md`** | A corrected cell is written to a real workbook and its charts, pivots and macros survive |
+| **8** | LibreOffice `XSolver` spike | Out of scope for this proposal; needs the optimization one |
 
 Phase 3 ships a working product. Phase 4 makes it fast. That ordering is the point — and it is
 only available because of §3.1.
 
 ---
 
-## 13. Alternatives considered
+## 14. Alternatives considered
 
 **Ask Excel or LibreOffice to recalculate per trial.** Rejected; §9. It is the architecture that
 makes the feature impossible rather than slow.
@@ -615,7 +708,7 @@ downstream consumer's benefit, and the phase-2 histogram should decide whether i
 
 ---
 
-## 14. Legal
+## 15. Legal
 
 Frontline Systems owns "Solver", "Risk Solver" and "Analytic Solver" as marks; Microsoft licenses
 the bundled Excel Solver from them. Function names and signatures are reimplementable, and reading
@@ -629,7 +722,7 @@ a file format is not infringement. Three rules for anything that ships:
 
 ---
 
-## 15. Open questions
+## 16. Open questions
 
 1. **Does inlining without CSE blow up on real models?** (§5.3) Phase 2 answers it. If yes, CSE
    goes upstream in `BytecodeOptimizer`, benefiting every BusinessMath caller.
@@ -650,7 +743,7 @@ a file format is not infringement. Three rules for anything that ships:
 
 ---
 
-## 16. Documentation strategy
+## 17. Documentation strategy
 
 DocC on every public symbol, per the standing rule. Three articles beyond the reference:
 
@@ -660,9 +753,21 @@ DocC on every public symbol, per the standing rule. Three articles beyond the re
 - **"Reproducibility"** — seeds, sampling schemes, and the honest statement that a seeded run does
   not reproduce a number cached by Frontline's add-in, with the 71/19 `PsiBaseCase` measurement as
   the evidence.
+- **"What this writes, and what it will not"** — §12's constraint, stated before a user goes
+  looking for a save button. Until surgical save lands, corrections are reported or written to a
+  new workbook; this project does not modify an `.xlsx` it did not create.
 
 ---
 
-**Next step:** Phase 0. One hand-built graph, one lowered model, one number, and the
-interpreted:compiled ratio measured rather than guessed. Everything after it is ordered by what
-that measurement and the phase-2 histogram say.
+**Next step:** ~~Phase 0. One hand-built graph, one lowered model, one number, and the
+interpreted:compiled ratio measured rather than guessed.~~ **Done 2026-09-08 —
+`Phase0LoweringSpikeTests`, and the answer is 118×.** See §9.1. Both paths agree bit-for-bit at
+every depth, which also means §3.1's differential contract holds in practice and not just on paper.
+
+Phase 1 next, and it is smaller than this proposal originally scoped it: `SwiftXLSX.DependencyGraph`
+already provides the topological order, cycle detection and the precedent/dependent queries, so
+Phase 1 is `ModelGraph` wrapping it plus the recognizer. Then Phase 2's corpus histogram, which is
+the other number the ordering depends on.
+
+Write-back (§12) is gated on `SwiftXLSX/project/plans/proposals/PROPOSAL_surgical_save.md` and can
+proceed independently, in a separate session, without touching any of the above.
