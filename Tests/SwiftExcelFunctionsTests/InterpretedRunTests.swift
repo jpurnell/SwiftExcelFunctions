@@ -163,9 +163,21 @@ final class InterpretedRunTests: XCTestCase {
         XCTAssertThrowsError(try run(sheet, [CellRef("B1"), CellRef("B3")]))
     }
 
-    /// Nothing to collect is not a run.
-    func testAModelWithNoOutputsIsRejected() throws {
+    /// Nothing to collect is a refusal — but a different one from nothing to vary.
+    ///
+    /// The model here is perfectly simulable: it has a draw. What it does not have is any
+    /// statement of what to collect, and that is the caller's to supply rather than the
+    /// model's to fix. `PsiOutput()` is Frontline's convention, not a precondition.
+    func testAModelDeclaringNoOutputsSaysSoSpecifically() throws {
         let sheet = try Sheet(formulas: ["B1": "PsiUniform(0, 1)"])
+        XCTAssertThrowsError(try run(sheet, [CellRef("B1")])) { error in
+            XCTAssertEqual(error as? TrialRunError, .noOutputsToCollect)
+        }
+    }
+
+    /// And nothing to vary is the other one.
+    func testAModelWithNoDrawsIsNotSimulable() throws {
+        let sheet = try Sheet(formulas: ["B1": "1+1"], constants: ["A1": 3])
         XCTAssertThrowsError(try run(sheet, [CellRef("B1")])) { error in
             XCTAssertEqual(error as? TrialRunError, .notSimulable)
         }

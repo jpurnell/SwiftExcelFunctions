@@ -136,18 +136,44 @@ final class ModelSurveyTests: XCTestCase {
         XCTAssertFalse(survey.isFullyModelled)
     }
 
-    /// A sheet with distributions but no output marker cannot be simulated — there is
-    /// nothing to collect statistics about.
-    func testDistributionsWithoutAnOutputAreNotSimulable() throws {
+    /// Draws with no marker are still simulable — the marker is Frontline's convention,
+    /// not a precondition. What the model does not say is which cells to collect.
+    func testDistributionsWithoutAnOutputMarkerAreStillSimulable() throws {
         let survey = surveyor.survey(try Sheet(["B1": "PsiNormal(0, 1)"]))
-        XCTAssertFalse(survey.isSimulable)
-        XCTAssertEqual(survey.uncertain.count, 1)
+        XCTAssertTrue(survey.isSimulable)
+        XCTAssertFalse(survey.declaresItsOwnOutputs)
     }
 
-    /// And an output with nothing uncertain feeding it is a constant, not a simulation.
+    /// An output with nothing uncertain feeding it is a constant, not a simulation.
     func testOutputWithoutUncertaintyIsNotSimulable() throws {
         let survey = surveyor.survey(try Sheet(["B4": "SUM(A1:A3)+PsiOutput()"]))
         XCTAssertFalse(survey.isSimulable)
+        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+    }
+
+    /// **A cell asked about is an output.**
+    ///
+    /// `PsiMean(B4)` declares `B4` collected without any marker on `B4` itself. A real
+    /// 126-call workbook does exactly this and carries no `PsiOutput()` at all, so
+    /// requiring the marker rejected it outright.
+    func testACellNamedByAStatisticIsAnOutput() throws {
+        let survey = surveyor.survey(try Sheet([
+            "B1": "PsiNormal(0, 1)",
+            "B4": "B1*2",
+            "D1": "PsiMean(B4)"
+        ]))
+        XCTAssertTrue(survey.isSimulable)
+        XCTAssertTrue(survey.declaresItsOwnOutputs)
+        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+    }
+
+    /// A marker and a statistic naming the same cell is one output, not two.
+    func testAMarkedCellAlsoAskedAboutIsNotCountedTwice() throws {
+        let survey = surveyor.survey(try Sheet([
+            "B1": "PsiNormal(0, 1)",
+            "B4": "B1+PsiOutput()",
+            "D1": "PsiMean(B4)"
+        ]))
         XCTAssertEqual(survey.outputs, [CellRef("B4")])
     }
 }

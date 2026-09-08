@@ -14,8 +14,15 @@ import BusinessMath
 /// for, so nothing about the output says it should not be trusted.
 public enum TrialRunError: Error, Sendable, Equatable {
 
-    /// The model has no draws, or nothing collecting them. See ``ModelSurvey/isSimulable``.
+    /// The model has no uncertain cell, so there is nothing to vary.
     case notSimulable
+
+    /// Nothing to collect: the model declares no outputs and the caller named none.
+    ///
+    /// Separate from ``notSimulable`` because it is the caller's to fix rather than the
+    /// model's — a workbook may legitimately leave the choice open. See
+    /// ``ModelSurvey/declaresItsOwnOutputs``.
+    case noOutputsToCollect
 
     /// The evaluation order places a cell before something it reads.
     ///
@@ -134,6 +141,7 @@ public struct InterpretedRun: Sendable {
     ) throws -> SimulationRun {
         guard trials > 0 else { throw TrialRunError.invalidTrialCount(trials) }
         guard survey.isSimulable else { throw TrialRunError.notSimulable }
+        guard !survey.outputs.isEmpty else { throw TrialRunError.noOutputsToCollect }
         try validateOrder(against: cells)
 
         let random = SeededRandomSource(SplitMix64(seed: seed))

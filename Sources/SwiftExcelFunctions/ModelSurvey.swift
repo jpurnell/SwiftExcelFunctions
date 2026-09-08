@@ -43,7 +43,16 @@ public struct ModelSurvey: Sendable, Equatable {
     /// Every distribution call on the sheet, in reading order, with indices assigned.
     public let uncertain: [UncertainCell]
 
-    /// Cells carrying `PsiOutput()`, in reading order.
+    /// Cells the model collects results for, in reading order.
+    ///
+    /// Two ways a cell becomes one, because Frontline supports two. A cell carrying
+    /// `PsiOutput()` is marked explicitly. A cell some *other* formula asks a statistic
+    /// about — `PsiMean(B4)` — is an output by virtue of being asked about, and needs no
+    /// marker.
+    ///
+    /// The marker is not required, and treating it as required rejects real models: one
+    /// workbook here carries 126 Psi calls and **no `PsiOutput()` anywhere**, declaring
+    /// its outputs entirely through `PsiMean` and `PsiPercentile`.
     public let outputs: [CellRef]
 
     /// Property functions the recognizer met and does not model, by the cell holding them.
@@ -59,16 +68,25 @@ public struct ModelSurvey: Sendable, Equatable {
     /// Whether every property function encountered was one this recognizer models.
     public var isFullyModelled: Bool { unhandledProperties.isEmpty }
 
-    /// Whether there is a simulation here to run.
+    /// Whether there is anything to simulate.
     ///
-    /// Both halves are required and neither is sufficient. Draws with no output produce
-    /// numbers nobody collects; an output with no draws upstream is a constant computed
-    /// ten thousand times. Reporting either as runnable would produce a result that is
-    /// technically a distribution and practically a mistake.
+    /// Draws, and nothing else. A model with no uncertain cell has nothing to vary and a
+    /// run of it would compute the same answer ten thousand times.
     ///
-    /// This does **not** check that the outputs actually descend from the draws — that
-    /// needs the dependency edges, which this type deliberately does not have.
-    public var isSimulable: Bool { !uncertain.isEmpty && !outputs.isEmpty }
+    /// **Outputs are deliberately not required.** An earlier version demanded at least one,
+    /// and that rejected a real 126-call model outright for carrying no `PsiOutput()`.
+    /// Which cells to collect is the caller's decision and can be supplied; whether there
+    /// is randomness to propagate is a fact about the model. See ``outputs``.
+    ///
+    /// This does **not** check that the outputs descend from the draws — that needs the
+    /// dependency edges, which this type deliberately does not have.
+    public var isSimulable: Bool { !uncertain.isEmpty }
+
+    /// Whether the model says, by itself, what it wants collected.
+    ///
+    /// `false` is not an error: it means a caller running this model has to name the
+    /// outputs, because the workbook never did.
+    public var declaresItsOwnOutputs: Bool { !outputs.isEmpty }
 
     /// Creates a survey.
     ///
@@ -150,6 +168,7 @@ public struct ModelSurveyor: Sendable {
         var uncertain: [UncertainCell] = []
         var outputs: [CellRef] = []
         var unhandled: [CellRef: [String]] = [:]
+        var namedByStatistic: Set<CellRef> = []
         var nextIndex = 0
 
         for ref in Self.populatedRefs(of: cells) {
@@ -157,6 +176,11 @@ public struct ModelSurveyor: Sendable {
 
             let found = recognizer.recognize(ast)
             if found.isOutput { outputs.append(ref) }
+
+            // A cell this formula asks a statistic about is an output, wherever it lives.
+            for subject in found.statisticSubjects {
+                if case .cellRef(let subjectRef) = subject { namedByStatistic.insert(subjectRef) }
+            }
 
             for call in found.distributions {
                 uncertain.append(UncertainCell(address: ref, call: call, inputIndex: nextIndex))
@@ -167,7 +191,14 @@ public struct ModelSurveyor: Sendable {
             }
         }
 
-        return ModelSurvey(uncertain: uncertain, outputs: outputs, unhandledProperties: unhandled)
+        // Statistic-named cells join the marked ones, deduplicated and in reading order so
+        // the list stays stable between runs.
+        let marked = Set(outputs)
+        let combined = (outputs + namedByStatistic.subtracting(marked)
+            .sorted { ($0.row, $0.column) < ($1.row, $1.column) })
+
+        return ModelSurvey(
+            uncertain: uncertain, outputs: combined, unhandledProperties: unhandled)
     }
 
     /// The cells to consider, in reading order — row, then column.

@@ -21,6 +21,11 @@ public struct RecognizedFormula: Sendable, Equatable {
     /// Every distribution call in the formula, in the order they appear.
     public let distributions: [DistributionCall]
 
+    /// Cells this formula asks a statistic about, and which are therefore outputs.
+    ///
+    /// `PsiMean(B4)` names `B4`. Empty for a formula that asks nothing.
+    public let statisticSubjects: [FormulaAST]
+
     /// Whether the run should collect statistics for this cell.
     public var isOutput: Bool { outputMarkers > 0 }
 
@@ -32,9 +37,15 @@ public struct RecognizedFormula: Sendable, Equatable {
     /// - Parameters:
     ///   - outputMarkers: how many `PsiOutput()` calls the formula carries.
     ///   - distributions: every distribution call found, in the order they appear.
-    public init(outputMarkers: Int, distributions: [DistributionCall]) {
+    ///   - statisticSubjects: the first argument of each statistic call.
+    public init(
+        outputMarkers: Int,
+        distributions: [DistributionCall],
+        statisticSubjects: [FormulaAST] = []
+    ) {
         self.outputMarkers = outputMarkers
         self.distributions = distributions
+        self.statisticSubjects = statisticSubjects
     }
 }
 
@@ -131,6 +142,16 @@ public struct PsiRecognizer: Sendable {
     /// The marker that makes a cell a simulation output.
     private static let outputMarker = "PSIOUTPUT"
 
+    /// Statistics that read a completed run, and so name an output by their first argument.
+    ///
+    /// `PsiOutput()` is Frontline's way of marking a cell for collection, and it is not the
+    /// only one. A model that writes `PsiMean(B4)` has declared `B4` an output by asking a
+    /// question about it — measured on a real workbook of 126 Psi calls carrying **no**
+    /// `PsiOutput()` at all, which is not an unusual model but a common one.
+    static let statistics: Set<String> = [
+        "PSIMEAN", "PSISTDDEV", "PSIPERCENTILE", "PSITARGET", "PSIXTOP", "PSIBVAR", "PSICVAR"
+    ]
+
     /// Names that mark or annotate rather than draw, and so are never distributions.
     ///
     /// Exposed for ``PsiRecognizer`` and for the test that guards against the drift
@@ -174,16 +195,20 @@ public struct PsiRecognizer: Sendable {
     public func recognize(_ ast: FormulaAST) -> RecognizedFormula {
         var markers = 0
         var calls: [DistributionCall] = []
+        var subjects: [FormulaAST] = []
 
         Self.visitFunctionCalls(ast) { name, arguments in
             if name == Self.outputMarker {
                 markers += 1
+            } else if Self.statistics.contains(name) {
+                if let subject = arguments.first { subjects.append(subject) }
             } else if distributionNames.contains(name) {
                 calls.append(Self.call(named: name, arguments: arguments))
             }
         }
 
-        return RecognizedFormula(outputMarkers: markers, distributions: calls)
+        return RecognizedFormula(
+            outputMarkers: markers, distributions: calls, statisticSubjects: subjects)
     }
 
     /// Visits every function call in a formula, canonical name first.
