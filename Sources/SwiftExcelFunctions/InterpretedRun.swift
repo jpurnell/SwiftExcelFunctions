@@ -147,13 +147,13 @@ public struct InterpretedRun: Sendable {
                 let value = try FormulaEvaluator.evaluate(
                     ast, cells: trial, names: names, functions: registry,
                     at: nil, inSheet: "", random: random)
-                trial.overrides[ref] = value
+                trial.overrides[ref.positionKey] = value
             }
             for output in survey.outputs {
                 // A trial that produced an error contributes nothing rather than a zero.
                 // Averaging a `#DIV/0!` as 0 is the plausible-wrong-number this project
                 // exists to avoid; a short vector at least says something went wrong.
-                if case .number(let n) = trial.overrides[output] ?? .blank {
+                if case .number(let n) = trial.overrides[output.positionKey] ?? .blank {
                     collected[output, default: []].append(n)
                 }
             }
@@ -175,7 +175,7 @@ public struct InterpretedRun: Sendable {
     /// run completes and reports statistics about it.
     private func validateOrder(against cells: any CellValueProvider) throws {
         var position: [CellRef: Int] = [:]
-        for (index, ref) in evaluationOrder.enumerated() { position[ref] = index }
+        for (index, ref) in evaluationOrder.enumerated() { position[ref.positionKey] = index }
 
         for (index, ref) in evaluationOrder.enumerated() {
             guard let ast = cells.value(at: ref)?.formulaAST else { continue }
@@ -184,7 +184,7 @@ public struct InterpretedRun: Sendable {
                 // A reference to a constant or an empty cell has no position and needs
                 // none — only a *computed* precedent has to come first.
                 guard cells.value(at: precedent)?.formulaAST != nil else { continue }
-                guard let precedentIndex = position[precedent] else {
+                guard let precedentIndex = position[precedent.positionKey] else {
                     throw TrialRunError.orderOmitsCell(precedent)
                 }
                 guard precedentIndex < index else {
@@ -242,6 +242,24 @@ public struct InterpretedRun: Sendable {
     }
 }
 
+extension CellRef {
+    /// This reference, with the `$` markers removed from its identity.
+    ///
+    /// `CellRef` synthesises `Hashable` over all four fields, so `$B$8` and `B8` are
+    /// different keys — and they are the same cell. Absoluteness says what happens when a
+    /// formula is *copied*; it says nothing about which cell is being read.
+    ///
+    /// Without this, a trial computing `B8` stores it under `B8`, a formula reading `$B$8`
+    /// misses the override, falls through to the base provider, and reads the value Excel
+    /// cached before the simulation began. The run completes. It reports statistics about
+    /// a model that never propagated. SwiftXLSX hit the same thing — *"an absolute
+    /// reference is the same cell"* — and fixed it by normalising its keys.
+    ///
+    /// Normalising *to* absolute rather than away from it, because `absolute()` exists and
+    /// its inverse does not.
+    var positionKey: CellRef { absolute() }
+}
+
 /// A provider whose cells can be rewritten for the duration of one trial.
 ///
 /// Overrides shadow the base rather than replacing it, so constants and untouched cells
@@ -250,9 +268,9 @@ struct MutableCells: CellValueProvider {
     let base: any CellValueProvider
     var overrides: [CellRef: CellValue] = [:]
 
-    func value(at ref: CellRef) -> CellValue? { overrides[ref] ?? base.value(at: ref) }
+    func value(at ref: CellRef) -> CellValue? { overrides[ref.positionKey] ?? base.value(at: ref) }
     func value(at ref: CellRef, inSheet: String) -> CellValue? {
-        overrides[ref] ?? base.value(at: ref, inSheet: inSheet)
+        overrides[ref.positionKey] ?? base.value(at: ref, inSheet: inSheet)
     }
     func values(in range: CellRange) -> [CellValue] {
         range.cells.map { value(at: $0) ?? .blank }
