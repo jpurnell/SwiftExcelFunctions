@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fifty more Risk Solver distributions**, on BusinessMath 2.15.0 — which
+  implemented the whole 52-row completeness delta and adopted the proposal's shape.
+  **104 of 113 Psi distribution rows are now bound.**
+
+  **The 28 `*Alt` rows are one binding, not 28.** They are the same distributions
+  parameterised by what the modeller knows — `PsiNormalAlt(0.05, 1.5, 0.95, 4.5)`
+  says "the 5th percentile is 1.5 and the 95th is 4.5". One generic function reads
+  Frontline's pairs into `ParameterConstraint`s and hands them to
+  `PercentileParameterisable.fitting(_:)`.
+
+  Arguments come in **(name, value) pairs**, and a *numeric* name is a probability
+  while a *textual* one names a moment or native parameter. That split is what
+  removes the ambiguity a purely numeric convention would have: a bare `(0.05, x)`
+  cannot say whether it means "the 5th percentile is x" or "the scale is 0.05", and
+  Excel's `5%` formatting is display rather than value, so it does not reach the AST.
+
+  Tested by **round trip** rather than against a table: state a distribution's own
+  quantiles back to it and the fit must recover it. That works for every conformer
+  without a fixture apiece, and it fails loudly if a solve is wrong.
+
+  Also bound: `PsiPert`, `PsiErf`, `PsiPareto2`, `PsiBetaGen`, `PsiBetaSubj`,
+  `PsiHistogram`, `PsiCumulD`, `PsiNormalSkew`, `PsiTriangGen`, `PsiMetalog2`,
+  `PsiMetalogSPT`, `PsiFit`; the ARMA family (`PsiAR2`, `PsiMA1`, `PsiMA2`,
+  `PsiARMA11`), `PsiARCH1` and `PsiEGARCH11`; and the multivariate rows
+  (`PsiMVNormal`, `PsiMVLogNormal`, `PsiMVResample`, `PsiMVShuffle`), which answer a
+  **vector** that the existing spill machinery distributes — exactly as Frontline
+  documents them ("you must array-enter a formula").
+
+- **`RandomSourceGenerator`** — a `RandomNumberGenerator` view of a `RandomSource`.
+  The multivariate distributions have no scalar inverse to drive from a uniform, so
+  they ask for a generator; sampling the marginals independently instead would
+  type-check and discard the correlation, which is the whole point of them. The
+  bridge packs two uniform draws into each 64-bit value, is deterministic, and still
+  takes every bit from the caller.
+
 - **Forty-five more Risk Solver distributions**, taking the Psi distribution
   surface to 54 of 113 — everything BusinessMath 2.14.0 can back except two.
 

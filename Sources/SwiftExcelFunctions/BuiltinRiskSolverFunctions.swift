@@ -28,6 +28,7 @@ public enum BuiltinRiskSolverFunctions {
     /// All Risk Solver functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] =
         [psiOutput, psiBaseCase, psiName] + distributions + furtherDistributions
+            + completingDistributions
 
     /// `PsiOutput()` — marks a cell as a simulation result.
     ///

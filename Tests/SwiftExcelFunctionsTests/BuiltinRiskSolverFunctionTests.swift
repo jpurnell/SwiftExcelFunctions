@@ -23,6 +23,7 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
         let expected = Set(markers)
             .union(BuiltinRiskSolverFunctions.distributions.map(\.name))
             .union(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name))
+            .union(BuiltinRiskSolverFunctions.completingDistributions.map(\.name))
         XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)), expected)
         XCTAssertEqual(BuiltinRiskSolverFunctions.all.count, expected.count,
                        "a name is registered twice")
@@ -104,12 +105,17 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
     /// something with a similar tail.
     /// Resolving the prefix must not invent a function behind it.
     ///
-    /// `PsiPert` is the example because it is a real Frontline distribution this
-    /// package genuinely cannot answer — BusinessMath has no Beta-PERT at 2.14.0,
-    /// recorded in `project/plans/psi_upstream_gaps.md`. A workbook using it should
-    /// get `#NAME?`, which says "nobody here knows this", rather than a number.
+    /// `PsiSip` is the example because it is a real Frontline function this package
+    /// genuinely cannot answer, and for a reason that will not expire: it names a
+    /// stored data packet in the workbook rather than computing anything, so it is
+    /// address arithmetic and belongs downstream with `solver_adj`. A workbook using
+    /// it should get `#NAME?` — "nobody here knows this" — rather than a number.
+    ///
+    /// It replaced `PsiPert`, which was the example until BusinessMath 2.15.0 made it
+    /// answerable. That is the failure mode to watch for here: an example chosen
+    /// because it was missing stops testing anything the moment it arrives.
     func testAnUnknownPrefixedNameStaysUnknown() {
-        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xll.PsiPert"))
+        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xll.PsiSip"))
         XCTAssertNil(FunctionRegistry.builtin.function(named: "_xlfn.NOTAFUNCTION"))
     }
 

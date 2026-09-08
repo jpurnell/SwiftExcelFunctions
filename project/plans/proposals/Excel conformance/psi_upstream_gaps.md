@@ -77,31 +77,41 @@ corpus-shaped.
 
 ---
 
-## Bindable upstream, not yet bound here (2)
+## What is left, after BusinessMath 2.15.0
 
-Three of what were five here have since been bound, after reading Frontline's documentation
-rather than reasoning from the type signatures. Recorded because the mistake is worth keeping:
+2.15.0 implemented the whole 52-row delta this document was written to record, and adopted the
+proposal's shape: `PercentileParameterisable`, `ParameterConstraint`, `fitting(_:)`. **104 of 113
+distribution rows are now bound.** Nine remain, in three groups.
 
-- **`PsiAR1` and `PsiGARCH11`.** I had them down as needing simulation state a cell cannot carry.
-  Frontline's signatures pass the previous state *in* — `val0`, `err0`, `stdev0` are arguments,
-  supplied by the cell above, precisely because a spreadsheet cell has no memory. One step is
-  fully determined, and `StochasticProcess.step(from:dt:normalDraws:)` is exactly that step.
-- **`PsiMetalog`.** I read its trailing `prop_fcns` as an argument whose meaning was unstated.
-  It is Frontline's general **property-function slot** — the same one carrying `PsiTruncate`,
-  `PsiBaseCase` and `PsiName` — and `attached(_:_:)` already strips it. The parameters are the
-  three that remain, so the "optional leading bounds" never created an ambiguity.
+### Not mathematics — ours, and not a gap upstream (5)
 
-What remains:
+`PsiSip`, `PsiSlurp`, `PsiTSSip`, `PsiCertified`, `PsiVary`. Each names a stored data packet in
+the workbook or declares a sensitivity role; nothing is computed. Address arithmetic, which
+upstream's own proposal assigns downstream. These belong with `solver_adj` and the role
+declarations, read from the sheet rather than evaluated.
 
-| Function | Provider | What is unresolved |
-|---|---|---|
-| `PsiMVLogNormal` | `DistributionMVLogNormal` | Documented and unambiguous — µ a vector of means, Σ a covariance matrix, array-entered to spill across cells. Two things are missing on our side, neither of them a question about meaning: `sample(using:)` needs a `RandomNumberGenerator` where we hold a `RandomSource`, and the binding must answer a `CellMatrix` rather than one number. Sampling the marginals independently would type-check and discard the correlation, which is the entire point of the distribution. |
-| `PsiMetalogFit` | `DistributionMetalog` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)`. Which of x and y carries the probability is not stated in the signature, and getting it backwards fits a distribution to transposed data — an answer, and the wrong one. |
+### Bound nowhere, because the argument's meaning is unstated (3)
 
-`PsiMVLogNormal` is the more valuable of the two and is a known piece of work rather than an open
-question: an RNG bridge, and an array-returning variant of the sampler.
+| Function | What is unresolved |
+|---|---|
+| `PsiMetalogFit`, `PsiMetalog2Fit` | `(num_coef, x_values, y_values)` against `(fittingProbabilities:values:terms:)`. Which of x and y carries the probability is not stated, and backwards it fits to transposed data — an answer, and the wrong one. |
+| `PsiMakeInput` | `(freq, expr, deduct, limit)` builds a compound frequency/severity model, and `CompoundLossModel` takes `Frequency` and `Severity` *distributions*. A cell value cannot carry a distribution, so what `freq` and `expr` denote in a formula is the open question. |
 
-## Also still open upstream
+### One where the conversion is not derivable (1)
+
+`PsiAPARCH11`. `AsymmetricPowerArch` takes the constant `ω`, and — unlike `ExponentialGarch` —
+has no `unconditionalVolatility:` initialiser. Frontline states a `volatility`, and under a general
+power δ the stationary relation between the two depends on the innovation distribution rather than
+following from `ω = σ²(1 − α − β)` as it does at δ = 2.
+
+`PsiEGARCH11` *is* bound, because that type does supply the unconditional initialiser. `PsiARCH1`
+is bound as GARCH(1,1) at β = 0, which is the same mathematics rather than an approximation of it.
+
+**An `unconditionalVolatility:` initialiser on `AsymmetricPowerArch` is the one thing that would
+close this**, and it belongs upstream: deriving it here would be a second implementation of a
+variance recursion, which is what the package split exists to prevent.
+
+## Also still open upstream## Also still open upstream
 
 **The NASD February rule.** `thirty360` gives 302/360 for 2020-02-29 → 2020-12-31 where Excel
 gives 301/360. This one *is* a blocker: basis 0 is the basis every one of the corpus's 3,425
