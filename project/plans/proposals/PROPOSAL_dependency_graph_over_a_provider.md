@@ -25,7 +25,29 @@ Move `DependencyGraph` from SwiftXLSX to SwiftExcelCore, with a cell set and a
 
 ## 2. Motivation
 
-### 2.1 The type is already Core-shaped
+### 2.1 The initialiser already reads exactly a cell set and a provider
+
+This is the whole proposal in one paragraph. `DependencyGraph`'s designated
+initialiser reads **two things** off a `Worksheet`:
+
+```swift
+for sheet in sheets {
+    for (refString, (value, _)) in sheet.cells {
+        inScope.insert(CellAddress(sheet: sheet.name, ref: refString))
+    }
+}
+```
+
+`sheet.name` and `sheet.cells` — a name, and a dictionary from reference to value.
+That is **an address set and a value provider**, which is what this proposal asks the
+initialiser to take directly. `CellAddress` already carries the sheet name, so the
+substitution is `address.sheet` for one and `provider.value(at:inSheet:)` for the
+other.
+
+The type was already written against the abstraction. It had simply never been given
+it.
+
+### 2.2 The coupling corroborates it
 
 This is the argument, and it is a measurement rather than an opinion. In
 `DependencyGraph.swift` at 0.22.0:
@@ -51,27 +73,6 @@ And the five are not distributed through the logic. They are:
 So **four code references, all in initialisers.** The traversal, Kahn's sort, the
 cycle detection and the whole-column range intersection are already written entirely
 against types that live in SwiftExcelCore.
-
-### 2.2 What the designated initialiser actually reads off a `Worksheet`
-
-Two things:
-
-```swift
-for sheet in sheets {
-    for (refString, (value, _)) in sheet.cells {
-        inScope.insert(CellAddress(sheet: sheet.name, ref: refString))
-    }
-}
-```
-
-`sheet.name` and `sheet.cells` — a name, and a dictionary from reference to value.
-That is **exactly a cell set plus a value provider**, which is what this proposal
-asks the initialiser to take directly. `CellAddress` already carries the sheet name,
-so the substitution is `address.sheet` for `sheet.name` and
-`provider.value(at:inSheet:)` for the dictionary lookup.
-
-The type is not being ported. It is being asked to take the two facts it already
-uses, in the form the rest of the family already has them.
 
 ### 2.3 A dependency graph is not a file-format concern
 
@@ -196,10 +197,18 @@ The part a reviewer will weigh hardest, so stated plainly.
 - **Existing SwiftXLSX callers do not change.** The `typealias` keeps
   `SwiftXLSX.DependencyGraph` resolving, and the three initialisers keep their exact
   signatures.
-- **`import SwiftXLSX` continues to be sufficient**, because SwiftXLSX re-exports
-  SwiftExcelCore — the same arrangement that already lets `import SwiftXLSX` see
-  `CellValue` and `FormulaAST` after those moved. This move has a precedent in the
-  family and it worked.
+- **`import SwiftXLSX` continues to be sufficient.** The re-export is deliberate and
+  maintained, not incidental: SwiftXLSX carries a file whose entire content is
+
+  ```swift
+  // SwiftExcelCoreExports.swift
+  @_exported import SwiftExcelCore
+  ```
+
+  **And it has already carried two types through exactly this move.** `CellValue` and
+  `FormulaAST` live in SwiftExcelCore today; they were in SwiftXLSX before the
+  extraction, and `import SwiftXLSX` stayed sufficient throughout. This family has
+  done this before, deliberately, with a mechanism built for it.
 - **No new dependency edge in any direction.** SwiftXLSX → SwiftExcelCore already
   exists; SwiftExcelFunctions → SwiftExcelCore already exists. Nothing becomes
   cyclic, which is the failure mode the previous draft had to argue around.
@@ -310,8 +319,18 @@ precedent before its dependent — so a wrong order fails loudly rather than pro
 numbers.
 
 So this proposal **removes a duplication rather than unblocking a consumer**, and
-should be judged on that. There is a second consumer coming — a workbook-validator
-target, for which the graph is one input — but the case does not rest on it.
+should be judged on that.
+
+A second consumer exists and is designed rather than anticipated: the workbook
+validator, proposed at `53b853a` in SwiftExcelFunctions. Its §2.2 lists
+`DependencyGraph` as a required input for the `recursion` checker — circular
+references, which `cycles` already computes — and that is step 1 of its sequencing,
+chosen as the cheapest possible first checker.
+
+Its §7 records the open question of the graph's home and says explicitly that the
+validator does not depend on the outcome: it imports SwiftXLSX regardless, because it
+reads files. So it is a second consumer for whichever shape wins, not a second vote
+for this one.
 
 A proposal with a working fallback is a weaker claim on urgency and a stronger one on
 merit.
