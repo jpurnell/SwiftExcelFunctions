@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A structural recognizer for simulation models** — `PsiRecognizer`,
+  `RecognizedFormula`, `DistributionCall`, `ModelSurvey`, `UncertainCell`.
+
+  Reads what a formula *declares* rather than what it computes: which cells draw
+  from a `Psi*` distribution, which carry `PsiOutput()` and are collected, and
+  which do both. It evaluates nothing, so it works on a workbook with no add-in
+  present, no seed and no engine attached — which is the state every archived
+  Risk Solver model is in.
+
+  `ModelSurvey` lifts that to a sheet, assigning each uncertain cell an input
+  index. `unhandledProperties` reports property functions it does not model rather
+  than dropping them: leaving one among the parameters would shift every parameter
+  after it and still compute, which is the failure mode hardest to see.
+
+### Added
+
 - **`PsiMetalogFit` and `PsiMetalog2Fit`**, which needed no answer after all.
 
   Frontline does not say which of `x_values`/`y_values` carries the probability, and
