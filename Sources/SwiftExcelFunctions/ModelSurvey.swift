@@ -87,6 +87,27 @@ public struct ModelSurvey: Sendable, Equatable {
     }
 }
 
+/// A provider that can list what it holds.
+///
+/// `CellValueProvider` answers *what is at this address?* and cannot be
+/// asked *which addresses do you have?*. Without that, a survey has to scan the bounding
+/// rectangle implied by `lastPopulatedCell()`, which costs rows × columns lookups however
+/// few cells are populated — and real models are sparse and wide.
+///
+/// Measured on six real Risk Solver workbooks: the rectangle scan took **34.8s**, against
+/// **0.8s** for the same traversal driven by an explicit cell list. Adopting this where a
+/// provider already knows its keys — as a workbook-backed or dictionary-backed one always
+/// does — removes that entirely.
+///
+/// Optional by design. A provider that does not adopt it still surveys correctly, just
+/// slowly, which is the right trade for a protocol this package does not own.
+public protocol PopulatedCellProvider {
+
+    /// Every address this provider holds a value for. Order does not matter; the
+    /// surveyor sorts into reading order regardless.
+    func populatedCells() -> [CellRef]
+}
+
 /// Applies ``PsiRecognizer`` across a whole sheet and assigns input indices.
 ///
 /// ```swift
@@ -160,6 +181,12 @@ public struct ModelSurveyor: Sendable {
     /// Reading order rather than any other stable order, so that the person looking at
     /// the sheet and the person reading the input vector see the same sequence.
     private static func populatedRefs(of cells: any CellValueProvider) -> [CellRef] {
+        if let enumerable = cells as? PopulatedCellProvider {
+            return enumerable.populatedCells().sorted { ($0.row, $0.column) < ($1.row, $1.column) }
+        }
+
+        // The fallback, and it is genuinely expensive: rows × columns lookups regardless
+        // of how few cells are populated. See ``PopulatedCellProvider``.
         guard let last = cells.lastPopulatedCell() else { return [] }
 
         var refs: [CellRef] = []

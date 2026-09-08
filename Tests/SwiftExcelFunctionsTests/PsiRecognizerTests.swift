@@ -143,6 +143,39 @@ final class PsiRecognizerTests: XCTestCase {
         XCTAssertEqual(call.unhandledProperties, [])
     }
 
+    // MARK: - The drift guard
+
+    /// **Turns a silent misclassification into a red test.**
+    ///
+    /// The `Psi*` family is not distributions-plus-three-markers. It also holds
+    /// statistics — `PsiMean`, `PsiStdDev`, `PsiCVaR`, `PsiPercentile`, `PsiTarget`,
+    /// `PsiBVaR` — which read a completed run rather than drawing from one. All six occur
+    /// in real corpus workbooks; none is registered yet.
+    ///
+    /// If one is registered and this recognizer classified by subtraction, it would be
+    /// treated as a distribution: allocated an input index, handed a uniform, and asked
+    /// to draw. It would return a number and the model would compute. Nothing would
+    /// report anything.
+    ///
+    /// So every registered Risk Solver function must be *deliberately* classified. When
+    /// this fails, the fix is to decide what the new function is — not to widen the set
+    /// until it passes.
+    func testEveryRegisteredRiskSolverFunctionIsClassified() {
+        let distributions = Set(
+            PsiRecognizer.defaultDistributions.map { FunctionRegistry.canonical($0.name) })
+
+        let unclassified = BuiltinRiskSolverFunctions.all
+            .map { FunctionRegistry.canonical($0.name) }
+            .filter { !PsiRecognizer.markers.contains($0) && !distributions.contains($0) }
+
+        XCTAssertEqual(
+            unclassified.sorted(), [],
+            """
+            Registered but classified as neither marker nor distribution: \(unclassified.sorted()).
+            Decide what each one is. If it is a statistic that reads a completed run, it             must not be recognised as a distribution — see PROPOSAL_model_graph_simulation §6.4.
+            """)
+    }
+
     // MARK: - Both roles at once
 
     /// A cell can draw and report in the same formula.

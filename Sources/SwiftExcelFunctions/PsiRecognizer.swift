@@ -132,18 +132,37 @@ public struct PsiRecognizer: Sendable {
     private static let outputMarker = "PSIOUTPUT"
 
     /// Names that mark or annotate rather than draw, and so are never distributions.
-    private static let markers: Set<String> = ["PSIOUTPUT", "PSIBASECASE", "PSINAME"]
-
-    /// - Parameter functions: the Risk Solver functions to read. Defaults to
-    ///   ``BuiltinRiskSolverFunctions/all``, with the three markers removed.
     ///
-    ///   Taking the whole group rather than naming its constituent lists is deliberate.
-    ///   The distributions arrive in batches — `distributions`, `furtherDistributions`,
-    ///   `completingDistributions` — and a recognizer that named them individually would
-    ///   silently stop recognising each new batch until someone remembered this file.
-    ///   Subtracting the markers by name is the one thing that must stay in step, and it
-    ///   is three names rather than a hundred.
-    public init(functions: [ExcelFunction] = BuiltinRiskSolverFunctions.all) {
+    /// Exposed for ``PsiRecognizer`` and for the test that guards against the drift
+    /// described on ``defaultDistributions``.
+    static let markers: Set<String> = ["PSIOUTPUT", "PSIBASECASE", "PSINAME"]
+
+    /// Every distribution the Risk Solver group registers.
+    ///
+    /// ## Why this is a union and not a subtraction
+    ///
+    /// An earlier version took ``BuiltinRiskSolverFunctions/all`` and removed the three
+    /// markers, on the reasoning that anything else must be a distribution. That is true
+    /// only while it is true. The `Psi*` family also contains **statistics** —
+    /// `PsiMean`, `PsiStdDev`, `PsiCVaR`, `PsiPercentile`, `PsiTarget`, `PsiBVaR` — which
+    /// read a *completed run* rather than drawing anything, and every one of them appears
+    /// in real corpus workbooks. None is registered yet. The day one is, a subtraction
+    /// would classify it as a distribution, and the surveyor would allocate it an input
+    /// index and hand it a uniform. It would draw a number, the model would compute, and
+    /// nothing would report a problem.
+    ///
+    /// So the set is the union of the distribution lists, and
+    /// `PsiRecognizerTests.testEveryRegisteredRiskSolverFunctionIsClassified` fails the
+    /// moment a registered function is neither a marker nor in this union — which turns
+    /// that silent wrong answer into a red test.
+    public static let defaultDistributions: [ExcelFunction] =
+        BuiltinRiskSolverFunctions.distributions
+        + BuiltinRiskSolverFunctions.furtherDistributions
+        + BuiltinRiskSolverFunctions.completingDistributions
+
+    /// - Parameter functions: the distribution functions to recognise. Defaults to
+    ///   ``defaultDistributions``.
+    public init(functions: [ExcelFunction] = PsiRecognizer.defaultDistributions) {
         self.distributionNames = Set(functions.map { FunctionRegistry.canonical($0.name) })
             .subtracting(Self.markers)
     }
@@ -155,8 +174,33 @@ public struct PsiRecognizer: Sendable {
     public func recognize(_ ast: FormulaAST) -> RecognizedFormula {
         var markers = 0
         var calls: [DistributionCall] = []
-        walk(ast, markers: &markers, calls: &calls)
+
+        Self.visitFunctionCalls(ast) { name, arguments in
+            if name == Self.outputMarker {
+                markers += 1
+            } else if distributionNames.contains(name) {
+                calls.append(Self.call(named: name, arguments: arguments))
+            }
+        }
+
         return RecognizedFormula(outputMarkers: markers, distributions: calls)
+    }
+
+    /// Visits every function call in a formula, canonical name first.
+    ///
+    /// Exposed because auditing a corpus asks the same question the recognizer does —
+    /// *what does this formula call?* — and a second traversal written for that would be
+    /// a second place for the node list to fall out of date. Names arrive canonicalised,
+    /// so `_xll.PsiOutput` and `PSIOUTPUT` reach the visitor identically.
+    ///
+    /// - Parameters:
+    ///   - ast: the formula to walk.
+    ///   - visit: called for each function call, with its canonical name and arguments.
+    public static func visitFunctionNames(
+        _ ast: FormulaAST,
+        _ visit: (String) -> Void
+    ) {
+        visitFunctionCalls(ast) { name, _ in visit(name) }
     }
 
     // MARK: - Traversal
@@ -166,21 +210,37 @@ public struct PsiRecognizer: Sendable {
     /// The corpus writes `PsiOutput` onto a real formula — `=SUM(J2:J11)+_xll.PsiOutput()`,
     /// 167 times across 41 workbooks — so inspecting the root would find almost none of
     /// them. A distribution nests just as freely: `IF(A1>0, PsiNormal(0,1), 0)`.
-    private func walk(_ ast: FormulaAST, markers: inout Int, calls: inout [DistributionCall]) {
+    static func visitFunctionCalls(
+        _ ast: FormulaAST,
+        _ visit: (String, [FormulaAST]) -> Void
+    ) {
+        visitFunctionCalls(ast, depth: 0, visit)
+    }
+
+    /// The traversal proper, bounded the way the evaluator bounds its own.
+    ///
+    /// The base case is structural — every leaf returns — but a bound is carried anyway,
+    /// and it is ``FormulaEvaluator/maxDepth`` rather than a second number. A formula the
+    /// evaluator would refuse as too deep is one this must not recurse into either, and
+    /// two limits that could disagree would mean a formula the recognizer walked and the
+    /// evaluator rejected. Silently stopping is correct here: a tree deeper than the
+    /// evaluator will ever enter has no simulation role to report.
+    private static func visitFunctionCalls(
+        _ ast: FormulaAST,
+        depth: Int,
+        _ visit: (String, [FormulaAST]) -> Void
+    ) {
+        guard depth < FormulaEvaluator.maxDepth else { return }
+        let next = depth + 1
+
         switch ast {
         case .function(let rawName, let arguments):
-            let name = FunctionRegistry.canonical(rawName)
-
-            if name == Self.outputMarker {
-                markers += 1
-            } else if distributionNames.contains(name) {
-                calls.append(Self.call(named: name, arguments: arguments))
-            }
+            visit(FunctionRegistry.canonical(rawName), arguments)
 
             // Descend regardless. A distribution's own arguments can contain another
             // distribution — `PsiNormal(PsiUniform(0, 1), 10)` is legal and is two draws.
             for argument in arguments {
-                walk(argument, markers: &markers, calls: &calls)
+                visitFunctionCalls(argument, depth: next, visit)
             }
 
         case .add(let lhs, let rhs), .subtract(let lhs, let rhs),
@@ -189,11 +249,11 @@ public struct PsiRecognizer: Sendable {
              .equal(let lhs, let rhs), .notEqual(let lhs, let rhs),
              .greaterThan(let lhs, let rhs), .lessThan(let lhs, let rhs),
              .greaterOrEqual(let lhs, let rhs), .lessOrEqual(let lhs, let rhs):
-            walk(lhs, markers: &markers, calls: &calls)
-            walk(rhs, markers: &markers, calls: &calls)
+            visitFunctionCalls(lhs, depth: next, visit)
+            visitFunctionCalls(rhs, depth: next, visit)
 
         case .negate(let operand):
-            walk(operand, markers: &markers, calls: &calls)
+            visitFunctionCalls(operand, depth: next, visit)
 
         case .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error, .missing:
