@@ -4,12 +4,23 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.5.0 released; 163 functions registered, 782 tests, quality gate 45/45 at 0/0.
+**Status:** 0.6.0; 269 functions registered, 855 tests, quality gate 45/45 at 0/0.
 
-Of Excel's 519 documented worksheet functions, 160 are implemented and 57 more are bindable
-against mathematics BusinessMath already computes. Coverage is tracked in
-`project/plans/excel_function_coverage_matrix.tsv`, which is reconciled against the live
-`FunctionRegistry` rather than maintained by hand.
+- **160** of Microsoft's 519 documented worksheet functions.
+- **109** of Frontline Risk Solver's `Psi*` functions — 106 of its 113 distribution rows — so a
+  workbook built with Risk Solver can be read without the add-in.
+
+Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
+reconciled against the live `FunctionRegistry` rather than maintained by hand.
+
+## Installation
+
+```swift
+.package(url: "https://github.com/jpurnell/SwiftExcelFunctions", from: "0.6.0")
+```
+
+Requires Swift 6 and macOS 14. Depends on SwiftExcelCore for the spreadsheet vocabulary and
+BusinessMath for the mathematics; SwiftXLSX is a test-only dependency.
 
 ## The family
 
@@ -30,6 +41,10 @@ Two suites, deliberately overlapping, because they fail for different reasons:
   formula; none is taken from what this package currently returns.
 - **`ExcelOracleTests`** — every formula we can evaluate, checked against the value Excel itself
   cached for it in real workbooks. **99.62%** agreement over 155,897 comparable cells.
+
+Randomness is never taken from the system: a caller supplies a `RandomSource`, and without one
+`RAND()` and every Psi distribution answer `#VALUE!` rather than inventing a draw. The same seed
+gives the same workbook twice.
 
 The oracle reads private workbooks and takes minutes, so it is opt-in:
 

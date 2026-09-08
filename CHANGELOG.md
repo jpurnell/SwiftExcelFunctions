@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-08
+
 ### Added
 
 - **`PsiMetalogFit` and `PsiMetalog2Fit`**, which needed no answer after all.
@@ -488,9 +490,10 @@ cases that use SwiftXLSX's parser through a test-only dependency.
 Against Microsoft's 519 documented worksheet functions: 72 present, 84 bindable against
 mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 347 unreviewed.
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
-See `project/plans/excel_function_coverage_matrix.tsv`.
+See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.2.0...v0.3.0

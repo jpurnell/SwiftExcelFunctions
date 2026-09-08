@@ -250,7 +250,12 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-07 — PSI rows reconciled against BusinessMath 2.14.0, which closed its
+**Last Updated:** 2026-09-08 — **v0.6.0 released.** BusinessMath 2.15.0 implemented the whole
+52-row Psi completeness delta and closed the NASD February rule, the last outstanding source of
+corpus disagreement. 50 more distributions bound: 106 of Frontline's 113 distribution rows now
+answer, 269 functions registered, 855 tests. Capability map filled in — it had been the unedited
+template. Coverage docs moved to `project/plans/proposals/Excel conformance/`.
+Earlier: 2026-09-07 — PSI rows reconciled against BusinessMath 2.14.0, which closed its
 Risk Solver work list: all 113 distribution rows now resolved (56 bindable, 57 absent upstream),
 `bindable` 50 → 72. The dependency moved 2.11.0 → 2.14.0, which fixed the daylight-saving hour in
 `actual/360`, `actual/365` and `actual/actual`; three `XCTExpectFailure` guards were removed
