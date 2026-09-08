@@ -573,8 +573,8 @@ PSI	PsiCubeOutput	other	unreviewed		0	0	output_cell|confirmed
 PSI	PsiCumul	distribution	have	risksolver	0	0	a, b, {x1..xn}, {p1..pn}|confirmed
 PSI	PsiCumulD	distribution	have	risksolver	0	0	min, max, {x1..xn}, {p1..pn}|confirmed
 PSI	PsiCurrentOpt	other	unreviewed		0	0	(none)|inferred
-PSI	PsiBVaR	statistic	bindable	FinancialSimulation.valueAtRisk — negate at binding, it returns the raw percentile	3	3	cell, percentile, simulation, [struc_format], [param_slice]|confirmed
-PSI	PsiCVaR	statistic	bindable	FinancialSimulation.conditionalValueAtRisk — negate at binding; tail convention matches	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
+PSI	PsiBVaR	statistic	have	SimulationResults.valueAtRisk — negate at binding	3	3	cell, percentile, simulation, [struc_format], [param_slice]|confirmed
+PSI	PsiCVaR	statistic	have	SimulationResults.conditionalValueAtRisk — negate at binding; tail exact	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiDagum	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
 PSI	PsiData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
 PSI	PsiDataSrc	other	unreviewed		0	0	src_name, val_col_names, data, idx1_name, idx1_elem, idx2_name, idx2_elem|confirmed

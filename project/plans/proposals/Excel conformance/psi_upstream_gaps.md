@@ -152,24 +152,41 @@ BusinessMath grows a `probabilityAtOrBelow`, that is the one call site to change
 **Two wrong answers in a row on the same row, and neither would have failed a test.** The first
 came from trusting the matrix; the second from reading a function's name instead of its body.
 
-### `PsiCVaR` and `PsiBVaR`: the tail agrees, the sign does not
+### `PsiCVaR` and `PsiBVaR`: two functions share a name, and only one is right
 
 Frontline, verbatim: PsiCVaR is *"computed as the negative of the mean value of the specified
 uncertain function for the trials that lie between PsiMin(cell) and PsiPercentile(cell,
 1-percentile), **inclusive**"*, and *"Like PsiBVaR, PsiCVaR returns a loss as a positive number."*
 
-BusinessMath's `conditionalValueAtRisk` takes the worst `ceil(n(1 − confidence))` sorted values and
-returns their mean **signed**. So:
+**BusinessMath has two `conditionalValueAtRisk` functions, in different types, computing different
+things.** The matrix named the wrong one.
 
-- **Tail convention matches.** Both are inclusive from the worst end.
-- **Sign does not.** Frontline negates; BusinessMath does not. Negate at the binding, which is
-  where the master plan puts every sign convention. `valueAtRisk` has the same gap — its own doc
-  example prints `abs(...)`.
+| | tail | shape |
+|---|---|---|
+| `FinancialSimulation.conditionalValueAtRisk` | **count** — worst `ceil(n(1−c))` sorted | takes a `(FinancialProjection) -> Double` metric |
+| `SimulationResults.conditionalValueAtRisk` | **value** — `filter { $0 <= varThreshold }` | reads raw trial values |
 
-One residue, and it is the `PsiTarget` lesson again: Frontline defines the tail by **value**
-(everything between the minimum and the percentile, inclusive) and BusinessMath by **count** (the
-first *k* sorted). Those agree except when trials tie at the boundary, where Frontline takes all of
-them and a count takes as many as fit. Discrete outputs tie constantly.
+The second is Frontline's definition exactly: everything at or below `PsiPercentile(cell, 1−p)`,
+inclusive, no count anywhere. It is also the right *shape* — Psi statistics read a cell's ten
+thousand trial values, not a projection model behind a metric closure.
+
+So the mathematics stays upstream and **only the sign flips at the binding**, as for `PsiBVaR`.
+`SimulationResults.valueAtRisk` likewise returns the raw percentile rather than a positive loss.
+
+I had reported a tie residue here — that Frontline defines the tail by value and BusinessMath by
+count, so they would disagree when trials tie at the boundary. **That was true of the function the
+matrix named and false of the function anyone would actually use.** MinLP checked rather than
+taking it, which is the discipline this section keeps being about.
+
+The regression test that distinguishes the two definitions, rather than merely exercising the
+function: one trial at −10 and ninety-nine at 0. The value-based tail is all one hundred trials,
+mean −0.1, reported 0.1. A count-based tail averages the worst five to −2 and reports 2. Twenty
+times apart, and both are numbers a reader would accept.
+
+**The lesson, third time on this page:** a name is not evidence. Neither is a description — mine
+included. `probabilityBelow` *looked* right and counts strictly; `conditionalValueAtRisk` was
+*reported* wrong by me and is exact. Only the body settles it, and when two bodies share a name,
+which one you are looking at settles it first.
 
 ### `PsiXtoP` is the same function under another name
 
