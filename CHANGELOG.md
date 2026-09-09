@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`enum SwiftExcelFunctions` and its `version` constant.** The same scaffold
+  residue removed from SwiftExcelCore in its 0.7.0, and removed here for the same
+  three reasons.
+
+  It shadowed the module name, so a qualified `SwiftExcelFunctions.SomeType` did not
+  resolve. It was **wrong** — `version` read `"0.1.0-dev"` while the package was at
+  0.6.0, because a hardcoded string has nothing keeping it in sync with the tag.
+  And its only test asserted that a literal was non-empty, which cannot fail.
+
+  That both packages carried the identical constant with the identical stale value
+  is the evidence: this is what the pattern does, not an oversight in one place.
+  Neither SwiftXLSX nor BusinessMathExcel has one.
+
+  Module documentation already lives in the DocC catalogue, more fully than the
+  enum's doc comment carried it.
+
+  **Migration:** none expected. Take a version from your dependency graph, where it
+  is true.
+
+
 ### Added
 
 - **The simulation stack.** A Risk Solver workbook can be read, recognised, run and read
