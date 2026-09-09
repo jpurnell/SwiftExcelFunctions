@@ -121,9 +121,35 @@ size. It is not: **41 of 2,236 workbooks carry a Psi call**. `SUM` alone appears
 workbooks in the `EXCEL` half. Forty-one is a correct and well-sourced number that has been
 quoted as the wrong kind of quantity.
 
+### `STDEV.S` resolved: within the `EXCEL` half, `calls` and `books` come from different sweeps
+
+`ReferenceFunctionTests.swift:13` states a denominator: *"Measured across 79 workbooks:
+`COLUMN` 86,620 calls, `INDIRECT` 20,978, `OFFSET` 9,798, `ROW` 1,222."* Against this file:
+
+| Function | 79-workbook sweep | Matrix `calls` | Matrix `books` |
+|---|---|---|---|
+| `COLUMN` | 86,620 | **86,620** | 45 |
+| `OFFSET` | 9,798 | **9,798** | 32 |
+| `ROW` | 1,222 | **1,222** | 2 |
+| `INDIRECT` | 20,978 | 21,017 | 32 |
+
+Three of four agree **exactly**, and the fourth is off by 39 calls in 21,000 — a re-run over a
+near-identical set, not a different population. **So the `EXCEL` half's `calls` column is that
+79-workbook sweep.**
+
+Its `books` column cannot be. `SUM` reports 338 books, `IF` 239, `SUMPRODUCT` 134 — you cannot
+observe a function in 338 workbooks having read 79. **The two columns of the same row were
+produced by different sweeps**, and no row's `calls`/`books` pair is internally consistent.
+
+That closes `STDEV.S` with no error in it anywhere: 86,410 calls from the 79-workbook sweep,
+42 books from the larger one. The source comment's *"86,410 times across 79 workbooks"* names
+the sweep it came from, phrased so that the denominator reads as a book count. Nothing
+disagreed; the sentence was ambiguous and both halves of this file were quoted as one.
+
 ## Still open
 
-- The `STDEV.S` book discrepancy, 79 against 42, inside the `EXCEL` half.
+- What sweep produced the `EXCEL` half's `books` column. It read at least 338 workbooks;
+  nothing records it. (The `calls` column is settled: the 79-workbook sweep.)
 - Why the matrix's `PSI` half is three to five times smaller than the documented sweep in
   `PROPOSAL_psi_bindings.md` §2, given both claim to read the same kind of thing. The
   proposal's is authoritative; what the matrix's is remains unknown.
