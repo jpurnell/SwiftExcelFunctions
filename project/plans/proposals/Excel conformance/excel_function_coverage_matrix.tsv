@@ -1,30 +1,30 @@
 source	function	category	status	provider	calls	books	returns
 EXCEL	ABS	math	have	math	208	32	number
 EXCEL	ACOS	math	have	math	0	0	number
-EXCEL	ACOSH	math	unreviewed		0	0	number
-EXCEL	ACOT	math	unreviewed		0	0	number
-EXCEL	ACOTH	math	unreviewed		0	0	number
+EXCEL	ACOSH	math	have	primitives	0	0	number
+EXCEL	ACOT	math	have	primitives	0	0	number
+EXCEL	ACOTH	math	have	primitives	0	0	number
 EXCEL	AGGREGATE	math	unreviewed		0	0	function_num, options, ref1, [ref2], ...
 EXCEL	ARABIC	math	unreviewed		0	0	text
 EXCEL	ASIN	math	have	math	0	0	number
-EXCEL	ASINH	math	unreviewed		0	0	number
+EXCEL	ASINH	math	have	primitives	0	0	number
 EXCEL	ATAN	math	have	math	0	0	number
 EXCEL	ATAN2	math	have	math	0	0	x_num, y_num
-EXCEL	ATANH	math	unreviewed		0	0	number
+EXCEL	ATANH	math	have	primitives	0	0	number
 EXCEL	BASE	math	have	math	0	0	Number, Radix [Min_length]
 EXCEL	CEILING.MATH	math	unreviewed		0	0	number, [significance], [mode]
 EXCEL	CEILING.PRECISE	math	unreviewed		0	0	number, [significance]
 EXCEL	COMBIN	math	bindable	combination	0	0	number, number_chosen
 EXCEL	COMBINA	math	unreviewed		0	0	number, number_chosen
 EXCEL	COS	math	have	math	0	0	number
-EXCEL	COSH	math	unreviewed		0	0	number
-EXCEL	COT	math	unreviewed		0	0	number
-EXCEL	COTH	math	unreviewed		0	0	number
-EXCEL	CSC	math	unreviewed		0	0	number
-EXCEL	CSCH	math	unreviewed		0	0	number
+EXCEL	COSH	math	have	primitives	0	0	number
+EXCEL	COT	math	have	primitives	0	0	number
+EXCEL	COTH	math	have	primitives	0	0	number
+EXCEL	CSC	math	have	primitives	0	0	number
+EXCEL	CSCH	math	have	primitives	0	0	number
 EXCEL	DECIMAL	math	have	math	0	0	text, radix
-EXCEL	DEGREES	math	unreviewed		0	0	angle
-EXCEL	EVEN	math	unreviewed		0	0	number
+EXCEL	DEGREES	math	have	primitives	0	0	angle
+EXCEL	EVEN	math	have	primitives	0	0	number
 EXCEL	EXP	math	have	math	41	2	number
 EXCEL	FACT	math	bindable	factorial	0	0	number
 EXCEL	FACTDOUBLE	math	unreviewed		0	0	number
@@ -44,13 +44,13 @@ EXCEL	MOD	math	have	math	2924	3	number, divisor
 EXCEL	MROUND	math	unreviewed		0	0	number, multiple
 EXCEL	MULTINOMIAL	math	unreviewed		0	0	number1, [number2], ...
 EXCEL	MUNIT	math	unreviewed		0	0	dimension
-EXCEL	ODD	math	unreviewed		0	0	number
+EXCEL	ODD	math	have	primitives	0	0	number
 EXCEL	PERCENTOF	math	unreviewed		0	0	data_subset,data_all
 EXCEL	PI	math	have	math	0	0	(no arguments)
 EXCEL	POWER	math	have	math	0	0	number, power
 EXCEL	PRODUCT	math	have	math	0	0	number1, [number2], ...
-EXCEL	QUOTIENT	math	unreviewed		0	0	numerator, denominator
-EXCEL	RADIANS	math	unreviewed		0	0	angle
+EXCEL	QUOTIENT	math	have	primitives	0	0	numerator, denominator
+EXCEL	RADIANS	math	have	primitives	0	0	angle
 EXCEL	RAND	math	have	math	44	1	(no arguments)
 EXCEL	RANDARRAY	math	unreviewed		0	0	[rows],[columns],[min],[max],[whole_number]
 EXCEL	RANDBETWEEN	math	have	math	150	2	bottom, top
@@ -58,15 +58,15 @@ EXCEL	ROMAN	math	unreviewed		0	0	number, [form]
 EXCEL	ROUND	math	have	math	154	24	number, num_digits
 EXCEL	ROUNDDOWN	math	have	math	0	0	number, num_digits
 EXCEL	ROUNDUP	math	have	math	2	2	number, num_digits
-EXCEL	SEC	math	unreviewed		0	0	number
-EXCEL	SECH	math	unreviewed		0	0	number
+EXCEL	SEC	math	have	primitives	0	0	number
+EXCEL	SECH	math	have	primitives	0	0	number
 EXCEL	SERIESSUM	math	unreviewed		0	0	x, n, m, coefficients
 EXCEL	SEQUENCE	math	bindable	linearSpace	0	0	rows,[columns],[start],[step]
 EXCEL	SIGN	math	have	math	0	0	number
 EXCEL	SIN	math	have	math	0	0	number
-EXCEL	SINH	math	unreviewed		0	0	number
+EXCEL	SINH	math	have	primitives	0	0	number
 EXCEL	SQRT	math	have	math	153	7	number
-EXCEL	SQRTPI	math	unreviewed		0	0	number
+EXCEL	SQRTPI	math	have	primitives	0	0	number
 EXCEL	SUBTOTAL	math	unreviewed		0	0	function_num,ref1,[ref2],...
 EXCEL	SUM	math	have	aggregation	69194	338	number1,[number2],...
 EXCEL	SUMIF	math	have	aggregation	38	4	range, criteria, [sum_range]
@@ -77,7 +77,7 @@ EXCEL	SUMX2MY2	math	unreviewed		0	0	array_x, array_y
 EXCEL	SUMX2PY2	math	unreviewed		0	0	array_x, array_y
 EXCEL	SUMXMY2	math	bindable	NelsonSiegelYieldCurve.sumSquaredErrors	0	0	array_x, array_y
 EXCEL	TAN	math	have	math	0	0	number
-EXCEL	TANH	math	unreviewed		0	0	number
+EXCEL	TANH	math	have	primitives	0	0	number
 EXCEL	TRUNC	math	have	math	0	0	number, [num_digits]
 EXCEL	AVEDEV	statistical	unreviewed		0	0	number1, [number2], ...
 EXCEL	AVERAGE	statistical	have	stats	67	18	number1, [number2], ...
