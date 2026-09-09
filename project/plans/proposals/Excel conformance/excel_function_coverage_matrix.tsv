@@ -93,8 +93,8 @@ EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
 EXCEL	CHISQ.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom
 EXCEL	CHISQ.INV	statistical	unreviewed		0	0	probability,deg_freedom
 EXCEL	CHISQ.INV.RT	statistical	have	DistributionChiSquared.quantile(1-p) — bound	0	0	probability,deg_freedom
-EXCEL	CHISQ.TEST	statistical	unreviewed		0	0	actual_range,expected_range
-EXCEL	CONFIDENCE.NORM	statistical	bindable	confidence	0	0	alpha,standard_dev,size
+EXCEL	CHISQ.TEST	statistical	have	statistical tests	0	0	actual_range,expected_range
+EXCEL	CONFIDENCE.NORM	statistical	have	statistical tests	0	0	alpha,standard_dev,size
 EXCEL	CONFIDENCE.T	statistical	bindable	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
 EXCEL	CORREL	statistical	bindable	correlationCoefficient	0	0	array1, array2
 EXCEL	COUNT	statistical	have	stats	43316	45	value1, [value2], ...
@@ -110,7 +110,7 @@ EXCEL	F.DIST	statistical	bindable	fCDF	0	0	x,deg_freedom1,deg_freedom2,cumulativ
 EXCEL	F.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom1,deg_freedom2
 EXCEL	F.INV	statistical	bindable	fQuantile	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.INV.RT	statistical	have	statistical quantiles	0	0	probability,deg_freedom1,deg_freedom2
-EXCEL	F.TEST	statistical	unreviewed		0	0	array1,array2
+EXCEL	F.TEST	statistical	have	statistical tests	0	0	array1,array2
 EXCEL	FISHER	statistical	bindable	fisher	0	0	x
 EXCEL	FISHERINV	statistical	bindable	rho	0	0	y
 EXCEL	FORECAST	statistical	bindable	linearRegression	0	0	x, known_y's, known_x's
@@ -129,7 +129,7 @@ EXCEL	GAUSS	statistical	unreviewed		0	0	z
 EXCEL	GEOMEAN	statistical	bindable	geometricMean	0	0	number1, [number2], ...
 EXCEL	GROWTH	statistical	bindable	TimeSeries.exponential	0	0	known_y's, [known_x's], [new_x's], [const]
 EXCEL	HARMEAN	statistical	bindable	harmonicMean	0	0	number1, [number2], ...
-EXCEL	HYPGEOM.DIST	statistical	bindable	hypergeometric	0	0	sample_s,number_sample,population_s,number_pop,cumulative
+EXCEL	HYPGEOM.DIST	statistical	have	statistical tests	0	0	sample_s,number_sample,population_s,number_pop,cumulative
 EXCEL	INTERCEPT	statistical	have	bindings	0	0	known_y's, known_x's
 EXCEL	KURT	statistical	bindable	kurtosis	0	0	number1, [number2], ...
 EXCEL	LARGE	statistical	have	stats	0	0	array, k
@@ -146,7 +146,7 @@ EXCEL	MINA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	MINIFS	statistical	unreviewed		0	0	min_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	MODE.MULT	statistical	unreviewed		0	0	number1,[number2],...
 EXCEL	MODE.SNGL	statistical	unreviewed		0	0	number1,[number2],...
-EXCEL	NEGBINOM.DIST	statistical	unreviewed		0	0	number_f,number_s,probability_s,cumulative
+EXCEL	NEGBINOM.DIST	statistical	have	statistical tests	0	0	number_f,number_s,probability_s,cumulative
 EXCEL	NORM.DIST	statistical	have	bindings	0	0	x,mean,standard_dev,cumulative
 EXCEL	NORM.INV	statistical	have	bindings	0	0	probability,mean,standard_dev
 EXCEL	NORM.S.DIST	statistical	have	bindings	0	0	z,cumulative
@@ -188,8 +188,8 @@ EXCEL	VAR.P	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	VAR.S	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	VARA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	VARPA	statistical	unreviewed		0	0	value1, [value2], ...
-EXCEL	WEIBULL.DIST	statistical	unreviewed		0	0	x,alpha,beta,cumulative
-EXCEL	Z.TEST	statistical	unreviewed		0	0	array,x,[sigma]
+EXCEL	WEIBULL.DIST	statistical	have	statistical tests	0	0	x,alpha,beta,cumulative
+EXCEL	Z.TEST	statistical	have	statistical tests	0	0	array,x,[sigma]
 EXCEL	ACCRINT	financial	new	verified absent	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
 EXCEL	ACCRINTM	financial	unreviewed		0	0	issue, settlement, rate, par, [basis]
 EXCEL	AMORDEGRC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
