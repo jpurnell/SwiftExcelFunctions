@@ -34,19 +34,27 @@ Nine new binding files, each with its own test file, all through the same seams:
 
 ## 3. Immediate next step
 
-**`FORECAST.ETS.SEASONALITY` and `FORECAST.ETS.STAT` — and they are NOT a quick win.**
-Corrected mid-session after I called them one:
+**`FORECAST.ETS.SEASONALITY` and `FORECAST.ETS.STAT`. The proposal is written** —
+`PROPOSAL_ets_fitting.md`, handed to the BusinessMath session for their tree. **Two of the
+four gaps I listed here were not gaps**, found by opening files in the 2.15.0 checkout
+(`be704795`) instead of probing keywords:
 
-- Excel's `STAT` types 1–3 are the **fitted** α/β/γ. `HoltWintersModel` takes those as
-  *constructor arguments* (`init(alpha:beta:gamma:seasonalPeriods:)`), so returning them
-  reports an input as a result.
-- Nothing upstream **detects seasonality**, which is `SEASONALITY`'s entire job.
-- `mae` and `rmse` exist upstream; **MASE and SMAPE do not**.
-- The pieces for a fitting routine are all there — `NelderMead` in
-  `Optimization/Heuristic`, `HoltWintersModel`, the two error metrics — but wiring them is
-  real work and **belongs in BusinessMath**, not the binding layer.
+- `TimeSeries.dominantSeasonLength(maxLag:)` (`Time Series/Diagnostics/Autocorrelation.swift`)
+  is **public and already does what `SEASONALITY` does** — strongest ACF lag `h ≥ 2` clearing
+  the `1.96/√n` band, `nil` when none clears it. I had written that nothing upstream detects
+  seasonality.
+- `TimeSeries.mase(against:training:seasonLength:)` **exists**, over `naiveScale`, with
+  `BacktestReport` carrying it pooled out-of-sample. I had written that MASE was absent.
 
-That is the proposal to write next if these are wanted.
+What is genuinely absent is a **parameter search** for α/β/γ — `HoltWintersModel` takes them
+as `public let` constructor arguments, so returning them today reports an input as a result —
+and **SMAPE**, the only metric missing from `STAT`'s eight. Five of the eight are answerable
+by code that already exists. `NelderMead` supplies the search.
+
+The Excel side of it stays here: `data_completion`, `aggregation`, timeline step detection
+(which is `STAT` type 8 and never reaches a model), the `statistic_type` dispatch, and the
+`#NUM!`/`#VALUE!`/`#N/A` mapping — all of Excel's error conditions are timeline conditions
+caught before a `TimeSeries` can be built.
 
 ## 4. Two proposals filed in BusinessMath — both landed on `main`
 
@@ -101,9 +109,11 @@ so reading them means `gh api`.
    code because the expected value was recalled rather than read: `ERF(0.745)`,
    `CHISQ.INV.RT(0.050001, 10)`, and a population σ. Round-trips and definitions cannot fail
    that way.
-3. **"Not there" has meant "not there where I looked" six times today.** Every one shrank the
+3. **"Not there" has meant "not there where I looked" eight times now.** Every one shrank the
    work. A keyword probe finds free functions and **misses methods on types** — that is how
-   three "absent" distributions were miscounted.
+   three "absent" distributions were miscounted, and how seasonality detection and MASE were
+   both written off as missing while sitting public in the tree. The reliable move is to open
+   the directory the thing would live in and read it.
 4. **The fp-safety checker tracks the divisor *symbol***, not the logical precondition.
    `guard count >= 2` then `/ Double(count - 1)` does *not* satisfy it. Bind the divisor and
    guard the binding.
