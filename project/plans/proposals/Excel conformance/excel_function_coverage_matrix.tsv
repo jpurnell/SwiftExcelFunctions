@@ -87,7 +87,7 @@ EXCEL	AVERAGEIFS	statistical	bindable	PeriodSequence.aggregate	0	0	average_range
 EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOM.DIST	statistical	have	statistical distributions	0	0	number_s,trials,probability_s,cumulative
-EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s,[number_s2]
+EXCEL	BINOM.DIST.RANGE	statistical	have	gamma and modes	0	0	trials,probability_s,number_s,[number_s2]
 EXCEL	BINOM.INV	statistical	have	accumulate binomialPMF, as PsiBinomial does — bound	0	0	trials,probability_s,alpha
 EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
 EXCEL	CHISQ.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom
@@ -120,12 +120,12 @@ EXCEL	FORECAST.ETS.SEASONALITY	statistical	unreviewed		0	0	values, timeline, [da
 EXCEL	FORECAST.ETS.STAT	statistical	unreviewed		0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
 EXCEL	FREQUENCY	statistical	have	spreadsheet statistics	0	0	data_array, bins_array
-EXCEL	GAMMA	statistical	unreviewed		0	0	number
+EXCEL	GAMMA	statistical	have	gamma and modes	0	0	number
 EXCEL	GAMMA.DIST	statistical	have	statistical distributions	0	0	x,alpha,beta,cumulative
 EXCEL	GAMMA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta
 EXCEL	GAMMALN	statistical	bindable	logFactorial	0	0	x
-EXCEL	GAMMALN.PRECISE	statistical	unreviewed		0	0	x
-EXCEL	GAUSS	statistical	unreviewed		0	0	z
+EXCEL	GAMMALN.PRECISE	statistical	have	gamma and modes	0	0	x
+EXCEL	GAUSS	statistical	have	gamma and modes	0	0	z
 EXCEL	GEOMEAN	statistical	bindable	geometricMean	0	0	number1, [number2], ...
 EXCEL	GROWTH	statistical	bindable	TimeSeries.exponential	0	0	known_y's, [known_x's], [new_x's], [const]
 EXCEL	HARMEAN	statistical	bindable	harmonicMean	0	0	number1, [number2], ...
@@ -144,8 +144,8 @@ EXCEL	MEDIAN	statistical	have	stats	0	0	number1, [number2], ...
 EXCEL	MIN	statistical	have	stats	1973	33	number1, [number2], ...
 EXCEL	MINA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	MINIFS	statistical	unreviewed		0	0	min_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
-EXCEL	MODE.MULT	statistical	unreviewed		0	0	number1,[number2],...
-EXCEL	MODE.SNGL	statistical	unreviewed		0	0	number1,[number2],...
+EXCEL	MODE.MULT	statistical	have	gamma and modes	0	0	number1,[number2],...
+EXCEL	MODE.SNGL	statistical	have	gamma and modes	0	0	number1,[number2],...
 EXCEL	NEGBINOM.DIST	statistical	have	statistical tests	0	0	number_f,number_s,probability_s,cumulative
 EXCEL	NORM.DIST	statistical	have	bindings	0	0	x,mean,standard_dev,cumulative
 EXCEL	NORM.INV	statistical	have	bindings	0	0	probability,mean,standard_dev
@@ -154,11 +154,11 @@ EXCEL	NORM.S.INV	statistical	have	bindings	2	1	probability
 EXCEL	PEARSON	statistical	bindable	correlationCoefficient	0	0	array1, array2
 EXCEL	PERCENTILE.EXC	statistical	have	spreadsheet statistics	0	0	array,k
 EXCEL	PERCENTILE.INC	statistical	have	stats	0	0	array,k
-EXCEL	PERCENTRANK.EXC	statistical	unreviewed		0	0	array,x,[significance]
+EXCEL	PERCENTRANK.EXC	statistical	have	gamma and modes	0	0	array,x,[significance]
 EXCEL	PERCENTRANK.INC	statistical	have	spreadsheet statistics	0	0	array,x,[significance]
 EXCEL	PERMUT	statistical	bindable	permutation	0	0	number, number_chosen
-EXCEL	PERMUTATIONA	statistical	unreviewed		0	0	number, number-chosen
-EXCEL	PHI	statistical	unreviewed		0	0	x
+EXCEL	PERMUTATIONA	statistical	have	gamma and modes	0	0	number, number-chosen
+EXCEL	PHI	statistical	have	gamma and modes	0	0	x
 EXCEL	POISSON.DIST	statistical	have	statistical distributions	0	0	x,mean,cumulative
 EXCEL	PROB	statistical	have	spreadsheet statistics	0	0	x_range, prob_range, [lower_limit], [upper_limit]
 EXCEL	QUARTILE.EXC	statistical	have	spreadsheet statistics	0	0	array, quart
