@@ -534,7 +534,7 @@ PSI	PsiBinomial	distribution	have	risksolver	0	0	n, p|confirmed
 PSI	PsiBoxFunction	other	unreviewed		0	0	table_range, Arg1, Arg2|confirmed
 PSI	PsiBoxIterator	other	unreviewed		0	0	table_range|confirmed
 PSI	PsiBurr12	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
-PSI	PsiBVar	statistic	unreviewed		1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
+PSI	PsiBVar	statistic	have	SimulationResults trial values — computed at binding	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiCalcParam	other	unreviewed		0	0	values_or_lower, upper, base_case|confirmed
 PSI	PsiCalcValue	other	unreviewed		0	0	Output_cell, paramidx|confirmed
 PSI	PsiCategory	property	unreviewed		0	0	string|confirmed
@@ -658,7 +658,7 @@ PSI	PsiMakeInput	distribution	new	absent from BusinessMath 2.14.0	0	0	freq, expr
 PSI	PsiMax	statistic	bindable	ScenarioSet.range	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMaxExtreme	distribution	have	risksolver	0	0	m, s|confirmed
 PSI	PsiMaxExtremeAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, mean, var, mode, scale|confirmed
-PSI	PsiMean	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	31	13	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiMean	statistic	have	SimulationResults trial values — not FinancialSimulation (metric closure)	31	13	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMeanCI	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
 PSI	PsiMeanCIB	statistic	bindable	SimulationResults trial values — not FinancialSimulation (metric closure)	0	0	cell, confidence_level, [lowerbound], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiMedian	statistic	bindable	median	0	0	cell, simulation, struc_format, param_slice|confirmed
@@ -701,7 +701,7 @@ PSI	PsiPearson5	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiPearson5Alt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, shape, scale|confirmed
 PSI	PsiPearson6	distribution	have	risksolver	0	0	alpha1, alpha2, beta|confirmed
 PSI	PsiPearson6Alt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, shape, scale|confirmed
-PSI	PsiPercentile	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	28	4	cell, percentile, simulation, struc_format, param_slice|confirmed
+PSI	PsiPercentile	statistic	have	Percentiles.percentile — not FinancialSimulation (metric closure)	28	4	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiPercentileCI	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, percentile, confidence_level, [simulation]|confirmed
 PSI	PsiPercentileD	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, percentile, simulation|confirmed
 PSI	PsiPercentiles	statistic	bindable	Percentiles.percentile — not FinancialSimulation (metric closure)	0	0	cell, [simulation], [struc_format], [param_slice]|confirmed
@@ -765,13 +765,13 @@ PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
 PSI	PsiSlurp	distribution	new	absent from BusinessMath 2.14.0	0	0	slurp, j|confirmed
 PSI	PsiSpearmanRho	statistic	unreviewed		0	0	cell1, cell2|confirmed
 PSI	PsiStatic	property	unreviewed		0	0	static_val|confirmed
-PSI	PsiStdDev	statistic	unreviewed		4	3	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiStdDev	statistic	have	SimulationResults.statistics.stdDev — sample, not population	4	3	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdDevCI	statistic	unreviewed		0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdErr	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStudent	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiStudentAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
 PSI	PsiTableCube	other	unreviewed		0	0	table_description, table_values|confirmed
-PSI	PsiTarget	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	5	2	cell, target_value, simulation, struc_format, param_slice|confirmed
+PSI	PsiTarget	statistic	have	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	5	2	cell, target_value, simulation, struc_format, param_slice|confirmed
 PSI	PsiTargetCI	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, confidence_level, [simulation]|confirmed
 PSI	PsiTargetD	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell_or_name, target_value, simulation|confirmed
 PSI	PsiTheoKurtosis	statistic	unreviewed		0	0	cell_or_name|confirmed
