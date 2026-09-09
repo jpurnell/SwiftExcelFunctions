@@ -86,17 +86,47 @@ This is the part that bears on sequencing:
 So "no unbound row has any corpus demand" holds **firmly for the Excel half and weakly for
 the Psi half**. Quote it with the half it applies to.
 
-### And "the 41-workbook corpus" is wrong
+### There are three Psi measurements, and the matrix holds the weakest one
 
-That phrase has been used in this repository and in session summaries. `SUM` alone appears in
-338 workbooks. Forty-one was only ever how many workbooks carried Psi under one sweep, and it
-is the denominator of nothing in the `EXCEL` half.
+`PROPOSAL_psi_bindings.md` §2 documents a sweep **and its denominator**: "Measured across
+2,236 workbooks: 27 distinct functions, 1,950 calls, 41 workbooks." That matches the ~2,240
+`.xlsx` files under `.excel-corpus`'s root, so it is a sweep of the whole document tree.
+Setting its table beside the other two:
+
+| Function | Proposal (2,236 books swept) | Matrix `PSI` half | Binding doc comment |
+|---|---|---|---|
+| `PsiOutput` | 167 / 41 | 24 / 11 | 167 / 41 |
+| `PsiMean` | 108 / 23 | 31 / 13 | 28 / 5 |
+| `PsiPercentile` | 28 / 3 | 28 / 4 | 10 / 1 |
+| `PsiStdDev` | 21 / 4 | 4 / 3 | 12 / 2 |
+| `PsiTarget` | (tail, uncounted) | 5 / 2 | 7 / 3 |
+
+Three populations, and the ordering is informative:
+
+- **The proposal's sweep is the documented one** — it names its denominator and its date, and
+  it is the only one of the three that does. Treat it as authoritative for Psi.
+- **The matrix's `PSI` half understates it by three to five times** on every row that appears
+  in both. It is a partial sweep of unrecorded provenance, which is a stronger statement than
+  "a different population": it is demonstrably less complete than a measurement we have.
+- **The binding doc comments are smaller again**, and their book counts — 5, 2, 1, 3 — are all
+  within six. That is consistent with the six simulation models behind
+  `RISK_SOLVER_WORKBOOKS`, which would make them correct about a deliberately small
+  population. `PsiOutput`'s comment is the exception: 167/41 is quoted from the proposal, not
+  measured over six. So that one file mixes two sources without saying so.
+
+### And "the 41-workbook corpus" is a numerator, not a denominator
+
+The phrase appears in this repository and in session summaries as though 41 were the corpus
+size. It is not: **41 of 2,236 workbooks carry a Psi call**. `SUM` alone appears in 338
+workbooks in the `EXCEL` half. Forty-one is a correct and well-sourced number that has been
+quoted as the wrong kind of quantity.
 
 ## Still open
 
 - The `STDEV.S` book discrepancy, 79 against 42, inside the `EXCEL` half.
-- Which Psi sweep is authoritative — the one behind the source comments, or the one behind
-  this file's `PSI` rows.
+- Why the matrix's `PSI` half is three to five times smaller than the documented sweep in
+  `PROPOSAL_psi_bindings.md` §2, given both claim to read the same kind of thing. The
+  proposal's is authoritative; what the matrix's is remains unknown.
 - A third file version exists: the BusinessMath session's `excel_function_coverage_matrix_bak.tsv`
   counts one fewer row under each tag than this file. Same maxima, so it does not affect
   anything above, but the two are not identical and neither records its date.
