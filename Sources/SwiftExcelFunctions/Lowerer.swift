@@ -389,9 +389,12 @@ extension Lowerer {
         case .namedRange(let name):
             failure = .unsupportedNode("named range \(name)", at: cell); return nil
 
-        case .add, .subtract, .multiply, .divide, .power, .concatenate,
+        case .add, .subtract, .multiply, .divide, .power,
              .equal, .notEqual, .greaterThan, .lessThan, .greaterOrEqual, .lessOrEqual:
-            // Taken by `ast.binary` above. Present so the switch stays exhaustive.
+            // Taken by `ast.binary` above. Present so the switch stays exhaustive, which
+            // is what makes a node kind added upstream a compile error here rather than a
+            // silent `nil`. `.concatenate` is absent because `.text, .concatenate` catches
+            // it first — it is a refusal, not a structural pass-through.
             return nil
         }
     }
