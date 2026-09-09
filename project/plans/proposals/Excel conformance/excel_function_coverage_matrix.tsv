@@ -354,54 +354,54 @@ EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [s
 EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
 EXCEL	ASC	text	bindable	Lease.rightOfUseAsset	0	0	text
 EXCEL	ARRAYTOTEXT	text	unreviewed		0	0	array, [format]
-EXCEL	BAHTTEXT	text	unreviewed		0	0	number
-EXCEL	CHAR	text	unreviewed		0	0	number
+EXCEL	BAHTTEXT	text	new	double-byte locale semantics	0	0	number
+EXCEL	CHAR	text	have	text	0	0	number
 EXCEL	CLEAN	text	have	text	0	0	text
-EXCEL	CODE	text	unreviewed		0	0	text
-EXCEL	CONCAT	text	unreviewed		0	0	text1, [text2],...
+EXCEL	CODE	text	have	text	0	0	text
+EXCEL	CONCAT	text	have	text	0	0	text1, [text2],...
 EXCEL	CONCATENATE	text	have	text	0	0	text1, [text2], ...
-EXCEL	DBCS	text	unreviewed		0	0	text
-EXCEL	DETECTLANGUAGE	text	unreviewed		0	0	text
+EXCEL	DBCS	text	new	double-byte locale semantics	0	0	text
+EXCEL	DETECTLANGUAGE	text	out of scope	network service, as cube/web	0	0	text
 EXCEL	DOLLAR	text	unreviewed		0	0	number, [decimals]
-EXCEL	EXACT	text	unreviewed		0	0	text1, text2
+EXCEL	EXACT	text	have	text	0	0	text1, text2
 EXCEL	FIND	text	have	text	0	0	find_text, within_text, [start_num]
-EXCEL	FINDB	text	unreviewed		0	0	find_text, within_text, [start_num]
-EXCEL	FIXED	text	unreviewed		0	0	number, [decimals], [no_commas]
+EXCEL	FINDB	text	new	double-byte locale semantics	0	0	find_text, within_text, [start_num]
+EXCEL	FIXED	text	have	text	0	0	number, [decimals], [no_commas]
 EXCEL	LEFT	text	have	text	17	1	text, [num_chars]
-EXCEL	LEFTB	text	unreviewed		0	0	UNCONFIRMED
+EXCEL	LEFTB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
 EXCEL	LEN	text	have	text	0	0	text
-EXCEL	LENB	text	unreviewed		0	0	UNCONFIRMED
+EXCEL	LENB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
 EXCEL	LOWER	text	have	text	0	0	text
 EXCEL	MID	text	have	text	0	0	text, start_num, num_chars
-EXCEL	MIDB	text	unreviewed		0	0	UNCONFIRMED
+EXCEL	MIDB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
 EXCEL	NUMBERVALUE	text	have	text	0	0	Text, [Decimal_separator], [Group_separator]
-EXCEL	PHONETIC	text	unreviewed		0	0	reference
+EXCEL	PHONETIC	text	new	double-byte locale semantics	0	0	reference
 EXCEL	PROPER	text	have	text	0	0	text
 EXCEL	REGEXEXTRACT	text	unreviewed		0	0	text, pattern, [return_mode], [case_sensitivity]
 EXCEL	REGEXREPLACE	text	unreviewed		0	0	text, pattern, replacement, [occurrence], [case_sensitivity]
 EXCEL	REGEXTEST	text	unreviewed		0	0	text, pattern, [case_sensitivity]
-EXCEL	REPLACE	text	unreviewed		0	0	old_text, start_num, num_chars, new_text
-EXCEL	REPLACEB	text	unreviewed		0	0	UNCONFIRMED
-EXCEL	REPT	text	unreviewed		0	0	text, number_times
+EXCEL	REPLACE	text	have	text	0	0	old_text, start_num, num_chars, new_text
+EXCEL	REPLACEB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	REPT	text	have	text	0	0	text, number_times
 EXCEL	RIGHT	text	have	text	61	13	text,[num_chars]
-EXCEL	RIGHTB	text	unreviewed		0	0	UNCONFIRMED
+EXCEL	RIGHTB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
 EXCEL	SEARCH	text	have	text	0	0	find_text, within_text, [start_num]
-EXCEL	SEARCHB	text	unreviewed		0	0	UNCONFIRMED
+EXCEL	SEARCHB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
 EXCEL	SUBSTITUTE	text	have	text	0	0	text, old_text, new_text, [instance_num]
-EXCEL	T	text	unreviewed		0	0	value
+EXCEL	T	text	have	text	0	0	value
 EXCEL	TEXT	text	have	text	51	24	value, format_text
-EXCEL	TEXTAFTER	text	unreviewed		0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
-EXCEL	TEXTBEFORE	text	unreviewed		0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
-EXCEL	TEXTJOIN	text	unreviewed		0	0	delimiter, ignore_empty, text1, [text2], ...
+EXCEL	TEXTAFTER	text	have	text	0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
+EXCEL	TEXTBEFORE	text	have	text	0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
+EXCEL	TEXTJOIN	text	have	text	0	0	delimiter, ignore_empty, text1, [text2], ...
 EXCEL	TEXTSPLIT	text	unreviewed		0	0	text,col_delimiter,[row_delimiter],[ignore_empty], [match_mode], [pad_with]
-EXCEL	TRANSLATE	text	unreviewed		0	0	text, [source_language], [target_language]
+EXCEL	TRANSLATE	text	out of scope	network service, as cube/web	0	0	text, [source_language], [target_language]
 EXCEL	TRIM	text	have	text	0	0	text
 EXCEL	UNICHAR	text	have	text	0	0	number
 EXCEL	UNICODE	text	have	text	0	0	text
 EXCEL	UPPER	text	have	text	0	0	text
-EXCEL	VALUE	text	unreviewed		0	0	text
+EXCEL	VALUE	text	have	text	0	0	text
 EXCEL	VALUETOTEXT	text	unreviewed		0	0	value, [format]
-EXCEL	JIS	text	unreviewed		0	0	text
+EXCEL	JIS	text	new	double-byte locale semantics	0	0	text
 EXCEL	DAVERAGE	database	unreviewed		0	0	database, field, criteria
 EXCEL	DCOUNT	database	unreviewed		0	0	database, field, criteria
 EXCEL	DCOUNTA	database	unreviewed		0	0	database, field, criteria
