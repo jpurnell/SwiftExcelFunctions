@@ -79,7 +79,7 @@ EXCEL	SUMXMY2	math	bindable	NelsonSiegelYieldCurve.sumSquaredErrors	0	0	array_x,
 EXCEL	TAN	math	have	math	0	0	number
 EXCEL	TANH	math	have	primitives	0	0	number
 EXCEL	TRUNC	math	have	math	0	0	number, [num_digits]
-EXCEL	AVEDEV	statistical	unreviewed		0	0	number1, [number2], ...
+EXCEL	AVEDEV	statistical	have	spreadsheet statistics	0	0	number1, [number2], ...
 EXCEL	AVERAGE	statistical	have	stats	67	18	number1, [number2], ...
 EXCEL	AVERAGEA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	AVERAGEIF	statistical	have	aggregation	0	0	range, criteria, [average_range]
@@ -91,7 +91,7 @@ EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s
 EXCEL	BINOM.INV	statistical	have	accumulate binomialPMF, as PsiBinomial does — bound	0	0	trials,probability_s,alpha
 EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
 EXCEL	CHISQ.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom
-EXCEL	CHISQ.INV	statistical	unreviewed		0	0	probability,deg_freedom
+EXCEL	CHISQ.INV	statistical	have	spreadsheet statistics	0	0	probability,deg_freedom
 EXCEL	CHISQ.INV.RT	statistical	have	DistributionChiSquared.quantile(1-p) — bound	0	0	probability,deg_freedom
 EXCEL	CHISQ.TEST	statistical	have	statistical tests	0	0	actual_range,expected_range
 EXCEL	CONFIDENCE.NORM	statistical	have	statistical tests	0	0	alpha,standard_dev,size
@@ -119,7 +119,7 @@ EXCEL	FORECAST.ETS.CONFINT	statistical	bindable	HoltWintersModel.predictWithConf
 EXCEL	FORECAST.ETS.SEASONALITY	statistical	unreviewed		0	0	values, timeline, [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.STAT	statistical	unreviewed		0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
-EXCEL	FREQUENCY	statistical	unreviewed		0	0	data_array, bins_array
+EXCEL	FREQUENCY	statistical	have	spreadsheet statistics	0	0	data_array, bins_array
 EXCEL	GAMMA	statistical	unreviewed		0	0	number
 EXCEL	GAMMA.DIST	statistical	have	statistical distributions	0	0	x,alpha,beta,cumulative
 EXCEL	GAMMA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta
@@ -152,17 +152,17 @@ EXCEL	NORM.INV	statistical	have	bindings	0	0	probability,mean,standard_dev
 EXCEL	NORM.S.DIST	statistical	have	bindings	0	0	z,cumulative
 EXCEL	NORM.S.INV	statistical	have	bindings	2	1	probability
 EXCEL	PEARSON	statistical	bindable	correlationCoefficient	0	0	array1, array2
-EXCEL	PERCENTILE.EXC	statistical	unreviewed		0	0	array,k
+EXCEL	PERCENTILE.EXC	statistical	have	spreadsheet statistics	0	0	array,k
 EXCEL	PERCENTILE.INC	statistical	have	stats	0	0	array,k
 EXCEL	PERCENTRANK.EXC	statistical	unreviewed		0	0	array,x,[significance]
-EXCEL	PERCENTRANK.INC	statistical	unreviewed		0	0	array,x,[significance]
+EXCEL	PERCENTRANK.INC	statistical	have	spreadsheet statistics	0	0	array,x,[significance]
 EXCEL	PERMUT	statistical	bindable	permutation	0	0	number, number_chosen
 EXCEL	PERMUTATIONA	statistical	unreviewed		0	0	number, number-chosen
 EXCEL	PHI	statistical	unreviewed		0	0	x
 EXCEL	POISSON.DIST	statistical	have	statistical distributions	0	0	x,mean,cumulative
-EXCEL	PROB	statistical	unreviewed		0	0	x_range, prob_range, [lower_limit], [upper_limit]
-EXCEL	QUARTILE.EXC	statistical	unreviewed		0	0	array, quart
-EXCEL	QUARTILE.INC	statistical	unreviewed		0	0	array,quart
+EXCEL	PROB	statistical	have	spreadsheet statistics	0	0	x_range, prob_range, [lower_limit], [upper_limit]
+EXCEL	QUARTILE.EXC	statistical	have	spreadsheet statistics	0	0	array, quart
+EXCEL	QUARTILE.INC	statistical	have	spreadsheet statistics	0	0	array,quart
 EXCEL	RANK.AVG	statistical	have	bindings	0	0	number,ref,[order]
 EXCEL	RANK.EQ	statistical	have	bindings	0	0	number,ref,[order]
 EXCEL	RSQ	statistical	bindable	rSquared	0	0	known_y's,known_x's
@@ -175,15 +175,15 @@ EXCEL	STDEV.P	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	STDEV.S	statistical	have	stats	86410	42	number1,[number2],...
 EXCEL	STDEVA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	STDEVPA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
-EXCEL	STEYX	statistical	unreviewed		0	0	known_y's, known_x's
+EXCEL	STEYX	statistical	have	spreadsheet statistics	0	0	known_y's, known_x's
 EXCEL	T.DIST	statistical	bindable	studentTPDF	0	0	x,deg_freedom, cumulative
 EXCEL	T.DIST.2T	statistical	have	statistical distributions	0	0	x,deg_freedom
-EXCEL	T.DIST.RT	statistical	unreviewed		0	0	x,deg_freedom
+EXCEL	T.DIST.RT	statistical	have	spreadsheet statistics	0	0	x,deg_freedom
 EXCEL	T.INV	statistical	bindable	tQuantile	0	0	probability,deg_freedom
 EXCEL	T.INV.2T	statistical	have	statistical quantiles	0	0	probability,deg_freedom
-EXCEL	T.TEST	statistical	unreviewed		0	0	array1,array2,tails,type
+EXCEL	T.TEST	statistical	have	spreadsheet statistics	0	0	array1,array2,tails,type
 EXCEL	TREND	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [new_x's], [const]
-EXCEL	TRIMMEAN	statistical	unreviewed		0	0	array, percent
+EXCEL	TRIMMEAN	statistical	have	spreadsheet statistics	0	0	array, percent
 EXCEL	VAR.P	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	VAR.S	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	VARA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
