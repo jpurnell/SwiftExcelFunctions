@@ -73,18 +73,41 @@ That resolves most of the table above:
   the `EXCEL` half: the same extraction produced 86,410 in both places while the book
   denominator differs, 79 against 42.
 
-### A zero is not a zero
+### A zero is not a zero — and every zero in this file is one observation
 
-This is the part that bears on sequencing:
+**Superseded reading, kept because it was quoted:** that an `EXCEL` zero means "absent from a
+population reaching 338 workbooks." It does not, and the test that killed it is one line.
 
-- **An `EXCEL` zero means absent from a population reaching 338 workbooks.** Strong evidence.
-  `COMPLEX`, all 25 `IM*` rows and all four `FORECAST.ETS*` rows are `EXCEL` rows, so their
-  zero demand is well evidenced.
-- **A `PSI` zero means absent from a population topping out at 17.** Thin evidence. Every
-  `PsiForecast*` row is a `PSI` row.
+Across all 815 rows: **no row has `calls > 0` with `books = 0`, and none has `calls = 0` with
+`books > 0`.** The two columns agree perfectly on which 89 functions are non-zero. If the
+`books` column really came from an independent sweep four times larger, it should have found
+at least one function the smaller sweep missed. It found none — which means the `books` column
+never searched the 726 candidates at `0 / 0`. Found by the BusinessMath session; confirmed
+here.
 
-So "no unbound row has any corpus demand" holds **firmly for the Excel half and weakly for
-the Psi half**. Quote it with the half it applies to.
+So **every zero in this file rests on the 79-workbook call sweep**, and the defensible
+statement is *"not observed in 79 workbooks, and not separately looked for in whatever
+produced the book counts."* Not 338. And because it is the same 79 behind all of them, the
+726 zeros are **one observation, not 726**.
+
+Two explanations fit, and they differ in what a fix would cost:
+
+- **Back-fill.** A larger sweep counted books only for functions the 79-workbook sweep had
+  already found.
+- **The column is sheets, not workbooks.** One sweep, one candidate list, a mislabelled
+  column. `SUM` at 338 over 79 workbooks is 4.3 sheets per workbook, which is unremarkable,
+  and it explains the perfect zero-alignment without needing two sweeps at all.
+
+Nothing in the repository distinguishes them: the matrix is read by
+`UnreviewedCoverageTests` and generated nowhere, so its provenance is genuinely unrecorded.
+Both predict the same thing for sequencing, and neither is fixed by re-measuring the `books`
+column alone.
+
+**What this leaves for sequencing.** 79 workbooks is a real sample, and `COMPLEX`, all 25
+`IM*` rows and all four `FORECAST.ETS*` rows are absent from it — that still says nobody in
+that sample wrote them. It is one sample rather than an exhaustive search, and a `PSI` zero
+remains weaker still, since that half undercounts the documented Psi sweep three to five
+times over.
 
 ### There are three Psi measurements, and the matrix holds the weakest one
 
@@ -148,8 +171,10 @@ disagreed; the sentence was ambiguous and both halves of this file were quoted a
 
 ## Still open
 
-- What sweep produced the `EXCEL` half's `books` column. It read at least 338 workbooks;
-  nothing records it. (The `calls` column is settled: the 79-workbook sweep.)
+- What the `EXCEL` half's `books` column counts, and whether it ever looked for the 726
+  functions at `0 / 0` — the evidence says it did not. (The `calls` column is settled: the
+  79-workbook sweep.) **A re-measure of the books column alone would not change a single
+  zero**; what is needed is a fresh sweep over the full candidate list on a named denominator.
 - Why the matrix's `PSI` half is three to five times smaller than the documented sweep in
   `PROPOSAL_psi_bindings.md` §2, given both claim to read the same kind of thing. The
   proposal's is authoritative; what the matrix's is remains unknown.
