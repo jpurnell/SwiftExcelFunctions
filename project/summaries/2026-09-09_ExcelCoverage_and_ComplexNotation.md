@@ -48,17 +48,21 @@ Corrected mid-session after I called them one:
 
 That is the proposal to write next if these are wanted.
 
-## 4. Two proposals filed in BusinessMath — note the branch
+## 4. Two proposals filed in BusinessMath — both landed on `main`
 
-Both are on **`feature/stage-6-template-delegation`**, not `main`. The BusinessMath session
-switched branches mid-sitting; I flagged it and left the cherry-pick to them.
+Written on `feature/stage-6-template-delegation`; the BusinessMath session cherry-picked them
+to `main` and pushed. Verified 2026-09-09 against the GitHub API — every commit below is an
+ancestor of `main` and both files are present there. Neither is checked out locally on this
+machine: only the SPM checkout at `be704795` exists, which predates the proposals directory,
+so reading them means `gh api`.
 
-- `PROPOSAL_compatibility_and_lookup.md` (`259c1e70`, `daa7c460`) — the 26 compatibility and
+- `proposals/excel-coverage/PROPOSAL_compatibility_and_lookup.md` (`259c1e70`, `daa7c460`) — the 26 compatibility and
   24 lookup rows. **24 of 26 modern statistical spellings have upstream mathematics**; only
   `CHISQ.TEST` and `F.TEST` were absent, and both are now bound. Eight compatibility rows are
   **not aliases** even once their targets exist — `CHIDIST` is `CHISQ.DIST.RT`, `TINV` is
   `T.INV.2T`, `TDIST` dispatches on `tails`, `BETADIST`/`LOGNORMDIST` are always cumulative.
-- `PROPOSAL_complex_notation.md` (`1569c8d9`, `11742a90`, `c533869c`) — a `Complex` ↔ `String`
+- `proposals/PROPOSAL_complex_notation.md` (`f06947ea`, `febdf909`, `72242e07` on `main`;
+  `1569c8d9`, `11742a90`, `c533869c` as originally written) — a `Complex` ↔ `String`
   codec in `a+bi` notation. **Revised to a member (`notation`, `init?(notation:)`), not a
   `LosslessStringConvertible` conformance** — see §6 there.
 
