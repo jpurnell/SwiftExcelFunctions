@@ -152,7 +152,7 @@ public enum BuiltinAggregationFunctions {
     }
 
     /// Extracts the flat array of values from a `CellValue`.
-    private static func toArray(_ value: CellValue) -> [CellValue] {
+    static func toArray(_ value: CellValue) -> [CellValue] {
         if case .array(let matrix) = value {
             return matrix.elements
         }
@@ -272,7 +272,7 @@ public enum BuiltinAggregationFunctions {
     }
 
     /// Extracts the criteria string from a `CellValue`.
-    private static func criteriaString(from value: CellValue) -> String? {
+    static func criteriaString(from value: CellValue) -> String? {
         switch value {
         case .text(let s):
             return s

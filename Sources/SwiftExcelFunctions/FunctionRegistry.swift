@@ -90,6 +90,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinCoercingAggregates.all,
             BuiltinSpreadsheetStatistics.all,
             BuiltinGammaAndModes.all,
+            BuiltinConditionalExtremes.all,
             BuiltinStatsFunctions.all,
             BuiltinFinancialFunctions.all,
             BuiltinLogicFunctions.all,
