@@ -85,7 +85,7 @@ EXCEL	AVERAGEA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	AVERAGEIF	statistical	have	aggregation	0	0	range, criteria, [average_range]
 EXCEL	AVERAGEIFS	statistical	bindable	PeriodSequence.aggregate	0	0	average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
-EXCEL	BETA.INV	statistical	unreviewed		0	0	probability,alpha,beta,[A],[B]
+EXCEL	BETA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOM.DIST	statistical	have	statistical distributions	0	0	number_s,trials,probability_s,cumulative
 EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s,[number_s2]
 EXCEL	BINOM.INV	statistical	have	accumulate binomialPMF, as PsiBinomial does — bound	0	0	trials,probability_s,alpha
@@ -109,7 +109,7 @@ EXCEL	EXPON.DIST	statistical	have	statistical distributions	0	0	x,lambda,cumulat
 EXCEL	F.DIST	statistical	bindable	fCDF	0	0	x,deg_freedom1,deg_freedom2,cumulative
 EXCEL	F.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom1,deg_freedom2
 EXCEL	F.INV	statistical	bindable	fQuantile	0	0	probability,deg_freedom1,deg_freedom2
-EXCEL	F.INV.RT	statistical	unreviewed		0	0	probability,deg_freedom1,deg_freedom2
+EXCEL	F.INV.RT	statistical	have	statistical quantiles	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.TEST	statistical	unreviewed		0	0	array1,array2
 EXCEL	FISHER	statistical	bindable	fisher	0	0	x
 EXCEL	FISHERINV	statistical	bindable	rho	0	0	y
@@ -122,7 +122,7 @@ EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, kn
 EXCEL	FREQUENCY	statistical	unreviewed		0	0	data_array, bins_array
 EXCEL	GAMMA	statistical	unreviewed		0	0	number
 EXCEL	GAMMA.DIST	statistical	have	statistical distributions	0	0	x,alpha,beta,cumulative
-EXCEL	GAMMA.INV	statistical	unreviewed		0	0	probability,alpha,beta
+EXCEL	GAMMA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta
 EXCEL	GAMMALN	statistical	bindable	logFactorial	0	0	x
 EXCEL	GAMMALN.PRECISE	statistical	unreviewed		0	0	x
 EXCEL	GAUSS	statistical	unreviewed		0	0	z
@@ -136,7 +136,7 @@ EXCEL	LARGE	statistical	have	stats	0	0	array, k
 EXCEL	LINEST	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGEST	statistical	bindable	ExponentialTrend	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGNORM.DIST	statistical	have	statistical distributions	0	0	x,mean,standard_dev,cumulative
-EXCEL	LOGNORM.INV	statistical	bindable	DistributionLogNormal.quantile — verified	0	0	probability, mean, standard_dev
+EXCEL	LOGNORM.INV	statistical	have	statistical quantiles	0	0	probability, mean, standard_dev
 EXCEL	MAX	statistical	have	stats	992	114	number1, [number2], ...
 EXCEL	MAXA	statistical	unreviewed		0	0	value1,[value2],...
 EXCEL	MAXIFS	statistical	unreviewed		0	0	max_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
@@ -180,7 +180,7 @@ EXCEL	T.DIST	statistical	bindable	studentTPDF	0	0	x,deg_freedom, cumulative
 EXCEL	T.DIST.2T	statistical	have	statistical distributions	0	0	x,deg_freedom
 EXCEL	T.DIST.RT	statistical	unreviewed		0	0	x,deg_freedom
 EXCEL	T.INV	statistical	bindable	tQuantile	0	0	probability,deg_freedom
-EXCEL	T.INV.2T	statistical	unreviewed		0	0	probability,deg_freedom
+EXCEL	T.INV.2T	statistical	have	statistical quantiles	0	0	probability,deg_freedom
 EXCEL	T.TEST	statistical	unreviewed		0	0	array1,array2,tails,type
 EXCEL	TREND	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [new_x's], [const]
 EXCEL	TRIMMEAN	statistical	unreviewed		0	0	array, percent
