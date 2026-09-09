@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-08
+
+### Changed
+
+- **Dependency pins loosened: `SwiftExcelCore` to `from:`, `SwiftXLSX` to
+  `upToNextMinor`.**
+
+  Every recorded justification for the `exact:` pins was a *lower* bound — "0.13.0
+  is the release that removed these functions; anything **earlier** would import a
+  second `FormulaEvaluator`" — and none required exactness.
+
+  The strict form had a cost. When `DependencyGraph` moved to SwiftExcelCore,
+  BusinessMathExcel could not resolve at all: this package wanted Core `exact 0.5.0`
+  and SwiftXLSX 0.23.0 wanted `exact 0.6.0`. Two `exact:` pins on the same shared
+  package deadlock the moment they differ, and the only exit was a coordinated
+  release of everything downstream.
+
+  The constraint they existed to enforce is unchanged: the family must unify on one
+  SwiftExcelCore, because two versions would mean two `CellValue` types and nothing
+  would typecheck. `from:` enforces that *better* — it resolves to the highest
+  version satisfying every consumer, where `exact:` simply fails.
+
+  SwiftXLSX is `upToNextMinor` rather than `from:` because this family ships
+  breaking changes in minor versions while it is pre-1.0 — two `refactor!` commits
+  in one day. A patch should flow freely; a minor should be a deliberate bump.
+
+
 ## [0.7.0] - 2026-09-08
 
 ### Removed
@@ -623,7 +650,8 @@ mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 3
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.4.0...v0.5.0

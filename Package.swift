@@ -9,14 +9,21 @@ let package = Package(
         .library(name: "WorkbookAudit", targets: ["WorkbookAudit"])
     ],
     dependencies: [
-        .package(url: "https://github.com/jpurnell/SwiftExcelCore", exact: "0.6.0"),
+        // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
+        // family on one SwiftExcelCore — two versions would mean two `CellValue` types
+        // and nothing would typecheck — and `from:` enforces that better than `exact:`,
+        // by resolving to the highest version satisfying everyone rather than refusing.
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.6.0"),
         .package(url: "https://github.com/jpurnell/BusinessMath", from: "2.11.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
         // Test-only: FormulaParserIntegrationTests needs SwiftXLSX's parser to feed
         // this package's evaluator. 0.13.0 is the release that removed these
         // functions from SwiftXLSX — anything earlier would import a second
         // FormulaEvaluator and make every reference ambiguous.
-        .package(url: "https://github.com/jpurnell/SwiftXLSX", exact: "0.23.0")
+        // `upToNextMinor` rather than `from:`: this family ships breaking changes in
+        // minor versions while it is pre-1.0, so a patch should flow freely and a minor
+        // should be a deliberate bump.
+        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.23.0"))
     ],
     targets: [
         .target(
