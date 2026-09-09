@@ -66,6 +66,8 @@ A caller sees one registry. Underneath there are four sources, and the boundary 
 | This package, on shape alone | `TRANSPOSE`, `COUNTBLANK` | the rectangle is the subject, not its values |
 | Foundation, swift-numerics | trigonometry, logs, rounding, dates, text, complex | primitives |
 | **BusinessMath** | distributions, statistics, financial, Risk Solver | where a second implementation could disagree |
+| This package, over a completed run | the `Psi*` statistics — `PsiMean`, `PsiCVaR`, `PsiBVaR` | they read a *run*, not a value; see ``SimulationResultProvider`` |
+| This package, simulating | `PsiRecognizer`, `ModelSurveyor`, `InterpretedRun`, `Lowerer` | reading a model, running it, and compiling its propagation |
 
 Excel's sign conventions are applied **here**, at the binding — BusinessMath returns positive
 where Excel returns negative, and the flip belongs in the translation, not the mathematics.
@@ -74,16 +76,38 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**v0.5.0 — released 2026-09-05.** Spilling.
+**Unreleased — the simulation stack.** A Risk Solver workbook now runs.
 
-- [x] `FormulaEvaluator.spill` — one formula, evaluated once, filling a span
-- [x] Four integration tests carrying an array formula out to a file and back
-- [x] 662 tests, gate 45/45 at 0/0
+- [x] `PsiRecognizer` — what a formula declares: draws, outputs, property functions
+- [x] `ModelSurveyor` / `ModelSurvey` — the same across a sheet, with input indices assigned
+- [x] `SimulationResultProvider` — the seam that lets `PsiMean(B4)` reach a completed run
+- [x] `BuiltinRiskSolverStatistics` — seven read-out functions
+- [x] `InterpretedRun` — the trial loop: draw, propagate, collect
+- [x] `Lowerer` — `FormulaAST` into BusinessMath bytecode, **83% of real outputs**
+- [x] 907 tests, gate 45/45 at 0/0
 
-The last piece, and it needed no new dependency: evaluation produces an assignment,
-SwiftXLSX applies one. Writing the integration test found three gaps that neither
-package's own tests could — the two halves did not compose, array formulas were not
-discoverable from outside, and a cached error vanished on save.
+**Seven sheets across six real Risk Solver workbooks run end to end**, 36 outputs,
+reproducing exactly under seed. `PROPOSAL_model_graph_simulation.md` is the design;
+phases 0 through 4 of its §13 are done.
+
+Six defects came out of running against real files rather than fixtures, and none of
+them would have shown up otherwise:
+
+| Found | Was |
+|---|---|
+| `ModelSurveyor` scanned the bounding rectangle | 34.8s → 1.08s, a 32× cost on sparse-and-wide sheets |
+| `$B$8` and `B8` are different `CellRef` keys | a trial's computed value missed, reading Excel's stale cache instead |
+| `PsiTarget`'s provider was `probabilityAbove` | the complement of the truth |
+| ...and `probabilityBelow` counts strictly `<` | Frontline says "or equal to"; 0.30 vs 0.00 on a Bernoulli output |
+| `PsiOutput()` treated as required | rejected a real 126-call model; cost Jeffords 8 of its 14 outputs |
+| `Lowerer.audit` re-walked cells per path | 5,400 findings for a handful of cells |
+
+**v0.6.0 — released 2026-09-08.** BusinessMath 2.15.0; the Psi distribution surface.
+
+**v0.5.0 — released 2026-09-05.** Spilling. `FormulaEvaluator.spill`, four integration
+tests carrying an array formula out to a file and back, 662 tests. Evaluation produces an
+assignment and SwiftXLSX applies one; writing the integration test found three gaps
+neither package's own suite could see.
 
 ---
 
@@ -250,7 +274,15 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-08 — **v0.6.0 released.** BusinessMath 2.15.0 implemented the whole
+**Last Updated:** 2026-09-08 (later) — the simulation stack recorded. Current Status
+rewritten: it still described v0.5.0's spilling while fifteen public types had shipped
+underneath it, which is the same drift this project found in BusinessMath's roadmap on the
+same day — a capability shipping without anything prompting the documents to notice. The
+source table gains two rows for the simulation layer, and the six defects the real
+workbooks found are recorded with what each one was, because "tested against real files"
+is a claim and those are the evidence for it.
+
+Earlier: 2026-09-08 — **v0.6.0 released.** BusinessMath 2.15.0 implemented the whole
 52-row Psi completeness delta and closed the NASD February rule, the last outstanding source of
 corpus disagreement. 50 more distributions bound: 106 of Frontline's 113 distribution rows now
 answer, 269 functions registered, 865 tests. Capability map filled in — it had been the unedited

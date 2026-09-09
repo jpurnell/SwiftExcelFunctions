@@ -1,6 +1,8 @@
 # Proposal — The model graph: running a Risk Solver workbook without Risk Solver
 
-**Status:** Draft
+**Status:** Phases 0–4 shipped, 2026-09-08. See §13 for what each ended on and §9.2 for
+what the corpus said. The design below stands except where a section says otherwise —
+three of its assumptions were wrong and are corrected in place rather than quietly edited
 **Spans:** SwiftExcelFunctions (the graph, the lowering pass, the statistic bindings),
 BusinessMath (the engines, unchanged), a new SwiftUI application target
 **Date:** 2026-09-07
@@ -528,6 +530,31 @@ where a real formula dispatches through the registry and reads ranges; and the p
 dictionary, where a workbook-backed one costs more. Both make the interpreted side more
 expensive.
 
+### 9.2 Phase 4 result — what actually lowers
+
+Measured with `Lowerer.audit` over all 36 outputs of the six real models, adding rules in
+the order the histogram named rather than the order they seemed important:
+
+| Rules | Outputs lowering |
+|---|---|
+| arithmetic, comparisons, `IF`, `SUM`, `SUMPRODUCT`, `MIN`/`MAX`/`AVERAGE` | 23 (64%) |
+| `+ NPV` — 10 of the 13 refusals, in one rule | 25 (69%) |
+| `+ AND`/`OR`/`NOT` | **30 (83%)** |
+
+The remaining six are cross-sheet references: this pass is `CellRef`-shaped and those need
+`CellAddress`. Not a missing rule.
+
+`AND` and `OR` needed no new opcode. Excel's booleans are 1 and 0 and `Expression`'s
+comparisons already return exactly that, so `AND` is a product.
+
+**§5.3's blow-up is real, and arrived on schedule.** Instruction counts ran 1–181 with the
+first rule set, 1–463 after `NPV`, and **1–34,347** once boolean logic unlocked a model
+with real branching. Still runnable, but a 75× jump from one rule is the evidence for
+common subexpression elimination upstream: `BytecodeOptimizer` folds constants and
+simplifies algebra but does not eliminate common subexpressions, and a cell read *k* times
+is inlined *k* times. Open question 16.1 is answered — it does blow up — and the fix
+belongs in BusinessMath where every caller benefits.
+
 **Consequence for §13:** Phase 4 (lowering rules) moves ahead of Phase 6 (SwiftUI). §3.1 still
 stands — the interpreted path remains the correctness baseline and the differential test — but it
 is now clearly a fallback rather than a plausible shipping configuration for large models.
@@ -671,10 +698,10 @@ Each phase ends somewhere shippable.
 | # | Deliverable | Ends when |
 |---|---|---|
 | **0** | **Spike.** Hand-built `ModelGraph` for one arithmetic model, lower it, run 10,000 trials, print the mean. Measure the interpreted:compiled ratio (§9). | The ratio is a number, not an assumption |
-| **1** | `ModelGraph` over `SwiftXLSX.DependencyGraph`, + the recognizer | A corpus workbook builds a graph with its uncertain cells and outputs marked |
-| **2** | `Lowerer.audit` + corpus histogram (§8.2) | The lowering work list is ordered by evidence |
-| **3** | Interpreted path, end to end, `PsiMean`/`PsiStdDev`/`PsiPercentile` bound via §6.4 | A real workbook simulates correctly, slowly |
-| **4** | Lowering rules, top-down by the phase-2 histogram, each under the §8.1 differential test | Diminishing returns on the histogram |
+| ~~**1**~~ | ~~`ModelGraph` + the recognizer~~ **Done** — `PsiRecognizer`, `ModelSurveyor`. Shipped as a *survey* rather than a graph: `DependencyGraph` supplies the edges | A corpus workbook builds a survey with its uncertain cells and outputs marked |
+| ~~**2**~~ | ~~`Lowerer.audit` + corpus histogram~~ **Done** — §9.2 | The work list was ordered by evidence, and named `NPV` |
+| ~~**3**~~ | ~~Interpreted path, end to end~~ **Done** — seven real sheets, 36 outputs, reproducing under seed. Seven statistics bound, not three |
+| ~~**4**~~ | ~~Lowering rules by histogram~~ **Done to 83%** — the differential test holds bit-for-bit at every step | The remainder is cross-sheet, not a rule |
 | **5** | The remaining `statistic` rows | 87 rows resolved |
 | **6** | SwiftUI app | It opens a workbook and draws a histogram |
 | **7** | Write-back, **gated on `PROPOSAL_surgical_save.md`** | A corrected cell is written to a real workbook and its charts, pivots and macros survive |

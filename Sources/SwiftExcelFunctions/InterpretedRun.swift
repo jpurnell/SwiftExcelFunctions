@@ -35,6 +35,13 @@ public enum TrialRunError: Error, Sendable, Equatable {
 
     /// Trials must be at least one.
     case invalidTrialCount(Int)
+
+    /// The model is circular, so no evaluation order exists.
+    ///
+    /// Carries the first cycle found. A circular reference is the model's defect and Excel
+    /// reports it too; this refuses rather than iterating to a fixed point, because a
+    /// simulation of a model that disagrees with itself is not a simulation of anything.
+    case orderHasACycle([CellRef])
 }
 
 /// A completed simulation.
@@ -85,17 +92,19 @@ public struct SimulationRun: Sendable, SimulationResultProvider {
 /// (§9.1), so a large model will want the compiled path. It will not need a different
 /// answer.
 ///
-/// ## The evaluation order is supplied
+/// ## The evaluation order
 ///
-/// A trial loop needs a topological order. `SwiftXLSX.DependencyGraph` computes one, with
-/// cycle detection — but it takes a `Worksheet`, and depending on a file format here would
-/// cost this package the one promise it makes. Writing a second topological sort would be
-/// worse: two orders that could disagree, in a project whose evaluator already relies on
-/// the first.
+/// A trial loop needs a topological order. When this was written, `DependencyGraph` lived
+/// in SwiftXLSX and took a `Worksheet`, so reaching it here would have cost this package
+/// its one promise — and writing a second topological sort would have been worse, since
+/// two orders that could disagree is exactly what the evaluator already relies on not
+/// happening. The order was therefore a parameter.
 ///
-/// So the caller supplies it, exactly as they supply cells and randomness. It is
-/// **validated** rather than trusted, because a wrong order does not fail — it reads a
-/// cell before that cell has been computed and reports the result as a simulation.
+/// **`DependencyGraph` now lives in SwiftExcelCore** and takes a `CellValueProvider`, so
+/// the static `run(survey:over:names:inSheet:trials:seed:registry:)` computes it, and
+/// ``run(over:names:)`` still accepts one.
+/// Both validate rather than trust, because a wrong order does not fail — it reads a cell
+/// before that cell has been computed and reports the result as a simulation.
 public struct InterpretedRun: Sendable {
 
     private let survey: ModelSurvey
@@ -172,6 +181,46 @@ public struct InterpretedRun: Sendable {
             outputs[ref] = SimulationResults(values: values)
         }
         return SimulationRun(outputs: outputs, trials: trials, seed: seed)
+    }
+
+    /// Runs the model, computing the evaluation order from the cells themselves.
+    ///
+    /// The convenience the parameter form existed to avoid needing. `DependencyGraph` is
+    /// in SwiftExcelCore now, so this package can reach it without a file-format
+    /// dependency and without a second topological sort.
+    ///
+    /// - Parameters:
+    ///   - survey: what the recognizer found — the draws and the outputs.
+    ///   - cells: the model's cells, able to enumerate themselves.
+    ///   - names: the named-range resolver.
+    ///   - sheet: the sheet name the addresses belong to.
+    ///   - trials: how many times to run the model.
+    ///   - seed: the seed for every draw.
+    ///   - registry: the functions to evaluate with.
+    /// - Returns: a completed run.
+    /// - Throws: ``TrialRunError/orderHasACycle(_:)`` if the model is circular, or
+    ///   whatever ``run(over:names:)`` throws.
+    public static func run(
+        survey: ModelSurvey,
+        over cells: any CellValueProvider & PopulatedCellProvider,
+        names: any NameResolver,
+        inSheet sheet: String = "",
+        trials: Int,
+        seed: UInt64,
+        registry: FunctionRegistry = .builtin
+    ) throws -> SimulationRun {
+        let addresses = cells.populatedCells().map { CellAddress(sheet: sheet, cell: $0) }
+        let graph = DependencyGraph(cells: addresses, provider: cells)
+
+        guard graph.isAcyclic else {
+            throw TrialRunError.orderHasACycle(graph.cycles.first?.map(\.cell) ?? [])
+        }
+
+        return try InterpretedRun(
+            survey: survey,
+            evaluationOrder: graph.evaluationOrder.map(\.cell),
+            trials: trials, seed: seed, registry: registry
+        ).run(over: cells, names: names)
     }
 
     // MARK: - Validating the order

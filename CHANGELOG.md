@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The simulation stack.** A Risk Solver workbook can be read, recognised, run and read
+  back. Seven sheets across six real models run end to end, 36 outputs, reproducing
+  exactly under seed.
+  - `PsiRecognizer` — what a formula declares about its role: distribution calls, output
+    markers, and property functions it cannot model, named rather than absorbed.
+  - `ModelSurveyor` / `ModelSurvey` / `UncertainCell` — the same across a sheet, assigning
+    the input indices a sampler fills. Indices are per *call site*, so two draws in one
+    cell stay independent.
+  - `PopulatedCellProvider` — optional enumeration for a provider that knows its own keys.
+    Without it a survey scans the bounding rectangle: measured 34.8s against 1.08s on six
+    real workbooks.
+  - `SimulationResultProvider` and `EvaluationContext.simulation` — the seam that lets
+    `PsiMean(B4)` read a completed run. Without one every statistic answers `#N/A`, which
+    is what Risk Solver shows before a simulation.
+  - `BuiltinRiskSolverStatistics` — `PsiMean`, `PsiStdDev`, `PsiPercentile`, `PsiTarget`,
+    `PsiXtoP`, `PsiBVaR`, `PsiCVaR`. Measured at 70 of 314 Psi calls in real workbooks.
+  - `InterpretedRun` / `SimulationRun` / `TrialRunError` — the trial loop, with the
+    evaluation order validated rather than trusted.
+  - `Lowerer` / `LoweredModel` / `LoweringFailure` — `FormulaAST` compiled to BusinessMath
+    bytecode. 83% of real outputs lower; the rest are cross-sheet.
+
+### Fixed
+
+- **An absolute reference is the same cell.** `CellRef` hashes its `$` markers, so a trial
+  computing `B8` stored it where a formula reading `$B$8` could not find it — falling
+  through to the value Excel cached before the simulation began, and reporting statistics
+  about a model that never propagated.
+- **`PsiTarget` is cumulative and inclusive.** The coverage matrix recorded
+  `probabilityAbove`, the complement; `probabilityBelow` then proved to count strictly
+  `<` where Frontline documents "less than or equal to". On a Bernoulli output that is
+  0.30 against 0.00 — the entire probability mass at the boundary.
+- **`PsiOutput()` is not required.** A cell another formula asks a statistic about is an
+  output by virtue of being asked about. Requiring the marker rejected a real 126-call
+  model outright and cost another eight of its fourteen outputs.
+
 ## [0.6.0] - 2026-09-08
 
 ### Added

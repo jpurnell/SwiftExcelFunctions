@@ -142,6 +142,43 @@ final class InterpretedRunTests: XCTestCase {
         XCTAssertEqual(m, 1.0, accuracy: 0.05)
     }
 
+    // MARK: - Computing the order
+
+    /// The convenience the parameter form existed to avoid needing.
+    ///
+    /// `DependencyGraph` moved to SwiftExcelCore, so this package reaches it without a
+    /// file-format dependency. Same model, same seed, same numbers as the hand-ordered
+    /// run — which is the assertion that says the computed order is the right one.
+    func testComputingTheOrderGivesTheSameRunAsSupplyingIt() throws {
+        let (sheet, order) = try simpleModel()
+        let supplied = try run(sheet, order, trials: 300, seed: 5)
+        let computed = try InterpretedRun.run(
+            survey: ModelSurveyor().survey(sheet), over: sheet, names: NoNames(),
+            trials: 300, seed: 5)
+
+        XCTAssertEqual(supplied.results(for: CellRef("B3"))?.values,
+                       computed.results(for: CellRef("B3"))?.values)
+    }
+
+    /// A circular model has no order, and is refused rather than iterated.
+    func testACircularModelIsRefused() throws {
+        let sheet = try Sheet(formulas: [
+            "B1": "PsiUniform(0, 1)",
+            "B2": "B3+1",
+            "B3": "B2+B1",
+            "B4": "B3+PsiOutput()"
+        ])
+        XCTAssertThrowsError(
+            try InterpretedRun.run(
+                survey: ModelSurveyor().survey(sheet), over: sheet, names: NoNames(),
+                trials: 10, seed: 1)
+        ) { error in
+            guard case TrialRunError.orderHasACycle = error else {
+                return XCTFail("expected orderHasACycle, got \(error)")
+            }
+        }
+    }
+
     // MARK: - Refusing a bad order
 
     /// An order that puts a cell before its own precedent is not an error the loop can
