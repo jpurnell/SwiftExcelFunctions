@@ -1,8 +1,48 @@
 # What the `calls` and `books` columns mean — and why nobody currently knows
 
-**Recorded 2026-09-09. Mostly resolved the same day** — see §"What it was". Read this
-before using `excel_function_coverage_matrix.tsv`'s counts to argue for anything, and in
-particular before reading a zero out of them.
+**Recorded 2026-09-09. Resolved the same day** — see §"The actual answer", which supersedes
+everything between here and it. That section is short and the rest is kept only because it
+was quoted onward while it was believed. Read it first.
+
+## The actual answer: the `books` column is a **sheet** count
+
+The generator was found by the BusinessMath session in a **third repository** —
+`BusinessMathExcel`, `Tests/BusinessMathExcelTests/CorpusMeasurementTests.swift`,
+`testWhichFunctionsTheCorpusCalls`. It loops over each workbook's sheets, incrementing
+`callsByName` per call and `sheetsByName` once per sheet on which a name appears, and prints
+`"\(calls) calls, \(sheets) sheets"`. **Both columns come out of the same loop over the same
+files.** The matrix relabelled `sheets` as `books`.
+
+That single relabelling generated every puzzle below:
+
+- `SUM` 338 is 338 *sheets* across the 79 workbooks — about 4.3 per workbook.
+- `STDEV.S` 42 against a comment's 79 is a sheet count against a workbook count. Two
+  quantities, never in conflict.
+- `EXCEL` 338 against `PSI` 17 is one sweep in which Psi appears on fewer sheets — not two
+  populations, and not two denominators.
+- The perfect zero-alignment is **structural**: the same loop writes both columns, so a
+  function with no calls has no sheets by construction. The test built on it measured the
+  shape of a `for` loop.
+
+**What a `0 / 0` row therefore means**, plainly and without inference: *absent from every
+formula on every sheet of the 79 workbooks swept.* The sweep parses each formula to an AST and
+records every function name in it, so this is a well-defined negative over a named sample —
+stronger than "not separately looked for" and weaker than "absent from 338 workbooks". Both of
+those readings appear below; both are wrong.
+
+**Not independently verified here.** `BusinessMathExcel` is not reachable from this machine's
+Dropbox tree, so this rests on the BusinessMath session's quotation of the source. It explains
+every observation in this document, which nothing else did.
+
+**When the sweep is next run:** rename the column to `sheets`; write the workbook count and
+the date beside the data rather than in prose; and emit a workbook count as well — the outer
+loop already computes it and discards it. `BUSINESSMATHEXCEL_CORPUS` gates that sweep;
+`RISK_SOLVER_WORKBOOKS` is a different gate over a possibly different corpus and does not
+regenerate this file.
+
+---
+
+*Everything below predates the answer above.*
 
 ## The problem
 
@@ -98,10 +138,11 @@ Two explanations fit, and they differ in what a fix would cost:
   column. `SUM` at 338 over 79 workbooks is 4.3 sheets per workbook, which is unremarkable,
   and it explains the perfect zero-alignment without needing two sweeps at all.
 
-Nothing in the repository distinguishes them: the matrix is read by
-`UnreviewedCoverageTests` and generated nowhere, so its provenance is genuinely unrecorded.
-Both predict the same thing for sequencing, and neither is fixed by re-measuring the `books`
-column alone.
+The second is correct — see the top of this document. My claim at the time, that the
+provenance was "unreconstructable from this tree", was true of *this* tree and false as
+stated: the generator lives in `BusinessMathExcel`, which this repository's own `README.md`
+and `master_plan.md` both name. Neither session found it because each searched the repository
+it was standing in.
 
 **What this leaves for sequencing.** 79 workbooks is a real sample, and `COMPLEX`, all 25
 `IM*` rows and all four `FORECAST.ETS*` rows are absent from it — that still says nobody in
