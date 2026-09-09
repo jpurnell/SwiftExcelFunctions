@@ -4,7 +4,7 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.6.0; 269 functions registered, 865 tests, quality gate 45/45 at 0/0.
+**Status:** 0.7.0; 269 functions registered, 909 tests, quality gate 45/45 at 0/0.
 
 - **160** of Microsoft's 519 documented worksheet functions.
 - **109** of Frontline Risk Solver's `Psi*` functions — 106 of its 113 distribution rows — so a
@@ -13,10 +13,30 @@ family is split the way it is.
 Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
 reconciled against the live `FunctionRegistry` rather than maintained by hand.
 
+## Two products
+
+| Product | What it does | Reads files? |
+|---|---|---|
+| **`SwiftExcelFunctions`** | The function library and evaluator. | **No** — works against a `CellValueProvider`, so it evaluates a sheet that never came from a file. |
+| **`WorkbookAudit`** | Audits a spreadsheet the way a quality gate audits code. | Yes — its own target for exactly that reason. |
+
+`WorkbookAudit` ships two checkers, each with the false-positive rate that decided
+whether it is on by default:
+
+- **`circular-reference`** (enabled) — cells depending on themselves, directly or
+  through a chain, across the whole workbook rather than a sheet at a time. **0
+  findings across 6 real workbooks.**
+- **`consistency`** (opt-in) — one cell in a run differing from its neighbours,
+  compared modulo relative offset so a copied formula counts as the same shape. It
+  finds real defects, and it produced **249 findings across 33% of six real
+  workbooks**. A checker firing that broadly gets a validator switched off wholesale,
+  taking the checker that *was* right with it — so it is opt-in until the rate comes
+  down.
+
 ## Installation
 
 ```swift
-.package(url: "https://github.com/jpurnell/SwiftExcelFunctions", from: "0.6.0")
+.package(url: "https://github.com/jpurnell/SwiftExcelFunctions", from: "0.7.0")
 ```
 
 Requires Swift 6 and macOS 14. Depends on SwiftExcelCore for the spreadsheet vocabulary and

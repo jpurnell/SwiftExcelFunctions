@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-08
+
 ### Removed
 
 - **`enum SwiftExcelFunctions` and its `version` constant.** The same scaffold
@@ -75,6 +77,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     rate comes down.
 
 ### Changed
+
+- **Depends on SwiftExcelCore 0.6.0 and SwiftXLSX 0.23.0, and the dependency graph
+  is now reachable from the library.**
+
+  `DependencyGraph` moved to SwiftExcelCore, so this package can build one from a
+  `CellValueProvider` without a file-format dependency. Verified rather than
+  assumed: a probe in the **library** target — not the test target, which could
+  always reach SwiftXLSX — compiles `DependencyGraph(cells:provider:)` against
+  SwiftExcelCore alone, and the library target imports SwiftXLSX in no file.
+
+  That closes the case the move was argued on. A trial loop needs a topological
+  order with cycle detection, and the alternative to reaching this one was a second
+  Kahn's implementation — two orders that could disagree, in a package whose
+  evaluator relies on the first.
+
+  The type's designated initialiser there is `init(cells:provider:)`. The cell set
+  is supplied rather than discovered because `CellValueProvider` answers "what is at
+  this address?" and cannot be asked "which addresses do you have?" — the same gap
+  `PopulatedCellProvider` names on this side.
+
 
 - `FunctionRegistry.canonical(_:)` is now public. `WorkbookAudit` needs the same `_xll.` /
   `_xlfn.` normalisation the recognizer does, and the alternative to exposing it was a
@@ -601,7 +623,8 @@ mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 3
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.3.0...v0.4.0
