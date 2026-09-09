@@ -68,9 +68,18 @@ so reading them means `gh api`.
 
 ## 5. Open decisions
 
-1. **The `IM*` family (21 rows).** Blocked on the complex-notation proposal landing. Once it
-   does, each binding is parse → call swift-numerics → format. swift-numerics already has
-   *all* the mathematics; BusinessMath already depends on `Numerics`.
+1. **The complex family — 26 rows, not the 21 I first said: 25 `IM*` plus `COMPLEX`.**
+   Blocked on the notation codec being *written* in BusinessMath, not on the proposal, which
+   has landed. Each binding is then parse → call swift-numerics → format; swift-numerics has
+   *all* the mathematics and BusinessMath already depends on `Numerics`.
+
+   **All 26 are `0 calls / 0 books` in the corpus.** This is specification coverage with no
+   measured demand behind it, which is the argument for sequencing it after anything the
+   corpus does call. `COMPLEX(real_num, i_num, [suffix])` is the only row where a suffix is
+   selected, and it selects it by argument — so a canonical `i`-only writer upstream is
+   sufficient and the binding swaps the final character. Whether Excel emits a suffix at all
+   for a zero imaginary part is a spec question to settle when the binding is written; do not
+   assume it.
 2. **Lookup's 18 array-returning functions.** Still gated on the array-shape design
    decision — `UNIQUE` and `FILTER` first as the spike, since `HSTACK`/`VSTACK` have
    statically known shapes and would settle nothing.
