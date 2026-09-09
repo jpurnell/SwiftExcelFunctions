@@ -81,6 +81,7 @@ public struct FunctionRegistry: Sendable {
         let allCategories: [[ExcelFunction]] = [
             BuiltinMathFunctions.all,
             BuiltinMathPrimitives.all,
+            BuiltinEngineeringFunctions.all,
             BuiltinStatsFunctions.all,
             BuiltinFinancialFunctions.all,
             BuiltinLogicFunctions.all,

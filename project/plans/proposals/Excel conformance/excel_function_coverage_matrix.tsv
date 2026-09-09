@@ -429,27 +429,27 @@ EXCEL	BESSELJ	engineering	unreviewed		0	0	X, N
 EXCEL	BESSELK	engineering	unreviewed		0	0	X, N
 EXCEL	BESSELY	engineering	unreviewed		0	0	X, N
 EXCEL	BIN2DEC	engineering	have	math	0	0	number
-EXCEL	BIN2HEX	engineering	unreviewed		0	0	number, [places]
-EXCEL	BIN2OCT	engineering	unreviewed		0	0	number, [places]
-EXCEL	BITAND	engineering	unreviewed		0	0	number1, number2
-EXCEL	BITLSHIFT	engineering	unreviewed		0	0	number, shift_amount
-EXCEL	BITOR	engineering	unreviewed		0	0	number1, number2
-EXCEL	BITRSHIFT	engineering	unreviewed		0	0	number, shift_amount
-EXCEL	BITXOR	engineering	unreviewed		0	0	number1, number2
+EXCEL	BIN2HEX	engineering	have	engineering	0	0	number, [places]
+EXCEL	BIN2OCT	engineering	have	engineering	0	0	number, [places]
+EXCEL	BITAND	engineering	have	engineering	0	0	number1, number2
+EXCEL	BITLSHIFT	engineering	have	engineering	0	0	number, shift_amount
+EXCEL	BITOR	engineering	have	engineering	0	0	number1, number2
+EXCEL	BITRSHIFT	engineering	have	engineering	0	0	number, shift_amount
+EXCEL	BITXOR	engineering	have	engineering	0	0	number1, number2
 EXCEL	COMPLEX	engineering	unreviewed		0	0	real_num, i_num, [suffix]
 EXCEL	CONVERT	engineering	unreviewed		0	0	number,from_unit,to_unit
 EXCEL	DEC2BIN	engineering	have	math	0	0	number, [places]
 EXCEL	DEC2HEX	engineering	have	math	0	0	number, [places]
 EXCEL	DEC2OCT	engineering	have	math	0	0	number, [places]
-EXCEL	DELTA	engineering	unreviewed		0	0	number1, [number2]
-EXCEL	ERF	engineering	unreviewed		0	0	lower_limit,[upper_limit]
-EXCEL	ERF.PRECISE	engineering	unreviewed		0	0	x
-EXCEL	ERFC	engineering	unreviewed		0	0	x
-EXCEL	ERFC.PRECISE	engineering	unreviewed		0	0	x
-EXCEL	GESTEP	engineering	unreviewed		0	0	number, [step]
-EXCEL	HEX2BIN	engineering	unreviewed		0	0	number, [places]
+EXCEL	DELTA	engineering	have	engineering	0	0	number1, [number2]
+EXCEL	ERF	engineering	have	engineering	0	0	lower_limit,[upper_limit]
+EXCEL	ERF.PRECISE	engineering	have	engineering	0	0	x
+EXCEL	ERFC	engineering	have	engineering	0	0	x
+EXCEL	ERFC.PRECISE	engineering	have	engineering	0	0	x
+EXCEL	GESTEP	engineering	have	engineering	0	0	number, [step]
+EXCEL	HEX2BIN	engineering	have	engineering	0	0	number, [places]
 EXCEL	HEX2DEC	engineering	have	math	0	0	number
-EXCEL	HEX2OCT	engineering	unreviewed		0	0	number, [places]
+EXCEL	HEX2OCT	engineering	have	engineering	0	0	number, [places]
 EXCEL	IMABS	engineering	unreviewed		0	0	inumber
 EXCEL	IMAGINARY	engineering	unreviewed		0	0	inumber
 EXCEL	IMARGUMENT	engineering	unreviewed		0	0	inumber
@@ -475,9 +475,9 @@ EXCEL	IMSQRT	engineering	unreviewed		0	0	inumber
 EXCEL	IMSUB	engineering	unreviewed		0	0	inumber1, inumber2
 EXCEL	IMSUM	engineering	unreviewed		0	0	inumber1, [inumber2], ...
 EXCEL	IMTAN	engineering	unreviewed		0	0	inumber
-EXCEL	OCT2BIN	engineering	unreviewed		0	0	number, [places]
+EXCEL	OCT2BIN	engineering	have	engineering	0	0	number, [places]
 EXCEL	OCT2DEC	engineering	have	math	0	0	number
-EXCEL	OCT2HEX	engineering	unreviewed		0	0	number, [places]
+EXCEL	OCT2HEX	engineering	have	engineering	0	0	number, [places]
 EXCEL	BETADIST	compatibility	unreviewed		0	0	x,alpha,beta,[A],[B]
 EXCEL	BETAINV	compatibility	unreviewed		0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOMDIST	compatibility	unreviewed		0	0	number_s,trials,probability_s,cumulative
