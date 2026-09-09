@@ -1,7 +1,8 @@
 # What the `calls` and `books` columns mean — and why nobody currently knows
 
-**Recorded 2026-09-09.** Unresolved. Read this before using
-`excel_function_coverage_matrix.tsv`'s counts to argue for anything.
+**Recorded 2026-09-09. Mostly resolved the same day** — see §"What it was". Read this
+before using `excel_function_coverage_matrix.tsv`'s counts to argue for anything, and in
+particular before reading a zero out of them.
 
 ## The problem
 
@@ -46,6 +47,59 @@ with its source rather than as a fact about the workbooks.
 
 The `status` column is unaffected — it is verifiable against the source tree, and was
 corrected for five rows in `84d92c7`.
+
+## What it was: the two halves have different denominators
+
+Group the matrix by its source tag and take the maxima. The answer is in the file:
+
+| Tag | Rows | Rows with any books | Max books | Max calls |
+|---|---|---|---|---|
+| `EXCEL` | 519 | 69 | **338** (`SUM`) | 168,779 (`IFERROR`) |
+| `PSI` | 296 | 20 | **17** (`PsiTriangular`) | 95 (`PsiBaseCase`) |
+
+A ceiling of seventeen workbooks across an entire function family, against three hundred and
+thirty-eight for the other, is not sampling variation. **The two halves were swept over
+different sets of files**, so every comparison across that line has been comparing
+denominators. Found by the BusinessMath session; confirmed here against this file, with
+identical maxima.
+
+That resolves most of the table above:
+
+- **`PsiOutput` 167/41 against 24/11 is not a contradiction.** The matrix's Psi half cannot
+  report 41 books for anything — its ceiling is 17. The comment came from a larger Psi sweep.
+- **The rank disagreement is explained.** "More workbooks than any other member of the
+  family" is true under that sweep and false under this half. Different populations.
+- **`STDEV.S` remains open**, and it is the interesting one, because it sits entirely inside
+  the `EXCEL` half: the same extraction produced 86,410 in both places while the book
+  denominator differs, 79 against 42.
+
+### A zero is not a zero
+
+This is the part that bears on sequencing:
+
+- **An `EXCEL` zero means absent from a population reaching 338 workbooks.** Strong evidence.
+  `COMPLEX`, all 25 `IM*` rows and all four `FORECAST.ETS*` rows are `EXCEL` rows, so their
+  zero demand is well evidenced.
+- **A `PSI` zero means absent from a population topping out at 17.** Thin evidence. Every
+  `PsiForecast*` row is a `PSI` row.
+
+So "no unbound row has any corpus demand" holds **firmly for the Excel half and weakly for
+the Psi half**. Quote it with the half it applies to.
+
+### And "the 41-workbook corpus" is wrong
+
+That phrase has been used in this repository and in session summaries. `SUM` alone appears in
+338 workbooks. Forty-one was only ever how many workbooks carried Psi under one sweep, and it
+is the denominator of nothing in the `EXCEL` half.
+
+## Still open
+
+- The `STDEV.S` book discrepancy, 79 against 42, inside the `EXCEL` half.
+- Which Psi sweep is authoritative — the one behind the source comments, or the one behind
+  this file's `PSI` rows.
+- A third file version exists: the BusinessMath session's `excel_function_coverage_matrix_bak.tsv`
+  counts one fewer row under each tag than this file. Same maxima, so it does not affect
+  anything above, but the two are not identical and neither records its date.
 
 ## How to resolve it
 
