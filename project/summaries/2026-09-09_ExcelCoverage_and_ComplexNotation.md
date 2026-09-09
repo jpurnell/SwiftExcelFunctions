@@ -51,6 +51,36 @@ as `public let` constructor arguments, so returning them today reports an input 
 and **SMAPE**, the only metric missing from `STAT`'s eight. Five of the eight are answerable
 by code that already exists. `NelderMead` supplies the search.
 
+**Measured against Excel for Mac, 2026-09-09 — the SMAPE convention is settled.** Justin ran
+`=FORECAST.ETS.STAT($D$21:$D$32,$C$21:$C$32,$D34,0)` over an alternating `+1, -1` series with
+seasonality forced to `0`:
+
+| Statistic | Type | Result |
+|---|---|---|
+| SMAPE | 5 | **1.94306435** |
+| MAE | 6 | 1.040036514 |
+| Alpha | 1 | 0.126 |
+
+**Excel uses the halved denominator**, `(|a| + |f|) / 2`, ranging `0-2`. This is decisive
+rather than suggestive: the unhalved form is `|a - f| / (|a| + |f|)`, which the triangle
+inequality bounds at `1` for every term and therefore at `1` for their mean. A reading of
+1.943 cannot be produced by it. MAE at 1.04 against actuals of ±1 confirms the forecasts sat
+near zero, which is what makes each term ≈ `1/0.5` = 2.
+
+The alpha reading answers nothing about boundary saturation and that was my design error: I
+attached the saturation question to the series built for the SMAPE question, and they need
+opposite data. Alpha → 1 is optimal for a *random walk*; an alternating series is maximally
+anti-persistent, so a small alpha is correct there. A second attempt
+(`10,12,11,14,13,16,15,18,20,19,22,21`) failed the same way — a trend with sawtooth noise,
+also mean-reverting — and returned 0.002. **Do not re-run this without a genuinely driftless
+walk**, and note that twelve points may be too few regardless, since the trend component
+absorbs part of the walk. It does not matter: snapping at saturation was settled on its own
+merits, and Excel's answer would only say whether we match in a corner.
+
+One thing the alpha reading does establish: 0.126 is neither the `0.2` library default nor a
+boundary, so **Excel genuinely fits alpha** rather than reporting a constant. That validates
+the premise behind `STAT` types 1-3.
+
 The Excel side of it stays here: `data_completion`, `aggregation`, timeline step detection
 (which is `STAT` type 8 and never reaches a model), the `statistic_type` dispatch, and the
 `#NUM!`/`#VALUE!`/`#N/A` mapping — all of Excel's error conditions are timeline conditions
