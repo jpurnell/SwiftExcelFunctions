@@ -32,7 +32,10 @@ those readings appear below; both are wrong.
 
 **Not independently verified here.** `BusinessMathExcel` is not reachable from this machine's
 Dropbox tree, so this rests on the BusinessMath session's quotation of the source. It explains
-every observation in this document, which nothing else did.
+every observation in this document, which nothing else did. Citable, for whoever next has both
+trees — in `BusinessMathExcel/Tests/BusinessMathExcelTests/CorpusMeasurementTests.swift`: the
+test at **183**, the corpus gate at **59**, the sheet accumulator at **195–203**, the print at
+**220**. One command to check rather than an afternoon to re-derive.
 
 **When the sweep is next run:** rename the column to `sheets`; write the workbook count and
 the date beside the data rather than in prose; and emit a workbook count as well — the outer
