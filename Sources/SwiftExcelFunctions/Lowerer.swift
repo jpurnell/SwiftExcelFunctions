@@ -169,73 +169,67 @@ public struct Lowerer: Sendable {
         failures: inout [LoweringFailure], visiting: inout Set<CellRef>,
         audited: inout Set<CellRef>
     ) {
+        // What this node itself rules out. Recursion is `FormulaAST.children`, so the node
+        // list lives in one place and adding a kind cannot silently skip this pass.
         switch ast {
-        case .number, .bool, .missing:
-            break
-
         case .text, .concatenate:
-            failures.append(.textValued(at: cell))
-
+            failures.append(.textValued(at: cell)); return
         case .error(let e):
-            failures.append(.errorValued(e, at: cell))
-
+            failures.append(.errorValued(e, at: cell)); return
         case .sheetRef:
-            failures.append(.unsupportedNode("sheet reference", at: cell))
+            failures.append(.unsupportedNode("sheet reference", at: cell)); return
         case .namedRange(let name):
-            failures.append(.unsupportedNode("named range \(name)", at: cell))
+            failures.append(.unsupportedNode("named range \(name)", at: cell)); return
 
         case .cellRef(let ref):
-            // An uncertain cell is an input and stops the walk. Anything else is inlined,
+            // An uncertain cell is an input and stops the walk; anything else is inlined,
             // so its own formula has to lower too.
-            guard !isUncertain(ref, in: survey) else { break }
+            guard !isUncertain(ref, in: survey) else { return }
             if cells.value(at: ref)?.formulaAST != nil {
                 audit(cell: ref, survey: survey, cells: cells,
                       failures: &failures, visiting: &visiting, audited: &audited)
             } else if cells.value(at: ref) == nil {
                 failures.append(.unresolvedReference(ref, at: cell))
             }
+            return
 
         case .cellRange(let range):
             for member in range.clipped(to: cells.lastPopulatedCell())?.cells ?? [] {
-                guard !isUncertain(member, in: survey) else { continue }
-                if cells.value(at: member)?.formulaAST != nil {
-                    audit(cell: member, survey: survey, cells: cells,
-                          failures: &failures, visiting: &visiting, audited: &audited)
-                }
-            }
-
-        case .add(let l, let r), .subtract(let l, let r), .multiply(let l, let r),
-             .divide(let l, let r), .power(let l, let r),
-             .equal(let l, let r), .notEqual(let l, let r),
-             .greaterThan(let l, let r), .lessThan(let l, let r),
-             .greaterOrEqual(let l, let r), .lessOrEqual(let l, let r):
-            audit(l, in: cell, survey: survey, cells: cells,
-                  failures: &failures, visiting: &visiting, audited: &audited)
-            audit(r, in: cell, survey: survey, cells: cells,
-                  failures: &failures, visiting: &visiting, audited: &audited)
-
-        case .negate(let operand):
-            audit(operand, in: cell, survey: survey, cells: cells,
-                  failures: &failures, visiting: &visiting, audited: &audited)
-
-        case .function(let rawName, let arguments):
-            let name = FunctionRegistry.canonical(rawName)
-
-            if Self.addressComputing.contains(name) {
-                failures.append(.computedAddress(function: name, at: cell))
-                return
-            }
-            // A distribution here means an uncertain cell was reached through a path the
-            // survey did not index — nothing to audit, the sampler supplies it.
-            if name == "PSIOUTPUT" || PsiRecognizer.statistics.contains(name) { return }
-            if !Self.representable.contains(name) {
-                failures.append(.unrepresentableFunction(name: name, at: cell))
-                return
-            }
-            for argument in arguments {
-                audit(argument, in: cell, survey: survey, cells: cells,
+                guard !isUncertain(member, in: survey),
+                      cells.value(at: member)?.formulaAST != nil else { continue }
+                audit(cell: member, survey: survey, cells: cells,
                       failures: &failures, visiting: &visiting, audited: &audited)
             }
+            return
+
+        case .function(let rawName, _):
+            let name = FunctionRegistry.canonical(rawName)
+            if Self.addressComputing.contains(name) {
+                failures.append(.computedAddress(function: name, at: cell)); return
+            }
+            // A distribution or a statistic here needs nothing audited — the sampler
+            // supplies one and a completed run supplies the other.
+            if name == "PSIOUTPUT" || PsiRecognizer.statistics.contains(name) { return }
+            if !Self.representable.contains(name) {
+                failures.append(.unrepresentableFunction(name: name, at: cell)); return
+            }
+
+        case .number, .bool, .missing:
+            return
+
+        // Structural: nothing about the node itself refuses, and the recursion below
+        // reaches its operands. Listed rather than defaulted so that a node kind added to
+        // `FormulaAST` fails to compile here and gets a decision, instead of being walked
+        // into silently by a pass whose job is to refuse what it cannot represent.
+        case .add, .subtract, .multiply, .divide, .power,
+             .equal, .notEqual, .greaterThan, .lessThan, .greaterOrEqual, .lessOrEqual,
+             .negate:
+            break
+        }
+
+        for child in ast.children {
+            audit(child, in: cell, survey: survey, cells: cells,
+                  failures: &failures, visiting: &visiting, audited: &audited)
         }
     }
 
@@ -347,6 +341,15 @@ extension Lowerer {
                   builder: builder, failure: &failure, depth: next)
         }
 
+        // Twelve binary operators, one path. `FormulaAST` gives each its own case, which
+        // is right for exact matching and wrong here: they differ only in the function
+        // applied to the operands, and writing them out was forty lines that had to be
+        // read to discover they were all the same.
+        if let (kind, lhs, rhs) = ast.binary {
+            guard let a = sub(lhs), let b = sub(rhs) else { return nil }
+            return apply(kind, a, b, in: cell, builder: builder, failure: &failure)
+        }
+
         switch ast {
         case .number(let v): return .value(v)
         case .bool(let b): return .value(b ? 1 : 0)
@@ -361,40 +364,14 @@ extension Lowerer {
             return build(cell: ref, survey: survey, cells: cells,
                          builder: builder, failure: &failure, depth: next)
 
-        case .add(let l, let r):
-            return combine(sub(l), sub(r), (+), { $0 + $1 }, { $0 + $1 }, { $0 + $1 })
-        case .subtract(let l, let r):
-            return combine(sub(l), sub(r), (-), { $0 - $1 }, { $0 - $1 }, { $0 - $1 })
-        case .multiply(let l, let r):
-            return combine(sub(l), sub(r), (*), { $0 * $1 }, { $0 * $1 }, { $0 * $1 })
-        case .divide(let l, let r):
-            return combine(sub(l), sub(r), (/), { $0 / $1 }, { $0 / $1 }, { $0 / $1 })
-
-        case .power(let l, let r):
-            guard let a = sub(l), let b = sub(r) else { return nil }
-            switch (a, b) {
-            case (.value(let x), .value(let y)): return .value(pow(x, y))
-            case (.expression(let e), .value(let y)): return .expression(e.power(y))
-            default:
-                return .expression(a.proxy(builder).power(b.proxy(builder)))
-            }
-
         case .negate(let operand):
             guard let a = sub(operand) else { return nil }
             if case .value(let v) = a { return .value(-v) }
             return .expression(-a.proxy(builder))
 
-        case .greaterThan(let l, let r): return compare(sub(l), sub(r), builder) { $0.greaterThan($1) } cmp: { $0 > $1 }
-        case .lessThan(let l, let r): return compare(sub(l), sub(r), builder) { $0.lessThan($1) } cmp: { $0 < $1 }
-        case .greaterOrEqual(let l, let r): return compare(sub(l), sub(r), builder) { $0.greaterOrEqual($1) } cmp: { $0 >= $1 }
-        case .lessOrEqual(let l, let r): return compare(sub(l), sub(r), builder) { $0.lessOrEqual($1) } cmp: { $0 <= $1 }
-        case .equal(let l, let r): return compare(sub(l), sub(r), builder) { $0.equal($1) } cmp: { $0 == $1 }
-        case .notEqual(let l, let r): return compare(sub(l), sub(r), builder) { $0.notEqual($1) } cmp: { $0 != $1 }
-
-        case .cellRange(let range):
-            // A range is not a value; only an aggregate consumes one. Reaching here means
-            // a range was used where a scalar was expected.
-            _ = range
+        case .cellRange:
+            // A range is not a value; only an aggregate consumes one, and an aggregate
+            // flattens its arguments before reaching here.
             failure = .unsupportedNode("a range outside an aggregate", at: cell)
             return nil
 
@@ -411,42 +388,96 @@ extension Lowerer {
             failure = .unsupportedNode("sheet reference", at: cell); return nil
         case .namedRange(let name):
             failure = .unsupportedNode("named range \(name)", at: cell); return nil
+
+        case .add, .subtract, .multiply, .divide, .power, .concatenate,
+             .equal, .notEqual, .greaterThan, .lessThan, .greaterOrEqual, .lessOrEqual:
+            // Taken by `ast.binary` above. Present so the switch stays exhaustive.
+            return nil
         }
     }
 
-    /// Folds two nodes, keeping constants constant.
-    private func combine(
-        _ lhs: Node?, _ rhs: Node?,
-        _ fold: (Double, Double) -> Double,
-        _ exprExpr: (ExpressionProxy, ExpressionProxy) -> ExpressionProxy,
-        _ exprValue: (ExpressionProxy, Double) -> ExpressionProxy,
-        _ valueExpr: (Double, ExpressionProxy) -> ExpressionProxy
+    /// Applies one binary operator to two lowered operands.
+    ///
+    /// Constants fold here, so `2*3` never becomes bytecode. Comparisons return 1 or 0,
+    /// which is both Excel's convention and what `Expression`'s comparison opcodes emit —
+    /// the two agreeing is why `AND` can be a product.
+    private func apply(
+        _ kind: BinaryKind, _ a: Node, _ b: Node, in cell: CellRef,
+        builder: ExpressionBuilder, failure: inout LoweringFailure?
     ) -> Node? {
-        guard let a = lhs, let b = rhs else { return nil }
-        switch (a, b) {
-        case (.value(let x), .value(let y)):
-            return .value(fold(x, y))
-        case (.expression(let e), .value(let y)):
-            return .expression(exprValue(e, y))
-        case (.value(let x), .expression(let e)):
-            // A separate overload rather than reordering the operands, because not every
-            // operator commutes — `x - e` is not `e - x`, and `x / e` is emphatically not
-            // `e / x`. BusinessMath ships the Double-on-the-left forms for exactly this.
-            return .expression(valueExpr(x, e))
-        case (.expression(let e), .expression(let f)):
-            return .expression(exprExpr(e, f))
+        if kind == .concatenate { failure = .textValued(at: cell); return nil }
+
+        if kind.isComparison {
+            if case .value(let x) = a, case .value(let y) = b {
+                return .value(Self.compareValues(kind, x, y) ? 1 : 0)
+            }
+            let l = a.proxy(builder), r = b.proxy(builder)
+            switch kind {
+            case .equal: return .expression(l.equal(r))
+            case .notEqual: return .expression(l.notEqual(r))
+            case .greaterThan: return .expression(l.greaterThan(r))
+            case .lessThan: return .expression(l.lessThan(r))
+            case .greaterOrEqual: return .expression(l.greaterOrEqual(r))
+            case .lessOrEqual: return .expression(l.lessOrEqual(r))
+            default: return nil
+            }
+        }
+
+        switch (kind, a, b) {
+        case (_, .value(let x), .value(let y)):
+            return .value(Self.foldValues(kind, x, y))
+
+        case (.power, .expression(let e), .value(let y)):
+            return .expression(e.power(y))
+        case (.power, _, _):
+            return .expression(a.proxy(builder).power(b.proxy(builder)))
+
+        case (.add, .expression(let e), .value(let y)): return .expression(e + y)
+        case (.add, .value(let x), .expression(let e)): return .expression(x + e)
+        case (.add, .expression(let e), .expression(let f)): return .expression(e + f)
+
+        case (.subtract, .expression(let e), .value(let y)): return .expression(e - y)
+        case (.subtract, .value(let x), .expression(let e)): return .expression(x - e)
+        case (.subtract, .expression(let e), .expression(let f)): return .expression(e - f)
+
+        case (.multiply, .expression(let e), .value(let y)): return .expression(e * y)
+        case (.multiply, .value(let x), .expression(let e)): return .expression(x * e)
+        case (.multiply, .expression(let e), .expression(let f)): return .expression(e * f)
+
+        case (.divide, .expression(let e), .value(let y)): return .expression(e / y)
+        case (.divide, .value(let x), .expression(let e)): return .expression(x / e)
+        case (.divide, .expression(let e), .expression(let f)): return .expression(e / f)
+
+        default:
+            return nil
         }
     }
 
-    private func compare(
-        _ lhs: Node?, _ rhs: Node?, _ builder: ExpressionBuilder,
-        _ op: (ExpressionProxy, ExpressionProxy) -> ExpressionProxy,
-        cmp: (Double, Double) -> Bool
-    ) -> Node? {
-        guard let a = lhs, let b = rhs else { return nil }
-        if case .value(let x) = a, case .value(let y) = b { return .value(cmp(x, y) ? 1 : 0) }
-        return .expression(op(a.proxy(builder), b.proxy(builder)))
+    /// The value-level fold for a non-comparison operator.
+    private static func foldValues(_ kind: BinaryKind, _ x: Double, _ y: Double) -> Double {
+        switch kind {
+        case .add: return x + y
+        case .subtract: return x - y
+        case .multiply: return x * y
+        case .divide: return x / y
+        case .power: return pow(x, y)
+        default: return 0
+        }
     }
+
+    /// The value-level comparison.
+    private static func compareValues(_ kind: BinaryKind, _ x: Double, _ y: Double) -> Bool {
+        switch kind {
+        case .equal: return x == y
+        case .notEqual: return x != y
+        case .greaterThan: return x > y
+        case .lessThan: return x < y
+        case .greaterOrEqual: return x >= y
+        case .lessOrEqual: return x <= y
+        default: return false
+        }
+    }
+
 }
 
 // MARK: - Function rules
@@ -549,8 +580,9 @@ extension Lowerer {
             for i in 0..<width {
                 var term = columns[0][i]
                 for column in columns.dropFirst() {
-                    guard let product = combine(
-                        term, column[i], (*), { $0 * $1 }, { $0 * $1 }, { $0 * $1 })
+                    guard let product = apply(
+                        .multiply, term, column[i], in: cell,
+                        builder: builder, failure: &failure)
                     else { return nil }
                     term = product
                 }
@@ -625,16 +657,18 @@ extension Lowerer {
             for (offset, flow) in flows.enumerated() {
                 let period = Double(offset + 1)
                 // (1 + r)^period
-                guard let onePlusRate = combine(
-                        .value(1), rateNode, (+), { $0 + $1 }, { $0 + $1 }, { $0 + $1 })
+                guard let onePlusRate = apply(
+                        .add, .value(1), rateNode, in: cell,
+                        builder: builder, failure: &failure)
                 else { return nil }
                 let discount: Node
                 switch onePlusRate {
                 case .value(let v): discount = .value(pow(v, period))
                 case .expression(let e): discount = .expression(e.power(period))
                 }
-                guard let term = combine(
-                        flow, discount, (/), { $0 / $1 }, { $0 / $1 }, { $0 / $1 })
+                guard let term = apply(
+                        .divide, flow, discount, in: cell,
+                        builder: builder, failure: &failure)
                 else { return nil }
                 terms.append(term)
             }

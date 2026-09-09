@@ -230,59 +230,22 @@ public struct PsiRecognizer: Sendable {
 
     // MARK: - Traversal
 
-    /// Walks the whole tree, because both markings are subexpressions.
+    /// Visits every function call, canonical name first.
     ///
-    /// The corpus writes `PsiOutput` onto a real formula — `=SUM(J2:J11)+_xll.PsiOutput()`,
-    /// 167 times across 41 workbooks — so inspecting the root would find almost none of
-    /// them. A distribution nests just as freely: `IF(A1>0, PsiNormal(0,1), 0)`.
+    /// Both markings are subexpressions, so the whole tree has to be walked: the corpus
+    /// writes `PsiOutput` onto a real formula — `=SUM(J2:J11)+_xll.PsiOutput()`, 167 times
+    /// across 41 workbooks — and inspecting the root would find almost none of them. A
+    /// distribution nests just as freely: `IF(A1>0, PsiNormal(0,1), 0)`.
+    ///
+    /// The traversal itself is `FormulaAST.walk(maxDepth:_:)`, so this file does not carry
+    /// its own copy of the node list.
     static func visitFunctionCalls(
         _ ast: FormulaAST,
         _ visit: (String, [FormulaAST]) -> Void
     ) {
-        visitFunctionCalls(ast, depth: 0, visit)
-    }
-
-    /// The traversal proper, bounded the way the evaluator bounds its own.
-    ///
-    /// The base case is structural — every leaf returns — but a bound is carried anyway,
-    /// and it is ``FormulaEvaluator/maxDepth`` rather than a second number. A formula the
-    /// evaluator would refuse as too deep is one this must not recurse into either, and
-    /// two limits that could disagree would mean a formula the recognizer walked and the
-    /// evaluator rejected. Silently stopping is correct here: a tree deeper than the
-    /// evaluator will ever enter has no simulation role to report.
-    private static func visitFunctionCalls(
-        _ ast: FormulaAST,
-        depth: Int,
-        _ visit: (String, [FormulaAST]) -> Void
-    ) {
-        guard depth < FormulaEvaluator.maxDepth else { return }
-        let next = depth + 1
-
-        switch ast {
-        case .function(let rawName, let arguments):
+        ast.walk { node in
+            guard case .function(let rawName, let arguments) = node else { return }
             visit(FunctionRegistry.canonical(rawName), arguments)
-
-            // Descend regardless. A distribution's own arguments can contain another
-            // distribution — `PsiNormal(PsiUniform(0, 1), 10)` is legal and is two draws.
-            for argument in arguments {
-                visitFunctionCalls(argument, depth: next, visit)
-            }
-
-        case .add(let lhs, let rhs), .subtract(let lhs, let rhs),
-             .multiply(let lhs, let rhs), .divide(let lhs, let rhs),
-             .power(let lhs, let rhs), .concatenate(let lhs, let rhs),
-             .equal(let lhs, let rhs), .notEqual(let lhs, let rhs),
-             .greaterThan(let lhs, let rhs), .lessThan(let lhs, let rhs),
-             .greaterOrEqual(let lhs, let rhs), .lessOrEqual(let lhs, let rhs):
-            visitFunctionCalls(lhs, depth: next, visit)
-            visitFunctionCalls(rhs, depth: next, visit)
-
-        case .negate(let operand):
-            visitFunctionCalls(operand, depth: next, visit)
-
-        case .cellRef, .cellRange, .sheetRef, .namedRange,
-             .number, .text, .bool, .error, .missing:
-            break
         }
     }
 

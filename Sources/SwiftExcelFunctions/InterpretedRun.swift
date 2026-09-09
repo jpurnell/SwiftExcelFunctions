@@ -255,47 +255,29 @@ public struct InterpretedRun: Sendable {
     ///
     /// Ranges are expanded, because `SUM(A1:A3)` depends on all three.
     ///
-    /// **Clipped first, and this matters.** `SUM($A:$A)` is a whole-column reference —
-    /// the corpus's most common range notation, and 87,773 `VLOOKUP` calls' worth of it —
+    /// **Clipped first, and this matters.** `SUM($A:$A)` is a whole-column reference — the
+    /// corpus's most common range notation, and 87,773 `VLOOKUP` calls' worth of it —
     /// which names a million cells. Expanding one to validate an order would cost more
-    /// than the simulation. `clipped(to:)` cuts it to what the sheet actually holds, which
-    /// is the only part that can be a precedent anyway.
-    ///
-    /// Bounded by ``FormulaEvaluator/maxDepth`` for the same reason the recognizer's walk
-    /// is: a formula the evaluator would refuse is one this must not recurse into either.
+    /// than the simulation it was guarding. `clipped(to:)` cuts it to what the sheet
+    /// actually holds, which is the only part that can be a precedent anyway.
     ///
     /// - Parameters:
     ///   - ast: the formula to read.
     ///   - limit: the sheet's last populated cell, to clip open ranges against.
-    ///   - depth: recursion depth, bounded as above.
-    static func referencedCells(
-        in ast: FormulaAST, limit: CellRef? = nil, depth: Int = 0
-    ) -> Set<CellRef> {
-        guard depth < FormulaEvaluator.maxDepth else { return [] }
-        let next = depth + 1
-
-        switch ast {
-        case .cellRef(let ref):
-            return [ref]
-        case .cellRange(let range):
-            guard let clipped = range.clipped(to: limit) else { return [] }
-            return Set(clipped.cells)
-        case .function(_, let arguments):
-            return arguments.reduce(into: Set<CellRef>()) {
-                $0.formUnion(referencedCells(in: $1, limit: limit, depth: next))
+    /// - Returns: the cells it reads.
+    static func referencedCells(in ast: FormulaAST, limit: CellRef? = nil) -> Set<CellRef> {
+        var found: Set<CellRef> = []
+        ast.walk { node in
+            switch node {
+            case .cellRef(let ref):
+                found.insert(ref)
+            case .cellRange(let range):
+                found.formUnion(range.clipped(to: limit)?.cells ?? [])
+            default:
+                break
             }
-        case .add(let l, let r), .subtract(let l, let r), .multiply(let l, let r),
-             .divide(let l, let r), .power(let l, let r), .concatenate(let l, let r),
-             .equal(let l, let r), .notEqual(let l, let r),
-             .greaterThan(let l, let r), .lessThan(let l, let r),
-             .greaterOrEqual(let l, let r), .lessOrEqual(let l, let r):
-            return referencedCells(in: l, limit: limit, depth: next)
-                .union(referencedCells(in: r, limit: limit, depth: next))
-        case .negate(let operand):
-            return referencedCells(in: operand, limit: limit, depth: next)
-        case .sheetRef, .namedRange, .number, .text, .bool, .error, .missing:
-            return []
         }
+        return found
     }
 }
 
