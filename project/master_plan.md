@@ -215,44 +215,90 @@ full-corpus census, which currently traps partway through.
 1. ~~**Extract the 73 unchanged**, with their tests, before adding anything.~~ **Done** in 0.1.0.
 2. ~~**Bind the statistical block.**~~ **Done.** The dotted spellings landed; `STDEV.S`, 86,410
    corpus calls and reachable from no formula at the time, now resolves.
-3. **Bind the Psi distributions**, each with a fixed-seed signature test. This is where a wrong
-   binding does real damage, and it is the only block left outside the registry.
-4. **Review the 347 unreviewed** before treating any of it as new work. Most is math, engineering
-   and text — largely Foundation, libm and swift-numerics — so a large share should resolve to
-   near-free.
+3. ~~**Bind the Psi distributions**, each with a fixed-seed signature test.~~ **Done.** 111 of
+   Frontline's 296 answer, including every distribution the corpus calls.
+4. **Resolve the 266 unreviewed.** In progress. Asked the live registry: **0 of 286 already
+   answered**, so the label was honest and none was secretly covered. Twenty math primitives have
+   landed since; the plan's expectation that most is *"math, engineering and text — largely
+   Foundation, libm and swift-numerics"* held exactly.
 5. **Compare against Excel, not against ourselves.** ADR-001. A test whose expected value came
-   from reading a specification proves only that we read it the same way twice. Every expected
-   value is quoted from a published example or computed from a documented formula.
-6. **Test the seams.** Three real bugs in one afternoon lived exactly where two
-   packages meet, where each half was self-consistent and neither suite could see the
-   other. `SpillIntegrationTests` is the only place that holds both, and it earned its
-   keep on the day it was written.
-7. **Correctness over coverage.** 0.3.0 found three shipped functions answering wrongly while the
-   coverage number said 99.93%. A function that is registered and wrong scores the same as one
+   from reading a specification proves only that we read it the same way twice.
+6. **Test the seams.** Three real bugs in one afternoon lived exactly where two packages meet.
+   Six more came out of running against real Risk Solver workbooks rather than fixtures — see
+   Current Status — and every one of them was invisible to a hand-written test.
+7. **Correctness over coverage.** A function that is registered and wrong scores the same as one
    that is registered and right, so the count is not the measure it looks like.
+8. **Measure before building, and record the number where the decision is.** The habit that has
+   paid most. 118× said lowering was worth writing; the corpus histogram named `NPV` as one rule
+   worth 10 of 13 refusals; 33% said the `consistency` checker must not ship enabled. None of
+   those was guessable, and each is recorded beside the thing it decided.
 
 ---
 
 ## Roadmap
 
-- **v0.1.0** — the 73, extracted, tests passing, gate clean.
-- ~~**v0.2.0** — the statistical block bound.~~ Shipped.
-- ~~**v0.3.0** — financial and Psi distributions, fixed-seed tested.~~ **Half shipped, and the
-  half that landed was not the half planned.** The financial bindings arrived, along with the
-  shape correction — which was not on this roadmap at all, because nobody knew the lookups were
-  wrong until the corpus made someone look. Psi remains.
-- **v0.4.0** — the Psi distributions, fixed-seed tested.
-- **v0.5.0** — the unreviewed bucket resolved into `have` / `bindable` / `new`.
+Three workstreams. They are genuinely independent except at one point, and that point orders
+everything.
 
-Not planned: **spilling**, the mechanism that would write a multi-cell result back across cells.
-`TRANSPOSE` is the only shipped function that would want it, and every corpus use of it is a
-top-level spill — so the feature is real but reaches almost nothing, and it is a large change to
-the evaluator's contract. Worth revisiting if a second function needs it.
+```
+  coverage ──────────────────────────► the oracle checker ──► the CLI
+  (the registry)                            ▲
+                                            │ needs a correct evaluator
+  simulation ─── done ─────────────────────┘
+  validator  ─── structural checkers ──────┘
+```
+
+**The dependency worth naming:** the validator's most valuable check is the oracle — Excel caches
+a value for every formula cell, so recomputing and comparing says where a *workbook* disagrees
+with itself. That is a claim no other tool can make, and it is only true where our evaluator is
+right. So the oracle checker is gated on coverage, and coverage is therefore the critical path to
+the motivating application rather than an end in itself.
+
+### Shipped
+
+- **v0.1.0** — the 73, extracted. **v0.2.0** — the statistical block.
+- ~~**v0.3.0** — financial and Psi distributions.~~ Half shipped, and the half that landed was
+  not the half planned; the shape correction was not on this roadmap at all, because nobody knew
+  the lookups were wrong until the corpus made someone look.
+- ~~**v0.4.0** — whole-column references.~~ ~~**v0.5.0** — spilling.~~ Both shipped. Note that
+  spilling appears below as *"not planned"*; it shipped anyway, on one function's need, and the
+  entry stays as written rather than being quietly revised.
+- ~~**v0.6.0** — BusinessMath 2.15.0 and the Psi distribution surface.~~ Shipped.
+- **v0.7.0** — the simulation stack and the validator. In flight.
+
+### Next
+
+- **v0.8.0 — the unreviewed bucket resolved.** 266 rows, and the categories are not equal:
+  **engineering (48)** and **text (32)** are the near-free ones, like math was — base conversion,
+  bitwise, `CHAR`/`CODE`/`EXACT`. **statistical (46)** belongs to BusinessMath and is not ours to
+  write. **lookup (24), financial (27), database (12)** need judgment per function and are where
+  the honest `new` and `out of scope` markings will come from. Success is `unreviewed` reaching
+  **0** — every row classified — not every row implemented.
+- **v0.9.0 — the oracle checker.** Recompute every formula, compare against Excel's cached value,
+  report the disagreements. Gated on v0.8.0, and on hand-triaging its corpus findings: a
+  disagreement is a finding only where *we* are right, and the ~0.40% where we are not must never
+  be reported as a workbook defect.
+- **v1.0 — `xlsx-audit`.** The motivating application, runnable by someone who is not us.
+
+### Carried, unscheduled
+
+- **Common subexpression elimination**, upstream in BusinessMath. `BytecodeOptimizer` folds
+  constants and simplifies algebra but does not eliminate common subexpressions, and a cell read
+  *k* times is inlined *k* times — measured 1→181→463→34,347 instructions as lowering rules
+  landed. Benefits every BusinessMath caller, not only us.
+- **Cross-sheet lowering.** The last 17% of real outputs refuse for one reason: `Lowerer` is
+  `CellRef`-shaped and they need `CellAddress`.
+- **`consistency` below its false-positive rate.** 33% across six real models. It finds real
+  defects and stays opt-in until that comes down.
+- **Errored trials.** Real models produce outputs where some trials error rather than returning a
+  number. They are excluded from the statistics rather than averaged as zero, and nothing yet
+  says *which* trials or *why*. That diagnosis is the validator's simulation tier.
+
+Not planned: nothing, currently. ~~Spilling~~ was the last entry here and it shipped.
 
 **The gate that is not corpus-shaped:** for any function, evaluating it must agree with the value
-Excel itself recorded. Excel stores a cached result for every formula cell, so a workbook is a
-test oracle. That check works on files nobody has seen, which is the difference between fitting a
-corpus and being correct.
+Excel itself recorded. That check works on files nobody has seen, which is the difference between
+fitting a corpus and being correct.
 
 ---
 
@@ -274,7 +320,15 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-08 (later) — the simulation stack recorded. Current Status
+**Last Updated:** 2026-09-08 (later still) — Priorities and Roadmap reconciled. The roadmap
+listed v0.4.0 and v0.5.0 as future when both had shipped, and named neither the simulation stack
+nor the validator. Rewritten around the dependency that actually orders the work: the oracle
+checker is the validator's most valuable claim and is only true where the evaluator is right, so
+coverage is the critical path to the motivating application rather than an end in itself. Added
+priority 8 — measure before building — because it is the habit that has paid most and was not
+written down. Spilling's "not planned" entry stays as written, with a note that it shipped anyway.
+
+Earlier: 2026-09-08 (later) — the simulation stack recorded. Current Status
 rewritten: it still described v0.5.0's spilling while fifteen public types had shipped
 underneath it, which is the same drift this project found in BusinessMath's roadmap on the
 same day — a capability shipping without anything prompting the documents to notice. The
