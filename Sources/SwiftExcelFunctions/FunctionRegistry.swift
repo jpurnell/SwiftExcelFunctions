@@ -84,6 +84,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinEngineeringFunctions.all,
             BuiltinTextPrimitives.all,
             BuiltinStatisticalInverses.all,
+            BuiltinStatisticalDistributions.all,
             BuiltinStatsFunctions.all,
             BuiltinFinancialFunctions.all,
             BuiltinLogicFunctions.all,

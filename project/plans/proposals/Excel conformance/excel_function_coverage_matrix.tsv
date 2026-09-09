@@ -86,11 +86,11 @@ EXCEL	AVERAGEIF	statistical	have	aggregation	0	0	range, criteria, [average_range
 EXCEL	AVERAGEIFS	statistical	bindable	PeriodSequence.aggregate	0	0	average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	unreviewed		0	0	probability,alpha,beta,[A],[B]
-EXCEL	BINOM.DIST	statistical	bindable	binomialPMF	0	0	number_s,trials,probability_s,cumulative
+EXCEL	BINOM.DIST	statistical	have	statistical distributions	0	0	number_s,trials,probability_s,cumulative
 EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s,[number_s2]
 EXCEL	BINOM.INV	statistical	have	accumulate binomialPMF, as PsiBinomial does — bound	0	0	trials,probability_s,alpha
 EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
-EXCEL	CHISQ.DIST.RT	statistical	bindable	TimeSeries.ljungBox	0	0	x,deg_freedom
+EXCEL	CHISQ.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom
 EXCEL	CHISQ.INV	statistical	unreviewed		0	0	probability,deg_freedom
 EXCEL	CHISQ.INV.RT	statistical	have	DistributionChiSquared.quantile(1-p) — bound	0	0	probability,deg_freedom
 EXCEL	CHISQ.TEST	statistical	unreviewed		0	0	actual_range,expected_range
@@ -105,9 +105,9 @@ EXCEL	COUNTIFS	statistical	have	aggregation	0	0	criteria_range1, criteria1, [cri
 EXCEL	COVARIANCE.P	statistical	have	bindings	124	4	array1,array2
 EXCEL	COVARIANCE.S	statistical	have	bindings	0	0	array1,array2
 EXCEL	DEVSQ	statistical	bindable	sumOfSquaredAvgDiff	0	0	number1, [number2], ...
-EXCEL	EXPON.DIST	statistical	bindable	exponentialCDF	0	0	x,lambda,cumulative
+EXCEL	EXPON.DIST	statistical	have	statistical distributions	0	0	x,lambda,cumulative
 EXCEL	F.DIST	statistical	bindable	fCDF	0	0	x,deg_freedom1,deg_freedom2,cumulative
-EXCEL	F.DIST.RT	statistical	unreviewed		0	0	x,deg_freedom1,deg_freedom2
+EXCEL	F.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom1,deg_freedom2
 EXCEL	F.INV	statistical	bindable	fQuantile	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.INV.RT	statistical	unreviewed		0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.TEST	statistical	unreviewed		0	0	array1,array2
@@ -121,7 +121,7 @@ EXCEL	FORECAST.ETS.STAT	statistical	unreviewed		0	0	values, timeline, statistic_
 EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
 EXCEL	FREQUENCY	statistical	unreviewed		0	0	data_array, bins_array
 EXCEL	GAMMA	statistical	unreviewed		0	0	number
-EXCEL	GAMMA.DIST	statistical	unreviewed		0	0	x,alpha,beta,cumulative
+EXCEL	GAMMA.DIST	statistical	have	statistical distributions	0	0	x,alpha,beta,cumulative
 EXCEL	GAMMA.INV	statistical	unreviewed		0	0	probability,alpha,beta
 EXCEL	GAMMALN	statistical	bindable	logFactorial	0	0	x
 EXCEL	GAMMALN.PRECISE	statistical	unreviewed		0	0	x
@@ -135,7 +135,7 @@ EXCEL	KURT	statistical	bindable	kurtosis	0	0	number1, [number2], ...
 EXCEL	LARGE	statistical	have	stats	0	0	array, k
 EXCEL	LINEST	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGEST	statistical	bindable	ExponentialTrend	0	0	known_y's, [known_x's], [const], [stats]
-EXCEL	LOGNORM.DIST	statistical	bindable	logNormalCDF	0	0	x,mean,standard_dev,cumulative
+EXCEL	LOGNORM.DIST	statistical	have	statistical distributions	0	0	x,mean,standard_dev,cumulative
 EXCEL	LOGNORM.INV	statistical	bindable	DistributionLogNormal.quantile — verified	0	0	probability, mean, standard_dev
 EXCEL	MAX	statistical	have	stats	992	114	number1, [number2], ...
 EXCEL	MAXA	statistical	unreviewed		0	0	value1,[value2],...
@@ -159,7 +159,7 @@ EXCEL	PERCENTRANK.INC	statistical	unreviewed		0	0	array,x,[significance]
 EXCEL	PERMUT	statistical	bindable	permutation	0	0	number, number_chosen
 EXCEL	PERMUTATIONA	statistical	unreviewed		0	0	number, number-chosen
 EXCEL	PHI	statistical	unreviewed		0	0	x
-EXCEL	POISSON.DIST	statistical	bindable	poissonCDF	0	0	x,mean,cumulative
+EXCEL	POISSON.DIST	statistical	have	statistical distributions	0	0	x,mean,cumulative
 EXCEL	PROB	statistical	unreviewed		0	0	x_range, prob_range, [lower_limit], [upper_limit]
 EXCEL	QUARTILE.EXC	statistical	unreviewed		0	0	array, quart
 EXCEL	QUARTILE.INC	statistical	unreviewed		0	0	array,quart
@@ -177,7 +177,7 @@ EXCEL	STDEVA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	STDEVPA	statistical	unreviewed		0	0	value1, [value2], ...
 EXCEL	STEYX	statistical	unreviewed		0	0	known_y's, known_x's
 EXCEL	T.DIST	statistical	bindable	studentTPDF	0	0	x,deg_freedom, cumulative
-EXCEL	T.DIST.2T	statistical	bindable	tPValue	0	0	x,deg_freedom
+EXCEL	T.DIST.2T	statistical	have	statistical distributions	0	0	x,deg_freedom
 EXCEL	T.DIST.RT	statistical	unreviewed		0	0	x,deg_freedom
 EXCEL	T.INV	statistical	bindable	tQuantile	0	0	probability,deg_freedom
 EXCEL	T.INV.2T	statistical	unreviewed		0	0	probability,deg_freedom
