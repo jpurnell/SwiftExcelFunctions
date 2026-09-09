@@ -210,9 +210,13 @@ public struct FunctionRegistry: Sendable {
     /// `SUMIFS` — which it must, or every modern spelling saved by an older Excel is
     /// unknown to us for a reason that is purely clerical.
     ///
+    /// Public because it is not this registry's private business. A recognizer, an
+    /// auditor and a lowering pass all have to ask the same question, and the alternative
+    /// to exposing it is each of them carrying a copy that can drift out of step.
+    ///
     /// - Parameter name: The name as written in the formula.
     /// - Returns: The name to look up.
-    static func canonical(_ name: String) -> String {
+    public static func canonical(_ name: String) -> String {
         let upper = name.uppercased()
         for prefix in ["_XLL.", "_XLFN."] where upper.hasPrefix(prefix) {
             return String(upper.dropFirst(prefix.count))
