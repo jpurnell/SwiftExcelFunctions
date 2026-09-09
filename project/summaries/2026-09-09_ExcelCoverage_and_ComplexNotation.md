@@ -79,9 +79,15 @@ so reading them means `gh api`.
 
 ## 6. Context-loss warnings
 
-1. **`Complex` is not a `Real`.** It conforms to `AlgebraicField`. Anything generic over
-   `Real & LosslessStringConvertible` — `PeriodDriver`, both cycle solvers — can never take
-   one. I wrote a proposal justification assuming otherwise; do not repeat it.
+1. **`Complex` is not a `Real`, and no wrapper around it becomes one.** It conforms to
+   `AlgebraicField`. **Five** sites in BusinessMath constrain on
+   `Real & Sendable & LosslessStringConvertible` — `PeriodDriver`, `LinearCycleSolver`,
+   `IterativeCycleSolver`, `ModelDefinition` (`Model Definition/ModelDefinition.swift:119`)
+   and `FormulaEvaluator` (`Time Series/FormulaEvaluator.swift:140`); I first counted three,
+   and the BusinessMath session found the other two. None of them can take a `Complex`, and
+   none can take a `ComplexNotation<R>` wrapper either — a wrapper satisfies
+   `LosslessStringConvertible` and still fails `Real`. That general form is the point: the
+   shape has now been proposed twice and failed the same test both times.
 2. **Assert relationships, not remembered constants.** Three tests today failed *correct*
    code because the expected value was recalled rather than read: `ERF(0.745)`,
    `CHISQ.INV.RT(0.050001, 10)`, and a population σ. Round-trips and definitions cannot fail
