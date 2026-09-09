@@ -52,6 +52,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Lowerer` / `LoweredModel` / `LoweringFailure` — `FormulaAST` compiled to BusinessMath
     bytecode. 83% of real outputs lower; the rest are cross-sheet.
 
+- **`WorkbookAudit`** — a new library product: a validator that audits a spreadsheet the
+  way the quality gate audits code. Its own target because it reads files, which
+  `SwiftExcelFunctions` promises not to.
+  - `Finding` / `Severity` / `WorkbookChecker` / `Requirement` / `AuditModel` /
+    `WorkbookAuditor`. A checker declares what it needs — structure, recomputation, or a
+    simulation — before any work happens, so a run that wants a structural check never
+    pays for a Monte Carlo. Findings sort worst-first then in reading order, totally and
+    deterministically, because a validator whose output moves between runs cannot be
+    diffed in CI.
+  - **`circular-reference`** (enabled). Cells that depend on themselves, directly or
+    through a chain. The graph is built over the whole workbook rather than a sheet at a
+    time, so a cycle closing across two sheets is still found — measured on real models,
+    2 of 6 are cross-sheet and the largest has 69% of its formulas referencing another
+    sheet. Census: **0 findings across 6 real workbooks**.
+  - **`consistency`** (opt-in, `WorkbookAuditor.experimental`). One cell in a run
+    differing from its neighbours, compared modulo relative offset so a copied formula
+    counts as the same shape. It finds real defects — in one real model,
+    `E19 = E17*E18*D13` where every neighbour reads `E13`. It also produced **249 findings
+    across 33% of six real workbooks**, and a checker firing that broadly gets a validator
+    switched off wholesale, taking the checker that *was* right with it. Opt-in until the
+    rate comes down.
+
+### Changed
+
+- `FunctionRegistry.canonical(_:)` is now public. `WorkbookAudit` needs the same `_xll.` /
+  `_xlfn.` normalisation the recognizer does, and the alternative to exposing it was a
+  second copy that could drift.
+- **The formula tree is described once.** `FormulaAST.children`, `.binary` and
+  `.walk(maxDepth:_:)` replace four separate walkers that each enumerated the AST's cases
+  — the recognizer's function visitor, the trial loop's precedent extractor, and the
+  lowering pass's audit and builder. The cost was never the lines; it was that adding a
+  node kind meant finding all four, and the compiler only helps where a switch is
+  exhaustive.
+
 ### Fixed
 
 - **An absolute reference is the same cell.** `CellRef` hashes its `$` markers, so a trial
