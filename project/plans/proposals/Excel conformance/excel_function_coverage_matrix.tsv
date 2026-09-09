@@ -88,11 +88,11 @@ EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	unreviewed		0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOM.DIST	statistical	bindable	binomialPMF	0	0	number_s,trials,probability_s,cumulative
 EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s,[number_s2]
-EXCEL	BINOM.INV	statistical	unreviewed		0	0	trials,probability_s,alpha
+EXCEL	BINOM.INV	statistical	bindable	accumulate binomialPMF, as PsiBinomial does — verified	0	0	trials,probability_s,alpha
 EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
 EXCEL	CHISQ.DIST.RT	statistical	bindable	TimeSeries.ljungBox	0	0	x,deg_freedom
 EXCEL	CHISQ.INV	statistical	unreviewed		0	0	probability,deg_freedom
-EXCEL	CHISQ.INV.RT	statistical	unreviewed		0	0	probability,deg_freedom
+EXCEL	CHISQ.INV.RT	statistical	bindable	DistributionChiSquared.quantile(1-p) — verified	0	0	probability,deg_freedom
 EXCEL	CHISQ.TEST	statistical	unreviewed		0	0	actual_range,expected_range
 EXCEL	CONFIDENCE.NORM	statistical	bindable	confidence	0	0	alpha,standard_dev,size
 EXCEL	CONFIDENCE.T	statistical	bindable	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
@@ -136,7 +136,7 @@ EXCEL	LARGE	statistical	have	stats	0	0	array, k
 EXCEL	LINEST	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGEST	statistical	bindable	ExponentialTrend	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGNORM.DIST	statistical	bindable	logNormalCDF	0	0	x,mean,standard_dev,cumulative
-EXCEL	LOGNORM.INV	statistical	unreviewed		0	0	probability, mean, standard_dev
+EXCEL	LOGNORM.INV	statistical	bindable	DistributionLogNormal.quantile — verified	0	0	probability, mean, standard_dev
 EXCEL	MAX	statistical	have	stats	992	114	number1, [number2], ...
 EXCEL	MAXA	statistical	unreviewed		0	0	value1,[value2],...
 EXCEL	MAXIFS	statistical	unreviewed		0	0	max_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
@@ -478,26 +478,26 @@ EXCEL	IMTAN	engineering	unreviewed		0	0	inumber
 EXCEL	OCT2BIN	engineering	have	engineering	0	0	number, [places]
 EXCEL	OCT2DEC	engineering	have	math	0	0	number
 EXCEL	OCT2HEX	engineering	have	engineering	0	0	number, [places]
-EXCEL	BETADIST	compatibility	unreviewed		0	0	x,alpha,beta,[A],[B]
+EXCEL	BETADIST	compatibility	unreviewed	always cumulative; BETA.DIST takes the flag as a REQUIRED MIDDLE argument	0	0	x,alpha,beta,[A],[B]
 EXCEL	BETAINV	compatibility	unreviewed		0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOMDIST	compatibility	unreviewed		0	0	number_s,trials,probability_s,cumulative
 EXCEL	CEILING	compatibility	have	math	2	2	number, significance
-EXCEL	CHIDIST	compatibility	unreviewed		0	0	x,deg_freedom
-EXCEL	CHIINV	compatibility	unreviewed		0	0	probability,deg_freedom
+EXCEL	CHIDIST	compatibility	unreviewed	alias of CHISQ.DIST.RT — right tail, NOT CHISQ.DIST	0	0	x,deg_freedom
+EXCEL	CHIINV	compatibility	unreviewed	alias of CHISQ.INV.RT — right tail, NOT CHISQ.INV	0	0	probability,deg_freedom
 EXCEL	CHITEST	compatibility	unreviewed		0	0	actual_range,expected_range
 EXCEL	CONFIDENCE	compatibility	unreviewed		0	0	alpha,standard_dev,size
 EXCEL	COVAR	compatibility	have	bindings	25	1	array1,array2
 EXCEL	CRITBINOM	compatibility	unreviewed		0	0	trials,probability_s,alpha
 EXCEL	EXPONDIST	compatibility	unreviewed		0	0	x,lambda,cumulative
-EXCEL	FDIST	compatibility	unreviewed		0	0	x,deg_freedom1,deg_freedom2
-EXCEL	FINV	compatibility	unreviewed		0	0	probability,deg_freedom1,deg_freedom2
+EXCEL	FDIST	compatibility	unreviewed	alias of F.DIST.RT — right tail, NOT F.DIST	0	0	x,deg_freedom1,deg_freedom2
+EXCEL	FINV	compatibility	unreviewed	alias of F.INV.RT — right tail, NOT F.INV	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	FLOOR	compatibility	have	math	0	0	number, significance
 EXCEL	FTEST	compatibility	unreviewed		0	0	array1,array2
 EXCEL	GAMMADIST	compatibility	unreviewed		0	0	x,alpha,beta,cumulative
 EXCEL	GAMMAINV	compatibility	unreviewed		0	0	probability,alpha,beta
 EXCEL	HYPGEOMDIST	compatibility	unreviewed		0	0	sample_s,number_sample,population_s,number_pop
 EXCEL	LOGINV	compatibility	unreviewed		0	0	probability, mean, standard_dev
-EXCEL	LOGNORMDIST	compatibility	unreviewed		0	0	x,mean,standard_dev
+EXCEL	LOGNORMDIST	compatibility	unreviewed	always cumulative; LOGNORM.DIST takes the flag as a required argument	0	0	x,mean,standard_dev
 EXCEL	MODE	compatibility	bindable	mode	0	0	number1,[number2],...
 EXCEL	NEGBINOMDIST	compatibility	unreviewed		0	0	number_f,number_s,probability_s
 EXCEL	NORMDIST	compatibility	have	bindings	0	0	x,mean,standard_dev,cumulative
@@ -511,8 +511,8 @@ EXCEL	QUARTILE	compatibility	unreviewed		0	0	array,quart
 EXCEL	RANK	compatibility	have	bindings	0	0	number,ref,[order]
 EXCEL	STDEV	compatibility	have	stats	5	1	number1,[number2],...
 EXCEL	STDEVP	compatibility	have	stats	0	0	number1,[number2],...
-EXCEL	TDIST	compatibility	unreviewed		0	0	x,deg_freedom,tails
-EXCEL	TINV	compatibility	unreviewed		0	0	probability,deg_freedom
+EXCEL	TDIST	compatibility	unreviewed	dispatches on its `tails` argument between T.DIST.RT and T.DIST.2T	0	0	x,deg_freedom,tails
+EXCEL	TINV	compatibility	unreviewed	alias of T.INV.2T — two-tailed, differs from T.INV by a factor of two	0	0	probability,deg_freedom
 EXCEL	TTEST	compatibility	unreviewed		0	0	array1,array2,tails,type
 EXCEL	VAR	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	VARP	compatibility	have	stats	0	0	number1,[number2],...
