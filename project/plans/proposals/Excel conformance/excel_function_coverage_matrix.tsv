@@ -88,11 +88,11 @@ EXCEL	BETA.DIST	statistical	bindable	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	unreviewed		0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOM.DIST	statistical	bindable	binomialPMF	0	0	number_s,trials,probability_s,cumulative
 EXCEL	BINOM.DIST.RANGE	statistical	unreviewed		0	0	trials,probability_s,number_s,[number_s2]
-EXCEL	BINOM.INV	statistical	bindable	accumulate binomialPMF, as PsiBinomial does — verified	0	0	trials,probability_s,alpha
+EXCEL	BINOM.INV	statistical	have	accumulate binomialPMF, as PsiBinomial does — bound	0	0	trials,probability_s,alpha
 EXCEL	CHISQ.DIST	statistical	bindable	chi2pdf	0	0	x,deg_freedom,cumulative
 EXCEL	CHISQ.DIST.RT	statistical	bindable	TimeSeries.ljungBox	0	0	x,deg_freedom
 EXCEL	CHISQ.INV	statistical	unreviewed		0	0	probability,deg_freedom
-EXCEL	CHISQ.INV.RT	statistical	bindable	DistributionChiSquared.quantile(1-p) — verified	0	0	probability,deg_freedom
+EXCEL	CHISQ.INV.RT	statistical	have	DistributionChiSquared.quantile(1-p) — bound	0	0	probability,deg_freedom
 EXCEL	CHISQ.TEST	statistical	unreviewed		0	0	actual_range,expected_range
 EXCEL	CONFIDENCE.NORM	statistical	bindable	confidence	0	0	alpha,standard_dev,size
 EXCEL	CONFIDENCE.T	statistical	bindable	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
