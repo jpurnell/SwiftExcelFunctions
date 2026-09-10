@@ -118,3 +118,135 @@ public enum ETSArguments {
         return nil
     }
 }
+
+// MARK: - data_completion
+
+public extension ETSArguments {
+
+    /// Excel's `data_completion` argument: what a missing point is worth.
+    enum DataCompletion: Equatable, Sendable {
+
+        /// Excel's `0` — a missing point reads as zero.
+        case zeros
+
+        /// Excel's `1`, the default — a missing point is completed "to be the average of
+        /// the neighboring points".
+        case neighbourAverage
+    }
+
+    /// A series with no holes in it: every point of the step grid carries a value.
+    struct Completed: Equatable, Sendable {
+
+        /// Every timestamp from the first to the last, at the step.
+        public let timeline: [Double]
+
+        /// The observations, aligned to ``timeline``, with holes filled.
+        public let values: [Double]
+
+        /// The interval the timeline is on.
+        public let step: Double
+
+        /// How many points were absent and had to be filled.
+        public let filledCount: Int
+    }
+
+    /// Puts a paired series back onto its own step grid, filling what is missing.
+    ///
+    /// Two kinds of hole arrive by different routes and are treated identically: a
+    /// timestamp absent from the timeline, and a blank cell against a present timestamp.
+    /// Excel's phrase for the argument — "missing points" — covers both, and a forecaster
+    /// wants a series with no holes however they arose.
+    ///
+    /// **A run of missing points all take the same average.** That is the literal reading
+    /// of "the average of the neighboring points": the neighbours are the nearest present
+    /// values on either side of the *run*, not interpolated points beside each hole. Linear
+    /// interpolation is the plausible alternative and is not what the wording says.
+    ///
+    /// A hole with only one neighbour — a blank first or last cell — takes that neighbour
+    /// rather than an average, there being nothing to average it with.
+    ///
+    /// - Parameters:
+    ///   - pair: The validated pair from ``paired(values:timeline:)``.
+    ///   - completion: Excel's `data_completion` treatment.
+    /// - Returns: The completed series, or `#NUM!` when nothing is present to estimate
+    ///   from, or when more than 30% of the grid is missing.
+    ///
+    /// - Note: **The 30% ceiling's error code is provisional.** Excel documents support for
+    ///   "up to 30% missing points" without naming what happens past it; `#NUM!` is this
+    ///   library's reading of "cannot compute" rather than a measured answer.
+    static func completed(_ pair: Paired, using completion: DataCompletion) -> ETSResult<Completed> {
+        let step = pair.step
+        guard step > 0, let first = pair.timeline.first, let last = pair.timeline.last else {
+            return .failure(.num)
+        }
+
+        // The grid the timeline is on, which is what the observations are placed into.
+        let spans = ((last - first) / step).rounded()
+        guard spans.isFinite, spans >= 0 else { return .failure(.num) }
+        let gridCount = Int(spans) + 1
+        guard gridCount >= 1 else { return .failure(.num) }
+
+        var grid = [Double?](repeating: nil, count: gridCount)
+        for (stamp, observation) in zip(pair.timeline, pair.observations) {
+            let offset = Int(((stamp - first) / step).rounded())
+            guard offset >= 0, offset < gridCount else { return .failure(.num) }
+            grid[offset] = observation
+        }
+
+        let presentCount = grid.reduce(into: 0) { total, slot in
+            if slot != nil { total += 1 }
+        }
+        // Nothing present is not a 100% gap to be filled — there is nothing to fill from.
+        guard presentCount > 0 else { return .failure(.num) }
+
+        let missingCount = gridCount - presentCount
+        // Bound and guarded: the fp-safety checker tracks the divisor symbol.
+        let total = Double(gridCount)
+        guard total > 0 else { return .failure(.num) }
+        guard Double(missingCount) / total <= 0.30 else { return .failure(.num) }
+
+        let filled: [Double]
+        switch completion {
+        case .zeros:
+            filled = grid.map { $0 ?? 0 }
+        case .neighbourAverage:
+            filled = fillFromNeighbours(grid)
+        }
+        return .success(Completed(timeline: (0..<gridCount).map { first + Double($0) * step },
+                                  values: filled,
+                                  step: step,
+                                  filledCount: missingCount))
+    }
+
+    /// Fills each hole with the average of the nearest present values around its run.
+    ///
+    /// - Parameter grid: The step grid, `nil` where a point is missing.
+    /// - Returns: The grid with every hole filled. Holes at either end take their single
+    ///   neighbour; a grid with no present value at all is returned unchanged, which
+    ///   ``completed(_:using:)`` refuses before reaching here.
+    private static func fillFromNeighbours(_ grid: [Double?]) -> [Double] {
+        // The nearest present value at or before each index, and at or after it.
+        var before = [Double?](repeating: nil, count: grid.count)
+        var carried: Double?
+        for index in grid.indices {
+            carried = grid[index] ?? carried
+            before[index] = carried
+        }
+        var after = [Double?](repeating: nil, count: grid.count)
+        carried = nil
+        for index in grid.indices.reversed() {
+            carried = grid[index] ?? carried
+            after[index] = carried
+        }
+
+        return grid.indices.map { index in
+            if let present = grid[index] { return present }
+            switch (before[index], after[index]) {
+            case let (previous?, next?): return (previous + next) / 2
+            case let (previous?, nil): return previous
+            case let (nil, next?): return next
+            case (nil, nil): return 0
+            }
+        }
+    }
+}
