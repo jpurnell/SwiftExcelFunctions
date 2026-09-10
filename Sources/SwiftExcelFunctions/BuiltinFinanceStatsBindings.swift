@@ -20,7 +20,105 @@ public enum BuiltinBindingFunctions {
         yearfrac, covariancePopulation, covarianceSample, covar, normSInverse, xirrFunction,
         slopeFunction, interceptFunction, normInverse, normalDistribution,
         standardNormalDistribution, rankFunction, rankEq, rankAvg,
+        nominal, effect, syd, vdb,
     ]
+
+    // MARK: - Rate conversion and depreciation
+    //
+    // Four functions the coverage matrix carried as absent for months, and all four
+    // were already upstream under names that no keyword search for the Excel name
+    // would reach: `nominalRate`, `effectiveRate`, `sumOfYearsDigitsDepreciation`,
+    // `variableDecliningBalanceDepreciation`. That is the recurring shape of this
+    // work — "not implemented" meaning "not implemented under the name I searched
+    // for" — and it has shrunk the remaining list every time it has come up.
+
+    /// `NOMINAL(effect_rate, npery)` — the annual nominal rate behind an effective one.
+    ///
+    /// `npery` is truncated to an integer, which is Excel's rule and not a
+    /// convenience: `NOMINAL(0.053543, 4.9)` is the quarterly answer, not something
+    /// between quarterly and monthly.
+    public static let nominal = ExcelFunction(name: "NOMINAL", minArgs: 2, maxArgs: 2) { args in
+        guard case .number(let effective) = args[0].resolved,
+              case .number(let periods) = args[1].resolved else { return .error(.value) }
+        let perYear = periods.rounded(.towardZero)
+        guard effective > 0, perYear >= 1 else { return .error(.num) }
+        do {
+            return .number(try nominalRate(effectiveRate: effective, periodsPerYear: perYear))
+        } catch {
+            return .error(.num)
+        }
+    }
+
+    /// `EFFECT(nominal_rate, npery)` — the effective annual rate from a nominal one.
+    ///
+    /// The inverse of ``nominal``, and the pair round-trips.
+    public static let effect = ExcelFunction(name: "EFFECT", minArgs: 2, maxArgs: 2) { args in
+        guard case .number(let nominalValue) = args[0].resolved,
+              case .number(let periods) = args[1].resolved else { return .error(.value) }
+        let perYear = periods.rounded(.towardZero)
+        guard nominalValue > 0, perYear >= 1 else { return .error(.num) }
+        do {
+            return .number(try effectiveRate(nominalRate: nominalValue, periodsPerYear: perYear))
+        } catch {
+            return .error(.num)
+        }
+    }
+
+    /// `SYD(cost, salvage, life, per)` — sum-of-years-digits depreciation for one period.
+    public static let syd = ExcelFunction(name: "SYD", minArgs: 4, maxArgs: 4) { args in
+        guard case .number(let cost) = args[0].resolved,
+              case .number(let salvage) = args[1].resolved,
+              case .number(let life) = args[2].resolved,
+              case .number(let period) = args[3].resolved else { return .error(.value) }
+        do {
+            return .number(try sumOfYearsDigitsDepreciation(
+                cost: cost, salvage: salvage, life: life, period: period))
+        } catch {
+            return .error(.num)
+        }
+    }
+
+    /// `VDB(cost, salvage, life, start_period, end_period, [factor], [no_switch])` —
+    /// declining-balance depreciation over a span of periods.
+    ///
+    /// Excel's seventh argument is `no_switch`, and it is negated: omitted or `FALSE`
+    /// means *do* switch to straight line once that charges more, which is the
+    /// default and the sense BusinessMath's `switchToStraightLine` carries. A binding
+    /// that passed it through unnegated would be wrong only for callers who set it,
+    /// and would look right in every default call.
+    public static let vdb = ExcelFunction(name: "VDB", minArgs: 5, maxArgs: 7) { args in
+        guard case .number(let cost) = args[0].resolved,
+              case .number(let salvage) = args[1].resolved,
+              case .number(let life) = args[2].resolved,
+              case .number(let start) = args[3].resolved,
+              case .number(let end) = args[4].resolved else { return .error(.value) }
+
+        var factor = 2.0
+        if args.count > 5 {
+            switch args[5].resolved {
+            case .blank: break
+            case .number(let value): factor = value
+            default: return .error(.value)
+            }
+        }
+        var noSwitch = false
+        if args.count > 6 {
+            switch args[6].resolved {
+            case .blank: break
+            case .bool(let flag): noSwitch = flag
+            case .number(let value): noSwitch = value != 0
+            default: return .error(.value)
+            }
+        }
+
+        do {
+            return .number(try variableDecliningBalanceDepreciation(
+                cost: cost, salvage: salvage, life: life, start: start, end: end,
+                factor: factor, switchToStraightLine: !noSwitch))
+        } catch {
+            return .error(.num)
+        }
+    }
 
     // MARK: - Day counts
 

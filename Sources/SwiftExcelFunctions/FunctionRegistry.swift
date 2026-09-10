@@ -93,6 +93,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinConditionalExtremes.all,
             BuiltinStatsFunctions.all,
             BuiltinFinancialFunctions.all,
+            BuiltinBondFunctions.all,
             BuiltinLogicFunctions.all,
             BuiltinTextFunctions.all,
             BuiltinTextByteFunctions.all,

@@ -35,7 +35,8 @@ final class BusinessMathBindingTests: XCTestCase {
             Set(BuiltinBindingFunctions.all.map(\.name)),
             ["YEARFRAC", "COVARIANCE.P", "COVARIANCE.S", "COVAR", "NORM.S.INV", "XIRR",
              "SLOPE", "INTERCEPT", "NORM.INV", "NORM.DIST", "NORM.S.DIST",
-             "RANK", "RANK.EQ", "RANK.AVG"])
+             "RANK", "RANK.EQ", "RANK.AVG",
+             "NOMINAL", "EFFECT", "SYD", "VDB"])
     }
 
     // MARK: - YEARFRAC
@@ -219,4 +220,129 @@ final class BusinessMathBindingTests: XCTestCase {
                        "Excel's own cached value for this cell")
     }
 
+
+    // MARK: - Rate conversion
+
+    /// Microsoft's `NOMINAL` example: 5.3543% effective, compounded quarterly.
+    func testNominalMicrosoftExample() throws {
+        XCTAssertEqual(try number("NOMINAL", [.number(0.053543), .number(4)]),
+                       0.0525, accuracy: 1e-6)
+    }
+
+    /// Microsoft's `EFFECT` example, which is the same pair the other way round.
+    ///
+    /// The expected value is computed from the documented formula —
+    /// `(1 + nominal/npery)^npery − 1` — rather than taken from Microsoft's rounded
+    /// display of it, which is 0.053543.
+    func testEffectMicrosoftExample() throws {
+        XCTAssertEqual(try number("EFFECT", [.number(0.0525), .number(4)]),
+                       0.05354266737075463, accuracy: 1e-9)
+    }
+
+    /// The two are inverses, which is the check that catches an argument order
+    /// swapped in exactly one of them.
+    func testNominalAndEffectInvert() throws {
+        let effective = try number("EFFECT", [.number(0.0525), .number(12)])
+        XCTAssertEqual(try number("NOMINAL", [.number(effective), .number(12)]),
+                       0.0525, accuracy: 1e-12)
+    }
+
+    /// `npery` is truncated, not rounded: 4.9 compounding periods is quarterly.
+    func testNperyIsTruncated() throws {
+        XCTAssertEqual(try number("EFFECT", [.number(0.0525), .number(4.9)]),
+                       try number("EFFECT", [.number(0.0525), .number(4)]),
+                       accuracy: 1e-12)
+    }
+
+    func testNperyBelowOneIsNum() throws {
+        XCTAssertEqual(try call("EFFECT", [.number(0.0525), .number(0)]), .error(.num))
+        XCTAssertEqual(try call("NOMINAL", [.number(0.0525), .number(0.5)]), .error(.num))
+    }
+
+    // MARK: - Depreciation
+
+    /// Microsoft's `SYD` example: 30,000 cost, 7,500 salvage, ten-year life.
+    ///
+    /// The first year charges 10/55 of the 22,500 depreciable base and the tenth
+    /// charges 1/55 — the published figures, and what the documented formula gives.
+    func testSydMicrosoftExample() throws {
+        XCTAssertEqual(
+            try number("SYD", [.number(30000), .number(7500), .number(10), .number(1)]),
+            4090.909090909091, accuracy: 1e-9)
+        XCTAssertEqual(
+            try number("SYD", [.number(30000), .number(7500), .number(10), .number(10)]),
+            409.0909090909091, accuracy: 1e-9)
+    }
+
+    /// A period outside `1...life` is `#NUM!`.
+    func testSydPeriodOutsideLifeIsNum() throws {
+        XCTAssertEqual(
+            try call("SYD", [.number(30000), .number(7500), .number(10), .number(11)]),
+            .error(.num))
+        XCTAssertEqual(
+            try call("SYD", [.number(30000), .number(7500), .number(10), .number(0)]),
+            .error(.num))
+    }
+
+    /// Microsoft's `VDB` example: 2,400 cost, 300 salvage, ten-year life. The first
+    /// year at the default factor of 2 charges 2,400 × 0.2 = 480.
+    func testVdbMicrosoftExample() throws {
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(10), .number(0), .number(1)]),
+            480, accuracy: 1e-9)
+    }
+
+    /// Microsoft's remaining `VDB` examples, which exercise the span and the factor
+    /// on the same asset expressed in days and months.
+    ///
+    /// | Call | Published |
+    /// |---|---|
+    /// | `VDB(2400, 300, 10*365, 0, 1)` — the first day | 1.32 |
+    /// | `VDB(2400, 300, 10*12, 0, 1)` — the first month | 40.00 |
+    /// | `VDB(2400, 300, 10*12, 6, 18)` — months 6 to 18 | 396.31 |
+    /// | `VDB(2400, 300, 10*12, 6, 18, 1.5)` — the same at factor 1.5 | 311.81 |
+    func testVdbSpanAndFactorMicrosoftExamples() throws {
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(3650), .number(0), .number(1)]),
+            1.32, accuracy: 0.005)
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(120), .number(0), .number(1)]),
+            40, accuracy: 1e-9)
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(120), .number(6), .number(18)]),
+            396.31, accuracy: 0.005)
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(120), .number(6), .number(18),
+                               .number(1.5)]),
+            311.81, accuracy: 0.005)
+    }
+
+    /// `no_switch` is negated across the binding, so it needs a test that sets it.
+    ///
+    /// Microsoft's own asset does not exercise it: at the default factor of 2, the
+    /// declining-balance charge on 2,400 over ten years beats straight line in every
+    /// period, so the switch never fires and the flag changes nothing whatever it is
+    /// set to. A test built on that asset would pass with the flag ignored entirely,
+    /// which is worth saying because the first version of this test did exactly that.
+    ///
+    /// At factor 1 the switch does fire — straight line overtakes in the sixth period
+    /// — and the last five periods then charge 1,027.50 with the switch and 580.35
+    /// without it.
+    func testVdbNoSwitchReachesTheUpstreamFlag() throws {
+        let switching = try number(
+            "VDB", [.number(2400), .number(300), .number(10), .number(5), .number(10), .number(1)])
+        let held = try number(
+            "VDB", [.number(2400), .number(300), .number(10), .number(5), .number(10),
+                    .number(1), .bool(true)])
+        XCTAssertEqual(switching, 1027.5, accuracy: 1e-6)
+        XCTAssertEqual(held, 580.3477437600002, accuracy: 1e-6)
+        XCTAssertLessThan(held, switching)
+    }
+
+    /// The full life depreciates the asset to its salvage value, switch or not.
+    func testVdbOverTheWholeLifeReachesSalvage() throws {
+        XCTAssertEqual(
+            try number("VDB", [.number(2400), .number(300), .number(10), .number(0), .number(10)]),
+            2100, accuracy: 1e-9)
+    }
 }

@@ -14,7 +14,17 @@ let package = Package(
         // and nothing would typecheck — and `from:` enforces that better than `exact:`,
         // by resolving to the highest version satisfying everyone rather than refusing.
         .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.6.0"),
-        .package(url: "https://github.com/jpurnell/BusinessMath", from: "2.11.0"),
+        // The mathematics. On the 3.0.0 prerelease line, and `.upToNextMinor` rather
+        // than `exact:` for two reasons. SwiftPM excludes prereleases from a version
+        // range *unless the lower bound is itself a prerelease*, so `from: "2.11.0"`
+        // cannot see an alpha at all and a bare `from: "3.0.0-alpha.3"` is the same
+        // trap one version up. And an `exact:` pin here would deadlock the moment a
+        // second consumer in one build pinned BusinessMath differently — which is
+        // precisely what stopped this repo resolving once before.
+        //
+        // The range admits 3.0.0-alpha.4 and 3.0.0 final without a Package.swift edit,
+        // which is what an alpha line wants. Revisit when 3.0.0 ships.
+        .package(url: "https://github.com/jpurnell/BusinessMath", .upToNextMinor(from: "3.0.0-alpha.3")),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
         // Test-only: FormulaParserIntegrationTests needs SwiftXLSX's parser to feed
         // this package's evaluator. 0.13.0 is the release that removed these
