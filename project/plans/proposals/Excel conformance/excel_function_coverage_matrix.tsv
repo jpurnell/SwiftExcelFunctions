@@ -116,8 +116,8 @@ EXCEL	FISHERINV	statistical	bindable	rho	0	0	y
 EXCEL	FORECAST	statistical	bindable	linearRegression	0	0	x, known_y's, known_x's
 EXCEL	FORECAST.ETS	statistical	bindable	HoltWintersModel.trainedForecast	0	0	target_date, values, timeline, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.CONFINT	statistical	bindable	HoltWintersModel.predictWithConfidence	0	0	target_date, values, timeline, [confidence_level], [seasonality], [data_completion], [aggregation]
-EXCEL	FORECAST.ETS.SEASONALITY	statistical	unreviewed		0	0	values, timeline, [data_completion], [aggregation]
-EXCEL	FORECAST.ETS.STAT	statistical	unreviewed		0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
+EXCEL	FORECAST.ETS.SEASONALITY	statistical	have	BuiltinForecastETS + dominantSeasonLength	0	0	values, timeline, [data_completion], [aggregation]
+EXCEL	FORECAST.ETS.STAT	statistical	have	BuiltinForecastETS + BusinessMath fitETS	0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
 EXCEL	FREQUENCY	statistical	have	spreadsheet statistics	0	0	data_array, bins_array
 EXCEL	GAMMA	statistical	have	gamma and modes	0	0	number

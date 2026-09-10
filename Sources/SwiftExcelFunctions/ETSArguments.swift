@@ -57,6 +57,9 @@ public enum ETSArguments {
     /// - Parameters:
     ///   - values: The `values` argument, a range or a single cell.
     ///   - timeline: The `timeline` argument, of matching length.
+    ///   - aggregation: How to combine values sharing a timestamp. Defaults to
+    ///     ``Aggregation/average``, which is Excel's default — though not, as measured,
+    ///     Excel's code `0`.
     /// - Returns: The ordered pair, or the error Excel shows: `#N/A` for a length mismatch,
     ///   `#VALUE!` for a non-numeric entry, `#NUM!` when no constant step can be read, and
     ///   any error found inside either range. A duplicate timestamp is *not* an error: its
@@ -113,7 +116,10 @@ public enum ETSArguments {
             let stamp = ordered[index].0
             var members: [Double] = []
             var next = index
-            while next < ordered.endIndex, ordered[next].0 == stamp {
+            // `isEqual(to:)` rather than `==`: identical operands, and named so it reads
+            // as the decision it is. Two cells holding the same number are the same
+            // timestamp, and a tolerance here would merge timestamps Excel keeps apart.
+            while next < ordered.endIndex, ordered[next].0.isEqual(to: stamp) {
                 if let observation = ordered[next].1 { members.append(observation) }
                 next += 1
             }
@@ -193,7 +199,7 @@ public extension ETSArguments {
     /// rather than an average, there being nothing to average it with.
     ///
     /// - Parameters:
-    ///   - pair: The validated pair from ``paired(values:timeline:)``.
+    ///   - pair: The validated pair from ``paired(values:timeline:aggregation:)``.
     ///   - completion: Excel's `data_completion` treatment.
     /// - Returns: The completed series, or `#NUM!` when nothing is present to estimate
     ///   from, or when more than 30% of the grid is missing.
