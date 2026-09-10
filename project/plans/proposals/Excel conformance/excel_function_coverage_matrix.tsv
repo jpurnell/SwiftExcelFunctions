@@ -352,7 +352,7 @@ EXCEL	WRAPROWS	lookup	unreviewed		0	0	vector, wrap_count, [pad_with]
 EXCEL	XLOOKUP	lookup	have	navigation	0	0	lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]
 EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [search_mode]
 EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
-EXCEL	ASC	text	bindable	Lease.rightOfUseAsset	0	0	text
+EXCEL	ASC	text	have	BuiltinTextWidthFunctions — inverse of DBCS	0	0	text
 EXCEL	ARRAYTOTEXT	text	unreviewed		0	0	array, [format]
 EXCEL	BAHTTEXT	text	have	BuiltinBahtText	0	0	number
 EXCEL	CHAR	text	have	text	0	0	number
@@ -375,7 +375,7 @@ EXCEL	LOWER	text	have	text	0	0	text
 EXCEL	MID	text	have	text	0	0	text, start_num, num_chars
 EXCEL	MIDB	text	have	BuiltinTextFunctions.mid — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	NUMBERVALUE	text	have	text	0	0	Text, [Decimal_separator], [Group_separator]
-EXCEL	PHONETIC	text	new	double-byte locale semantics	0	0	reference
+EXCEL	PHONETIC	text	not ours	blocked two links up: SwiftXLSX drops <rPh> runs, and CellValue has no rich-text case to carry them	0	0	reference
 EXCEL	PROPER	text	have	text	0	0	text
 EXCEL	REGEXEXTRACT	text	unreviewed		0	0	text, pattern, [return_mode], [case_sensitivity]
 EXCEL	REGEXREPLACE	text	unreviewed		0	0	text, pattern, replacement, [occurrence], [case_sensitivity]

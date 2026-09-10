@@ -2,13 +2,20 @@ import XCTest
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-/// `DBCS` and `JIS` — half-width to full-width.
+/// `DBCS`, `JIS` and `ASC` — the width conversions, in both directions.
 ///
-/// The two are **one function under two names**, which is Microsoft's own account: "the name
-/// of the function (and the characters that it converts) depends upon your language
-/// settings." `JIS` is what Japanese-language Excel calls `DBCS`. They are registered
-/// separately because a workbook may carry either spelling, and they delegate to one
-/// implementation because two would drift.
+/// `DBCS` and `JIS` are **one function under two names**, which is Microsoft's own account:
+/// "the name of the function (and the characters that it converts) depends upon your
+/// language settings." `JIS` is what Japanese-language Excel calls `DBCS`. Both spellings
+/// register, because a workbook may carry either, and both reach one implementation, because
+/// two would drift. `ASC` is the inverse.
+///
+/// **Neither direction is a per-character map**, which is the fact the whole file is
+/// arranged around. Widening composes — `ｶ` + `ﾞ` becomes the single `ガ`, so the string gets
+/// shorter — and narrowing decomposes it again, so the string gets longer. A space is
+/// asymmetric too: its wide form is the ideographic space `U+3000`, in a different block
+/// from the rest. An implementation written as "add `0xFEE0` to every printable scalar" gets
+/// Latin text entirely right and both of these wrong.
 final class TextWidthFunctionTests: XCTestCase {
 
     private func fn(_ name: String) throws -> ExcelFunction {
@@ -95,6 +102,48 @@ final class TextWidthFunctionTests: XCTestCase {
             XCTAssertEqual(try text("JIS", .text(input)),
                            try text("DBCS", .text(input)),
                            "disagreed on \(input)")
+        }
+    }
+
+    // MARK: - ASC, the inverse
+
+    func testASCNarrowsLatin() throws {
+        XCTAssertEqual(try text("ASC", .text("ＡＢＣ")), "ABC")
+        XCTAssertEqual(try text("ASC", .text("１２３")), "123")
+    }
+
+    /// The ideographic space narrows back to an ordinary one — the same asymmetry as
+    /// widening, in reverse.
+    func testASCNarrowsTheIdeographicSpace() throws {
+        XCTAssertEqual(try text("ASC", .text("\u{3000}")), " ")
+    }
+
+    /// **The mirror of the composing case, and the reason it is worth its own test.**
+    /// Widening turns two scalars into one; narrowing turns one into two, so the string
+    /// gets *longer*. `ガ` becomes `ｶ` followed by a separate `ﾞ`.
+    func testASCDecomposesVoicedKatakana() throws {
+        let narrowed = try text("ASC", .text("ガ"))
+        XCTAssertEqual(narrowed, "ｶﾞ")
+        XCTAssertEqual(narrowed.unicodeScalars.count, 2)
+    }
+
+    func testASCLeavesHalfWidthAlone() throws {
+        XCTAssertEqual(try text("ASC", .text("abc")), "abc")
+        XCTAssertEqual(try text("ASC", .text("ｱｲｳ")), "ｱｲｳ")
+    }
+
+    func testASCLeavesKanjiAlone() throws {
+        XCTAssertEqual(try text("ASC", .text("日本語")), "日本語")
+    }
+
+    /// **The relationship that ties the two together.** For any half-width input, widening
+    /// then narrowing returns it — including the composing katakana, where each direction
+    /// changes the scalar count and only a correct pair puts it back. Asserting the
+    /// round-trip catches a mismatched pair that two independent one-way tests would not.
+    func testWideningThenNarrowingRoundTrips() throws {
+        for input in ["abc", "123", "a b!", "ｱｲｳ", "ｶﾞｷﾞ", "ﾊﾟﾋﾟ"] {
+            let widened = try text("DBCS", .text(input))
+            XCTAssertEqual(try text("ASC", .text(widened)), input, "round trip of \(input)")
         }
     }
 
