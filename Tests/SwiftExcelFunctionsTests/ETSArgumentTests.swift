@@ -129,9 +129,17 @@ final class ETSArgumentTests: XCTestCase {
                        7, accuracy: 1e-12)
     }
 
-    /// A duplicate timestamp is decided at the pairing, so every function sees the same
-    /// answer for it. See ``ETSTimeline`` for why this reading is provisional.
-    func testDuplicateTimestampIsValue() throws {
-        XCTAssertEqual(try pairError(nums([10, 20, 30]), nums([1, 2, 2])), .value)
+    /// **A duplicate timestamp is combined, not rejected** — measured against Excel, which
+    /// contradicts the published specification. The pair that comes back is shorter than
+    /// the ranges that went in, and the aggregate is `data_completion`'s input like any
+    /// other observation. See ``ETSArguments/Aggregation`` for the measurements.
+    ///
+    /// This test previously asserted `#VALUE!` on the strength of Microsoft's documentation
+    /// and was marked provisional when written; the measurement is why it now reads the
+    /// other way.
+    func testDuplicateTimestampsAreCombined() throws {
+        let pair = try paired(nums([10, 20, 30]), nums([1, 2, 2]))
+        XCTAssertEqual(pair.timeline, [1, 2])
+        XCTAssertEqual(pair.observations, [10, 25])   // default AVERAGE of 20 and 30
     }
 }

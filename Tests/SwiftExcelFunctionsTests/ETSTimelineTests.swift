@@ -125,10 +125,12 @@ final class ETSTimelineTests: XCTestCase {
     /// nonsense — so it is reported as the duplicate it is rather than as an inconsistent
     /// step.
     ///
-    /// Whether Excel truly rejects duplicates here, or aggregates them under the
-    /// `aggregation` argument, is unsettled — see ``ETSTimeline`` for the conflict in the
-    /// published specification. This test pins the documented answer, and is the one to
-    /// change if the oracle says otherwise.
+    /// **Excel itself never reaches this branch**, and that is now measured rather than
+    /// assumed: `FORECAST.ETS*` aggregates duplicate timestamps, so
+    /// ``ETSArguments/paired(values:timeline:aggregation:)`` combines them before the step
+    /// is read. What remains here is the contract of `step(of:)` called directly — a
+    /// timeline still holding duplicates cannot yield a step, and saying so is better than
+    /// returning a zero interval's worth of nonsense.
     func testDuplicateTimestampIsValue() throws {
         XCTAssertEqual(try stepError([1, 2, 2, 3]), .value)
     }

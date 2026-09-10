@@ -58,9 +58,14 @@ public enum ETSArguments {
     ///   - values: The `values` argument, a range or a single cell.
     ///   - timeline: The `timeline` argument, of matching length.
     /// - Returns: The ordered pair, or the error Excel shows: `#N/A` for a length mismatch,
-    ///   `#VALUE!` for a non-numeric entry or a duplicate timestamp, `#NUM!` when no
-    ///   constant step can be read, and any error found inside either range.
-    public static func paired(values: CellValue, timeline: CellValue) -> ETSResult<Paired> {
+    ///   `#VALUE!` for a non-numeric entry, `#NUM!` when no constant step can be read, and
+    ///   any error found inside either range. A duplicate timestamp is *not* an error: its
+    ///   values are combined per `aggregation`. See ``Aggregation``.
+    public static func paired(
+        values: CellValue,
+        timeline: CellValue,
+        aggregation: Aggregation = .average
+    ) -> ETSResult<Paired> {
         let valueCells = BuiltinAggregationFunctions.toArray(values)
         let timeCells = BuiltinAggregationFunctions.toArray(timeline)
 
@@ -94,15 +99,37 @@ public enum ETSArguments {
             }
         }
 
-        switch ETSTimeline.step(of: stamps) {
+        // Sorted as pairs. Sorting the timeline alone would reassign every observation to
+        // the wrong timestamp — a wrong answer that looks entirely plausible.
+        let ordered = zip(stamps, observations).sorted { $0.0 < $1.0 }
+
+        // Duplicates are combined *before* the step is read. Read before, a repeated
+        // timestamp gives a zero interval and the whole call fails as a duplicate — which
+        // is what this pipeline did until Excel was measured and found to aggregate them.
+        var groupedStamps: [Double] = []
+        var groupedObservations: [Double?] = []
+        var index = ordered.startIndex
+        while index < ordered.endIndex {
+            let stamp = ordered[index].0
+            var members: [Double] = []
+            var next = index
+            while next < ordered.endIndex, ordered[next].0 == stamp {
+                if let observation = ordered[next].1 { members.append(observation) }
+                next += 1
+            }
+            groupedStamps.append(stamp)
+            // An all-blank group stays missing rather than aggregating to zero; that is
+            // `data_completion`'s job, not this one's.
+            groupedObservations.append(members.isEmpty ? nil : aggregation.combine(members))
+            index = next
+        }
+
+        switch ETSTimeline.step(of: groupedStamps) {
         case .failure(let error):
             return .failure(error)
         case .success(let step):
-            // Sorted as pairs. Sorting the timeline alone would reassign every observation
-            // to the wrong timestamp — a wrong answer that looks entirely plausible.
-            let ordered = zip(stamps, observations).sorted { $0.0 < $1.0 }
-            return .success(Paired(timeline: ordered.map(\.0),
-                                   observations: ordered.map(\.1),
+            return .success(Paired(timeline: groupedStamps,
+                                   observations: groupedObservations,
                                    step: step))
         }
     }
@@ -246,6 +273,107 @@ public extension ETSArguments {
             case let (previous?, nil): return previous
             case let (nil, next?): return next
             case (nil, nil): return 0
+            }
+        }
+    }
+}
+
+// MARK: - aggregation
+
+public extension ETSArguments {
+
+    /// Excel's `aggregation` argument: how values sharing a timestamp are combined.
+    ///
+    /// ## Measured, not documented
+    ///
+    /// **The published specification is wrong about this argument in three ways**, and every
+    /// case below is measured against Excel for Mac instead. The method: a ten-point flat
+    /// series with one timestamp repeated three times carrying `1, 2, 9`, whose aggregates
+    /// are all distinct — average 4, sum 12, max 9, median 2, min 1. `FORECAST.ETS.STAT`'s
+    /// MAE is exactly linear in that value, so dividing the results by the smallest gives the
+    /// aggregate outright. Five of seven codes landed on an expected value exactly, which is
+    /// what makes the reading trustworthy rather than fitted.
+    ///
+    /// | Wrong | Actually |
+    /// |---|---|
+    /// | Duplicates give `#VALUE!` | They are aggregated; no `#VALUE!` in eleven calls |
+    /// | Codes are `0`-based: AVERAGE, SUM, COUNT, COUNTA, MIN, MAX, MEDIAN | They are **1-based and alphabetical** |
+    /// | `0` means AVERAGE, the default | `0` gives `#NUM!`; AVERAGE is `1`, and is the default |
+    ///
+    /// ## The count anomaly
+    ///
+    /// `COUNT` and `COUNTA` return **one less than the group size** — a group of two measured
+    /// 1, a group of three measured 2. That is not what either function means, and it is
+    /// reproduced rather than corrected because this layer's job is to answer what Excel
+    /// answers.
+    ///
+    /// It is also more than an isolated oddity: the rule applies to *every* timestamp, not
+    /// only repeated ones. A series of singletons under `COUNT` becomes all zeros rather than
+    /// all ones, which is exactly what the measured baseline shows — the flat-zero series
+    /// stayed flat and zero. Had counts been group *sizes*, that baseline would have shifted
+    /// to one and the MAE would not have come back a clean multiple. So the anomaly is
+    /// corroborated by data that was not collected to test it.
+    enum Aggregation: Equatable, Sendable, CaseIterable {
+
+        /// Excel's `1`, and the default.
+        case average
+        /// Excel's `2`. See the count anomaly above.
+        case count
+        /// Excel's `3`. Measured identically to ``count``.
+        case countA
+        /// Excel's `4`.
+        case max
+        /// Excel's `5`.
+        case median
+        /// Excel's `6`.
+        case min
+        /// Excel's `7`.
+        case sum
+
+        /// Reads Excel's numeric `aggregation` argument.
+        ///
+        /// - Parameter raw: The argument as written in the formula.
+        /// - Returns: The aggregation, or `#NUM!` for a code Excel rejects — including `0`,
+        ///   which the specification names as the default and which Excel refuses.
+        public static func code(_ raw: Int) -> ETSResult<Aggregation> {
+            switch raw {
+            case 1: return .success(.average)
+            case 2: return .success(.count)
+            case 3: return .success(.countA)
+            case 4: return .success(.max)
+            case 5: return .success(.median)
+            case 6: return .success(.min)
+            case 7: return .success(.sum)
+            default: return .failure(.num)
+            }
+        }
+
+        /// Combines the observations sharing one timestamp.
+        ///
+        /// - Parameter values: The group's observations; never empty, since an all-blank
+        ///   group stays missing rather than being aggregated.
+        /// - Returns: The combined value.
+        func combine(_ values: [Double]) -> Double {
+            switch self {
+            case .average:
+                let count = Double(values.count)
+                guard count > 0 else { return 0 }
+                return values.reduce(0, +) / count
+            case .count, .countA:
+                // One less than the group size, as measured. See the type's documentation.
+                return Double(values.count - 1)
+            case .max:
+                return values.max() ?? 0
+            case .median:
+                let sorted = values.sorted()
+                let middle = sorted.count / 2
+                guard !sorted.isEmpty else { return 0 }
+                if sorted.count % 2 == 1 { return sorted[middle] }
+                return (sorted[middle - 1] + sorted[middle]) / 2
+            case .min:
+                return values.min() ?? 0
+            case .sum:
+                return values.reduce(0, +)
             }
         }
     }
