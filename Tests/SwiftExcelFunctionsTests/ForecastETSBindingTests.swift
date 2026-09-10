@@ -137,13 +137,13 @@ final class ForecastETSBindingTests: XCTestCase {
         XCTAssertEqual(result, .number(4))
     }
 
-    /// A monotone ramp has no repeating pattern. **What Excel returns here is not
-    /// established** — `0` and `1` are both plausible readings of "no pattern detected" and
-    /// the specification does not say. This pins our answer so a change is deliberate; it is
-    /// the first thing to check against a real workbook.
-    func testSeasonalityOnANonSeasonalSeries() throws {
+    /// A monotone ramp has no repeating pattern, and **Excel answers `0`** — measured, on
+    /// exactly this series. Our first reading was `1`, taken from upstream's non-seasonal
+    /// cycle length, and it was wrong: "no repeating pattern" and "a pattern that repeats
+    /// every period" are different claims, and only the second is a 1.
+    func testSeasonalityOnANonSeasonalSeriesIsZero() throws {
         let ramp = nums([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
         let result = try fn("FORECAST.ETS.SEASONALITY").evaluate([ramp, timeline])
-        XCTAssertEqual(result, .number(1))
+        XCTAssertEqual(result, .number(0))
     }
 }

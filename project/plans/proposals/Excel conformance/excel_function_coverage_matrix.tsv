@@ -114,8 +114,8 @@ EXCEL	F.TEST	statistical	have	statistical tests	0	0	array1,array2
 EXCEL	FISHER	statistical	bindable	fisher	0	0	x
 EXCEL	FISHERINV	statistical	bindable	rho	0	0	y
 EXCEL	FORECAST	statistical	bindable	linearRegression	0	0	x, known_y's, known_x's
-EXCEL	FORECAST.ETS	statistical	bindable	HoltWintersModel.trainedForecast	0	0	target_date, values, timeline, [seasonality], [data_completion], [aggregation]
-EXCEL	FORECAST.ETS.CONFINT	statistical	bindable	HoltWintersModel.predictWithConfidence	0	0	target_date, values, timeline, [confidence_level], [seasonality], [data_completion], [aggregation]
+EXCEL	FORECAST.ETS	statistical	have	BuiltinForecastETS + BusinessMath fitETS	0	0	target_date, values, timeline, [seasonality], [data_completion], [aggregation]
+EXCEL	FORECAST.ETS.CONFINT	statistical	have	BuiltinForecastETS + forecastWithConfidence	0	0	target_date, values, timeline, [confidence_level], [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.SEASONALITY	statistical	have	BuiltinForecastETS + dominantSeasonLength	0	0	values, timeline, [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.STAT	statistical	have	BuiltinForecastETS + BusinessMath fitETS	0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
@@ -354,13 +354,13 @@ EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [s
 EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
 EXCEL	ASC	text	bindable	Lease.rightOfUseAsset	0	0	text
 EXCEL	ARRAYTOTEXT	text	unreviewed		0	0	array, [format]
-EXCEL	BAHTTEXT	text	new	double-byte locale semantics	0	0	number
+EXCEL	BAHTTEXT	text	have	BuiltinBahtText	0	0	number
 EXCEL	CHAR	text	have	text	0	0	number
 EXCEL	CLEAN	text	have	text	0	0	text
 EXCEL	CODE	text	have	text	0	0	text
 EXCEL	CONCAT	text	have	text	0	0	text1, [text2],...
 EXCEL	CONCATENATE	text	have	text	0	0	text1, [text2], ...
-EXCEL	DBCS	text	new	double-byte locale semantics	0	0	text
+EXCEL	DBCS	text	have	BuiltinTextWidthFunctions	0	0	text
 EXCEL	DETECTLANGUAGE	text	out of scope	network service, as cube/web	0	0	text
 EXCEL	DOLLAR	text	unreviewed		0	0	number, [decimals]
 EXCEL	EXACT	text	have	text	0	0	text1, text2
@@ -401,7 +401,7 @@ EXCEL	UNICODE	text	have	text	0	0	text
 EXCEL	UPPER	text	have	text	0	0	text
 EXCEL	VALUE	text	have	text	0	0	text
 EXCEL	VALUETOTEXT	text	unreviewed		0	0	value, [format]
-EXCEL	JIS	text	new	double-byte locale semantics	0	0	text
+EXCEL	JIS	text	have	BuiltinTextWidthFunctions — same function as DBCS	0	0	text
 EXCEL	DAVERAGE	database	unreviewed		0	0	database, field, criteria
 EXCEL	DCOUNT	database	unreviewed		0	0	database, field, criteria
 EXCEL	DCOUNTA	database	unreviewed		0	0	database, field, criteria

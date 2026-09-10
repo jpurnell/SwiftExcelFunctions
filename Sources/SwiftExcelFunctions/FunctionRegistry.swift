@@ -98,6 +98,8 @@ public struct FunctionRegistry: Sendable {
             BuiltinTextFunctions.all,
             BuiltinTextByteFunctions.all,
             BuiltinForecastETS.all,
+            BuiltinTextWidthFunctions.all,
+            BuiltinBahtText.all,
             BuiltinNavigationFunctions.all,
             BuiltinDateTimeFunctions.all,
             BuiltinAggregationFunctions.all,

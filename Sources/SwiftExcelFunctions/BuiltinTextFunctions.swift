@@ -33,7 +33,7 @@ public enum BuiltinTextFunctions {
     /// - Parameter value: The cell value to convert.
     /// - Returns: The string representation.
     /// - Throws: ``EvalError`` on error values.
-    private static func toString(_ value: CellValue) throws -> String {
+    static func toString(_ value: CellValue) throws -> String {
         switch value {
         case .text(let s):
             return s
@@ -93,7 +93,7 @@ public enum BuiltinTextFunctions {
     }
 
     /// Wraps a function body so that ``EvalError`` maps to the correct ``CellValue/error(_:)``.
-    private static func catching(_ body: () throws -> CellValue) -> CellValue {
+    static func catching(_ body: () throws -> CellValue) -> CellValue {
         do {
             return try body()
         } catch EvalError.excelError(let e) {
