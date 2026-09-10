@@ -13,7 +13,7 @@ let package = Package(
         // family on one SwiftExcelCore — two versions would mean two `CellValue` types
         // and nothing would typecheck — and `from:` enforces that better than `exact:`,
         // by resolving to the highest version satisfying everyone rather than refusing.
-        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.6.0"),
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.8.0"),
         // The mathematics. On the 3.0.0 prerelease line, and `.upToNextMinor` rather
         // than `exact:` for two reasons. SwiftPM excludes prereleases from a version
         // range *unless the lower bound is itself a prerelease*, so `from: "2.11.0"`
@@ -33,7 +33,7 @@ let package = Package(
         // `upToNextMinor` rather than `from:`: this family ships breaking changes in
         // minor versions while it is pre-1.0, so a patch should flow freely and a minor
         // should be a deliberate bump.
-        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.23.0"))
+        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.24.0"))
     ],
     targets: [
         .target(

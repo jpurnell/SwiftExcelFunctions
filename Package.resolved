@@ -1,5 +1,5 @@
 {
-  "originHash" : "c64d3a55a0f52194f51459c8bc04b5780c09d864e0910032de0a84f491096da4",
+  "originHash" : "4d70e9f9a374b2eb1ee82ee04273ca21a5922abafd17bfaaa1d655e8a50208c0",
   "pins" : [
     {
       "identity" : "businessmath",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftExcelCore",
       "state" : {
-        "revision" : "60a7d6bffbbb584ab1c1726219188ff4987d082e",
-        "version" : "0.6.0"
+        "revision" : "5d5e3e9ac3cc86aba79319d120f34138e754d4ba",
+        "version" : "0.8.0"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftXLSX",
       "state" : {
-        "revision" : "6833f5fa4b79d9af40cd16390b091136a7848964",
-        "version" : "0.23.0"
+        "revision" : "fefc6262d61bd2935cca2a54182a004186e5a8ed",
+        "version" : "0.24.0"
       }
     },
     {
