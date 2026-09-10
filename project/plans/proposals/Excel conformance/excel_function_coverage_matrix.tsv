@@ -190,16 +190,16 @@ EXCEL	VARA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	VARPA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	WEIBULL.DIST	statistical	have	statistical tests	0	0	x,alpha,beta,cumulative
 EXCEL	Z.TEST	statistical	have	statistical tests	0	0	array,x,[sigma]
-EXCEL	ACCRINT	financial	bindable	accruedInterest — verified present	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
+EXCEL	ACCRINT	financial	have	accruedInterest	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
 EXCEL	ACCRINTM	financial	unreviewed		0	0	issue, settlement, rate, par, [basis]
 EXCEL	AMORDEGRC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
 EXCEL	AMORLINC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
-EXCEL	COUPDAYBS	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
-EXCEL	COUPDAYS	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
-EXCEL	COUPDAYSNC	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
-EXCEL	COUPNCD	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
-EXCEL	COUPNUM	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
-EXCEL	COUPPCD	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPDAYBS	financial	have	CouponPeriod.daysAccrued	0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPDAYS	financial	have	CouponPeriod.daysInPeriod	0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPDAYSNC	financial	have	CouponPeriod.daysToNextCoupon	0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPNCD	financial	have	CouponPeriod.nextCouponDate	0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPNUM	financial	have	CouponPeriod.couponsRemaining	0	0	settlement, maturity, frequency, [basis]
+EXCEL	COUPPCD	financial	have	CouponPeriod.previousCouponDate	0	0	settlement, maturity, frequency, [basis]
 EXCEL	CUMIPMT	financial	bindable	AmortizationSchedule.totalInterest	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	CUMPRINC	financial	bindable	AmortizationSchedule.totalPrincipal	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	DB	financial	have	financial	0	0	cost, salvage, life, period, [month]
@@ -207,17 +207,17 @@ EXCEL	DDB	financial	bindable	decliningBalanceDepreciation — verified present	0
 EXCEL	DISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	DOLLARDE	financial	unreviewed		0	0	fractional_dollar, fraction
 EXCEL	DOLLARFR	financial	unreviewed		0	0	decimal_dollar, fraction
-EXCEL	DURATION	financial	bindable	macaulayDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
-EXCEL	EFFECT	financial	bindable	DebtInstrument.effectiveAnnualRate	0	0	nominal_rate, npery
+EXCEL	DURATION	financial	have	bondDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
+EXCEL	EFFECT	financial	have	effectiveRate	0	0	nominal_rate, npery
 EXCEL	FV	financial	have	financial	0	0	rate, nper, pmt, [pv], [type]
 EXCEL	FVSCHEDULE	financial	unreviewed		0	0	principal, schedule
 EXCEL	INTRATE	financial	unreviewed		0	0	settlement, maturity, investment, redemption, [basis]
 EXCEL	IPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
 EXCEL	IRR	financial	have	financial	13	12	values, [guess]
 EXCEL	ISPMT	financial	unreviewed		0	0	rate, per, nper, pv
-EXCEL	MDURATION	financial	bindable	modifiedDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
+EXCEL	MDURATION	financial	have	bondModifiedDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	MIRR	financial	bindable	mirr	0	0	values, finance_rate, reinvest_rate
-EXCEL	NOMINAL	financial	bindable	nominalRate(effectiveRate:periodsPerYear:) — verified present	0	0	effect_rate, npery
+EXCEL	NOMINAL	financial	have	nominalRate	0	0	effect_rate, npery
 EXCEL	NPER	financial	have	financial	0	0	rate, pmt, pv, [fv], [type]
 EXCEL	NPV	financial	have	financial	169	78	rate, value1, [value2], ...
 EXCEL	ODDFPRICE	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]
@@ -227,7 +227,7 @@ EXCEL	ODDLYIELD	financial	unreviewed		0	0	settlement, maturity, last_interest, r
 EXCEL	PDURATION	financial	new	log(fv/pv)/log(1+rate) — arithmetic, not upstream mathematics	0	0	rate, pv, fv
 EXCEL	PMT	financial	have	financial	1352	48	rate, nper, pv, [fv], [type]
 EXCEL	PPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
-EXCEL	PRICE	financial	bindable	price	0	0	settlement, maturity, rate, yld, redemption, frequency, [basis]
+EXCEL	PRICE	financial	have	bondPrice	0	0	settlement, maturity, rate, yld, redemption, frequency, [basis]
 EXCEL	PRICEDISC	financial	unreviewed		0	0	settlement, maturity, discount, redemption, [basis]
 EXCEL	PRICEMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, yld, [basis]
 EXCEL	PV	financial	have	financial	39	13	rate, nper, pmt, [fv], [type]
@@ -235,14 +235,14 @@ EXCEL	RATE	financial	have	financial	10	2	nper, pmt, pv, [fv], [type], [guess]
 EXCEL	RECEIVED	financial	unreviewed		0	0	settlement, maturity, investment, discount, [basis]
 EXCEL	RRI	financial	bindable	cagr	0	0	nper, pv, fv
 EXCEL	SLN	financial	have	financial	0	0	cost, salvage, life
-EXCEL	SYD	financial	bindable	sumOfYearsDigitsDepreciation(cost:salvage:life:period:) — verified present	0	0	cost, salvage, life, per
+EXCEL	SYD	financial	have	sumOfYearsDigitsDepreciation	0	0	cost, salvage, life, per
 EXCEL	TBILLEQ	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLPRICE	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLYIELD	financial	unreviewed		0	0	settlement, maturity, pr
-EXCEL	VDB	financial	bindable	variableDecliningBalanceDepreciation — verified present	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
+EXCEL	VDB	financial	have	variableDecliningBalanceDepreciation	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
 EXCEL	XIRR	financial	have	bindings	2	2	values, dates, [guess]
 EXCEL	XNPV	financial	bindable	xnpv	0	0	rate, values, dates
-EXCEL	YIELD	financial	bindable	yieldToMaturity	0	0	settlement, maturity, rate, pr, redemption, frequency, [basis]
+EXCEL	YIELD	financial	have	bondYield	0	0	settlement, maturity, rate, pr, redemption, frequency, [basis]
 EXCEL	YIELDDISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	YIELDMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, pr, [basis]
 EXCEL	DATE	datetime	have	datetime	171	6	year,month,day
@@ -365,15 +365,15 @@ EXCEL	DETECTLANGUAGE	text	out of scope	network service, as cube/web	0	0	text
 EXCEL	DOLLAR	text	unreviewed		0	0	number, [decimals]
 EXCEL	EXACT	text	have	text	0	0	text1, text2
 EXCEL	FIND	text	have	text	0	0	find_text, within_text, [start_num]
-EXCEL	FINDB	text	new	double-byte locale semantics	0	0	find_text, within_text, [start_num]
+EXCEL	FINDB	text	have	BuiltinTextFunctions.find — Western locale, ADR-002	0	0	find_text, within_text, [start_num]
 EXCEL	FIXED	text	have	text	0	0	number, [decimals], [no_commas]
 EXCEL	LEFT	text	have	text	17	1	text, [num_chars]
-EXCEL	LEFTB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	LEFTB	text	have	BuiltinTextFunctions.left — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	LEN	text	have	text	0	0	text
-EXCEL	LENB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	LENB	text	have	BuiltinTextFunctions.len — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	LOWER	text	have	text	0	0	text
 EXCEL	MID	text	have	text	0	0	text, start_num, num_chars
-EXCEL	MIDB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	MIDB	text	have	BuiltinTextFunctions.mid — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	NUMBERVALUE	text	have	text	0	0	Text, [Decimal_separator], [Group_separator]
 EXCEL	PHONETIC	text	new	double-byte locale semantics	0	0	reference
 EXCEL	PROPER	text	have	text	0	0	text
@@ -381,12 +381,12 @@ EXCEL	REGEXEXTRACT	text	unreviewed		0	0	text, pattern, [return_mode], [case_sens
 EXCEL	REGEXREPLACE	text	unreviewed		0	0	text, pattern, replacement, [occurrence], [case_sensitivity]
 EXCEL	REGEXTEST	text	unreviewed		0	0	text, pattern, [case_sensitivity]
 EXCEL	REPLACE	text	have	text	0	0	old_text, start_num, num_chars, new_text
-EXCEL	REPLACEB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	REPLACEB	text	have	BuiltinTextFunctions.replace — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	REPT	text	have	text	0	0	text, number_times
 EXCEL	RIGHT	text	have	text	61	13	text,[num_chars]
-EXCEL	RIGHTB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	RIGHTB	text	have	BuiltinTextFunctions.right — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	SEARCH	text	have	text	0	0	find_text, within_text, [start_num]
-EXCEL	SEARCHB	text	new	double-byte locale semantics	0	0	UNCONFIRMED
+EXCEL	SEARCHB	text	have	BuiltinTextFunctions.search — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	SUBSTITUTE	text	have	text	0	0	text, old_text, new_text, [instance_num]
 EXCEL	T	text	have	text	0	0	value
 EXCEL	TEXT	text	have	text	51	24	value, format_text
@@ -534,7 +534,6 @@ PSI	PsiBinomial	distribution	have	risksolver	0	0	n, p|confirmed
 PSI	PsiBoxFunction	other	unreviewed		0	0	table_range, Arg1, Arg2|confirmed
 PSI	PsiBoxIterator	other	unreviewed		0	0	table_range|confirmed
 PSI	PsiBurr12	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
-PSI	PsiBVar	statistic	have	SimulationResults trial values — computed at binding	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiCalcParam	other	unreviewed		0	0	values_or_lower, upper, base_case|confirmed
 PSI	PsiCalcValue	other	unreviewed		0	0	Output_cell, paramidx|confirmed
 PSI	PsiCategory	property	unreviewed		0	0	string|confirmed
@@ -573,7 +572,7 @@ PSI	PsiCubeOutput	other	unreviewed		0	0	output_cell|confirmed
 PSI	PsiCumul	distribution	have	risksolver	0	0	a, b, {x1..xn}, {p1..pn}|confirmed
 PSI	PsiCumulD	distribution	have	risksolver	0	0	min, max, {x1..xn}, {p1..pn}|confirmed
 PSI	PsiCurrentOpt	other	unreviewed		0	0	(none)|inferred
-PSI	PsiBVaR	statistic	have	SimulationResults.valueAtRisk — negate at binding	3	3	cell, percentile, simulation, [struc_format], [param_slice]|confirmed
+PSI	PsiBVaR	statistic	have	SimulationResults.valueAtRisk — negate at binding	4	3	cell, percentile, simulation, [struc_format], [param_slice]|confirmed
 PSI	PsiCVaR	statistic	have	SimulationResults.conditionalValueAtRisk — negate at binding; tail exact	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiDagum	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
 PSI	PsiData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
@@ -812,5 +811,5 @@ PSI	PsiVariance	statistic	unreviewed		0	0	cell, simulation, struc_format, param_
 PSI	PsiVary	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	base, min, max, [range_type], [dist_name]|confirmed
 PSI	PsiWeibull	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiWeibullAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
-PSI	PsiXtoP	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, simulation, struc_format, param_slice|confirmed
+PSI	PsiXtoP	statistic	have	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, simulation, struc_format, param_slice|confirmed
 PSI	PsiXtoQ	statistic	unreviewed		0	0	cell_or_name, target_value, simulation|confirmed

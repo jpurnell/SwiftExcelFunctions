@@ -4,14 +4,24 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.7.0; 269 functions registered, 909 tests, quality gate 45/45 at 0/0.
+**Status:** 0.7.1 released; `main` carries the bond block. 400 functions registered,
+1,110 tests, quality gate 45/45 at 0/0.
 
-- **160** of Microsoft's 519 documented worksheet functions.
-- **109** of Frontline Risk Solver's `Psi*` functions — 106 of its 113 distribution rows — so a
-  workbook built with Risk Solver can be read without the add-in.
+- **283** of Microsoft's 519 documented worksheet functions.
+- **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**,
+  with 5 of the remaining 6 not ours to implement — so a workbook built with Risk Solver can
+  be read without the add-in.
 
 Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
-reconciled against the live `FunctionRegistry` rather than maintained by hand.
+reconciled against the live `FunctionRegistry` rather than maintained by hand. The
+reconciliation is arithmetic, not aspiration: 283 Excel rows plus 117 Psi rows marked `have`
+is exactly the 400 names the registry holds, and it is checked that way rather than asserted.
+
+That check earns its keep. It last found seven byte functions and `PsiXtoP` implemented but
+still filed as outstanding, and one Psi row entered twice under two spellings of the same
+name — which Excel, being case-insensitive about function names, cannot distinguish. Until
+those were fixed the two sides differed by eight, and the matrix under-reported its own
+coverage.
 
 ## Two products
 
