@@ -22,7 +22,7 @@ extension BuiltinRiskSolverFunctions {
          psiCumulD, psiNormalSkew, psiTriangGen, psiMetalog2, psiMetalogSPT,
          psiAR2, psiMA1, psiMA2, psiARMA11, psiARCH1, psiEGARCH11,
          psiMVNormal, psiMVLogNormal, psiMVResample, psiMVShuffle, psiFit,
-         psiMetalogFit, psiMetalog2Fit]
+         psiMetalogFit, psiMetalog2Fit, psiAPARCH11]
         + BuiltinRiskSolverAltDistributions.all
 
     // MARK: - Ordinary distributions
@@ -324,6 +324,45 @@ extension BuiltinRiskSolverFunctions {
     /// invented differently: two names that behave alike is a smaller error than one
     /// of them quietly fitting a different distribution.
     public static let psiMetalog2Fit = metalogFit("PSIMETALOG2FIT")
+
+    /// `PsiAPARCH11(mean, volatility, delta, gamma, err_coef, ar_coef, val0, stdev0)`.
+    ///
+    /// Asymmetric power ARCH: the recursion runs on `σ^δ` rather than `σ²`, so the
+    /// power itself is estimated instead of assumed to be 2, and a leverage term lets
+    /// bad news move volatility more than good news of the same size.
+    ///
+    /// This was the last row of the 52-item completeness delta, and it waited on
+    /// upstream for a reason worth recording. I had concluded the conversion from
+    /// Frontline's stated *volatility* to the type's constant `ω` was
+    /// distribution-dependent and so could not be derived. It is not:
+    ///
+    /// ```
+    /// ω = σ^δ (1 − ακ − β),   κ = E(|z| − γz)^δ
+    /// ```
+    ///
+    /// `κ` is an expectation over the **innovation**, depending on γ and δ alone and
+    /// not on ω, so it is computable before the distribution exists. At γ = 0, δ = 2
+    /// it is 1 and the whole thing collapses to `ω = σ²(1 − α − β)` — which is why the
+    /// GARCH case worked and this one looked harder than it was. BusinessMath supplies
+    /// it as `init(name:unconditionalVolatility:…)`, so the volatility goes in
+    /// directly and Frontline's argument name was accurate throughout.
+    public static let psiAPARCH11 = sampling("PSIAPARCH11", minArgs: 8, maxArgs: 10) { args in
+        guard let mean = real(args[0]), let vol = real(args[1]),
+              let delta = real(args[2]), let gamma = real(args[3]),
+              let alpha = real(args[4]), let beta = real(args[5]),
+              let v0 = real(args[6]), let s0 = real(args[7]),
+              vol > 0, s0 >= 0 else { return nil }
+        guard let process = AsymmetricPowerArch(name: "PsiAPARCH11",
+                                                unconditionalVolatility: vol,
+                                                shockWeight: alpha, persistenceWeight: beta,
+                                                asymmetry: gamma, power: delta) else { return nil }
+        let state = GarchState(value: v0 - mean, variance: s0 * s0)
+        let standardNormal = DistributionNormal(0, 1)
+        return { probability in
+            mean + process.step(from: state, dt: 1,
+                                normalDraws: standardNormal.quantile(probability)).value
+        }
+    }
 
     // MARK: - Multivariate, which answer a vector
 

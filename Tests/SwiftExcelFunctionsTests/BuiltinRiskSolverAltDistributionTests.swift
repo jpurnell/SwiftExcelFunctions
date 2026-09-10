@@ -184,6 +184,7 @@ final class BuiltinRiskSolverAltDistributionTests: XCTestCase {
             ("PSIARMA11", [0, 1, 0.5, 0.4, 0.5, 0.2]),
             ("PSIARCH1", [0, 0.02, 0.3, 0.01]),
             ("PSIEGARCH11", [0, 0.02, -0.1, 1, 0.1, 0.85, 0.01, 0.02]),
+            ("PSIAPARCH11", [0, 0.02, 2, -0.1, 0.1, 0.85, 0.01, 0.02]),
         ]
         for (name, args) in calls {
             for p in [0.2, 0.8] {

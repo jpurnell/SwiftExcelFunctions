@@ -190,7 +190,7 @@ EXCEL	VARA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	VARPA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	WEIBULL.DIST	statistical	have	statistical tests	0	0	x,alpha,beta,cumulative
 EXCEL	Z.TEST	statistical	have	statistical tests	0	0	array,x,[sigma]
-EXCEL	ACCRINT	financial	new	verified absent	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
+EXCEL	ACCRINT	financial	bindable	accruedInterest — verified present	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
 EXCEL	ACCRINTM	financial	unreviewed		0	0	issue, settlement, rate, par, [basis]
 EXCEL	AMORDEGRC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
 EXCEL	AMORLINC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
@@ -203,7 +203,7 @@ EXCEL	COUPPCD	financial	unreviewed		0	0	settlement, maturity, frequency, [basis]
 EXCEL	CUMIPMT	financial	bindable	AmortizationSchedule.totalInterest	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	CUMPRINC	financial	bindable	AmortizationSchedule.totalPrincipal	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	DB	financial	have	financial	0	0	cost, salvage, life, period, [month]
-EXCEL	DDB	financial	new	verified absent	0	0	cost, salvage, life, period, [factor]
+EXCEL	DDB	financial	bindable	decliningBalanceDepreciation — verified present	0	0	cost, salvage, life, period, [factor]
 EXCEL	DISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	DOLLARDE	financial	unreviewed		0	0	fractional_dollar, fraction
 EXCEL	DOLLARFR	financial	unreviewed		0	0	decimal_dollar, fraction
@@ -217,14 +217,14 @@ EXCEL	IRR	financial	have	financial	13	12	values, [guess]
 EXCEL	ISPMT	financial	unreviewed		0	0	rate, per, nper, pv
 EXCEL	MDURATION	financial	bindable	modifiedDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	MIRR	financial	bindable	mirr	0	0	values, finance_rate, reinvest_rate
-EXCEL	NOMINAL	financial	new	verified absent	0	0	effect_rate, npery
+EXCEL	NOMINAL	financial	bindable	nominalRate(effectiveRate:periodsPerYear:) — verified present	0	0	effect_rate, npery
 EXCEL	NPER	financial	have	financial	0	0	rate, pmt, pv, [fv], [type]
 EXCEL	NPV	financial	have	financial	169	78	rate, value1, [value2], ...
 EXCEL	ODDFPRICE	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]
 EXCEL	ODDFYIELD	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis]
 EXCEL	ODDLPRICE	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis]
 EXCEL	ODDLYIELD	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis]
-EXCEL	PDURATION	financial	new	verified absent	0	0	rate, pv, fv
+EXCEL	PDURATION	financial	new	log(fv/pv)/log(1+rate) — arithmetic, not upstream mathematics	0	0	rate, pv, fv
 EXCEL	PMT	financial	have	financial	1352	48	rate, nper, pv, [fv], [type]
 EXCEL	PPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
 EXCEL	PRICE	financial	bindable	price	0	0	settlement, maturity, rate, yld, redemption, frequency, [basis]
@@ -235,11 +235,11 @@ EXCEL	RATE	financial	have	financial	10	2	nper, pmt, pv, [fv], [type], [guess]
 EXCEL	RECEIVED	financial	unreviewed		0	0	settlement, maturity, investment, discount, [basis]
 EXCEL	RRI	financial	bindable	cagr	0	0	nper, pv, fv
 EXCEL	SLN	financial	have	financial	0	0	cost, salvage, life
-EXCEL	SYD	financial	new	verified absent	0	0	cost, salvage, life, per
+EXCEL	SYD	financial	bindable	sumOfYearsDigitsDepreciation(cost:salvage:life:period:) — verified present	0	0	cost, salvage, life, per
 EXCEL	TBILLEQ	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLPRICE	financial	unreviewed		0	0	settlement, maturity, discount
 EXCEL	TBILLYIELD	financial	unreviewed		0	0	settlement, maturity, pr
-EXCEL	VDB	financial	new	verified absent	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
+EXCEL	VDB	financial	bindable	variableDecliningBalanceDepreciation — verified present	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
 EXCEL	XIRR	financial	have	bindings	2	2	values, dates, [guess]
 EXCEL	XNPV	financial	bindable	xnpv	0	0	rate, values, dates
 EXCEL	YIELD	financial	bindable	yieldToMaturity	0	0	settlement, maturity, rate, pr, redemption, frequency, [basis]
@@ -519,7 +519,7 @@ EXCEL	VARP	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	WEIBULL	compatibility	unreviewed		0	0	x,alpha,beta,cumulative
 EXCEL	ZTEST	compatibility	unreviewed		0	0	array,x,[sigma]
 PSI	PsiAbsDev	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiAPARCH11	distribution	new	absent from BusinessMath 2.14.0	0	0	mean, volatility, delta, gamma, err_coef, ar_coef, val0, stdev0|confirmed
+PSI	PsiAPARCH11	distribution	have	AsymmetricPowerArch(unconditionalVolatility:) — BusinessMath 2.17.0	0	0	mean, volatility, delta, gamma, err_coef, ar_coef, val0, stdev0|confirmed
 PSI	PsiAR1	distribution	have	risksolver	0	0	mean, volatility, coef1, val0|confirmed
 PSI	PsiAR2	distribution	have	risksolver	0	0	mean, volatility, coef1, coef2, val0, val1|confirmed
 PSI	PsiARCH1	distribution	have	risksolver	0	0	mean, volatility, err_coef, val0|confirmed
@@ -541,7 +541,7 @@ PSI	PsiCategory	property	unreviewed		0	0	string|confirmed
 PSI	PsiCauchy	distribution	have	risksolver	0	0	loc, lambda|confirmed
 PSI	PsiCauchyAlt	distribution	have	risksolver	0	0	2 percentile/value pairs: percentile1, value1, percentile2, value2|confirmed
 PSI	PsiCensor	property	unreviewed		0	0	min, max, type|confirmed
-PSI	PsiCertified	distribution	new	absent from BusinessMath 2.14.0	0	0	name, sipname|confirmed
+PSI	PsiCertified	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	name, sipname|confirmed
 PSI	PsiCertify	property	unreviewed		0	0	name, default_value, short_description, full_description, version, author, copyright, trademark, history|confirmed
 PSI	PsiChiSquare	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiChiSquareAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
@@ -654,7 +654,7 @@ PSI	PsiLogNormal	distribution	have	risksolver	40	1	mu, sigma (arithmetic mean/st
 PSI	PsiLogNormalAlt	distribution	have	risksolver	0	0	2 parameters: 2 different percentiles, or percentile and mean, or percentile and stdev|confirmed
 PSI	PsiMA1	distribution	have	risksolver	0	0	mean, volatility, coef1, err0|confirmed
 PSI	PsiMA2	distribution	have	risksolver	0	0	mean, volatility, coef1, coef2, err0, err1|confirmed
-PSI	PsiMakeInput	distribution	new	absent from BusinessMath 2.14.0	0	0	freq, expr, deduct, limit|confirmed
+PSI	PsiMakeInput	distribution	new	CompoundLossModel exists; freq/expr are host semantics, not mathematics	0	0	freq, expr, deduct, limit|confirmed
 PSI	PsiMax	statistic	bindable	ScenarioSet.range	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiMaxExtreme	distribution	have	risksolver	0	0	m, s|confirmed
 PSI	PsiMaxExtremeAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, mean, var, mode, scale|confirmed
@@ -758,11 +758,11 @@ PSI	PsiSigmaZUpper	statistic	unreviewed		0	0	cell, upper_limit, simulation, stru
 PSI	PsiSimData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
 PSI	PsiSimOutput	annotation	not ours	role declaration, belongs with solver_adj	0	0	[cell_range]|confirmed
 PSI	PsiSimParam	annotation	not ours	role declaration, belongs with solver_adj	5	2	values, upper, base_case|confirmed
-PSI	PsiSip	distribution	new	absent from BusinessMath 2.14.0	0	0	sip|confirmed
+PSI	PsiSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	sip|confirmed
 PSI	PsiSixSigma	property	unreviewed		0	0	p1, p2, p3, p4, p5|confirmed
 PSI	PsiSkewness	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
-PSI	PsiSlurp	distribution	new	absent from BusinessMath 2.14.0	0	0	slurp, j|confirmed
+PSI	PsiSlurp	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	slurp, j|confirmed
 PSI	PsiSpearmanRho	statistic	unreviewed		0	0	cell1, cell2|confirmed
 PSI	PsiStatic	property	unreviewed		0	0	static_val|confirmed
 PSI	PsiStdDev	statistic	have	SimulationResults.statistics.stdDev — sample, not population	4	3	cell, simulation, struc_format, param_slice|confirmed
@@ -802,14 +802,14 @@ PSI	PsiTruncateP	property	unreviewed		0	0	[min], [max]|confirmed
 PSI	PsiTSIntegrate	property	unreviewed		0	0	order, c1, c2|confirmed
 PSI	PsiTSLen	property	unreviewed		0	0	length|confirmed
 PSI	PsiTSSeasonality	property	unreviewed		0	0	order, period, terms, index|confirmed
-PSI	PsiTSSip	distribution	new	absent from BusinessMath 2.14.0	0	0	tssip|confirmed
+PSI	PsiTSSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	tssip|confirmed
 PSI	PsiTSTransform	property	unreviewed		0	0	type, shift|confirmed
 PSI	PsiUniform	distribution	have	risksolver	24	16	a (min), b (max)|confirmed
 PSI	PsiUniformAlt	distribution	have	risksolver	0	0	2 parameters combining native args (lower, upper) with percentiles, e.g. (lower, percentile1) or (percentile1, upper) or (percentile1, percentile2)|confirmed
 PSI	PsiUnits	property	unreviewed		0	0	string|confirmed
 PSI	PsiVar	annotation	not ours	role declaration, belongs with solver_adj	0	0	cell_range, type, active, comment, model_name, critical|confirmed
 PSI	PsiVariance	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiVary	distribution	new	absent from BusinessMath 2.14.0	0	0	base, min, max, [range_type], [dist_name]|confirmed
+PSI	PsiVary	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	base, min, max, [range_type], [dist_name]|confirmed
 PSI	PsiWeibull	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiWeibullAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
 PSI	PsiXtoP	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, simulation, struc_format, param_slice|confirmed

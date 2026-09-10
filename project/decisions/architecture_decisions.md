@@ -101,3 +101,68 @@ in 2013.
 - The agreement number will never reach 100%, and should not be read as a grade.
 - Some functions are shipped documented-as-wrong while a fix is upstream. Stating the defect where
   a caller reads it is the obligation that makes that acceptable.
+
+---
+
+## ADR-002 — The byte functions are Western-locale, and say so
+
+**Date:** 2026-09-09
+**Category:** scope
+**Status:** Accepted, in force
+
+### Decision
+
+`LENB`, `LEFTB`, `RIGHTB`, `MIDB`, `FINDB`, `SEARCHB` and `REPLACEB` behave as they do
+under a **single-byte locale**: identically to `LEN`, `LEFT`, `RIGHT`, `MID`, `FIND`,
+`SEARCH` and `REPLACE`.
+
+No locale is modelled. The package gains no locale parameter, and
+``EvaluationContext`` gains no field.
+
+### Why this is a decision and not an omission
+
+ADR-001 says Excel is the specification. These seven functions are the case it does
+not cover: **Excel's answer depends on the machine it is running on.**
+
+Under a DBCS locale — Japanese, Chinese, Korean — a double-byte character counts as
+two, so `LENB("あい")` is 4. Under any Western locale it counts as one and the answer
+is 2. Same workbook, same formula, two answers, and *nothing in the file records
+which locale produced the cached value*. There is no single Excel to match.
+
+So a choice had to be made rather than discovered, which is what makes it an ADR.
+
+### Why Western
+
+- **Nothing in the corpus calls them.** All seven measure zero calls across 2,240
+  workbooks, as do `DBCS`, `JIS`, `PHONETIC` and `BAHTTEXT`. This is completeness
+  work, and completeness work does not justify a public API change.
+- **The alternative is a locale seam.** Modelling this properly means an optional
+  locale on ``EvaluationContext``, in the shape `random` and `simulation` already
+  have — a public API change, a default to argue about, and a second code path
+  through seven functions, for a behaviour no measured workbook exercises.
+- **Western is the honest default for a package with no locale.** Returning DBCS
+  answers on a machine with no DBCS locale would be *less* faithful to what Excel
+  does in front of the person running it, not more.
+
+### What this rules out
+
+- **Claiming DBCS support.** These are documented as Western-locale, in each
+  function's own DocC, so a caller reads the limit where they read the function.
+- **Quietly diverging later.** If DBCS behaviour is ever wanted, it arrives as a
+  locale on the context and these become two-branch functions. That is an additive
+  change and this decision does not block it — the seam is *open*, merely not built.
+
+### The revisit condition, stated so it is testable
+
+A workbook that calls any of the seven, from a DBCS locale, where the cached value
+disagrees with the Western answer. That single measurement flips this decision, and
+until it exists the locale seam is speculative work.
+
+### Related, and deliberately not bundled
+
+- **`PHONETIC` is blocked upstream, not undone.** It reads furigana stored as `<rPh>`
+  runs in the file, and SwiftXLSX does not parse them. It is a file-format read
+  wearing the shape of a text function, and it belongs to whoever adds `rPh` support.
+- **`DBCS` and `JIS`** convert between half-width and full-width forms. That is a
+  Unicode mapping table rather than a locale question, and it is unaffected by this
+  decision.
