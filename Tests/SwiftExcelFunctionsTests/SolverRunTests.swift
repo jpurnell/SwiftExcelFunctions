@@ -18,12 +18,15 @@ final class SolverRunTests: XCTestCase {
                 .formula(.add(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))), cached: nil),
             CellRef("C1").positionKey:
                 .formula(.subtract(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))), cached: nil),
+            // Deliberately nonlinear, for the Simplex refusal.
+            CellRef("E1").positionKey:
+                .formula(.multiply(.cellRef(CellRef("A1")), .cellRef(CellRef("A1"))), cached: nil),
         ]
         func value(at ref: CellRef) -> CellValue? { stored[ref.positionKey] }
         func value(at ref: CellRef, inSheet: String) -> CellValue? { value(at: ref) }
         func values(in range: CellRange) -> [CellValue] { range.cells.map { value(at: $0) ?? .blank } }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
-        func lastPopulatedCell() -> CellRef? { CellRef("C1") }
+        func lastPopulatedCell() -> CellRef? { CellRef("E1") }
         func lastPopulatedCell(inSheet: String) -> CellRef? { lastPopulatedCell() }
         func populatedCells() -> [CellRef] {
             stored.keys.map { CellRef(column: $0.column, row: $0.row) }
@@ -109,27 +112,6 @@ final class SolverRunTests: XCTestCase {
 
     // MARK: - What it refuses
 
-    /// **An integrality constraint is refused, not ignored.**
-    ///
-    /// Dropping it would answer a different question than the one asked and return a
-    /// fractional solution to a problem that required whole numbers — the plausible wrong
-    /// answer this project exists to avoid. Branch-and-bound exists upstream; wiring it is
-    /// separate work, and until then this says so.
-    func testIntegerConstraintsAreRefusedRatherThanDropped() throws {
-        XCTAssertThrowsError(try solve(model(constraints: [
-            .init(lhs: [CellRef("A1")], relation: .integer, rhs: .constant(0)),
-        ]))) { error in
-            XCTAssertEqual(error as? SolverRunError,
-                           SolverRunError.unsupportedRelation(.integer))
-        }
-    }
-
-    func testBinaryConstraintsAreRefused() throws {
-        XCTAssertThrowsError(try solve(model(constraints: [
-            .init(lhs: [CellRef("A1")], relation: .binary, rhs: .constant(0)),
-        ])))
-    }
-
     /// A model with no objective has nothing to optimise.
     func testAModelWithoutAnObjectiveIsRefused() throws {
         let headless = SolverModel(objective: nil, sense: .minimise,
@@ -148,13 +130,143 @@ final class SolverRunTests: XCTestCase {
         }
     }
 
+    // MARK: - Integrality
+
+    /// **An integer constraint is now honoured rather than refused.** Minimising `A1 + A2`
+    /// with `A1 >= 2.4` and `A1` integral puts the answer at 3, not 2.4 — the constraint
+    /// changes the optimum rather than merely rounding it.
+    func testIntegerConstraintIsHonoured() throws {
+        let solution = try solve(model(constraints: [
+            .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(2.4)),
+            .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
+            .init(lhs: [CellRef("A1")], relation: .integer, rhs: .constant(0)),
+        ]))
+        let a1 = solution.variables[CellRef("A1").positionKey] ?? .nan
+        XCTAssertEqual(a1, a1.rounded(), accuracy: 1e-6, "A1 must be integral")
+        XCTAssertEqual(a1, 3, accuracy: 0.01)
+        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+    }
+
+    /// A binary variable is 0 or 1 and nothing between.
+    func testBinaryConstraintIsHonoured() throws {
+        let solution = try solve(model(
+            sense: .maximise,
+            constraints: [
+                .init(lhs: [CellRef("B1")], relation: .lessOrEqual, rhs: .constant(10)),
+                .init(lhs: [CellRef("A1")], relation: .binary, rhs: .constant(0)),
+                .init(lhs: [CellRef("A2")], relation: .lessOrEqual, rhs: .constant(0)),
+            ]))
+        let a1 = solution.variables[CellRef("A1").positionKey] ?? .nan
+        XCTAssertTrue(abs(a1) < 1e-6 || abs(a1 - 1) < 1e-6, "A1 was \(a1), not 0 or 1")
+    }
+
+    /// **Integrality outranks the nominated engine**, as it does in Excel: a model with
+    /// integer variables goes to branch-and-bound whatever the workbook asked for.
+    func testIntegralityOutranksTheNominatedEngine() throws {
+        let solution = try solve(model(
+            constraints: [
+                .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(1)),
+                .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
+                .init(lhs: [CellRef("A1")], relation: .integer, rhs: .constant(0)),
+            ],
+            engine: .simplexLP))
+        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+    }
+
+    /// An integrality constraint on a cell that is not a decision variable is malformed —
+    /// Excel only lets you declare one on an adjustable cell.
+    func testIntegerConstraintOnANonVariableIsRefused() throws {
+        XCTAssertThrowsError(try solve(model(constraints: [
+            .init(lhs: [CellRef("B1")], relation: .integer, rhs: .constant(0)),
+        ]))) { error in
+            XCTAssertEqual(error as? SolverRunError,
+                           SolverRunError.integralityOnNonVariable(CellRef("B1")))
+        }
+    }
+
+    // MARK: - Simplex
+
+    /// **A linear model nominated for Simplex really runs Simplex.** `B1 = A1 + A2` is
+    /// linear in both variables, so the coefficients extract and the LP solves.
+    func testLinearModelRunsOnSimplex() throws {
+        let solution = try solve(model(
+            sense: .maximise,
+            constraints: [
+                .init(lhs: [CellRef("B1")], relation: .lessOrEqual, rhs: .constant(7)),
+                .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(0)),
+                .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
+            ],
+            engine: .simplexLP))
+        XCTAssertEqual(solution.engineUsed, .simplex)
+        XCTAssertEqual(solution.objective, 7, accuracy: 0.01)
+    }
+
+    /// **A nonlinear model nominated for Simplex is refused, not silently re-solved.**
+    /// Excel says the same thing — "the linearity conditions required by this LP Solver are
+    /// not satisfied" — and it is the right answer: quietly switching engines would return
+    /// a number the caller believes came from an LP.
+    func testNonlinearModelIsRefusedBySimplex() throws {
+        let squared = SolverModel(
+            objective: CellRef("E1"), sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2")],
+            constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
+                                rhs: .constant(1))],
+            engine: .simplexLP)
+        XCTAssertThrowsError(try solve(squared)) { error in
+            guard case .nonlinearModel = error as? SolverRunError else {
+                return XCTFail("expected nonlinearModel, got \(error)")
+            }
+        }
+    }
+
+    /// The same nonlinear model solves happily under the nonlinear engine.
+    func testNonlinearModelSolvesUnderGRG() throws {
+        let squared = SolverModel(
+            objective: CellRef("E1"), sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2")],
+            constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
+                                rhs: .constant(2))],
+            engine: .grgNonlinear)
+        let solution = try solve(squared)
+        XCTAssertEqual(solution.objective, 4, accuracy: 0.1)
+    }
+
+    // MARK: - Evolutionary
+
+    /// The evolutionary engine is dispatched to, and reported. Both variables are bounded,
+    /// because a population-based search has nowhere to sample otherwise.
+    func testEvolutionaryEngine() throws {
+        let solution = try solve(model(
+            constraints: [
+                .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(1)),
+                .init(lhs: [CellRef("A1")], relation: .lessOrEqual, rhs: .constant(9)),
+                .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(1)),
+                .init(lhs: [CellRef("A2")], relation: .lessOrEqual, rhs: .constant(9)),
+            ],
+            engine: .evolutionary))
+        XCTAssertEqual(solution.engineUsed, .differentialEvolution)
+        XCTAssertEqual(solution.objective, 2, accuracy: 0.5)
+    }
+
+    /// **An unbounded variable is refused**, as Excel refuses it: a population-based search
+    /// samples within a box, and inventing one would make the answer depend on a number
+    /// nobody in the workbook chose.
+    func testEvolutionaryRefusesAnUnboundedVariable() throws {
+        XCTAssertThrowsError(try solve(model(
+            constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
+                                rhs: .constant(1))],
+            engine: .evolutionary))) { error in
+            XCTAssertEqual(error as? SolverRunError,
+                           SolverRunError.evolutionaryNeedsBounds(CellRef("A1")))
+        }
+    }
+
     // MARK: - The engine
 
     /// **The engine actually used is reported, not assumed.** The workbook nominates one;
     /// this reports what ran, so a caller is never misled about how their answer was found.
     func testTheEngineUsedIsReported() throws {
-        let solution = try solve(model(engine: .simplexLP))
-        XCTAssertEqual(solution.engineUsed, .nelderMead,
-                       "Simplex needs a linear model extracted from the sheet, which is not done yet")
+        let solution = try solve(model(engine: .grgNonlinear))
+        XCTAssertEqual(solution.engineUsed, .nelderMead)
     }
 }

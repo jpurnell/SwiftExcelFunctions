@@ -11,12 +11,25 @@ public enum SolverRunError: Error, Equatable, Sendable {
     /// The model names no cells to adjust.
     case noVariables
 
-    /// A constraint this runner cannot honour.
+    /// An integrality constraint names a cell that is not a decision variable.
     ///
-    /// **Refused rather than dropped.** Ignoring an integrality constraint answers a
-    /// different question than the one asked and returns a fractional solution to a problem
-    /// that required whole numbers.
-    case unsupportedRelation(SolverModel.Relation)
+    /// Excel only lets one be declared on an adjustable cell, and a constraint that says a
+    /// *computed* cell must be whole is not a statement this runner can act on.
+    case integralityOnNonVariable(CellRef)
+
+    /// The evolutionary engine was nominated but a variable has no bounds.
+    ///
+    /// Excel refuses the same way. A population-based search samples *within* a box, so
+    /// without one there is nothing to sample from — and inventing a range would make the
+    /// answer depend on a number nobody chose.
+    case evolutionaryNeedsBounds(CellRef)
+
+    /// Simplex was nominated but the model is not linear.
+    ///
+    /// **Refused rather than quietly re-solved**, which is also Excel's own answer: "the
+    /// linearity conditions required by this LP Solver are not satisfied". Switching engines
+    /// silently would hand back a number the caller believes came from an LP.
+    case nonlinearModel(String)
 
     /// The optimizer refused or failed.
     case optimizerFailed(String)
@@ -65,8 +78,14 @@ public enum SolverRun {
 
         /// The optimizers this runner can dispatch to.
         public enum Engine: Equatable, Sendable {
-            /// Nelder-Mead, with constraints handled by the optimizer's penalty path.
+            /// Nelder-Mead. Stands in for Excel's GRG Nonlinear.
             case nelderMead
+            /// True simplex, on coefficients extracted from the sheet.
+            case simplex
+            /// Differential evolution. Stands in for Excel's Evolutionary.
+            case differentialEvolution
+            /// Branch-and-bound, whenever any variable must be whole.
+            case branchAndBound
         }
     }
 
@@ -86,12 +105,29 @@ public enum SolverRun {
         guard let objectiveCell = model.objective else { throw SolverRunError.noObjective }
         guard !model.variables.isEmpty else { throw SolverRunError.noVariables }
 
+        // Integrality declarations are separated from comparisons here, because Excel
+        // writes them in the same list and they are not the same kind of statement:
+        // `C1 <= 10` constrains a computed cell, `A1 integer` constrains a variable.
+        var integerIndices: Set<Int> = []
+        var binaryIndices: Set<Int> = []
+        var comparisons: [SolverModel.Constraint] = []
+        let position = Dictionary(uniqueKeysWithValues:
+            model.variables.enumerated().map { ($1.positionKey, $0) })
         for constraint in model.constraints {
             switch constraint.relation {
             case .lessOrEqual, .equal, .greaterOrEqual:
-                continue
+                comparisons.append(constraint)
             case .integer, .binary, .allDifferent:
-                throw SolverRunError.unsupportedRelation(constraint.relation)
+                for ref in constraint.lhs {
+                    guard let index = position[ref.positionKey] else {
+                        throw SolverRunError.integralityOnNonVariable(ref)
+                    }
+                    if constraint.relation == .binary {
+                        binaryIndices.insert(index)
+                    } else {
+                        integerIndices.insert(index)
+                    }
+                }
             }
         }
 
@@ -103,7 +139,7 @@ public enum SolverRun {
         var outputCells = [objectiveCell]
         var lhsOffsets: [Int] = []
         var rhsOffsets: [Int?] = []
-        for constraint in model.constraints {
+        for constraint in comparisons {
             lhsOffsets.append(outputCells.count)
             outputCells.append(contentsOf: constraint.lhs)
             // A bound that names cells is read from the sheet like anything else. Comparing
@@ -130,7 +166,7 @@ public enum SolverRun {
         }
 
         var constraints: [MultivariateConstraint<VectorN<Double>>] = []
-        for (index, constraint) in model.constraints.enumerated() {
+        for (index, constraint) in comparisons.enumerated() {
             let start = lhsOffsets[index]
             let boundStart = rhsOffsets[index]
             let count = constraint.lhs.count
@@ -162,17 +198,63 @@ public enum SolverRun {
             return 0
         })
 
-        let optimizer = NelderMead<VectorN<Double>>()
-        let result: MultivariateOptimizationResult<VectorN<Double>>
-        do {
-            result = try optimizer.minimize(objective, from: start, constraints: constraints)
-        } catch {
-            // Carried rather than discarded: the optimizer's own account of why is the
-            // only diagnosis a caller will get.
-            throw SolverRunError.optimizerFailed(String(describing: error))
+        let integral = !integerIndices.isEmpty || !binaryIndices.isEmpty
+        let found: [Double]
+        let converged: Bool
+        let used: Solution.Engine
+
+        if integral {
+            // **Integrality outranks the nominated engine**, as it does in Excel: whichever
+            // engine a workbook asks for, whole-number variables mean branch-and-bound.
+            let specification = IntegerProgramSpecification(
+                integerVariables: integerIndices, binaryVariables: binaryIndices)
+            let solver = BranchAndBoundSolver<VectorN<Double>>()
+            do {
+                let result = try solver.solve(
+                    objective: objective, from: start,
+                    subjectTo: constraints, integerSpec: specification)
+                found = result.solution.toArray()
+                converged = true
+                used = .branchAndBound
+            } catch let failure {
+                throw SolverRunError.optimizerFailed(String(describing: failure))
+            }
+        } else if model.engine == .simplexLP {
+            // Simplex needs coefficients rather than a callable sheet, so the sheet is
+            // probed for them — and refused if it is not linear, which is Excel's own
+            // answer rather than a silent change of engine.
+            let solved = try simplex(objective: objective, constraints: constraints,
+                                     comparisons: comparisons, start: start,
+                                     dimension: model.variables.count, sense: model.sense)
+            found = solved.solution
+            converged = solved.converged
+            used = .simplex
+        } else {
+            // Outside the `do`: a missing bound is the model's problem, not the
+            // optimizer's, and wrapping it as `optimizerFailed` would misattribute it.
+            let searchSpace = model.engine == .evolutionary
+                ? try box(for: model, comparisons: comparisons)
+                : []
+            let result: MultivariateOptimizationResult<VectorN<Double>>
+            do {
+                if model.engine == .evolutionary {
+                    result = try DifferentialEvolution<VectorN<Double>>(searchSpace: searchSpace)
+                        .minimize(objective, from: start, constraints: constraints)
+                    used = .differentialEvolution
+                } else {
+                    result = try NelderMead<VectorN<Double>>()
+                        .minimize(objective, from: start, constraints: constraints)
+                    used = .nelderMead
+                }
+            } catch let failure {
+                // Carried rather than discarded: the optimizer's own account of why is the
+                // only diagnosis a caller will get.
+                throw SolverRunError.optimizerFailed(String(describing: failure))
+            }
+            found = result.solution.toArray()
+            converged = result.converged
         }
 
-        let found = result.solution.toArray()
         // Reported in the caller's terms: the objective cell's own value, not the
         // transformed quantity the optimizer was minimising.
         let objectiveValue = sheet.outputs(at: found)?.first
@@ -182,8 +264,132 @@ public enum SolverRun {
         }
         return Solution(variables: variables,
                         objective: objectiveValue ?? .nan,
-                        converged: result.converged,
-                        engineUsed: .nelderMead)
+                        converged: converged,
+                        engineUsed: used)
+    }
+
+    /// The box a population-based search samples within.
+    ///
+    /// Read from the constraints that are plain bounds on a single variable — `A1 >= 0`,
+    /// `A1 <= 10`. A variable with no bound is refused rather than given an invented range,
+    /// because the answer would then depend on a number nobody in the workbook chose.
+    ///
+    /// - Parameters:
+    ///   - model: The model, for its variables.
+    ///   - comparisons: The comparison constraints.
+    /// - Returns: One `(lower, upper)` pair per variable, in variable order.
+    /// - Throws: ``SolverRunError/evolutionaryNeedsBounds(_:)``.
+    private static func box(
+        for model: SolverModel, comparisons: [SolverModel.Constraint]
+    ) throws -> [(lower: Double, upper: Double)] {
+        var lower = [Double?](repeating: nil, count: model.variables.count)
+        var upper = [Double?](repeating: nil, count: model.variables.count)
+        let position = Dictionary(uniqueKeysWithValues:
+            model.variables.enumerated().map { ($1.positionKey, $0) })
+
+        for constraint in comparisons {
+            // Only a constraint naming one variable directly, against a number, is a bound.
+            // `C1 <= 10` constrains a computed cell and says nothing about the box.
+            guard constraint.lhs.count == 1,
+                  let index = position[constraint.lhs[0].positionKey],
+                  case .constant(let value) = constraint.rhs else { continue }
+            switch constraint.relation {
+            case .greaterOrEqual: lower[index] = max(lower[index] ?? value, value)
+            case .lessOrEqual: upper[index] = min(upper[index] ?? value, value)
+            case .equal:
+                lower[index] = value
+                upper[index] = value
+            default: continue
+            }
+        }
+
+        return try model.variables.indices.map { index in
+            guard let low = lower[index], let high = upper[index] else {
+                throw SolverRunError.evolutionaryNeedsBounds(model.variables[index])
+            }
+            return (lower: low, upper: high)
+        }
+    }
+
+    /// Solves a linear model with simplex, on coefficients probed out of the sheet.
+    ///
+    /// `validateLinearModel` samples the function and refuses if the samples do not lie on
+    /// a plane, which is what makes this honest: a nonlinear sheet cannot be made to look
+    /// linear by asking politely.
+    ///
+    /// - Parameters:
+    ///   - objective: The quantity being minimised.
+    ///   - constraints: The constraint closures, in the same order as `comparisons`.
+    ///   - comparisons: The declared comparisons, for their relations.
+    ///   - start: Where to probe from.
+    ///   - dimension: How many variables.
+    ///   - sense: What the model wants, for reporting.
+    /// - Returns: The solution and whether it was optimal.
+    /// - Throws: ``SolverRunError/nonlinearModel(_:)`` or ``SolverRunError/optimizerFailed(_:)``.
+    private static func simplex(
+        objective: @escaping @Sendable (VectorN<Double>) -> Double,
+        constraints: [MultivariateConstraint<VectorN<Double>>],
+        comparisons: [SolverModel.Constraint],
+        start: VectorN<Double>,
+        dimension: Int,
+        sense: SolverModel.Sense
+    ) throws -> (solution: [Double], converged: Bool) {
+        let objectiveTerms: (coefficients: [Double], constant: Double)
+        do {
+            objectiveTerms = try validateLinearModel(objective, dimension: dimension, at: start)
+        } catch let failure {
+            throw SolverRunError.nonlinearModel("objective: \(failure)")
+        }
+
+        // One simplex row per constraint closure. Each closure is already in the form
+        // `g(x) <= 0` or `h(x) = 0`, so its linear terms give `c·x <= -k` directly.
+        var rows: [SimplexConstraint] = []
+        var index = 0
+        for constraint in comparisons {
+            for _ in constraint.lhs {
+                guard index < constraints.count else { break }
+                let body = constraints[index]
+                index += 1
+                let terms: (coefficients: [Double], constant: Double)
+                do {
+                    terms = try validateLinearModel(
+                        { point in evaluate(body, at: point) }, dimension: dimension, at: start)
+                } catch let failure {
+                    throw SolverRunError.nonlinearModel("constraint: \(failure)")
+                }
+                rows.append(SimplexConstraint(
+                    coefficients: terms.coefficients,
+                    relation: constraint.relation == .equal ? .equal : .lessOrEqual,
+                    rhs: -terms.constant))
+            }
+        }
+
+        // Simplex assumes non-negative variables, which Excel's LP does too.
+        do {
+            let solver = SimplexSolver()
+            let result = try solver.minimize(objective: objectiveTerms.coefficients,
+                                             subjectTo: rows)
+            return (result.solution, result.status == .optimal)
+        } catch let failure {
+            throw SolverRunError.optimizerFailed(String(describing: failure))
+        }
+    }
+
+    /// A constraint closure's value at a point, whichever case it is.
+    ///
+    /// - Parameters:
+    ///   - constraint: The constraint.
+    ///   - point: Where to evaluate it.
+    /// - Returns: The constraint function's value.
+    private static func evaluate(
+        _ constraint: MultivariateConstraint<VectorN<Double>>, at point: VectorN<Double>
+    ) -> Double {
+        switch constraint {
+        case .equality(let function, _), .inequality(let function, _):
+            return function(point)
+        default:
+            return 0
+        }
     }
 
     /// What the optimizer minimises, given what the model asked for.
