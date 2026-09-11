@@ -338,14 +338,31 @@ public enum ExcelSolverReader {
     // MARK: - Reading targets
 
     /// The number a name holds, if it holds one rather than a reference.
+    ///
+    /// **A bare number arrives as text.** `solver_eng` refers to `2`, which is not a cell
+    /// reference, so `DefinedNameResolver` cannot resolve it and hands back
+    /// `.formula(.text("2"))`. Reading only `.number` therefore found nothing in a real
+    /// file: every engine read as GRG and every model as having no constraints, because
+    /// `solver_num` was unreadable too.
+    ///
+    /// The tests did not catch it because they built these targets by hand — encoding an
+    /// assumption about the parse rather than exercising it. `ExcelSolverReaderRealFileTests`
+    /// goes through the resolver for exactly that reason.
     private static func number(_ target: NamedRangeTarget?) -> Double? {
-        guard case .formula(let ast) = target, case .number(let value) = ast else { return nil }
-        return value
+        guard case .formula(let ast) = target else { return nil }
+        switch ast {
+        case .number(let value): return value
+        case .text(let text): return Double(text.trimmingCharacters(in: .whitespaces))
+        default: return nil
+        }
     }
 
     /// The word a name holds, if it holds text rather than a number or a reference.
     private static func label(_ target: NamedRangeTarget?) -> String? {
         guard case .formula(let ast) = target, case .text(let word) = ast else { return nil }
+        // A bare number also arrives as text, and `"10"` is a bound rather than a label.
+        // Callers try `number(_:)` first; this guard makes the order unnecessary to know.
+        guard Double(word.trimmingCharacters(in: .whitespaces)) == nil else { return nil }
         return word
     }
 

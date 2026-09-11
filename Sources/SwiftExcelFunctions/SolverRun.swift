@@ -118,6 +118,42 @@ public enum SolverRun {
         }
     }
 
+    /// Reads a sheet's Solver model and solves it.
+    ///
+    /// The two halves in one call, for a caller who should not have to know they are
+    /// separate types.
+    ///
+    /// **It takes a provider and a name collection rather than a workbook.** This package
+    /// promises to take no dependency on a file format, and `Workbook` belongs to
+    /// SwiftXLSX — a library that evaluates a sheet which never came from a file cannot
+    /// name one. `WorkbookAudit` is where the file-reading half lives, and a caller holding
+    /// a real workbook passes its provider and its `namedRanges` here.
+    ///
+    /// - Parameters:
+    ///   - cells: The sheet the model refers to.
+    ///   - names: The workbook's defined names.
+    ///   - sheet: Which sheet's model to solve. Solver models are sheet-scoped, so a
+    ///     workbook may hold several; `nil` takes the first by name, which is the right
+    ///     answer only when there is one.
+    /// - Returns: The solution, or `nil` when the sheet declares no model — an ordinary
+    ///   answer about an ordinary workbook rather than a failure.
+    /// - Throws: ``SolverRunError``.
+    public static func solve(
+        cells: any CellValueProvider & PopulatedCellProvider,
+        names: NamedRangeCollection,
+        inSheet sheet: String? = nil
+    ) throws -> Solution? {
+        let models = ExcelSolverReader.models(from: names)
+        let model: SolverModel?
+        if let sheet {
+            model = models[sheet]
+        } else {
+            model = models.keys.sorted().first.flatMap { models[$0] }
+        }
+        guard let model else { return nil }
+        return try solve(model, cells: cells, names: names)
+    }
+
     /// Solves a model against a sheet.
     ///
     /// - Parameters:

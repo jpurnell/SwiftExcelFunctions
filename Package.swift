@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
     products: [
         .library(name: "SwiftExcelFunctions", targets: ["SwiftExcelFunctions"]),
-        .library(name: "WorkbookAudit", targets: ["WorkbookAudit"])
+        .library(name: "WorkbookAudit", targets: ["WorkbookAudit"]),
+        .executable(name: "workbook-census", targets: ["WorkbookCensus"])
     ],
     dependencies: [
         // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
@@ -49,6 +50,20 @@ let package = Package(
         // does not. That separation is the point: `SwiftExcelFunctions` promises to take
         // no dependency on a file format, and an auditor of *files* is a different
         // product with a different promise.
+        // A corpus scanner, and an executable rather than a test on purpose. Two earlier
+        // attempts at this were XCTestCases and both were abandoned mid-run having
+        // produced nothing: a test prints only at the end, cannot resume, and gives no way
+        // to tell a working run from a hung one. See `WorkbookCensus/main.swift`.
+        .executableTarget(
+            name: "WorkbookCensus",
+            dependencies: [
+                "SwiftExcelFunctions",
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/WorkbookCensus",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
         .target(
             name: "WorkbookAudit",
             dependencies: [

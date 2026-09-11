@@ -143,6 +143,42 @@ final class SolverRunTests: XCTestCase {
         }
     }
 
+    // MARK: - Reading and solving in one step
+
+    /// **The entry point that joins the two halves.** A caller with a sheet and its names
+    /// should not have to know that reading the model and solving it are separate types.
+    ///
+    /// It takes a provider and a name collection rather than a workbook, because this
+    /// package promises to take no dependency on a file format — `Workbook` belongs to
+    /// SwiftXLSX, and a library that evaluates a sheet which never came from a file cannot
+    /// name it. `WorkbookAudit` is where the file-reading half lives.
+    func testSolvesFromNamesDirectly() throws {
+        var collection = NamedRangeCollection()
+        let entries: [(String, NamedRangeTarget)] = [
+            ("solver_opt", .cell(CellRef("B1"))),
+            ("solver_typ", .formula(.number(2))),
+            ("solver_adj", .range(CellRange(from: CellRef("A1"), to: CellRef("A2")))),
+            ("solver_num", .formula(.number(1))),
+            ("solver_lhs1", .cell(CellRef("A1"))),
+            ("solver_rel1", .formula(.number(3))),
+            ("solver_rhs1", .formula(.number(3))),
+        ]
+        for (name, target) in entries {
+            collection.add(NamedRange(name: name, reference: target, scope: .sheet("Sheet1")))
+        }
+
+        let solution = try XCTUnwrap(
+            SolverRun.solve(cells: Sheet(), names: collection, inSheet: "Sheet1"))
+        // Minimising A1 + A2 with A1 >= 3 and both non-negative by default: 3.
+        XCTAssertEqual(solution.objective ?? .nan, 3, accuracy: 0.05)
+    }
+
+    /// **No model is `nil`, not a throw.** "This sheet has no Solver model" is an ordinary
+    /// answer about an ordinary workbook, not a failure.
+    func testNoModelReturnsNil() throws {
+        XCTAssertNil(try SolverRun.solve(cells: Sheet(), names: NamedRangeCollection()))
+    }
+
     // MARK: - Integrality
 
     /// **An integer constraint is now honoured rather than refused.** Minimising `A1 + A2`
