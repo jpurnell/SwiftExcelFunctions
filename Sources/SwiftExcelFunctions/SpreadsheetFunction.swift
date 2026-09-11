@@ -1,5 +1,8 @@
 import Foundation
 import SwiftExcelCore
+#if canImport(os)
+import os
+#endif
 
 /// Why a spreadsheet could not be read as a function.
 public enum SpreadsheetFunctionError: Error, Equatable, Sendable {
@@ -22,6 +25,12 @@ public enum SpreadsheetFunctionError: Error, Equatable, Sendable {
 
     /// The sheet's formulas refer to each other in a circle, so no evaluation order exists.
     case circular
+
+    /// Evaluating a formula failed, carrying the evaluator's own account of why.
+    ///
+    /// Carried rather than discarded: for a caller chasing a model that will not run, the
+    /// evaluator's message is the only diagnosis there is.
+    case evaluationFailed(String)
 }
 
 /// A spreadsheet, read as a function of some of its cells.
@@ -116,6 +125,24 @@ public struct SpreadsheetFunction: Sendable {
         self.registry = registry
     }
 
+    /// The outputs at one point, or `nil` where the sheet yields no number there.
+    ///
+    /// **For a search, an unevaluable point is not an error — it is infeasible.** An
+    /// optimizer will step somewhere that divides by zero or overflows, and that is
+    /// ordinary: it means "not here", not "the model is broken". Throwing would force every
+    /// caller to catch inside a closure that cannot rethrow, and swallow it there.
+    ///
+    /// ``callAsFunction(_:)`` still throws, because a caller asking about *one* point wants
+    /// to know which output failed and how.
+    ///
+    /// - Parameter x: One value per entry of ``inputs``.
+    /// - Returns: One value per entry of ``outputs``, or `nil` if any output is not a
+    ///   number or the argument count is wrong.
+    public func outputs(at x: [Double]) -> [Double]? {
+        guard case .success(let values) = evaluate(x) else { return nil }
+        return values
+    }
+
     /// Evaluates the sheet at one point.
     ///
     /// - Parameter x: One value per entry of ``inputs``.
@@ -124,8 +151,20 @@ public struct SpreadsheetFunction: Sendable {
     ///   ``SpreadsheetFunctionError/outputNotNumeric(_:_:)``, or whatever evaluating a
     ///   formula throws.
     public func callAsFunction(_ x: [Double]) throws -> [Double] {
+        try evaluate(x).get()
+    }
+
+    /// One evaluation, with the failure as a value rather than a throw.
+    ///
+    /// The single place the sheet is actually computed. Both entry points read from here —
+    /// ``callAsFunction(_:)`` by rethrowing, ``outputs(at:)`` by pattern-matching — so
+    /// neither has to discard an error to convert between the two shapes.
+    ///
+    /// - Parameter x: One value per entry of ``inputs``.
+    /// - Returns: The outputs, or why they could not be produced.
+    private func evaluate(_ x: [Double]) -> Swift.Result<[Double], SpreadsheetFunctionError> {
         guard x.count == inputs.count else {
-            throw SpreadsheetFunctionError.wrongInputCount(expected: inputs.count, got: x.count)
+            return .failure(.wrongInputCount(expected: inputs.count, got: x.count))
         }
 
         // A fresh overlay per call. The sheet underneath is never written to, which is what
@@ -136,19 +175,40 @@ public struct SpreadsheetFunction: Sendable {
         }
         for ref in evaluationOrder {
             guard let ast = cells.value(at: ref)?.formulaAST else { continue }
-            pass.overrides[ref.positionKey] = try FormulaEvaluator.evaluate(
-                ast, cells: pass, names: names, functions: registry,
-                at: nil, inSheet: "")
+            do {
+                pass.overrides[ref.positionKey] = try FormulaEvaluator.evaluate(
+                    ast, cells: pass, names: names, functions: registry,
+                    at: nil, inSheet: "")
+            } catch let failure {
+                // **A throw here is structural, not a bad point.** `FormulaEvaluator`
+                // answers `#DIV/0!` with a *value*; it throws only for an unknown function,
+                // a wrong argument count, or runaway depth — conditions that hold at every
+                // point rather than this one. Logged rather than quietly folded into
+                // "infeasible", which is all a search would otherwise see.
+                let reason = String(describing: failure)
+                #if canImport(os)
+                // Public privacy: a cell reference and an evaluator message are structure,
+                // not anyone's data. `os` is Apple-only, and on Linux the failure still
+                // reaches the caller as `evaluationFailed` — the log is a second copy of
+                // the diagnosis, never the only one.
+                Logger(subsystem: "SwiftExcelFunctions", category: "SpreadsheetFunction")
+                    .error("evaluation failed at \(ref.reference, privacy: .public): \(reason, privacy: .public)")
+                #endif
+                return .failure(.evaluationFailed(reason))
+            }
         }
 
-        return try outputs.map { ref in
+        var results: [Double] = []
+        results.reserveCapacity(outputs.count)
+        for ref in outputs {
             let value = pass.overrides[ref.positionKey] ?? cells.value(at: ref) ?? .blank
             guard case .number(let number) = value else {
                 // Not silently zero. An objective that reads `#DIV/0!` as 0 is the
                 // plausible wrong answer an optimizer will happily march towards.
-                throw SpreadsheetFunctionError.outputNotNumeric(ref, value)
+                return .failure(.outputNotNumeric(ref, value))
             }
-            return number
+            results.append(number)
         }
+        return .success(results)
     }
 }
