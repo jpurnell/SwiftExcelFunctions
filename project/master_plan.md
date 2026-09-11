@@ -87,7 +87,10 @@ where Excel returns negative, and the flip belongs in the translation, not the m
       differential evolution, refusing an unbounded variable as Excel does
 - [x] All-different and non-negativity, both implemented rather than refused — they are
       in the free Excel Solver, so refusing them was not an answer
-- [x] 1,238 tests, gate 45/45 at 0/0
+- [x] A model with no objective is a feasibility search, which Excel allows
+- [x] One model *per sheet*, multi-area changing cells, and `solver_lin` for workbooks
+      older than the engine dropdown
+- [x] 1,245 tests, gate 45/45 at 0/0
 
 **Constraints are enforced by construction, not by penalty.** This is the correction 0.8.1
 exists for, and it is worth recording as a trap rather than a fix. NelderMead penalises every
@@ -109,12 +112,26 @@ asked for and `Solution.engineUsed` reports what ran, so a model declared for Ex
 Simplex can go to branch-and-cut or a robust optimizer. Keeping the model and the method
 independent is what makes that possible rather than a rewrite.
 
-**What is not verified:** the `solver_typ`, relation and engine encodings come from
-Frontline's published layout and have never been measured against a real workbook. Every
-other encoding taken from documentation this cycle was wrong in at least one respect — the
+**The encodings are measured**, from three workbooks built in Excel for Mac and read
+directly. All six relation codes, all three engines, both `solver_neg` settings and
+`solver_typ` for Max and Value Of matched the published layout; only `solver_typ = 2` for
+Min is inferred, as the last value of three.
+
+That mattered because documentation had been wrong four times this cycle — the
 `FORECAST.ETS` aggregation codes were a different base *and* a different order than
-published, and duplicate timestamps aggregate where the documentation says `#VALUE!`.
-Settling it needs one Solver model built in Excel and its defined names read back.
+published, and duplicate timestamps aggregate where the documentation says `#VALUE!`. Here
+it was right, which is only knowable by checking.
+
+**What the files taught that reading could not**, and what each one cost:
+
+| Found | Would have been |
+|---|---|
+| Models are sheet-scoped | two sheets' models merged into one made of neither's parts |
+| `solver_num` is authoritative *(observed, not reasoned)* | five deleted constraints resurrected, including an `alldifferent` |
+| `solver_opt` is absent, not empty, when there is no objective | a legal Excel model refused |
+| `solver_typ` is written anyway | `.maximise` reported for something that maximises nothing |
+| `solver_lin` exists | a linear model from an old workbook solved by a nonlinear method |
+| An integrality bound is a *word* | read as an empty cell list, by accident rather than intent |
 
 **Previously — the simulation stack.** A Risk Solver workbook now runs.
 
@@ -373,7 +390,12 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-11 (later) — reconciled for 0.8.1: all-different and
+**Last Updated:** 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings
+measured against three real workbooks rather than taken from documentation, a model with no
+objective supported, and three gaps the files exposed — sheet scoping, `solver_lin`, and
+multi-area changing cells. 1,245 tests.
+
+Earlier: 2026-09-11 (later) — reconciled for 0.8.1: all-different and
 non-negativity implemented rather than refused, and the constraint-handling correction
 recorded in Current Status as a trap rather than a fix. 1,238 tests.
 

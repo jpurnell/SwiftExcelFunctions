@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-11
+
+### Changed
+
+- **The Solver encodings are measured rather than documented.** Three workbooks built in
+  Excel for Mac, saved without solving, and read directly: all six relation codes, all
+  three engines, both `solver_neg` settings, and `solver_typ` for Max and Value Of matched
+  Frontline's published layout. Only `solver_typ = 2` for Min stays inferred.
+
+  It mattered that this was checked. Documentation had been wrong four times this cycle —
+  `FORECAST.ETS`'s aggregation codes were a different base *and* a different order than
+  published, and duplicate timestamps aggregate where the docs say `#VALUE!`. Here it was
+  right, which is only knowable by looking.
+
+### Added
+
+- **A model with no objective is a feasibility search**, which Excel allows and this
+  refused. The file settles it unambiguously: `solver_opt` is omitted entirely rather than
+  written empty. `Solution.objective` is now optional, because reporting zero or NaN for a
+  model that has no objective would be inventing one.
+
+- **`SolverModel.formatVersion`**, recording `solver_ver` — measured as 2. It is the one
+  value that could renumber every other encoding with nothing else in the file to say so.
+
+- **`SolverModel.Bound.label(_:)`**, for the integrality declarations. Excel writes the
+  *word* `"integer"`, `"binary"` or `"alldifferent"` where a bound would go.
+
+### Fixed
+
+- **Solver models are sheet-scoped and were read as though they were not.** Excel writes
+  every `solver_` name with a `localSheetId`, so a workbook may hold several; reading them
+  into one namespace merged two models into one made of neither's parts. `models(from:)`
+  returns one per sheet.
+
+- **`solver_lin` was written and ignored.** It is the pre-2010 "Assume Linear Model"
+  checkbox, and a workbook old enough to carry it without `solver_eng` declares a linear
+  model — read as GRG, that solves a linear program with a nonlinear method.
+
+- **`solver_adj` may name several non-contiguous areas** — measured as
+  `Sheet1!$A$1:$A$3,Sheet1!$C$3`. It resolves to neither a cell nor a range, so it arrived
+  as text and yielded no variables at all, which reads as a model with nothing to adjust
+  rather than one that could not be parsed.
+
+- **`solver_typ` is written even when there is no objective**, so `sense` is meaningless
+  on its own. Recorded on the property rather than left as a trap.
+
 ## [0.8.1] - 2026-09-11
 
 ### Added
@@ -740,6 +786,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...HEAD
+[0.9.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...v0.7.1
