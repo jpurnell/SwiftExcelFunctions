@@ -76,7 +76,30 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**Unreleased — the simulation stack.** A Risk Solver workbook now runs.
+**0.8.0 — the Solver path.** An Excel Solver model now reads and solves.
+
+- [x] `SpreadsheetFunction` — a sheet as `([Double]) -> [Double]`: set, recalculate, read
+- [x] `ExcelSolverReader` — the model from `solver_*` defined names, which no amount of
+      function coverage could ever have revealed, because there is nothing to call
+- [x] `SolverRun` — the join: reader, callable sheet, BusinessMath optimizer
+- [x] Integrality via branch-and-bound; Simplex on coefficients probed from the sheet and
+      **refused if it is not linear**, which is Excel's own answer; evolutionary via
+      differential evolution, refusing an unbounded variable as Excel does
+- [x] 1,235 tests, gate 45/45 at 0/0
+
+**The engine is dispatched, not obeyed.** ``SolverModel.engine`` records what the workbook
+asked for and `Solution.engineUsed` reports what ran, so a model declared for Excel's plain
+Simplex can go to branch-and-cut or a robust optimizer. Keeping the model and the method
+independent is what makes that possible rather than a rewrite.
+
+**What is not verified:** the `solver_typ`, relation and engine encodings come from
+Frontline's published layout and have never been measured against a real workbook. Every
+other encoding taken from documentation this cycle was wrong in at least one respect — the
+`FORECAST.ETS` aggregation codes were a different base *and* a different order than
+published, and duplicate timestamps aggregate where the documentation says `#VALUE!`.
+Settling it needs one Solver model built in Excel and its defined names read back.
+
+**Previously — the simulation stack.** A Risk Solver workbook now runs.
 
 - [x] `PsiRecognizer` — what a formula declares: draws, outputs, property functions
 - [x] `ModelSurveyor` / `ModelSurvey` — the same across a sheet, with input indices assigned
@@ -264,11 +287,24 @@ the motivating application rather than an end in itself.
   spilling appears below as *"not planned"*; it shipped anyway, on one function's need, and the
   entry stays as written rather than being quietly revised.
 - ~~**v0.6.0** — BusinessMath 2.15.0 and the Psi distribution surface.~~ Shipped.
-- **v0.7.0** — the simulation stack and the validator. In flight.
+- ~~**v0.7.0** — the simulation stack and the validator.~~ Shipped. **v0.7.1** — dependency
+  pins loosened.
+- ~~**v0.8.0** — *planned as* "the unreviewed bucket resolved".~~ **Shipped as something
+  else entirely: the Solver path.** The bucket went from 266 rows to 172 rather than to 0,
+  so the stated success condition was not met and is not being quietly restated. What
+  happened instead is that reading Excel's Solver models turned out to be a *binding*
+  rather than a build — the optimizers and the recalculation loop both already existed —
+  and it reaches the motivating application faster than classifying the tail of the
+  registry would have.
+
+  The entry stays as written. A plan that rewrites its own history to look prescient is
+  worth less than one that shows where it was wrong.
 
 ### Next
 
-- **v0.8.0 — the unreviewed bucket resolved.** 266 rows, and the categories are not equal:
+- **The unreviewed bucket, still.** 172 `EXCEL` rows and 147 `PSI`, down from 266. The
+  original framing below still holds; only the version number it was attached to has moved.
+  Written at the time as:
   **engineering (48)** and **text (32)** are the near-free ones, like math was — base conversion,
   bitwise, `CHAR`/`CODE`/`EXACT`. **statistical (46)** belongs to BusinessMath and is not ours to
   write. **lookup (24), financial (27), database (12)** need judgment per function and are where
@@ -320,7 +356,12 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-08 (later still) — Priorities and Roadmap reconciled. The roadmap
+**Last Updated:** 2026-09-11 — reconciled for 0.8.0. Current Status gains the Solver path;
+the Roadmap records that 0.8.0 shipped as something other than what it promised, and that the
+unreviewed bucket reached 172 rather than 0. README's counts corrected: 409 registered (was
+400), 292 Excel rows (was 283), 1,235 tests (was 1,110).
+
+Earlier: 2026-09-08 (later still) — Priorities and Roadmap reconciled. The roadmap
 listed v0.4.0 and v0.5.0 as future when both had shipped, and named neither the simulation stack
 nor the validator. Rewritten around the dependency that actually orders the work: the oracle
 checker is the validator's most valuable claim and is only true where the evaluator is right, so

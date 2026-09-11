@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-11
+
+### Added
+
+- **An Excel Solver model now reads and solves.**
+
+  Solver stores its model in *defined names* — `solver_opt`, `solver_adj`,
+  `solver_lhs1`/`rel1`/`rhs1` — not in cells or functions, which is why no amount of
+  function coverage ever revealed whether a workbook carried one, and why a function-level
+  coverage matrix is structurally blind to it.
+
+  Three pieces: `SpreadsheetFunction` reads a sheet as `([Double]) -> [Double]` by setting
+  cells, recalculating in dependency order and reading others; `ExcelSolverReader` reads the
+  model; `SolverRun` joins them to BusinessMath's optimizers.
+
+  **The engine is dispatched, not obeyed.** `SolverModel.engine` records what the workbook
+  asked for; `Solution.engineUsed` reports what ran. So a model declared for Excel's plain
+  Simplex can be solved by branch-and-cut or a robust optimizer — the model and the method
+  never get entangled.
+
+  Integrality goes to branch-and-bound and outranks the nominated engine, as it does in
+  Excel. Simplex probes the sheet for linear coefficients and **refuses a nonlinear model**,
+  which is Excel's own answer rather than a silent change of engine. Evolutionary dispatches
+  to differential evolution and refuses an unbounded variable, as Excel does.
+
+- **`FORECAST.ETS`, `.CONFINT`, `.STAT` and `.SEASONALITY`**, with the argument layer
+  beneath them: timeline step detection, `data_completion`, and `aggregation`.
+
+  Three of those behaviours are measured against Excel rather than taken from the
+  documentation, which is wrong about all three: duplicate timestamps are *aggregated*, not
+  `#VALUE!`; the aggregation codes are 1-based and alphabetical, not 0-based in the
+  published order; and SMAPE uses the halved denominator. `SEASONALITY` answers `0` when no
+  cycle is detected, also measured.
+
+- **`PHONETIC`, `ASC`, `DBCS`, `JIS` and `BAHTTEXT`.** `DBCS` and `JIS` are one function
+  under two names, on Microsoft's own account. `BAHTTEXT` was written from the documented
+  Thai grammar and then verified against Excel, seven values for seven.
+
+### Fixed
+
+- **`allDifferent` was silently treated as integrality.** It requires the variables to be
+  pairwise distinct, which is strictly stronger than requiring them to be whole. It is now
+  refused, because `IntegerProgramSpecification` cannot express it.
+
+- **`solver_neg` was ignored.** Excel's "Make Unconstrained Variables Non-Negative" controls
+  whether a simplex solver can answer at all, since simplex assumes `x >= 0` structurally.
+
+### Requires
+
+- SwiftExcelCore 0.8.0 and SwiftXLSX 0.24.1. The latter fixes two defects found while
+  scoping this work rather than by testing it: furigana was being concatenated into cell
+  values, and a long identifier overflowed the formula lexer and **killed the process**.
+
 ## [0.7.1] - 2026-09-08
 
 ### Changed
@@ -651,6 +704,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...HEAD
+[0.8.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.5.0...v0.6.0
