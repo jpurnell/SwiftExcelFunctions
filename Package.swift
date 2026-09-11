@@ -33,7 +33,7 @@ let package = Package(
         // `upToNextMinor` rather than `from:`: this family ships breaking changes in
         // minor versions while it is pre-1.0, so a patch should flow freely and a minor
         // should be a deliberate bump.
-        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.24.0"))
+        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.24.1"))
     ],
     targets: [
         .target(
