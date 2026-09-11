@@ -66,7 +66,7 @@ final class SolverRunTests: XCTestCase {
             .init(lhs: [CellRef("C1")], relation: .equal, rhs: .constant(0)),
             .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(3)),
         ]))
-        XCTAssertEqual(solution.objective, 6, accuracy: 0.05)
+        XCTAssertEqual(solution.objective ?? .nan, 6, accuracy: 0.05)
         XCTAssertEqual(solution.variables[CellRef("A1").positionKey] ?? .nan, 3, accuracy: 0.05)
     }
 
@@ -76,7 +76,7 @@ final class SolverRunTests: XCTestCase {
         let solution = try solve(model(
             sense: .maximise,
             constraints: [.init(lhs: [CellRef("B1")], relation: .lessOrEqual, rhs: .constant(4))]))
-        XCTAssertEqual(solution.objective, 4, accuracy: 0.05)
+        XCTAssertEqual(solution.objective ?? .nan, 4, accuracy: 0.05)
     }
 
     /// **"Value of" drives the objective to a number**, which is a different problem from
@@ -84,7 +84,7 @@ final class SolverRunTests: XCTestCase {
     /// objective is still the cell's own value.
     func testTargetValue() throws {
         let solution = try solve(model(sense: .target(7)))
-        XCTAssertEqual(solution.objective, 7, accuracy: 0.05)
+        XCTAssertEqual(solution.objective ?? .nan, 7, accuracy: 0.05)
     }
 
     /// The solution carries the variables back keyed by cell, because an optimizer returns
@@ -111,18 +111,27 @@ final class SolverRunTests: XCTestCase {
                                 rhs: .cells([CellRef("D1")]))],
             engine: .grgNonlinear)
         let solution = try SolverRun.solve(bounded, cells: sheet, names: NamedRangeCollection())
-        XCTAssertEqual(solution.objective, 5, accuracy: 0.05)
+        XCTAssertEqual(solution.objective ?? .nan, 5, accuracy: 0.05)
     }
 
     // MARK: - What it refuses
 
-    /// A model with no objective has nothing to optimise.
-    func testAModelWithoutAnObjectiveIsRefused() throws {
-        let headless = SolverModel(objective: nil, sense: .minimise,
-                                   variables: [CellRef("A1")], constraints: [], engine: .grgNonlinear)
-        XCTAssertThrowsError(try solve(headless)) { error in
-            XCTAssertEqual(error as? SolverRunError, SolverRunError.noObjective)
-        }
+    /// **A model with no objective is a feasibility search**, which Excel allows: leave
+    /// Set Objective blank and Solver looks for any point satisfying the constraints.
+    /// Measured — such a workbook omits `solver_opt` entirely rather than writing it empty,
+    /// though it still writes `solver_typ`, which therefore means nothing on its own.
+    func testAModelWithoutAnObjectiveSatisfiesConstraints() throws {
+        let headless = SolverModel(
+            objective: nil, sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2")],
+            constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
+                                rhs: .constant(4))],
+            engine: .grgNonlinear)
+        let solution = try SolverRun.solve(headless, cells: Sheet(),
+                                           names: NamedRangeCollection())
+        XCTAssertNil(solution.objective, "there is no objective to report")
+        XCTAssertGreaterThanOrEqual(solution.variables[CellRef("A1").positionKey] ?? .nan,
+                                    4 - 0.05, "the constraint still holds")
     }
 
     /// A model with no variables has nothing to adjust.
@@ -237,7 +246,7 @@ final class SolverRunTests: XCTestCase {
     /// minus infinity.
     func testNonNegativityIsAssumedByDefault() throws {
         let solution = try solve(model())
-        XCTAssertEqual(solution.objective, 0, accuracy: 0.05)
+        XCTAssertEqual(solution.objective ?? .nan, 0, accuracy: 0.05)
         for ref in [CellRef("A1"), CellRef("A2")] {
             XCTAssertGreaterThanOrEqual(solution.variables[ref.positionKey] ?? .nan, -1e-6)
         }
@@ -257,7 +266,7 @@ final class SolverRunTests: XCTestCase {
             engine: .grgNonlinear,
             assumesNonNegative: false)
         let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
-        XCTAssertEqual(solution.objective, -5, accuracy: 0.1)
+        XCTAssertEqual(solution.objective ?? .nan, -5, accuracy: 0.1)
     }
 
     /// And Simplex handles a free variable by splitting it, rather than refusing.
@@ -273,7 +282,7 @@ final class SolverRunTests: XCTestCase {
             assumesNonNegative: false)
         let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
         XCTAssertEqual(solution.engineUsed, .simplex)
-        XCTAssertEqual(solution.objective, -5, accuracy: 0.1)
+        XCTAssertEqual(solution.objective ?? .nan, -5, accuracy: 0.1)
     }
 
     // MARK: - Simplex
@@ -290,7 +299,7 @@ final class SolverRunTests: XCTestCase {
             ],
             engine: .simplexLP))
         XCTAssertEqual(solution.engineUsed, .simplex)
-        XCTAssertEqual(solution.objective, 7, accuracy: 0.01)
+        XCTAssertEqual(solution.objective ?? .nan, 7, accuracy: 0.01)
     }
 
     /// **A nonlinear model nominated for Simplex is refused, not silently re-solved.**
@@ -320,7 +329,7 @@ final class SolverRunTests: XCTestCase {
                                 rhs: .constant(2))],
             engine: .grgNonlinear)
         let solution = try solve(squared)
-        XCTAssertEqual(solution.objective, 4, accuracy: 0.1)
+        XCTAssertEqual(solution.objective ?? .nan, 4, accuracy: 0.1)
     }
 
     // MARK: - Evolutionary
@@ -337,7 +346,7 @@ final class SolverRunTests: XCTestCase {
             ],
             engine: .evolutionary))
         XCTAssertEqual(solution.engineUsed, .differentialEvolution)
-        XCTAssertEqual(solution.objective, 2, accuracy: 0.5)
+        XCTAssertEqual(solution.objective ?? .nan, 2, accuracy: 0.5)
     }
 
     /// **An unbounded variable is refused**, as Excel refuses it: a population-based search

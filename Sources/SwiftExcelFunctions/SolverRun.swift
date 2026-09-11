@@ -5,9 +5,6 @@ import SwiftExcelCore
 /// Why a Solver model could not be run.
 public enum SolverRunError: Error, Equatable, Sendable {
 
-    /// The model names no objective cell.
-    case noObjective
-
     /// The model names no cells to adjust.
     case noVariables
 
@@ -76,7 +73,11 @@ public enum SolverRun {
 
         /// The objective cell's value at the solution, in the caller's terms — not the
         /// optimizer's, which may have been minimising a negation or a distance.
-        public let objective: Double
+        ///
+        /// `nil` for a model with no objective. Excel allows one: leave Set Objective blank
+        /// and Solver looks for any point satisfying the constraints. Measured — such a
+        /// workbook omits `solver_opt` entirely rather than writing it empty.
+        public let objective: Double?
 
         /// Whether the optimizer reported convergence.
         public let converged: Bool
@@ -130,7 +131,6 @@ public enum SolverRun {
         cells: any CellValueProvider & PopulatedCellProvider,
         names: any NameResolver
     ) throws -> Solution {
-        guard let objectiveCell = model.objective else { throw SolverRunError.noObjective }
         guard !model.variables.isEmpty else { throw SolverRunError.noVariables }
 
         // Integrality declarations are separated from comparisons here, because Excel
@@ -177,7 +177,11 @@ public enum SolverRun {
         // recompute the sheet once per cell.
         // Every cell the search must see goes into one output vector, so a candidate
         // recomputes the sheet once rather than once per cell.
-        var outputCells = [objectiveCell]
+        // **A model may have no objective.** Excel allows it — leave Set Objective blank
+        // and Solver looks for any feasible point — so the objective is one output when
+        // there is one and none when there is not. Everything downstream indexes from
+        // `outputCells.count` rather than from a fixed 1, which is what makes that work.
+        var outputCells: [CellRef] = model.objective.map { [$0] } ?? []
         var lhsOffsets: [Int] = []
         var rhsOffsets: [Int?] = []
         for constraint in comparisons {
@@ -255,11 +259,14 @@ public enum SolverRun {
         }
 
         let sense = model.sense
+        let hasObjective = model.objective != nil
         let objective: @Sendable (VectorN<Double>) -> Double = { point in
             // Infinity for a point the sheet cannot evaluate: for a minimiser that reads
             // as "not here", which is what an infeasible point means.
             guard let out = sheet.outputs(at: decode(point.toArray())) else { return .infinity }
-            return cost(of: out, under: sense)
+            // With no objective the search is a feasibility search: every evaluable point
+            // is equally good, and the constraints do all the work.
+            return hasObjective ? cost(of: out, under: sense) : 0
         }
 
         var constraints: [MultivariateConstraint<VectorN<Double>>] = []
@@ -384,7 +391,7 @@ public enum SolverRun {
         let held = decode(found)
         // Reported in the caller's terms: the objective cell's own value at the reported
         // point, not the transformed quantity the optimizer was minimising.
-        let objectiveValue = sheet.outputs(at: held)?.first
+        let objectiveValue = hasObjective ? sheet.outputs(at: held)?.first : nil
         // Measured at the point being reported, so the number describes the answer the
         // caller is given rather than some intermediate the optimizer passed through.
         let point = VectorN(found)
@@ -412,7 +419,7 @@ public enum SolverRun {
             variables[ref.positionKey] = value
         }
         return Solution(variables: variables,
-                        objective: objectiveValue ?? .nan,
+                        objective: hasObjective ? (objectiveValue ?? .nan) : nil,
                         converged: converged,
                         worstViolation: worst,
                         engineUsed: used)

@@ -87,6 +87,10 @@ public struct SolverModel: Equatable, Sendable {
     public let objective: CellRef?
 
     /// What to do with the objective.
+    ///
+    /// **Meaningless when ``objective`` is `nil`.** Excel writes `solver_typ` even for a
+    /// model that has no objective at all, so this reads as `.maximise` for something that
+    /// maximises nothing. Measured, on a workbook saved with Set Objective left blank.
     public let sense: Sense
 
     /// The decision variables, in the order `solver_adj` lists them.
@@ -163,12 +167,13 @@ public struct SolverModel: Equatable, Sendable {
 ///
 /// ## The encodings are measured
 ///
-/// Every numeric code here was read out of two workbooks built in Excel for Mac on
-/// 2026-09-11 and saved without solving — `solver_ver` 2. All six relation codes, both
-/// objective senses tested, two of three engines, and both settings of `solver_neg` matched
-/// Frontline's published layout exactly.
+/// Every numeric code here was read out of three workbooks built in Excel for Mac on
+/// 2026-09-11 and saved without solving — `solver_ver` 2. All six relation codes, all three
+/// engines, both settings of `solver_neg`, and `solver_typ` for Max and Value Of matched
+/// Frontline's published layout exactly. Only `solver_typ = 2` for Min is inferred, as the
+/// remaining value of three.
 ///
-/// Three things the files taught that reading could not:
+/// Five things the files taught that reading could not:
 ///
 /// - **`solver_num` really is authoritative.** A workbook edited down from six constraints
 ///   to one kept `solver_lhs2…6` and `solver_rel2…6` in the file, including an
@@ -178,6 +183,12 @@ public struct SolverModel: Equatable, Sendable {
 ///   `"integer"`, `"binary"`, `"alldifferent"`. See ``SolverModel/Bound/label(_:)``.
 /// - **Excel reorders the constraints**, writing the integrality declarations before the
 ///   comparisons whatever order they were entered in. Nothing may depend on their order.
+/// - **A model with no objective omits `solver_opt` entirely** rather than writing it
+///   empty, so the absence is unambiguous — but it still writes `solver_typ`, which
+///   therefore means nothing on its own. ``SolverModel/sense`` is only meaningful where
+///   ``SolverModel/objective`` is non-`nil`.
+/// - **`solver_adj` really is written as a multi-area reference** —
+///   `Sheet1!$A$1:$A$3,Sheet1!$C$3` — confirming by observation what the format implied.
 ///
 /// The codes are gathered in `relation(for:)`, `sense(for:value:)` and `engine(for:)` —
 /// internal, so plain code spans rather than symbol links — which keeps every encoding in
