@@ -140,6 +140,20 @@ final class ExcelSolverReaderTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(ExcelSolverReader.model(from: minimal)).engine, .grgNonlinear)
     }
 
+    // MARK: - Non-negativity
+
+    /// Excel's default is to assume it, so an absent `solver_neg` means `true`.
+    func testNonNegativityDefaultsToAssumed() throws {
+        XCTAssertTrue(try XCTUnwrap(ExcelSolverReader.model(from: minimal)).assumesNonNegative)
+    }
+
+    /// `solver_neg` of 2 permits negative variables.
+    func testSolverNegTwoPermitsNegatives() throws {
+        var pairs = Array(minimal.all.map { ($0.name, $0.reference) })
+        pairs.append(("solver_neg", number(2)))
+        XCTAssertFalse(try XCTUnwrap(ExcelSolverReader.model(from: names(pairs))).assumesNonNegative)
+    }
+
     // MARK: - Absence
 
     /// **No Solver names is not an empty model, it is no model.** A workbook that never had

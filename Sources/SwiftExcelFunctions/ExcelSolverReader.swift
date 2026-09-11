@@ -88,6 +88,41 @@ public struct SolverModel: Equatable, Sendable {
 
     /// The engine the workbook nominates. **Advisory** — see ``ExcelSolverReader``.
     public let engine: Engine
+
+    /// Whether unconstrained variables are assumed non-negative.
+    ///
+    /// Excel's "Make Unconstrained Variables Non-Negative" checkbox, stored as
+    /// `solver_neg`: `1` assumes it, `2` permits negatives. It defaults to `true`, which is
+    /// Excel's own default, and it matters more than a checkbox sounds — a simplex solver
+    /// assumes `x >= 0` structurally, so a model that permits negatives cannot be handed to
+    /// one without changing the answer.
+    public let assumesNonNegative: Bool
+
+    /// Creates a model.
+    ///
+    /// - Parameters:
+    ///   - objective: The objective cell, or `nil`.
+    ///   - sense: What to do with it.
+    ///   - variables: The decision variables, in order.
+    ///   - constraints: The constraints, in declaration order.
+    ///   - engine: The nominated engine.
+    ///   - assumesNonNegative: Excel's non-negativity assumption, which defaults to `true`
+    ///     because that is Excel's own default.
+    public init(
+        objective: CellRef?,
+        sense: Sense,
+        variables: [CellRef],
+        constraints: [Constraint],
+        engine: Engine,
+        assumesNonNegative: Bool = true
+    ) {
+        self.objective = objective
+        self.sense = sense
+        self.variables = variables
+        self.constraints = constraints
+        self.engine = engine
+        self.assumesNonNegative = assumesNonNegative
+    }
 }
 
 /// Reads a classic Excel Solver model out of a workbook's defined names.
@@ -155,7 +190,11 @@ public enum ExcelSolverReader {
             sense: sense,
             variables: variables,
             constraints: constraints,
-            engine: engine(for: number(byName["solver_eng"])))
+            engine: engine(for: number(byName["solver_eng"])),
+            // Excel's default is to assume non-negative, so an absent name means `true`.
+            // `isEqual(to:)` rather than `!=`: this is an exact comparison against a code,
+            // chosen deliberately, and naming it says so.
+            assumesNonNegative: !(number(byName["solver_neg"])?.isEqual(to: 2) ?? false))
     }
 
     // MARK: - Encodings

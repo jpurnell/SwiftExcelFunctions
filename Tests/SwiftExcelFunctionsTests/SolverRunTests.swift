@@ -184,6 +184,36 @@ final class SolverRunTests: XCTestCase {
         }
     }
 
+    /// **All-different is refused, not approximated.** It requires the variables to be
+    /// pairwise distinct, which is strictly stronger than requiring them to be whole.
+    /// Treating it as integrality — which an earlier draft of this file did — answers a
+    /// different question and returns a solution with repeats in it.
+    func testAllDifferentIsRefused() throws {
+        XCTAssertThrowsError(try solve(model(constraints: [
+            .init(lhs: [CellRef("A1"), CellRef("A2")], relation: .allDifferent,
+                  rhs: .constant(0)),
+        ]))) { error in
+            XCTAssertEqual(error as? SolverRunError,
+                           SolverRunError.unsupportedRelation(.allDifferent))
+        }
+    }
+
+    /// **A model permitting negatives cannot go to Simplex.** The solver assumes `x >= 0`
+    /// in its structure rather than as a constraint, so answering anyway would be answering
+    /// a different problem — quietly.
+    func testSimplexRefusesAModelThatPermitsNegatives() throws {
+        let signed = SolverModel(
+            objective: CellRef("B1"), sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2")],
+            constraints: [.init(lhs: [CellRef("B1")], relation: .greaterOrEqual,
+                                rhs: .constant(1))],
+            engine: .simplexLP,
+            assumesNonNegative: false)
+        XCTAssertThrowsError(try solve(signed)) { error in
+            XCTAssertEqual(error as? SolverRunError, SolverRunError.simplexRequiresNonNegative)
+        }
+    }
+
     // MARK: - Simplex
 
     /// **A linear model nominated for Simplex really runs Simplex.** `B1 = A1 + A2` is

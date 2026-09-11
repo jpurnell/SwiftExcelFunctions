@@ -24,6 +24,21 @@ public enum SolverRunError: Error, Equatable, Sendable {
     /// answer depend on a number nobody chose.
     case evolutionaryNeedsBounds(CellRef)
 
+    /// A constraint this runner cannot express.
+    ///
+    /// **Refused rather than approximated.** Excel's "all different" requires the variables
+    /// to be pairwise distinct, which is strictly stronger than requiring them to be whole.
+    /// Treating it as integrality — which an earlier draft did — answers a different
+    /// question and returns a solution with repeats in it, confidently.
+    case unsupportedRelation(SolverModel.Relation)
+
+    /// Simplex was nominated on a model that permits negative variables.
+    ///
+    /// A simplex solver assumes `x >= 0` in its structure rather than as a constraint, so
+    /// it cannot answer for a model whose `solver_neg` permits negatives without silently
+    /// returning the answer to a different problem.
+    case simplexRequiresNonNegative
+
     /// Simplex was nominated but the model is not linear.
     ///
     /// **Refused rather than quietly re-solved**, which is also Excel's own answer: "the
@@ -117,7 +132,12 @@ public enum SolverRun {
             switch constraint.relation {
             case .lessOrEqual, .equal, .greaterOrEqual:
                 comparisons.append(constraint)
-            case .integer, .binary, .allDifferent:
+            case .allDifferent:
+                // Pairwise distinctness, which is stronger than integrality and which
+                // `IntegerProgramSpecification` cannot express — it carries integer, binary
+                // and SOS sets, none of which say "no two of these are equal".
+                throw SolverRunError.unsupportedRelation(.allDifferent)
+            case .integer, .binary:
                 for ref in constraint.lhs {
                     guard let index = position[ref.positionKey] else {
                         throw SolverRunError.integralityOnNonVariable(ref)
@@ -220,6 +240,9 @@ public enum SolverRun {
                 throw SolverRunError.optimizerFailed(String(describing: failure))
             }
         } else if model.engine == .simplexLP {
+            guard model.assumesNonNegative else {
+                throw SolverRunError.simplexRequiresNonNegative
+            }
             // Simplex needs coefficients rather than a callable sheet, so the sheet is
             // probed for them — and refused if it is not linear, which is Excel's own
             // answer rather than a silent change of engine.
@@ -364,7 +387,8 @@ public enum SolverRun {
             }
         }
 
-        // Simplex assumes non-negative variables, which Excel's LP does too.
+        // Simplex assumes `x >= 0` structurally. The caller has already checked that the
+        // model agrees, because a model permitting negatives cannot be answered here.
         do {
             let solver = SimplexSolver()
             let result = try solver.minimize(objective: objectiveTerms.coefficients,
