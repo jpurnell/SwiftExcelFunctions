@@ -81,6 +81,26 @@ public enum SolverRun {
         /// Whether the optimizer reported convergence.
         public let converged: Bool
 
+        /// The worst constraint violation at the reported point, in the constraint's own
+        /// units. Zero or negative means every constraint holds.
+        ///
+        /// **Reported rather than hidden.** Where constraints are handled by penalty the
+        /// optimizer satisfies them approximately, and an earlier draft of this file
+        /// projected the answer onto its bounds to tidy that away — which does not fix
+        /// infeasibility, it moves it: clamping a variable that an equality ties to another
+        /// simply breaks the equality instead. Excel reports the same thing, as "Solver
+        /// could not find a feasible solution".
+        public let worstViolation: Double
+
+        /// Whether every constraint holds at the reported point, within `precision`.
+        ///
+        /// - Parameter precision: How much violation to tolerate. Excel's own default for
+        ///   its Constraint Precision setting is `1e-6`.
+        /// - Returns: Whether the solution is feasible.
+        public func isFeasible(within precision: Double = 1e-6) -> Bool {
+            worstViolation <= precision
+        }
+
         /// What actually ran. See the note on ``SolverRun``.
         public let engineUsed: Engine
 
@@ -135,7 +155,6 @@ public enum SolverRun {
                     guard let index = position[ref.positionKey] else {
                         throw SolverRunError.integralityOnNonVariable(ref)
                     }
-                    integerIndices.insert(index)
                     group.append(index)
                 }
                 distinctGroups.append(group)
@@ -179,11 +198,67 @@ public enum SolverRun {
             outputs: outputCells,
             cells: cells, names: names)
 
+        // **All-different is satisfied by construction rather than constrained.**
+        //
+        // Excel's `dif` says the group takes the integers 1…N, each once — a permutation.
+        // Expressed as constraints that is disjunctive (`xᵢ ≠ xⱼ` is two inequalities with
+        // an or between them), which no penalty can enforce and which an earlier draft got
+        // wrong: starting at (0, 0, 0) the search stayed there, the penalty never
+        // outweighing the objective.
+        //
+        // Decoding removes the problem instead of policing it. The optimizer's values are
+        // read as *sort keys*, and the permutation is their rank order, so every point in
+        // the whole search space maps to a valid permutation and no infeasible point
+        // exists to be found. This is the random-key encoding, and it is why these
+        // variables need no integrality, no bounds and no distinctness constraints.
+        // The simple bounds this runner generated. Applied the same way the permutation
+        // decode is — by construction rather than by penalty.
+        //
+        // **A penalty makes a hard bound soft.** NelderMead penalises every constraint it
+        // is given, `.linearInequality` included: only branch-and-bound's relaxation and
+        // simplex enforce those exactly. So a bound handed to the general path is a
+        // *preference*, and the search trades it against the objective and settles outside
+        // — non-negativity came back as -0.005.
+        //
+        // Clamping inside the objective removes the trade. Every evaluation happens at a
+        // point inside the bounds, so the function being minimised *is* the bounded one,
+        // and the point reported is the point that was evaluated. That is the difference
+        // from clamping the final answer, which an earlier draft did: that left the
+        // reported point inconsistent with the objective the optimizer had seen, and moved
+        // violations onto whatever other constraint tied the variable down.
+        //
+        // Not on the simplex path. There the bounds are real constraints the solver
+        // enforces exactly, and clamping would make the objective nonlinear — `max(x, 0)`
+        // is not a linear function — so the linearity probe would reject a model that is
+        // perfectly linear.
+        var lowerBound = [Double?](repeating: nil, count: model.variables.count)
+        if model.assumesNonNegative, model.engine != .simplexLP {
+            for index in model.variables.indices { lowerBound[index] = 0 }
+        }
+        let floors = lowerBound
+        let groups = distinctGroups
+        let decode: @Sendable ([Double]) -> [Double] = { raw in
+            var decoded = raw
+            for index in decoded.indices {
+                if let low = floors[index] { decoded[index] = max(decoded[index], low) }
+            }
+            guard !groups.isEmpty else { return decoded }
+            for group in groups {
+                let ranked = group.enumerated()
+                    .sorted { decoded[$0.element] < decoded[$1.element] }
+                    .map(\.offset)
+                for (rank, offset) in ranked.enumerated() {
+                    decoded[group[offset]] = Double(rank + 1)
+                }
+            }
+            return decoded
+        }
+
         let sense = model.sense
         let objective: @Sendable (VectorN<Double>) -> Double = { point in
             // Infinity for a point the sheet cannot evaluate: for a minimiser that reads
             // as "not here", which is what an infeasible point means.
-            guard let out = sheet.outputs(at: point.toArray()) else { return .infinity }
+            guard let out = sheet.outputs(at: decode(point.toArray())) else { return .infinity }
             return cost(of: out, under: sense)
         }
 
@@ -199,7 +274,9 @@ public enum SolverRun {
             for offset in 0..<count {
                 let slot = start + offset
                 let body: @Sendable (VectorN<Double>) -> Double = { point in
-                    guard let out = sheet.outputs(at: point.toArray()) else { return .infinity }
+                    guard let out = sheet.outputs(at: decode(point.toArray())) else {
+                        return .infinity
+                    }
                     let lhs = out[slot]
                     let rhs = boundStart.map { out[$0 + min(offset, count - 1)] }
                         ?? constantValue(of: bound)
@@ -218,67 +295,30 @@ public enum SolverRun {
         // Excel's non-negativity checkbox, which is a *constraint generator* rather than a
         // flag: it adds `x >= 0` to every variable, and that is why turning it off changes
         // the answer rather than merely permitting a different one.
-        if model.assumesNonNegative {
+        // **Structured, not closures.** `.linearInequality` is what branch-and-bound
+        // enforces through its relaxation — it is the form B&B itself emits when it
+        // branches. An opaque `.inequality(function:)` can only be *penalised*, which makes
+        // a hard bound soft: the search trades violation against objective and settles
+        // slightly outside. That is how non-negativity came back as -0.005.
+        func bound(_ index: Int, _ sense: ConstraintSense, _ rhs: Double)
+            -> MultivariateConstraint<VectorN<Double>> {
+            var coefficients = [Double](repeating: 0, count: model.variables.count)
+            coefficients[index] = 1
+            return .linearInequality(coefficients: coefficients, rhs: rhs, sense: sense)
+        }
+        // Only for the paths that enforce them exactly. The general path gets the same
+        // bounds structurally, above, so adding them here as well would penalise a
+        // constraint that can no longer be violated.
+        if model.assumesNonNegative, model.engine == .simplexLP {
             for index in model.variables.indices {
-                constraints.append(.inequality(
-                    function: { point in -point.toArray()[index] }, gradient: nil))
+                constraints.append(bound(index, .greaterOrEqual, 0))
             }
         }
 
-        // All-different, as three statements: the box, and pairwise distinctness. The
-        // integrality half is already in `integerIndices`.
-        for group in distinctGroups {
-            let size = Double(group.count)
-            for index in group {
-                constraints.append(.inequality(
-                    function: { point in 1 - point.toArray()[index] }, gradient: nil))
-                constraints.append(.inequality(
-                    function: { point in point.toArray()[index] - size }, gradient: nil))
-            }
-            for outer in 0..<group.count {
-                for inner in (outer + 1)..<group.count {
-                    let left = group[outer]
-                    let right = group[inner]
-                    // `|xᵢ - xⱼ| >= 1`, which with integrality is exactly distinctness.
-                    constraints.append(.inequality(
-                        function: { point in
-                            let values = point.toArray()
-                            return 1 - abs(values[left] - values[right])
-                        }, gradient: nil))
-                }
-            }
-        }
 
-        // The simple bounds this runner generated itself — non-negativity and the
-        // all-different box. Kept separately from the constraint closures because they are
-        // *structural*: we asserted them, so we can both start inside them and hold the
-        // answer to them, neither of which is true of the model's own constraints.
-        var floor = [Double?](repeating: nil, count: model.variables.count)
-        var ceiling = [Double?](repeating: nil, count: model.variables.count)
-        if model.assumesNonNegative {
-            for index in model.variables.indices { floor[index] = 0 }
-        }
-        for group in distinctGroups {
-            for index in group {
-                floor[index] = max(floor[index] ?? 1, 1)
-                ceiling[index] = Double(group.count)
-            }
-        }
-
-        var startValues = model.variables.map { ref -> Double in
+        let startValues = model.variables.map { ref -> Double in
             if case .number(let value) = cells.value(at: ref) ?? .blank { return value }
             return 0
-        }
-        // **Start inside the bounds.** A penalty-based search begun at an infeasible point
-        // can settle there — an all-different group starting at (0, 0, 0) came back as
-        // (0, 0, 0), the penalty never outweighing the objective. The identity permutation
-        // is feasible by construction, so distinct groups are seeded with it.
-        for group in distinctGroups {
-            for (offset, index) in group.enumerated() { startValues[index] = Double(offset + 1) }
-        }
-        for index in startValues.indices {
-            if let low = floor[index] { startValues[index] = max(startValues[index], low) }
-            if let high = ceiling[index] { startValues[index] = min(startValues[index], high) }
         }
         let start = VectorN(startValues)
 
@@ -339,24 +379,34 @@ public enum SolverRun {
             converged = result.converged
         }
 
-        // **Held to the bounds we asserted.** A penalty method satisfies constraints
-        // approximately — non-negativity came back as -0.005 — and reporting a negative
-        // value for a variable this runner declared non-negative would be reporting a
-        // violation of its own statement. Only the generated bounds are projected; the
-        // model's own constraints are the optimizer's business and are reported as found.
-        var held = found
-        for index in held.indices {
-            if let low = floor[index] { held[index] = max(held[index], low) }
-            if let high = ceiling[index] { held[index] = min(held[index], high) }
-        }
-        // Integral variables are reported integral, for the same reason.
-        for index in integerIndices.union(binaryIndices) where index < held.count {
-            held[index] = held[index].rounded()
-        }
-
+        // Decoded, so the reported variables are the permutation the objective was
+        // actually evaluated at rather than the sort keys that produced it.
+        let held = decode(found)
         // Reported in the caller's terms: the objective cell's own value at the reported
         // point, not the transformed quantity the optimizer was minimising.
         let objectiveValue = sheet.outputs(at: held)?.first
+        // Measured at the point being reported, so the number describes the answer the
+        // caller is given rather than some intermediate the optimizer passed through.
+        let point = VectorN(found)
+        var worst = 0.0
+        for constraint in constraints {
+            switch constraint {
+            case .inequality(let function, _):
+                worst = max(worst, function(point))
+            case .equality(let function, _):
+                worst = max(worst, abs(function(point)))
+            case .linearInequality(let coefficients, let rhs, let sense):
+                let lhs = zip(coefficients, held).reduce(0) { $0 + $1.0 * $1.1 }
+                switch sense {
+                case .lessOrEqual: worst = max(worst, lhs - rhs)
+                case .greaterOrEqual: worst = max(worst, rhs - lhs)
+                case .equal: worst = max(worst, abs(lhs - rhs))
+                }
+            default:
+                continue
+            }
+        }
+
         var variables: [CellRef: Double] = [:]
         for (ref, value) in zip(model.variables, held) {
             variables[ref.positionKey] = value
@@ -364,6 +414,7 @@ public enum SolverRun {
         return Solution(variables: variables,
                         objective: objectiveValue ?? .nan,
                         converged: converged,
+                        worstViolation: worst,
                         engineUsed: used)
     }
 

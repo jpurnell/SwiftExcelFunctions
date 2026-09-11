@@ -212,7 +212,11 @@ final class SolverRunTests: XCTestCase {
         }
         XCTAssertEqual(Set(values.map { Int($0.rounded()) }), [1, 2, 3],
                        "each of 1…3 exactly once")
-        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+        // **No branch-and-bound.** Decoding makes the permutation structural, so these
+        // variables need no integrality, no bounds and no distinctness constraints — and
+        // therefore no integer solver. An earlier draft forced B&B because it encoded the
+        // same thing as constraints.
+        XCTAssertEqual(solution.engineUsed, .nelderMead)
     }
 
     /// All-different on a cell that is not a decision variable is malformed, as integrality
