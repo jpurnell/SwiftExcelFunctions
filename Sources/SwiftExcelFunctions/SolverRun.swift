@@ -585,7 +585,12 @@ public enum SolverRun {
     /// - Returns: The number, or zero for a bound that names cells — which never reaches
     ///   here, since those are read from the sheet.
     private static func constantValue(of bound: SolverModel.Bound) -> Double {
-        if case .constant(let value) = bound { return value }
-        return 0
+        switch bound {
+        case .constant(let value): return value
+        // A label is Excel's word for an integrality declaration — "integer", "binary",
+        // "alldifferent" — and those constrain the variable rather than compare it, so
+        // there is nothing to measure against.
+        case .label, .cells: return 0
+        }
     }
 }

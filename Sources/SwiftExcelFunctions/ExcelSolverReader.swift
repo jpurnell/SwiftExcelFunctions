@@ -34,6 +34,15 @@ public struct SolverModel: Equatable, Sendable {
     public enum Bound: Equatable, Sendable {
         case constant(Double)
         case cells([CellRef])
+
+        /// A word rather than a value — `"integer"`, `"binary"`, `"alldifferent"`.
+        ///
+        /// Excel writes these in `solver_rhsN` for the integrality declarations, where a
+        /// bound would otherwise go. They carry no numeric meaning: the relation already
+        /// says everything, and this is the label Excel shows in its own dialog. Read as
+        /// what it is rather than falling through to an empty cell list, which is where it
+        /// landed before anyone looked at a real file.
+        case label(String)
     }
 
     /// One constraint.
@@ -89,6 +98,14 @@ public struct SolverModel: Equatable, Sendable {
     /// The engine the workbook nominates. **Advisory** — see ``ExcelSolverReader``.
     public let engine: Engine
 
+    /// Excel's `solver_ver`, the model format's own version number.
+    ///
+    /// Measured as `2` in Excel for Mac, 2026. It is recorded because it is the one thing
+    /// that would make every other encoding here wrong at once: a future Solver writing
+    /// version 3 could renumber the relations, and nothing else in the file would say so.
+    /// A caller comparing this against what was verified can refuse rather than misread.
+    public let formatVersion: Int?
+
     /// Whether unconstrained variables are assumed non-negative.
     ///
     /// Excel's "Make Unconstrained Variables Non-Negative" checkbox, stored as
@@ -108,13 +125,15 @@ public struct SolverModel: Equatable, Sendable {
     ///   - engine: The nominated engine.
     ///   - assumesNonNegative: Excel's non-negativity assumption, which defaults to `true`
     ///     because that is Excel's own default.
+    ///   - formatVersion: Excel's `solver_ver`, if the workbook carried one.
     public init(
         objective: CellRef?,
         sense: Sense,
         variables: [CellRef],
         constraints: [Constraint],
         engine: Engine,
-        assumesNonNegative: Bool = true
+        assumesNonNegative: Bool = true,
+        formatVersion: Int? = nil
     ) {
         self.objective = objective
         self.sense = sense
@@ -122,6 +141,7 @@ public struct SolverModel: Equatable, Sendable {
         self.constraints = constraints
         self.engine = engine
         self.assumesNonNegative = assumesNonNegative
+        self.formatVersion = formatVersion
     }
 }
 
@@ -141,29 +161,72 @@ public struct SolverModel: Equatable, Sendable {
 /// independent here is what makes "read a plain Excel model, solve it with a better engine"
 /// possible at all.
 ///
-/// ## What is not verified
+/// ## The encodings are measured
 ///
-/// The numeric encodings — `solver_typ` 1/2/3, the relation codes, the engine codes — come
-/// from Frontline's published layout and have **not been measured against a real workbook**.
-/// They are gathered in `relation(for:)`, `sense(for:value:)` and `engine(for:)` — internal,
-/// so plain code spans rather than symbol links — which puts every encoding in one place and
-/// makes correcting one a single edit. The tests pin them, so a disagreement with a real
-/// workbook fails loudly rather than misreading quietly.
+/// Every numeric code here was read out of two workbooks built in Excel for Mac on
+/// 2026-09-11 and saved without solving — `solver_ver` 2. All six relation codes, both
+/// objective senses tested, two of three engines, and both settings of `solver_neg` matched
+/// Frontline's published layout exactly.
+///
+/// Three things the files taught that reading could not:
+///
+/// - **`solver_num` really is authoritative.** A workbook edited down from six constraints
+///   to one kept `solver_lhs2…6` and `solver_rel2…6` in the file, including an
+///   `alldifferent`. Reading every `solver_lhs*` present would have resurrected five
+///   constraints the model no longer has.
+/// - **An integrality declaration's right-hand side is a *word***, not a number:
+///   `"integer"`, `"binary"`, `"alldifferent"`. See ``SolverModel/Bound/label(_:)``.
+/// - **Excel reorders the constraints**, writing the integrality declarations before the
+///   comparisons whatever order they were entered in. Nothing may depend on their order.
+///
+/// The codes are gathered in `relation(for:)`, `sense(for:value:)` and `engine(for:)` —
+/// internal, so plain code spans rather than symbol links — which keeps every encoding in
+/// one place. ``SolverModel/formatVersion`` records `solver_ver` because a future version
+/// could renumber all of them with nothing else in the file to say so.
 public enum ExcelSolverReader {
 
-    /// Reads the model, if the workbook declares one.
+    /// Reads every Solver model the workbook declares, one per worksheet.
+    ///
+    /// **Solver models are sheet-scoped**, which the file says plainly: Excel writes every
+    /// `solver_` name with a `localSheetId`. A workbook may therefore hold several, one per
+    /// worksheet, and reading them into a single namespace merges two models into one made
+    /// of neither's parts — the last `solver_opt` seen wins and the constraint count comes
+    /// from somewhere else entirely.
     ///
     /// - Parameter names: The workbook's defined names.
-    /// - Returns: The model, or `nil` when no `solver_` names are present at all — which is
-    ///   a different thing from a model whose objective is missing, and the distinction a
-    ///   caller needs in order to say "this workbook has no Solver model" honestly.
-    public static func model(from names: NamedRangeCollection) -> SolverModel? {
-        // Case-insensitively: Excel writes `solver_opt`, but a workbook round-tripped
-        // through another tool need not have preserved that.
-        var byName: [String: NamedRangeTarget] = [:]
+    /// - Returns: One model per sheet that declares one, keyed by sheet name. Empty when no
+    ///   `solver_` names are present at all — which is a different thing from a model whose
+    ///   objective is missing, and the distinction a caller needs in order to say "this
+    ///   workbook has no Solver model" honestly.
+    public static func models(from names: NamedRangeCollection) -> [String: SolverModel] {
+        var bySheet: [String: [String: NamedRangeTarget]] = [:]
         for range in names.all where range.name.lowercased().hasPrefix("solver_") {
-            byName[range.name.lowercased()] = range.reference
+            // Workbook-scoped Solver names are not a thing Excel writes, but a file that
+            // has been through another tool might carry them; they get their own bucket
+            // rather than being attributed to an arbitrary sheet.
+            let sheet: String
+            if case .sheet(let name) = range.scope { sheet = name } else { sheet = "" }
+            bySheet[sheet, default: [:]][range.name.lowercased()] = range.reference
         }
+        return bySheet.compactMapValues { model(fromNames: $0) }
+    }
+
+    /// Reads one model, for callers with a single-sheet workbook.
+    ///
+    /// - Parameter names: The workbook's defined names.
+    /// - Returns: The model, or `nil`. When several sheets declare one, the sheet that
+    ///   sorts first is returned — use ``models(from:)`` where that matters.
+    public static func model(from names: NamedRangeCollection) -> SolverModel? {
+        let all = models(from: names)
+        guard let key = all.keys.sorted().first else { return nil }
+        return all[key]
+    }
+
+    /// Reads one sheet's model from its own `solver_` names.
+    ///
+    /// - Parameter byName: The sheet's `solver_` names, lowercased.
+    /// - Returns: The model, or `nil` when the sheet declares none.
+    private static func model(fromNames byName: [String: NamedRangeTarget]) -> SolverModel? {
         guard !byName.isEmpty else { return nil }
 
         let objective = byName["solver_opt"].flatMap(firstCell)
@@ -180,8 +243,14 @@ public enum ExcelSolverReader {
             guard let lhs = byName["solver_lhs\(index)"].map(cells),
                   let relation = relation(for: number(byName["solver_rel\(index)"])),
                   let rhsTarget = byName["solver_rhs\(index)"] else { continue }
-            let rhs: SolverModel.Bound = number(rhsTarget).map { .constant($0) }
-                ?? .cells(cells(rhsTarget))
+            let rhs: SolverModel.Bound
+            if let value = number(rhsTarget) {
+                rhs = .constant(value)
+            } else if let word = label(rhsTarget) {
+                rhs = .label(word)
+            } else {
+                rhs = .cells(cells(rhsTarget))
+            }
             constraints.append(.init(lhs: lhs, relation: relation, rhs: rhs))
         }
 
@@ -190,11 +259,13 @@ public enum ExcelSolverReader {
             sense: sense,
             variables: variables,
             constraints: constraints,
-            engine: engine(for: number(byName["solver_eng"])),
+            engine: engine(for: number(byName["solver_eng"]),
+                           linear: number(byName["solver_lin"])),
             // Excel's default is to assume non-negative, so an absent name means `true`.
             // `isEqual(to:)` rather than `!=`: this is an exact comparison against a code,
             // chosen deliberately, and naming it says so.
-            assumesNonNegative: !(number(byName["solver_neg"])?.isEqual(to: 2) ?? false))
+            assumesNonNegative: !(number(byName["solver_neg"])?.isEqual(to: 2) ?? false),
+            formatVersion: number(byName["solver_ver"]).map { Int($0) })
     }
 
     // MARK: - Encodings
@@ -233,13 +304,23 @@ public enum ExcelSolverReader {
 
     /// `solver_eng`: 1 GRG Nonlinear, 2 Simplex LP, 3 Evolutionary.
     ///
-    /// - Parameter code: The engine code.
-    /// - Returns: The engine. Absent means GRG, which is Excel's own default.
-    static func engine(for code: Double?) -> SolverModel.Engine {
+    /// Falls back to `solver_lin`, the "Assume Linear Model" checkbox that Solver used
+    /// before 2010 and still writes — measured as `1` beside Simplex and `2` beside
+    /// Evolutionary. A workbook old enough to carry `solver_lin` and *no* `solver_eng`
+    /// declares a linear model, and reading it as GRG would quietly solve a linear program
+    /// with a nonlinear method.
+    ///
+    /// - Parameters:
+    ///   - code: The `solver_eng` value.
+    ///   - linear: The `solver_lin` value, for a file that has no `solver_eng`.
+    /// - Returns: The engine. Absent from both means GRG, which is Excel's own default.
+    static func engine(for code: Double?, linear: Double? = nil) -> SolverModel.Engine {
         switch code {
         case 2: return .simplexLP
         case 3: return .evolutionary
-        default: return .grgNonlinear
+        case 1: return .grgNonlinear
+        default:
+            return linear?.isEqual(to: 1) == true ? .simplexLP : .grgNonlinear
         }
     }
 
@@ -251,7 +332,19 @@ public enum ExcelSolverReader {
         return value
     }
 
+    /// The word a name holds, if it holds text rather than a number or a reference.
+    private static func label(_ target: NamedRangeTarget?) -> String? {
+        guard case .formula(let ast) = target, case .text(let word) = ast else { return nil }
+        return word
+    }
+
     /// Every cell a name covers, in reading order.
+    ///
+    /// **A multi-area reference is one name covering several blocks** — Excel lets the
+    /// changing cells be `$A$1:$A$3,$C$5`, and writes exactly that. It resolves to no
+    /// single cell or range, so it arrives as a formula, and returning nothing for it reads
+    /// as "a model with nothing to adjust" rather than as a model this could not parse.
+    /// Each comma-separated part is therefore read on its own.
     private static func cells(_ target: NamedRangeTarget) -> [CellRef] {
         switch target {
         case .cell(let ref): return [ref]
@@ -259,7 +352,28 @@ public enum ExcelSolverReader {
         // A `SheetReference` always carries a `CellRange`; the single-cell initialiser
         // just makes a degenerate one. So both cases read the same way.
         case .sheetCell(let reference), .sheetRange(let reference): return reference.range.cells
-        case .formula: return []
+        case .formula(let ast):
+            guard case .text(let reference) = ast else { return [] }
+            return areas(in: reference)
+        }
+    }
+
+    /// The cells of a possibly multi-area reference string.
+    ///
+    /// - Parameter reference: Something like `Sheet1!$A$1:$A$3,Sheet1!$C$5`.
+    /// - Returns: Every cell it covers, in the order the areas are written.
+    private static func areas(in reference: String) -> [CellRef] {
+        reference.split(separator: ",").flatMap { part -> [CellRef] in
+            // The sheet qualifier is dropped: a Solver model's cells are on the sheet that
+            // owns the model, and the parts of one name cannot disagree about that.
+            let body = part.split(separator: "!").last.map(String.init) ?? String(part)
+            guard !body.isEmpty else { return [] }
+            // Normalised to relative, because `CellRange.cells` yields relative refs and a
+            // list mixing `A1` with `$C$5` invites a caller to compare two of its own
+            // entries and find them unequal. Position is what a model means here; the `$`
+            // is notation from the file.
+            let parsed = body.contains(":") ? CellRange(body).cells : [CellRef(body)]
+            return parsed.map { CellRef(column: $0.column, row: $0.row) }
         }
     }
 
