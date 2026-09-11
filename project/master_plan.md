@@ -85,7 +85,24 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 - [x] Integrality via branch-and-bound; Simplex on coefficients probed from the sheet and
       **refused if it is not linear**, which is Excel's own answer; evolutionary via
       differential evolution, refusing an unbounded variable as Excel does
-- [x] 1,235 tests, gate 45/45 at 0/0
+- [x] All-different and non-negativity, both implemented rather than refused — they are
+      in the free Excel Solver, so refusing them was not an answer
+- [x] 1,238 tests, gate 45/45 at 0/0
+
+**Constraints are enforced by construction, not by penalty.** This is the correction 0.8.1
+exists for, and it is worth recording as a trap rather than a fix. NelderMead penalises every
+constraint it is given — `.linearInequality` included; only branch-and-bound's relaxation and
+simplex enforce those exactly. A penalty makes a hard bound *soft*: the search trades it
+against the objective and settles outside, which is how non-negativity came back as -0.005
+and how an all-different group starting at (0, 0, 0) stayed there.
+
+Projecting the answer afterwards, which the first attempt did, is worse than the symptom. It
+does not fix infeasibility, it moves it — clamping a variable that an equality ties to another
+breaks the equality instead — and it leaves the reported point inconsistent with the objective
+the optimizer saw. Bounds are therefore clamped *inside* the objective, and all-different is
+decoded from sort keys into a permutation, so no infeasible point exists to be found. Where
+penalty remains the only method, `worstViolation` reports what Excel reports as "Solver could
+not find a feasible solution".
 
 **The engine is dispatched, not obeyed.** ``SolverModel.engine`` records what the workbook
 asked for and `Solution.engineUsed` reports what ran, so a model declared for Excel's plain
@@ -356,7 +373,11 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-11 — reconciled for 0.8.0. Current Status gains the Solver path;
+**Last Updated:** 2026-09-11 (later) — reconciled for 0.8.1: all-different and
+non-negativity implemented rather than refused, and the constraint-handling correction
+recorded in Current Status as a trap rather than a fix. 1,238 tests.
+
+Earlier: 2026-09-11 — reconciled for 0.8.0. Current Status gains the Solver path;
 the Roadmap records that 0.8.0 shipped as something other than what it promised, and that the
 unreviewed bucket reached 172 rather than 0. README's counts corrected: 409 registered (was
 400), 292 Excel rows (was 283), 1,235 tests (was 1,110).

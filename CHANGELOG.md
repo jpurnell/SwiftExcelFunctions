@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-11
+
+### Added
+
+- **All-different and "Make Unconstrained Variables Non-Negative" are implemented**, where
+  0.8.0 refused them. Both are in the free Excel Solver, so refusing them was not an answer.
+
+  All-different is Excel's `dif`: the group takes the integers `1…N`, each exactly once.
+  It is satisfied by *decoding* rather than constraining — the optimizer's values are read
+  as sort keys and the permutation is their rank order, so every point in the search space
+  maps to a valid permutation and no infeasible point exists to be found.
+
+  `solver_neg` is a constraint generator rather than a flag: it adds `x >= 0` to every
+  variable, which is why turning it off changes the answer rather than merely permitting a
+  different one. Simplex splits free variables into `x⁺ - x⁻` rather than refusing them.
+
+- **`Solution.worstViolation` and `isFeasible(within:)`**, reporting what Excel reports as
+  "Solver could not find a feasible solution", measured at the point the caller is given.
+
+### Fixed
+
+- **Constraints were enforced by penalty, which makes a hard constraint soft.**
+
+  NelderMead penalises every constraint it is given, `.linearInequality` included — only
+  branch-and-bound's relaxation and simplex enforce those exactly. So a bound on the general
+  path was a *preference*, traded against the objective: non-negativity settled at `-0.005`,
+  and an all-different group starting at `(0, 0, 0)` stayed there.
+
+  Projecting the answer afterwards is worse than the symptom. It does not fix infeasibility,
+  it moves it — clamping a variable that an equality ties to another breaks the equality
+  instead — and it leaves the reported point inconsistent with the objective the optimizer
+  saw. Bounds are now clamped *inside* the objective, so every evaluation happens at a
+  feasible point and the function being minimised is the bounded one. Not on the simplex
+  path, where bounds are real constraints and clamping would make the objective nonlinear:
+  `max(x, 0)` is not linear, and the linearity probe would reject a perfectly linear model.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added
@@ -704,6 +740,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...HEAD
+[0.8.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.6.0...v0.7.0
