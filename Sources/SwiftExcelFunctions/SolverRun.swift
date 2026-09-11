@@ -32,13 +32,6 @@ public enum SolverRunError: Error, Equatable, Sendable {
     /// question and returns a solution with repeats in it, confidently.
     case unsupportedRelation(SolverModel.Relation)
 
-    /// Simplex was nominated on a model that permits negative variables.
-    ///
-    /// A simplex solver assumes `x >= 0` in its structure rather than as a constraint, so
-    /// it cannot answer for a model whose `solver_neg` permits negatives without silently
-    /// returning the answer to a different problem.
-    case simplexRequiresNonNegative
-
     /// Simplex was nominated but the model is not linear.
     ///
     /// **Refused rather than quietly re-solved**, which is also Excel's own answer: "the
@@ -125,6 +118,7 @@ public enum SolverRun {
         // `C1 <= 10` constrains a computed cell, `A1 integer` constrains a variable.
         var integerIndices: Set<Int> = []
         var binaryIndices: Set<Int> = []
+        var distinctGroups: [[Int]] = []
         var comparisons: [SolverModel.Constraint] = []
         let position = Dictionary(uniqueKeysWithValues:
             model.variables.enumerated().map { ($1.positionKey, $0) })
@@ -133,10 +127,18 @@ public enum SolverRun {
             case .lessOrEqual, .equal, .greaterOrEqual:
                 comparisons.append(constraint)
             case .allDifferent:
-                // Pairwise distinctness, which is stronger than integrality and which
-                // `IntegerProgramSpecification` cannot express — it carries integer, binary
-                // and SOS sets, none of which say "no two of these are equal".
-                throw SolverRunError.unsupportedRelation(.allDifferent)
+                // Excel's `dif`: the group takes the integers 1…N, each once, where N is
+                // the group's size. So it is integrality *plus* a box *plus* pairwise
+                // distinctness — three statements in one checkbox.
+                var group: [Int] = []
+                for ref in constraint.lhs {
+                    guard let index = position[ref.positionKey] else {
+                        throw SolverRunError.integralityOnNonVariable(ref)
+                    }
+                    integerIndices.insert(index)
+                    group.append(index)
+                }
+                distinctGroups.append(group)
             case .integer, .binary:
                 for ref in constraint.lhs {
                     guard let index = position[ref.positionKey] else {
@@ -213,10 +215,72 @@ public enum SolverRun {
             }
         }
 
-        let start = VectorN(model.variables.map { ref in
+        // Excel's non-negativity checkbox, which is a *constraint generator* rather than a
+        // flag: it adds `x >= 0` to every variable, and that is why turning it off changes
+        // the answer rather than merely permitting a different one.
+        if model.assumesNonNegative {
+            for index in model.variables.indices {
+                constraints.append(.inequality(
+                    function: { point in -point.toArray()[index] }, gradient: nil))
+            }
+        }
+
+        // All-different, as three statements: the box, and pairwise distinctness. The
+        // integrality half is already in `integerIndices`.
+        for group in distinctGroups {
+            let size = Double(group.count)
+            for index in group {
+                constraints.append(.inequality(
+                    function: { point in 1 - point.toArray()[index] }, gradient: nil))
+                constraints.append(.inequality(
+                    function: { point in point.toArray()[index] - size }, gradient: nil))
+            }
+            for outer in 0..<group.count {
+                for inner in (outer + 1)..<group.count {
+                    let left = group[outer]
+                    let right = group[inner]
+                    // `|xᵢ - xⱼ| >= 1`, which with integrality is exactly distinctness.
+                    constraints.append(.inequality(
+                        function: { point in
+                            let values = point.toArray()
+                            return 1 - abs(values[left] - values[right])
+                        }, gradient: nil))
+                }
+            }
+        }
+
+        // The simple bounds this runner generated itself — non-negativity and the
+        // all-different box. Kept separately from the constraint closures because they are
+        // *structural*: we asserted them, so we can both start inside them and hold the
+        // answer to them, neither of which is true of the model's own constraints.
+        var floor = [Double?](repeating: nil, count: model.variables.count)
+        var ceiling = [Double?](repeating: nil, count: model.variables.count)
+        if model.assumesNonNegative {
+            for index in model.variables.indices { floor[index] = 0 }
+        }
+        for group in distinctGroups {
+            for index in group {
+                floor[index] = max(floor[index] ?? 1, 1)
+                ceiling[index] = Double(group.count)
+            }
+        }
+
+        var startValues = model.variables.map { ref -> Double in
             if case .number(let value) = cells.value(at: ref) ?? .blank { return value }
             return 0
-        })
+        }
+        // **Start inside the bounds.** A penalty-based search begun at an infeasible point
+        // can settle there — an all-different group starting at (0, 0, 0) came back as
+        // (0, 0, 0), the penalty never outweighing the objective. The identity permutation
+        // is feasible by construction, so distinct groups are seeded with it.
+        for group in distinctGroups {
+            for (offset, index) in group.enumerated() { startValues[index] = Double(offset + 1) }
+        }
+        for index in startValues.indices {
+            if let low = floor[index] { startValues[index] = max(startValues[index], low) }
+            if let high = ceiling[index] { startValues[index] = min(startValues[index], high) }
+        }
+        let start = VectorN(startValues)
 
         let integral = !integerIndices.isEmpty || !binaryIndices.isEmpty
         let found: [Double]
@@ -240,15 +304,12 @@ public enum SolverRun {
                 throw SolverRunError.optimizerFailed(String(describing: failure))
             }
         } else if model.engine == .simplexLP {
-            guard model.assumesNonNegative else {
-                throw SolverRunError.simplexRequiresNonNegative
-            }
             // Simplex needs coefficients rather than a callable sheet, so the sheet is
             // probed for them — and refused if it is not linear, which is Excel's own
             // answer rather than a silent change of engine.
             let solved = try simplex(objective: objective, constraints: constraints,
-                                     comparisons: comparisons, start: start,
-                                     dimension: model.variables.count, sense: model.sense)
+                                     start: start, dimension: model.variables.count,
+                                     free: !model.assumesNonNegative)
             found = solved.solution
             converged = solved.converged
             used = .simplex
@@ -278,11 +339,26 @@ public enum SolverRun {
             converged = result.converged
         }
 
-        // Reported in the caller's terms: the objective cell's own value, not the
-        // transformed quantity the optimizer was minimising.
-        let objectiveValue = sheet.outputs(at: found)?.first
+        // **Held to the bounds we asserted.** A penalty method satisfies constraints
+        // approximately — non-negativity came back as -0.005 — and reporting a negative
+        // value for a variable this runner declared non-negative would be reporting a
+        // violation of its own statement. Only the generated bounds are projected; the
+        // model's own constraints are the optimizer's business and are reported as found.
+        var held = found
+        for index in held.indices {
+            if let low = floor[index] { held[index] = max(held[index], low) }
+            if let high = ceiling[index] { held[index] = min(held[index], high) }
+        }
+        // Integral variables are reported integral, for the same reason.
+        for index in integerIndices.union(binaryIndices) where index < held.count {
+            held[index] = held[index].rounded()
+        }
+
+        // Reported in the caller's terms: the objective cell's own value at the reported
+        // point, not the transformed quantity the optimizer was minimising.
+        let objectiveValue = sheet.outputs(at: held)?.first
         var variables: [CellRef: Double] = [:]
-        for (ref, value) in zip(model.variables, found) {
+        for (ref, value) in zip(model.variables, held) {
             variables[ref.positionKey] = value
         }
         return Solution(variables: variables,
@@ -352,10 +428,9 @@ public enum SolverRun {
     private static func simplex(
         objective: @escaping @Sendable (VectorN<Double>) -> Double,
         constraints: [MultivariateConstraint<VectorN<Double>>],
-        comparisons: [SolverModel.Constraint],
         start: VectorN<Double>,
         dimension: Int,
-        sense: SolverModel.Sense
+        free: Bool
     ) throws -> (solution: [Double], converged: Bool) {
         let objectiveTerms: (coefficients: [Double], constant: Double)
         do {
@@ -364,36 +439,57 @@ public enum SolverRun {
             throw SolverRunError.nonlinearModel("objective: \(failure)")
         }
 
-        // One simplex row per constraint closure. Each closure is already in the form
-        // `g(x) <= 0` or `h(x) = 0`, so its linear terms give `c·x <= -k` directly.
-        var rows: [SimplexConstraint] = []
-        var index = 0
-        for constraint in comparisons {
-            for _ in constraint.lhs {
-                guard index < constraints.count else { break }
-                let body = constraints[index]
-                index += 1
-                let terms: (coefficients: [Double], constant: Double)
-                do {
-                    terms = try validateLinearModel(
-                        { point in evaluate(body, at: point) }, dimension: dimension, at: start)
-                } catch let failure {
-                    throw SolverRunError.nonlinearModel("constraint: \(failure)")
-                }
-                rows.append(SimplexConstraint(
-                    coefficients: terms.coefficients,
-                    relation: constraint.relation == .equal ? .equal : .lessOrEqual,
-                    rhs: -terms.constant))
+        // Every constraint closure is already `g(x) <= 0` or `h(x) = 0`, so its linear
+        // terms give `c·x <= -k` directly. Which relation it was is recovered from the
+        // case rather than from the declaration, so the derived constraints — the
+        // non-negativity and all-different rows added above — come through too.
+        var rows: [(coefficients: [Double], relation: ConstraintRelation, rhs: Double)] = []
+        for constraint in constraints {
+            let isEquality: Bool
+            switch constraint {
+            case .equality: isEquality = true
+            case .inequality: isEquality = false
+            default: continue
             }
+            let terms: (coefficients: [Double], constant: Double)
+            do {
+                terms = try validateLinearModel(
+                    { point in evaluate(constraint, at: point) }, dimension: dimension, at: start)
+            } catch let failure {
+                throw SolverRunError.nonlinearModel("constraint: \(failure)")
+            }
+            rows.append((terms.coefficients,
+                         isEquality ? .equal : .lessOrEqual,
+                         -terms.constant))
         }
 
-        // Simplex assumes `x >= 0` structurally. The caller has already checked that the
-        // model agrees, because a model permitting negatives cannot be answered here.
+        // **Free variables are split rather than refused.** Simplex assumes `x >= 0` in its
+        // structure, so a variable Excel permits to go negative becomes `x⁺ - x⁻` with both
+        // halves non-negative. The dimension doubles and the answer is recombined; nothing
+        // about the model changes.
+        let width = free ? dimension * 2 : dimension
+        func widen(_ coefficients: [Double]) -> [Double] {
+            free ? coefficients + coefficients.map { -$0 } : coefficients
+        }
+
+        let simplexRows = rows.map {
+            SimplexConstraint(coefficients: widen($0.coefficients),
+                              relation: $0.relation, rhs: $0.rhs)
+        }
+
         do {
-            let solver = SimplexSolver()
-            let result = try solver.minimize(objective: objectiveTerms.coefficients,
-                                             subjectTo: rows)
-            return (result.solution, result.status == .optimal)
+            let result = try SimplexSolver().minimize(
+                objective: widen(objectiveTerms.coefficients), subjectTo: simplexRows)
+            guard result.solution.count >= width else {
+                throw SolverRunError.optimizerFailed(
+                    "simplex returned \(result.solution.count) values for \(width) columns")
+            }
+            let recombined = free
+                ? (0..<dimension).map { result.solution[$0] - result.solution[$0 + dimension] }
+                : Array(result.solution.prefix(dimension))
+            return (recombined, result.status == .optimal)
+        } catch let failure as SolverRunError {
+            throw failure
         } catch let failure {
             throw SolverRunError.optimizerFailed(String(describing: failure))
         }

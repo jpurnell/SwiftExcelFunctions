@@ -14,6 +14,10 @@ final class SolverRunTests: XCTestCase {
         var stored: [CellRef: CellValue] = [
             CellRef("A1").positionKey: .number(0),
             CellRef("A2").positionKey: .number(0),
+            CellRef("A3").positionKey: .number(0),
+            CellRef("D2").positionKey:
+                .formula(.add(.add(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))),
+                              .cellRef(CellRef("A3"))), cached: nil),
             CellRef("B1").positionKey:
                 .formula(.add(.cellRef(CellRef("A1")), .cellRef(CellRef("A2"))), cached: nil),
             CellRef("C1").positionKey:
@@ -184,34 +188,88 @@ final class SolverRunTests: XCTestCase {
         }
     }
 
-    /// **All-different is refused, not approximated.** It requires the variables to be
-    /// pairwise distinct, which is strictly stronger than requiring them to be whole.
-    /// Treating it as integrality — which an earlier draft of this file did — answers a
-    /// different question and returns a solution with repeats in it.
-    func testAllDifferentIsRefused() throws {
+    // MARK: - All different
+
+    /// **All-different is Excel's `dif`: integers `1…N`, each used once**, where `N` is the
+    /// number of cells in the group. So three variables must be a permutation of 1, 2, 3 —
+    /// which makes their sum 6 whatever the objective wanted, and that is the point of the
+    /// constraint rather than a coincidence of the test.
+    func testAllDifferentIsAPermutation() throws {
+        let permuted = SolverModel(
+            objective: CellRef("D2"), sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2"), CellRef("A3")],
+            constraints: [.init(lhs: [CellRef("A1"), CellRef("A2"), CellRef("A3")],
+                                relation: .allDifferent, rhs: .constant(0))],
+            engine: .grgNonlinear)
+        let solution = try SolverRun.solve(permuted, cells: Sheet(), names: NamedRangeCollection())
+
+        let values = [CellRef("A1"), CellRef("A2"), CellRef("A3")]
+            .map { solution.variables[$0.positionKey] ?? .nan }
+        for value in values {
+            XCTAssertEqual(value, value.rounded(), accuracy: 1e-6, "must be integral")
+            XCTAssertGreaterThanOrEqual(value, 1 - 1e-6)
+            XCTAssertLessThanOrEqual(value, 3 + 1e-6)
+        }
+        XCTAssertEqual(Set(values.map { Int($0.rounded()) }), [1, 2, 3],
+                       "each of 1…3 exactly once")
+        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+    }
+
+    /// All-different on a cell that is not a decision variable is malformed, as integrality
+    /// is.
+    func testAllDifferentOnANonVariableIsRefused() throws {
         XCTAssertThrowsError(try solve(model(constraints: [
-            .init(lhs: [CellRef("A1"), CellRef("A2")], relation: .allDifferent,
-                  rhs: .constant(0)),
+            .init(lhs: [CellRef("B1")], relation: .allDifferent, rhs: .constant(0)),
         ]))) { error in
             XCTAssertEqual(error as? SolverRunError,
-                           SolverRunError.unsupportedRelation(.allDifferent))
+                           SolverRunError.integralityOnNonVariable(CellRef("B1")))
         }
     }
 
-    /// **A model permitting negatives cannot go to Simplex.** The solver assumes `x >= 0`
-    /// in its structure rather than as a constraint, so answering anyway would be answering
-    /// a different problem — quietly.
-    func testSimplexRefusesAModelThatPermitsNegatives() throws {
+    // MARK: - Non-negativity
+
+    /// **The default adds `x >= 0` to every variable**, which is what Excel's checkbox does.
+    /// Minimising `A1 + A2` with nothing else said therefore bottoms out at 0, not at
+    /// minus infinity.
+    func testNonNegativityIsAssumedByDefault() throws {
+        let solution = try solve(model())
+        XCTAssertEqual(solution.objective, 0, accuracy: 0.05)
+        for ref in [CellRef("A1"), CellRef("A2")] {
+            XCTAssertGreaterThanOrEqual(solution.variables[ref.positionKey] ?? .nan, -1e-6)
+        }
+    }
+
+    /// **Turning it off changes the answer**, which is the whole reason it is a setting.
+    /// With `A1 >= -5` and negatives permitted, minimising `A1 + A2` reaches -5 rather
+    /// than 0.
+    func testPermittingNegativesChangesTheAnswer() throws {
         let signed = SolverModel(
             objective: CellRef("B1"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
-            constraints: [.init(lhs: [CellRef("B1")], relation: .greaterOrEqual,
-                                rhs: .constant(1))],
+            constraints: [
+                .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(-5)),
+                .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
+            ],
+            engine: .grgNonlinear,
+            assumesNonNegative: false)
+        let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
+        XCTAssertEqual(solution.objective, -5, accuracy: 0.1)
+    }
+
+    /// And Simplex handles a free variable by splitting it, rather than refusing.
+    func testSimplexSolvesWithNegativesPermitted() throws {
+        let signed = SolverModel(
+            objective: CellRef("B1"), sense: .minimise,
+            variables: [CellRef("A1"), CellRef("A2")],
+            constraints: [
+                .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(-5)),
+                .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
+            ],
             engine: .simplexLP,
             assumesNonNegative: false)
-        XCTAssertThrowsError(try solve(signed)) { error in
-            XCTAssertEqual(error as? SolverRunError, SolverRunError.simplexRequiresNonNegative)
-        }
+        let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
+        XCTAssertEqual(solution.engineUsed, .simplex)
+        XCTAssertEqual(solution.objective, -5, accuracy: 0.1)
     }
 
     // MARK: - Simplex
