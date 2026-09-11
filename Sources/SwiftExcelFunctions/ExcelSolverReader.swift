@@ -346,7 +346,7 @@ public enum ExcelSolverReader {
     /// `solver_num` was unreadable too.
     ///
     /// The tests did not catch it because they built these targets by hand — encoding an
-    /// assumption about the parse rather than exercising it. `ExcelSolverReaderRealFileTests`
+    /// assumption about the parse rather than exercising it. `ExcelSolverReaderParseTests`
     /// goes through the resolver for exactly that reason.
     private static func number(_ target: NamedRangeTarget?) -> Double? {
         guard case .formula(let ast) = target else { return nil }

@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-11
+
+### Fixed
+
+- **Every numeric Solver setting was read as text and discarded.** A defined name whose
+  value is a bare number — `solver_eng = 2`, `solver_num = 6` — is not a cell reference, so
+  `DefinedNameResolver` cannot resolve it and hands back `.formula(.text("2"))` rather than
+  `.formula(.number(2))`. The reader matched only `.number`. In every real workbook that
+  meant **every model reported `grgNonlinear` whatever engine it named, and every model
+  reported no constraints at all**, because `solver_num` failed the same way. The runner
+  would have solved unconstrained versions of real problems and reported success.
+
+  The census found it within minutes of first working, which is the whole argument for
+  having built it. The corpus shows the before and after directly: the pre-fix rows read
+  100% `grgNonlinear` with an empty relations column in **every** row, and the same files
+  re-read now resolve `simplexLP` where the workbook asks for it and decode relation codes
+  1, 2, 3, 4 and 5. `Graded Assignment 1.xlsx` is the cleanest single case — four models,
+  read as four GRG models before and four Simplex LP models after.
+
+  The existing tests could not have caught it. They build `NamedRangeTarget` values by
+  hand, which encodes an assumption about the parse rather than exercising it — the third
+  time this week a hand-built fixture agreed with the code about something neither had
+  checked, after the corpus provenance and the furigana corruption.
+  `ExcelSolverReaderParseTests` goes through the textual form throughout, deliberately.
+
+- **A label no longer swallows a number.** Now that numbers arrive as text, `"10"` is a
+  bound and `"integer"` is a declaration, and they are the same case of the same enum.
+  `label(_:)` refuses anything that parses as a `Double`, which makes the order callers try
+  them in unnecessary to know.
+
+- **A DocC comment named a test that does not exist** — `ExcelSolverReaderRealFileTests`,
+  for what shipped as `ExcelSolverReaderParseTests`. The comment's claim is the load-bearing
+  part: it says which test exercises the parse rather than assuming it, and a reader who
+  goes looking must find it.
+
+### Added
+
+- **`SolverRun.solve(cells:names:inSheet:)`** — the one-call entry point that joins reading
+  and solving. It takes a `CellValueProvider` and a name collection rather than a
+  `Workbook`, because this package promises no dependency on a file format: `Workbook`
+  belongs to SwiftXLSX, and the file-reading half belongs in `WorkbookAudit`.
+
+- **`workbook-census`**, an executable that scans a directory for classic Solver models and
+  writes one TSV row per workbook. Two earlier attempts at this census were `XCTestCase`s
+  and both were abandoned mid-run having produced nothing: a test prints only at the end,
+  cannot resume, and gives no way to tell a working run from a hung one. This one writes and
+  flushes per workbook and uses the output file as its own resume state, so it is worth
+  stopping.
+
+  ```
+  swift run workbook-census ~/Documents --out census.tsv
+  ```
+
+### Changed
+
+- **Licensed AGPLv3, with a commercial licence available** — see `LICENSE` and
+  `LICENSING.md`. The network clause (§13) is deliberate: running this as a hosted service
+  is a form of use the copyleft is meant to reach. The permissive layers of the family —
+  SwiftExcelCore, SwiftXLSX, SwiftZIP — stay Apache 2.0, because copyleft may depend on
+  permissive but never the reverse.
+
 ## [0.9.0] - 2026-09-11
 
 ### Changed
@@ -785,7 +846,8 @@ mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 3
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.7.1...v0.8.0

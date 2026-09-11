@@ -76,7 +76,8 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**0.8.0 — the Solver path.** An Excel Solver model now reads and solves.
+**0.9.1 — the Solver path.** An Excel Solver model now reads and solves, and the
+reading has been checked against a real corpus rather than against fixtures.
 
 - [x] `SpreadsheetFunction` — a sheet as `([Double]) -> [Double]`: set, recalculate, read
 - [x] `ExcelSolverReader` — the model from `solver_*` defined names, which no amount of
@@ -90,7 +91,39 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 - [x] A model with no objective is a feasibility search, which Excel allows
 - [x] One model *per sheet*, multi-area changing cells, and `solver_lin` for workbooks
       older than the engine dropdown
-- [x] 1,245 tests, gate 45/45 at 0/0
+- [x] 1,251 tests, gate 45/45 at 0/0
+
+**Numbers arrive as text, and that one fact invalidated every model read from a real file.**
+A defined name holding a bare number — `solver_eng = 2`, `solver_num = 6` — is not a cell
+reference, so the resolver yields `.formula(.text("2"))`. The reader matched only `.number`,
+so **every** model read as `grgNonlinear` whatever engine it named, and **every** model read
+as having no constraints at all. The runner would have solved unconstrained versions of real
+problems and reported success on them.
+
+Nothing in the test suite could have found it: the tests build `NamedRangeTarget` values by
+hand, which encodes an assumption about the parse instead of exercising it. The census found
+it within minutes of first working, and the corpus then confirmed the fix — the pre-fix rows
+are 100% `grgNonlinear` with an empty relations column in every single row; re-read, the same
+files resolve `simplexLP` where the workbook asks for it and decode relation codes 1 through 5.
+
+**What the corpus says about Solver, from the first 231 workbooks of 2,240** (partial; the
+run is resumable and the file is the resume state):
+
+| Measure | Found |
+|---|---|
+| Workbooks carrying `solver_` names | 50 of 189 readable — **26%** |
+| Models | 147, one workbook holding **26**, one per sheet |
+| Engine | 131 `grgNonlinear` to 14 `simplexLP`; **no `evolutionary` yet** |
+| Relations | `≤` 26, `≥` 13, integer 7, binary 4, `=` 4; **all-different: none yet** |
+| Names but no model | **0** — no reader defect in 189 workbooks |
+
+Two cautions on those numbers. **Twenty of the fifty carry four `solver_` names or fewer**,
+which is Excel remembering that the Solver dialog was once opened rather than a model anyone
+built — so "26% carry Solver models" overstates what is there, and the honest figure for real
+models is nearer 30 of 189. And **42 of 231 rows are `unreadableFile`, all POSIX 60
+"Operation timed out"** — Dropbox dematerialising files mid-scan, not a defect in the reader.
+Three of those same paths read `ok` in the earlier run, which is how it was identified. They
+are excluded from every figure above.
 
 **Constraints are enforced by construction, not by penalty.** This is the correction 0.8.1
 exists for, and it is worth recording as a trap rather than a fix. NelderMead penalises every
@@ -344,8 +377,11 @@ the motivating application rather than an end in itself.
   write. **lookup (24), financial (27), database (12)** need judgment per function and are where
   the honest `new` and `out of scope` markings will come from. Success is `unreviewed` reaching
   **0** — every row classified — not every row implemented.
-- **v0.9.0 — the oracle checker.** Recompute every formula, compare against Excel's cached value,
-  report the disagreements. Gated on v0.8.0, and on hand-triaging its corpus findings: a
+- **v0.10.0 — the oracle checker.** Recompute every formula, compare against Excel's cached value,
+  report the disagreements. *(Renumbered: this was written as v0.9.0, but v0.9.0 shipped as the
+  Solver path instead — the Solver work was not on the roadmap at all when this was written, and
+  it overtook the checker. The plan is left showing that rather than quietly rewritten.)* Gated on
+  v0.8.0, and on hand-triaging its corpus findings: a
   disagreement is a finding only where *we* are right, and the ~0.40% where we are not must never
   be reported as a workbook defect.
 - **v1.0 — `xlsx-audit`.** The motivating application, runnable by someone who is not us.
@@ -390,7 +426,15 @@ From Frontline's own documentation, and worth encoding as tests rather than comm
 
 ---
 
-**Last Updated:** 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings
+**Last Updated:** 2026-09-11 (later still again) — reconciled for 0.9.1: every numeric
+Solver setting had been read as text and discarded, so every model from a real file read as
+GRG with no constraints; the census found it and then confirmed the fix across 231 workbooks.
+Current Status now carries what the corpus says about Solver, and the two cautions on those
+numbers. The oracle checker is renumbered v0.10.0, because v0.9.0 went to the Solver path
+instead. Also corrected: the Current Status heading still said 0.8.0, and a DocC comment named
+a test that does not exist. 1,251 tests.
+
+Earlier: 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings
 measured against three real workbooks rather than taken from documentation, a model with no
 objective supported, and three gaps the files exposed — sheet scoping, `solver_lin`, and
 multi-area changing cells. 1,245 tests.
