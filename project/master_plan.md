@@ -106,32 +106,51 @@ it within minutes of first working, and the corpus then confirmed the fix — th
 are 100% `grgNonlinear` with an empty relations column in every single row; re-read, the same
 files resolve `simplexLP` where the workbook asks for it and decode relation codes 1 through 5.
 
-**What the corpus says about Solver, from the first 231 workbooks of 2,240** (partial; the
-run is resumable and the file is the resume state):
+**What the corpus says about Solver — the complete scan, all 2,240 workbooks:**
 
 | Measure | Found |
 |---|---|
-| Workbooks carrying `solver_` names | 50 of 189 readable — **26%** |
-| Models | 147, one workbook holding **26**, one per sheet |
-| Engine | 131 `grgNonlinear` to 14 `simplexLP`; **no `evolutionary` yet** |
-| Relations | `≤` 26, `≥` 13, integer 7, binary 4, `=` 4; **all-different: none yet** |
-| Names but no model | **0** — no reader defect in 189 workbooks |
+| Readable | 2,236; **4 refused**, every one `SwiftZIP.ZIPError 4` |
+| Workbooks carrying `solver_` names | 339 — **15.2%** |
+| Models | **1,481**, one workbook holding **37**, one per sheet |
+| Engine | 1,264 `grgNonlinear`, 201 `simplexLP`, **16 `evolutionary`** |
+| Relations | `≤` 124, `≥` 85, `=` 70, binary 32, integer 23, **all-different 4** |
+| Names but no model | **0** — the reader never failed to assemble one, in 2,236 workbooks |
 
-Two cautions on those numbers. **Twenty of the fifty carry four `solver_` names or fewer**,
-which is Excel remembering that the Solver dialog was once opened rather than a model anyone
-built — so "26% carry Solver models" overstates what is there, and the honest figure for real
-models is nearer 30 of 189. And the scan itself was **recording failures that were not
-failures** — 42 rows of `POSIX 60 "Operation timed out"`, a file provider that had not
-materialised the file yet, every one of them readable minutes later and three already read
-`ok` in the previous run. Because the census file is its own resume state, that verdict was
-permanent: no later pass would have retried them. A 43rd was `POSIX 4`, an interrupted system
-call — the operator stopping the run, which was supposed to be free.
+**All six relation codes and all three engines are now attested in real files**, which was not
+true of the partial scan: at 231 workbooks neither `evolutionary` nor all-different had
+appeared at all, and the early sample read 26% rather than 15.2% because the alphabet put an
+optimisation course and a budgeting tree first. A partial census is worth having and is not
+worth extrapolating from.
 
-That is fixed rather than noted: transient failures are retried, then recorded as
-`transientFailure`, and resume excludes that outcome so the workbook is examined again. The 43
-rows were rewritten in place rather than deleted, because the attempt is part of the record.
-**Analysis must therefore take the last row per path**, which is now a property of the format
-rather than an accident of the repair.
+**All-different appears four times, and every one of them pairs it with `evolutionary`** —
+Chapter 9 of a Tuck Applied Optimization course, autumn 2012, 23 models between them. That is
+how Excel ships it, all-different being an evolutionary-engine feature, and it is the evidence
+for 0.8.0's decision to implement all-different and non-negativity *rather than refuse them*.
+Refusing would have failed on the only files in this corpus that use it.
+
+**Seventy-nine of the 339 carry four `solver_` names or fewer**, which is Excel remembering the
+Solver dialog was once opened rather than a model anyone built. So the honest figure for real
+models is **260 of 2,236 — 11.6%** — and "15.2% carry Solver models" overstates it.
+
+**Four workbooks are genuinely unreadable**, all with the same `SwiftZIP.ZIPError 4`, and all
+four survived the retry logic, so they are parse refusals rather than transient failures. That
+is an upstream finding for SwiftZIP, the same shape as the lexer crash an earlier census
+turned up, and it is the kind of thing only a census finds.
+
+**The scan itself had been recording failures that were not failures** — 42 rows of
+`POSIX 60 "Operation timed out"`, a file provider that had not materialised the file yet, every
+one readable minutes later and three already read `ok` in the previous run. Because the census
+file is its own resume state, that verdict was permanent: no later pass would have retried
+them. A 43rd was `POSIX 4`, an interrupted system call — the operator stopping the run, which
+was supposed to be free.
+
+Fixed rather than noted: transient failures are retried, then recorded as `transientFailure`,
+and resume excludes that outcome so the workbook is examined again. All 43 recovered on the
+next pass, and the completed scan needed no retries at all. The 43 rows were rewritten in place
+rather than deleted, because the attempt is part of the record. **Analysis must therefore take
+the last row per path**, which is now a property of the format rather than an accident of the
+repair.
 
 **Constraints are enforced by construction, not by penalty.** This is the correction 0.8.1
 exists for, and it is worth recording as a trap rather than a fix. NelderMead penalises every
@@ -441,7 +460,9 @@ Current Status now carries what the corpus says about Solver, and the two cautio
 numbers. The oracle checker is renumbered v0.10.0, because v0.9.0 went to the Solver path
 instead. Also corrected: the Current Status heading still said 0.8.0, and a DocC comment named
 a test that does not exist. The census now retries transient read failures and excludes them
-from its own resume state, with `--limit N` for batching. 1,251 tests in the main suite, and
+from its own resume state, with `--limit N` for batching. The census then ran to completion
+over all 2,240 workbooks — 1,481 Solver models, all three engines and all six relation codes
+attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
 Earlier: 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings

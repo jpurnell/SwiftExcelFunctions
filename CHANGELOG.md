@@ -23,8 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   having built it. The corpus shows the before and after directly: the pre-fix rows read
   100% `grgNonlinear` with an empty relations column in **every** row, and the same files
   re-read now resolve `simplexLP` where the workbook asks for it and decode relation codes
-  1, 2, 3, 4 and 5. `Graded Assignment 1.xlsx` is the cleanest single case — four models,
-  read as four GRG models before and four Simplex LP models after.
+  1 through 6 — every code Excel defines. `Graded Assignment 1.xlsx` is the cleanest single
+  case: four models, read as four GRG models before and four Simplex LP models after.
+
+  The completed scan puts numbers on it. Across **2,240 workbooks**, 339 carry `solver_`
+  names and they hold **1,481 models** — 1,264 `grgNonlinear`, 201 `simplexLP`, 16
+  `evolutionary`. Before the fix every one of those would have read as GRG with no
+  constraints. **No workbook produced names without a model**, so the reader assembled
+  something from all 2,236 it could open.
 
   The existing tests could not have caught it. They build `NamedRangeTarget` values by
   hand, which encodes an assumption about the parse rather than exercising it — the third
