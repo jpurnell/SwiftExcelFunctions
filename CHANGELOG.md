@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-09-12
+
+### Changed
+
+- **SwiftXLSX pin moved to 0.25.0.** No source change; this release exists so the
+  package can resolve at all.
+
+  SwiftXLSX's repository was deleted and recreated on 2026-09-12 to remove material
+  belonging to an unrelated project from its published history. That took tags
+  v0.6.0 through v0.24.1 with it, including the revision this package pinned — so
+  **v0.9.2 and every earlier tag can no longer resolve.**
+
+  0.25.0 is deliberately above every previously published SwiftXLSX version, so no
+  version number points at two different commits. SwiftPM records a
+  trust-on-first-use fingerprint per version, and re-pointing an existing number
+  makes every later resolve fail with *"does not match previously recorded value"*
+  on every machine that had seen it — including CI runners nobody can reach.
+  Reusing 0.24.1 would have been the quiet way to break this for everyone.
+
+  If a resolve fails with that message, delete
+  `~/.swiftpm/security/fingerprints/swiftxlsx-*.json` and try again; the old
+  records name revisions that are gone.
+
+1,251 tests pass against the rebuilt SwiftXLSX.
+
 ## [0.9.2] - 2026-09-12
 
 ### Added
