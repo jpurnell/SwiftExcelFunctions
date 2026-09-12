@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "SwiftExcelFunctions", targets: ["SwiftExcelFunctions"]),
         .library(name: "WorkbookAudit", targets: ["WorkbookAudit"]),
+        .library(name: "WorkbookContainer", targets: ["WorkbookContainer"]),
         .executable(name: "workbook-census", targets: ["WorkbookCensus"])
     ],
     dependencies: [
@@ -58,11 +59,26 @@ let package = Package(
             name: "WorkbookCensus",
             dependencies: [
                 "SwiftExcelFunctions",
+                "WorkbookContainer",
                 .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
                 .product(name: "SwiftXLSX", package: "SwiftXLSX")
             ],
             path: "Sources/WorkbookCensus",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
+        // What a file *is*, before anything parses it as a workbook — and the decryption
+        // that turns an encrypted container into one. Deliberately outside
+        // SwiftExcelFunctions, which promises no dependency on a file format at all.
+        .target(
+            name: "WorkbookContainer",
+            dependencies: [],
+            path: "Sources/WorkbookContainer",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
+        .testTarget(
+            name: "WorkbookContainerTests",
+            dependencies: ["WorkbookContainer"],
+            path: "Tests/WorkbookContainerTests"
         ),
         .target(
             name: "WorkbookAudit",

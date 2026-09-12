@@ -5,6 +5,7 @@ import os
 import SwiftExcelCore
 import SwiftExcelFunctions
 import SwiftXLSX
+import WorkbookContainer
 
 
 /// Writes one line to stderr, and to the system log where there is one.
@@ -151,6 +152,23 @@ struct Census {
                              solverNames: 0, models: 0, engines: [], relations: [],
                              milliseconds: elapsed(), detail: String(describing: failure))
         }
+        // What the bytes *are*, before asking a ZIP reader to make sense of them. An
+        // encrypted workbook and a mislabelled text file both fail as "damaged" otherwise,
+        // and neither is damaged.
+        let kind = ContainerKind(of: data)
+        switch kind {
+        case .compoundFile:
+            return CensusRow(path: path, outcome: .encryptedWorkbook, solverNames: 0, models: 0,
+                             engines: [], relations: [], milliseconds: elapsed(),
+                             detail: "ECMA-376 encrypted; a password would be needed")
+        case .unrecognised:
+            return CensusRow(path: path, outcome: .notAWorkbook, solverNames: 0, models: 0,
+                             engines: [], relations: [], milliseconds: elapsed(),
+                             detail: "not a ZIP or compound file — the extension is wrong")
+        case .zip:
+            break
+        }
+
         let workbook: Workbook
         do {
             workbook = try Workbook(xlsxData: data)

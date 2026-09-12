@@ -58,6 +58,19 @@ final class CensusResumeTests: XCTestCase {
                      "a transient failure must be retried, not skipped for ever")
     }
 
+    /// Encryption and wrong-file-type are answers, not failures to be retried.
+    ///
+    /// A census that re-examined every password-protected workbook on every pass would never
+    /// converge, and the answer would be the same each time.
+    func testAClassifiedContainerIsCountedAsCompleted() {
+        for outcome: CensusRow.Outcome in [.encryptedWorkbook, .notAWorkbook] {
+            let row = CensusRow(path: "a/b.xlsx", outcome: outcome, solverNames: 0, models: 0,
+                                engines: [], relations: [], milliseconds: 1, detail: "")
+            XCTAssertEqual(CensusRow.completedPath(ofLine: row.line), "a/b.xlsx",
+                           "\(outcome.rawValue) is a definite answer about the file")
+        }
+    }
+
     func testAnExaminedRowIsCountedAsCompleted() {
         for outcome: CensusRow.Outcome in [.ok, .unreadableFile, .unreadableWorkbook] {
             let row = CensusRow(path: "a/b.xlsx", outcome: outcome, solverNames: 0, models: 0,

@@ -15,6 +15,17 @@ struct CensusRow {
         case unreadableFile
         /// Opened by the reader and refused — a malformed or unsupported workbook.
         case unreadableWorkbook
+        /// An OLE2 compound file: ECMA-376 encryption, needing a password rather than repair.
+        ///
+        /// A ZIP reader reports this as damage, because the package it wants is a stream
+        /// *inside* the container. Four workbooks in one corpus were called corrupt on that
+        /// basis and two of them were simply locked.
+        case encryptedWorkbook
+        /// Not a spreadsheet at all — a file carrying the `.xlsx` extension and other bytes.
+        ///
+        /// Observed as a plain-text memo someone had saved with the wrong extension. It is
+        /// not a defect in any reader, and reporting it as one wastes the reader's time.
+        case notAWorkbook
         /// The bytes could not be read *yet* — a condition expected to clear on its own.
         ///
         /// **Recorded, but not an answer.** ``completedPath(ofLine:)`` returns `nil` for

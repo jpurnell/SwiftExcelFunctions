@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`WorkbookContainer`**, a target that says what a file *is* before anything parses it as a
+  workbook. `ContainerKind(of:)` reads the leading signature: a ZIP, an OLE2 compound file
+  (which for an `.xlsx` means ECMA-376 encryption), or neither.
+
+  It exists because a census of 2,240 workbooks found four a ZIP reader refused and reported
+  all four as damaged. They were three different things. Two were **password-protected and
+  completely intact** — the package a ZIP reader wants is a stream *inside* the compound
+  container, so it sees a broken archive. One was a **plain-text memo saved with an `.xlsx`
+  extension**. Exactly one was genuinely corrupt. The real corruption rate in that corpus is
+  1 in 2,240, not 4.
+
+  It sits outside `SwiftExcelFunctions` on purpose: that library promises no dependency on a
+  file format, and this is entirely about file formats.
+
+### Changed
+
+- **The census distinguishes those cases** rather than calling them all `unreadableWorkbook`.
+  New outcomes `encryptedWorkbook` and `notAWorkbook`, both of which count as answers — a
+  password-protected workbook gives the same answer every pass, so re-examining it for ever
+  would be its own bug. "This needs a password", "this is not a spreadsheet" and "this file
+  is damaged" ask three different things of whoever reads the report.
+
 ## [0.9.1] - 2026-09-11
 
 ### Fixed
