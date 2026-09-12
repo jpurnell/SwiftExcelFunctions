@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BusinessMath moved from `3.0.0-alpha.3` to `3.0.0-alpha.4`**, which carries `besselI`,
+  `besselJ`, `besselK` and `besselY` in `Statistics/SpecialFunctions/`. All four take an
+  integer order, matching Excel's `BESSELI(x, n)` signature exactly, so the four engineering
+  rows they answer are binding work rather than mathematics to be written.
+
+  Only `Package.resolved` changed: the declared range was already
+  `.upToNextMinor(from: "3.0.0-alpha.3")`, and its comment had anticipated this — *"The range
+  admits 3.0.0-alpha.4 and 3.0.0 final without a Package.swift edit."* 1,263 tests in the main
+  suite and 1,320 across all four, zero failures; gate 45/45 at zero warnings.
+
 ### Added
 
 - **Excel's twenty-six pre-2010 statistical spellings.** `CHIDIST`, `TINV`, `CRITBINOM` and

@@ -479,6 +479,17 @@ fitting a corpus and being correct.
 
 ## Known traps, recorded before they are hit
 
+**Search the version you would build against, not the one SwiftPM resolved.** "Not there" has
+meant "not there where I looked" nine times now, and the ninth added a variant the earlier
+eight did not cover. All four Bessel functions were reported absent from BusinessMath —
+absent from a keyword probe, absent from `Statistics/SpecialFunctions/` when that directory
+was opened and read, which is the remedy the first eight taught. They were in
+`Statistics/SpecialFunctions/` all along, in **`3.0.0-alpha.4`**, while `.build/checkouts`
+held the pinned `alpha.3`. Reading the right directory in the wrong version looks exactly
+like reading the wrong directory, and it produced a confident recommendation to write
+mathematics that already existed. Check `Package.resolved` against the remote's tags before
+concluding anything is missing from a dependency.
+
 From Frontline's own documentation, and worth encoding as tests rather than comments:
 
 - `PsiLogNormal(mu, sigma)` takes the **arithmetic** mean and standard deviation of the lognormal
