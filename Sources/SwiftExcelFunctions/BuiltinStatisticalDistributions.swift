@@ -20,7 +20,7 @@ public enum BuiltinStatisticalDistributions {
     /// All distribution spellings for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         binomDist, poissonDist, exponDist, gammaDist, logNormDist,
-        chiSquaredDistRightTail, fDistRightTail, tDistTwoTailed
+        chiSquaredDistRightTail, fDistRightTail, tDistTwoTailed, betaDist
     ]
 
     /// Excel's ceiling on degrees of freedom: `[1, 10¹⁰)`, the bound `CHISQ.INV.RT`
@@ -140,6 +140,51 @@ public enum BuiltinStatisticalDistributions {
             return .number(density)
         }
         return .number(logNormalCDF(x, mean: mean, stdDev: deviation))
+    }
+
+    /// `BETA.DIST(x, alpha, beta, cumulative, [A], [B])`.
+    ///
+    /// The only member of the modern statistical set that was still missing, and it surfaced
+    /// from the other end: `BETADIST`, the legacy spelling, has nothing to delegate to
+    /// without it.
+    ///
+    /// ## `A` and `B` move the density, not just the domain
+    ///
+    /// The bounds rescale the distribution off the unit interval. The cumulative form is
+    /// unaffected — a probability is a probability on any scale — but the **density must be
+    /// divided by the width**, because it is a density with respect to `x` and the change of
+    /// variable carries a Jacobian. Returning the unit-interval density on a range of 10
+    /// would overstate it tenfold, and it would still look like a plausible number.
+    public static let betaDist = ExcelFunction(
+        name: "BETA.DIST", minArgs: 4, maxArgs: 6
+    ) { values in
+        if let error = firstError(values) { return error }
+        guard let x = real(values.first), let alpha = real(values[1]),
+              let beta = real(values[2]), let cumulative = flag(values[3])
+        else { return .error(.value) }
+        guard alpha > 0, beta > 0 else { return .error(.num) }
+
+        let lower = values.count > 4 ? real(values[4]) : 0
+        let upper = values.count > 5 ? real(values[5]) : 1
+        guard let lower, let upper, upper > lower else { return .error(.num) }
+        guard x >= lower, x <= upper else { return .error(.num) }
+
+        let width = upper - lower
+        let unit = (x - lower) / width
+        if cumulative {
+            let probability = DistributionBeta(alpha: alpha, beta: beta).cdf(unit)
+            guard probability.isFinite else { return .error(.num) }
+            return .number(probability)
+        }
+
+        // The density, from the log form: the beta function overflows for ordinary shapes
+        // long before the density itself does.
+        guard unit > 0, unit < 1 else { return .error(.num) }
+        let logBeta = lgamma(alpha) + lgamma(beta) - lgamma(alpha + beta)
+        let logDensity = (alpha - 1) * log(unit) + (beta - 1) * log1p(-unit) - logBeta
+        let density = exp(logDensity) / width
+        guard density.isFinite else { return .error(.num) }
+        return .number(density)
     }
 
     // MARK: - The tails

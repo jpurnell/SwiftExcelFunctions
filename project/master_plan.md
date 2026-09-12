@@ -431,7 +431,12 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket, still.** 172 `EXCEL` rows and 147 `PSI`, down from 266. The
+- **The unreviewed bucket, still.** 146 `EXCEL` rows and 147 `PSI`, down from 266. The
+  `compatibility` category is **done** — all 26 pre-2010 statistical spellings answer, every one
+  delegating to its modern twin rather than reimplementing it, and `BETA.DIST` was written along
+  the way because `BETADIST` had nothing to delegate to. Their pairings came from documentation
+  and no corpus workbook calls them, so the five that are not plain aliases are unverified
+  against Excel itself. The
   original framing below still holds; only the version number it was attached to has moved.
   Written at the time as:
   **engineering (48)** and **text (32)** are the near-free ones, like math was — base conversion,

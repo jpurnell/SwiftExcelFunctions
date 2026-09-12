@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Excel's twenty-six pre-2010 statistical spellings.** `CHIDIST`, `TINV`, `CRITBINOM` and
+  the rest. Excel renamed the statistical library in 2010 and then kept every old name
+  working for ever, because twenty years of workbooks call them; a reader that answers only
+  the modern spellings cannot open a file written before 2010, which is most of the files
+  there are.
+
+  **Every one delegates.** `CHIDIST` calls `CHISQ.DIST.RT` and returns what it returns. A
+  second implementation that could disagree with the first is the failure this package exists
+  to prevent, and delegation makes drift impossible rather than merely unlikely.
+
+  Twenty-one are plain aliases. Five are not, and each returns a plausible number rather than
+  an error when read wrongly:
+
+  | Legacy | Modern | Why it is not an alias |
+  |---|---|---|
+  | `BETADIST` | `BETA.DIST(…, TRUE, [A], [B])` | cumulative only, and the flag sits **before** the bounds — appending it would pass `TRUE` as `A` |
+  | `HYPGEOMDIST` | `HYPGEOM.DIST(…, FALSE)` | the mass function, not the cumulative |
+  | `LOGNORMDIST` | `LOGNORM.DIST(…, TRUE)` | cumulative only |
+  | `NEGBINOMDIST` | `NEGBINOM.DIST(…, FALSE)` | the mass function |
+  | `TDIST` | `T.DIST.RT` **or** `T.DIST.2T` | dispatches on a tails argument, and refuses negative `x` |
+
+  `TDIST` is the sharpest: it is **not** `T.DIST.2T` under an old name, and reading it as one
+  hands every single-tailed caller exactly twice the probability they asked for.
+
+- **`BETA.DIST`**, which had to be written rather than delegated to — it was the one modern
+  statistical function still missing, and surfaced from the other end because `BETADIST` had
+  nothing to stand on. Its bounds rescale the distribution, so the **density is divided by the
+  width** while the cumulative form is left alone: a density carries a Jacobian through the
+  change of variable and a probability does not.
+
+  The tests hold it against `BETA.INV` rather than against a literal, because agreeing with an
+  existing inverse checks the parameterisation, which is where a beta implementation goes wrong.
+
+### Changed
+
+- **Coverage: 436 functions registered, up from 409.** The `unreviewed` bucket falls from 172
+  to 146 EXCEL rows, and the whole `compatibility` category is now resolved.
+
+  **Provenance, stated because it matters:** these pairings come from Microsoft's
+  documentation rather than from Excel. Documentation has been wrong four times in this
+  project's life. No workbook in the 2,240-file corpus calls any of these, so there was
+  nothing to check them against; the five non-aliases are the ones worth a hand-built
+  workbook, in the way the Solver encodings were.
+
 ## [0.9.3] - 2026-09-12
 
 ### Changed

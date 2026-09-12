@@ -87,6 +87,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinStatisticalDistributions.all,
             BuiltinStatisticalQuantiles.all,
             BuiltinStatisticalTests.all,
+            BuiltinCompatibilityFunctions.all,
             BuiltinCoercingAggregates.all,
             BuiltinSpreadsheetStatistics.all,
             BuiltinGammaAndModes.all,
