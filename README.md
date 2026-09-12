@@ -6,7 +6,7 @@ family is split the way it is.
 
 **Status:** 0.9.2 released; it adds the container layer — a file's bytes are identified
 before anything parses them, and a password-protected workbook opens rather than being
-reported as corrupt. 436 functions registered, 1,263 tests in the main suite, quality gate
+reported as corrupt. 440 functions registered, 1,274 tests in the main suite, quality gate
 45/45 at 0/0.
 
 - **292** of Microsoft's 519 documented worksheet functions.

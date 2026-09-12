@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`BESSELI`, `BESSELJ`, `BESSELK` and `BESSELY`**, bound to BusinessMath's `besselI`,
+  `besselJ`, `besselK` and `besselY`. The mathematics is emphatically not here: a Bessel
+  function is a real algorithm — series near the origin, asymptotics far from it — and a
+  second implementation could disagree with the first, which is the boundary this package
+  draws. What lives here is Excel's argument handling: a fractional order is **truncated
+  rather than rounded**, a negative one is `#NUM!`, and `K` and `Y` are refused at and below
+  zero where they are singular while `I` and `J` are perfectly ordinary there.
+
+  The tests assert **relationships, not remembered constants** — three tests in this project
+  have failed correct code because an expected value was recalled rather than read, and a
+  Bessel value is exactly the kind of number nobody can check by eye. So they check the
+  recurrences that define the functions, the values at zero, and the Wronskian
+  `Jₙ₊₁(x)·Yₙ(x) − Jₙ(x)·Yₙ₊₁(x) = 2/(πx)`. The Wronskian is the one that earns its place: it
+  fails if `J` and `Y` are individually right but mismatched, which no per-function test can
+  catch. The modified recurrences carry a sign difference from the ordinary ones, so writing
+  either with the wrong operator gives a plausible number and fails here.
+
 ### Changed
 
 - **BusinessMath moved from `3.0.0-alpha.3` to `3.0.0-alpha.4`**, which carries `besselI`,
@@ -18,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.upToNextMinor(from: "3.0.0-alpha.3")`, and its comment had anticipated this — *"The range
   admits 3.0.0-alpha.4 and 3.0.0 final without a Package.swift edit."* 1,263 tests in the main
   suite and 1,320 across all four, zero failures; gate 45/45 at zero warnings.
+
+- **Coverage: 440 functions registered, up from 436.** EXCEL `unreviewed` falls from 146 to
+  142, and the engineering bucket from 31 rows to 27 — the 26 `IM*` complex rows and
+  `CONVERT`, both of which are binding work rather than mathematics: swift-numerics has every
+  complex operation the `IM*` family needs, and `CONVERT` is a unit table.
 
 ### Added
 

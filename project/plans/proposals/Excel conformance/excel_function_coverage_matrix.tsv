@@ -424,10 +424,10 @@ EXCEL	CUBEVALUE	cube	out of scope		0	0	connection, [member_expression1], [member
 EXCEL	ENCODEURL	web	out of scope		0	0	text
 EXCEL	FILTERXML	web	out of scope		0	0	xml, xpath
 EXCEL	WEBSERVICE	web	out of scope		0	0	url
-EXCEL	BESSELI	engineering	unreviewed		0	0	X, N
-EXCEL	BESSELJ	engineering	unreviewed		0	0	X, N
-EXCEL	BESSELK	engineering	unreviewed		0	0	X, N
-EXCEL	BESSELY	engineering	unreviewed		0	0	X, N
+EXCEL	BESSELI	engineering	have	BusinessMath	0	0	X, N
+EXCEL	BESSELJ	engineering	have	BusinessMath	0	0	X, N
+EXCEL	BESSELK	engineering	have	BusinessMath	0	0	X, N
+EXCEL	BESSELY	engineering	have	BusinessMath	0	0	X, N
 EXCEL	BIN2DEC	engineering	have	math	0	0	number
 EXCEL	BIN2HEX	engineering	have	engineering	0	0	number, [places]
 EXCEL	BIN2OCT	engineering	have	engineering	0	0	number, [places]

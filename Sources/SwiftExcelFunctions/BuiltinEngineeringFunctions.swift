@@ -1,12 +1,15 @@
+import BusinessMath
 import Foundation
 import SwiftExcelCore
 
 /// The engineering primitives — base conversion, bitwise operations, step functions, and
 /// the error function.
 ///
-/// Seventeen of the forty-eight engineering rows. The remainder are recorded honestly
-/// rather than left unreviewed: the `IM*` complex family needs a complex type, `BESSEL*`
-/// needs special functions, and `CONVERT` is a unit table rather than a computation.
+/// Twenty-one of the forty-eight engineering rows. `BESSEL*` joined them when BusinessMath
+/// `3.0.0-alpha.4` shipped `besselI`, `besselJ`, `besselK` and `besselY` — they had been
+/// recorded as needing special functions, and the special functions arrived. The remainder
+/// are still recorded honestly: the `IM*` complex family needs a complex type, and `CONVERT`
+/// is a unit table rather than a computation.
 ///
 /// ```swift
 /// var registry = FunctionRegistry()
@@ -21,8 +24,96 @@ public enum BuiltinEngineeringFunctions {
         bin2hex, bin2oct, hex2bin, hex2oct, oct2bin, oct2hex,
         bitAnd, bitOr, bitXor, bitLShift, bitRShift,
         delta, geStep,
-        erf, erfPrecise, erfc, erfcPrecise
+        erf, erfPrecise, erfc, erfcPrecise,
+        besselI, besselJ, besselK, besselY
     ]
+
+    // MARK: - Bessel
+
+    /// The two arguments every `BESSEL*` function takes, validated the same way.
+    ///
+    /// Excel truncates a fractional order rather than rounding it, and refuses a negative
+    /// one. Both are documented, and both are the sort of thing that silently returns a
+    /// neighbouring function's answer if guessed at.
+    ///
+    /// - Parameter values: The raw arguments.
+    /// - Returns: The argument and the integer order, or the error to report instead.
+    private static func besselArguments(_ values: [CellValue]) -> BesselArguments {
+        if let error = BuiltinStatisticalDistributions.firstError(values) {
+            return .refused(error)
+        }
+        guard let x = BuiltinStatisticalDistributions.real(values.first),
+              let order = BuiltinStatisticalDistributions.real(values.dropFirst().first)
+        else { return .refused(.error(.value)) }
+        guard order >= 0 else { return .refused(.error(.num)) }
+        return .ready(x: x, order: Int(order.rounded(.towardZero)))
+    }
+
+    /// What ``besselArguments(_:)`` made of a call.
+    ///
+    /// An enum rather than `Result`, because the failure here is a `CellValue` — Excel
+    /// reports a domain problem as a value in the cell, not as a thrown error, and making
+    /// `CellValue` conform to `Error` to satisfy `Result` would say the opposite.
+    private enum BesselArguments {
+        /// The call is well formed.
+        case ready(x: Double, order: Int)
+        /// The call is not, and this is what the cell should say.
+        case refused(CellValue)
+    }
+
+    /// Wraps one of BusinessMath's Bessel functions as an Excel function.
+    ///
+    /// The mathematics is not here and must not be: a Bessel function is a genuine
+    /// algorithm — series near zero, asymptotics far from it — and a second implementation
+    /// could disagree with the first, which is the boundary this package draws. What belongs
+    /// here is Excel's argument handling and Excel's idea of a domain error.
+    ///
+    /// - Parameters:
+    ///   - name: The Excel name.
+    ///   - positiveOnly: Whether the function is undefined at and below zero, as `K` and `Y`
+    ///     are — both are singular at the origin, where `I` and `J` are perfectly ordinary.
+    ///   - compute: The BusinessMath function.
+    private static func bessel(_ name: String, positiveOnly: Bool,
+                               _ compute: @escaping @Sendable (Double, Int) -> Double)
+    -> ExcelFunction {
+        ExcelFunction(name: name, minArgs: 2, maxArgs: 2) { values in
+            switch besselArguments(values) {
+            case .refused(let error):
+                return error
+            case .ready(let x, let order):
+                guard !positiveOnly || x > 0 else { return .error(.num) }
+                let result = compute(x, order)
+                // A non-finite answer is a domain Excel reports rather than a number it
+                // returns, and it is the only signal an overflowing order gives.
+                guard result.isFinite else { return .error(.num) }
+                return .number(result)
+            }
+        }
+    }
+
+    /// `BESSELI(x, n)` — the modified Bessel function of the first kind, which grows.
+    public static let besselI = bessel("BESSELI", positiveOnly: false) { x, n in
+        BusinessMath.besselI(x: x, order: n)
+    }
+
+    /// `BESSELJ(x, n)` — the Bessel function of the first kind, which oscillates and decays.
+    public static let besselJ = bessel("BESSELJ", positiveOnly: false) { x, n in
+        BusinessMath.besselJ(x: x, order: n)
+    }
+
+    /// `BESSELK(x, n)` — the modified Bessel function of the second kind, which decays.
+    ///
+    /// Singular at the origin and undefined below it, unlike its unmodified cousin.
+    public static let besselK = bessel("BESSELK", positiveOnly: true) { x, n in
+        BusinessMath.besselK(x: x, order: n)
+    }
+
+    /// `BESSELY(x, n)` — the Bessel function of the second kind, sometimes called Neumann's.
+    ///
+    /// Singular at the origin and undefined below it.
+    public static let besselY = bessel("BESSELY", positiveOnly: true) { x, n in
+        BusinessMath.besselY(x: x, order: n)
+    }
 
     // MARK: - Base conversion
 
