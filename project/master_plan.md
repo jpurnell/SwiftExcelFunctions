@@ -76,7 +76,30 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**0.9.1 — the Solver path.** An Excel Solver model now reads and solves, and the
+**0.9.2 — the container layer.** A file's bytes are identified before anything parses them,
+and a password-protected workbook opens rather than being called corrupt.
+
+- [x] `ContainerKind` — ZIP, OLE2 compound file, or neither, from the leading signature
+- [x] `CompoundFile` — the OLE2 container, both the FAT and mini-FAT paths, chains guarded
+      against loops so a malformed file cannot hang a scan
+- [x] `WorkbookDecryptor` — ECMA-376 agile encryption, with the password verified before the
+      package is touched
+- [x] `workbook-census --password P`
+- [x] 1,251 tests in the main suite, 23 in `WorkbookContainerTests`, gate 45/45 at 0/0
+
+**Four "corrupt" workbooks were three different problems.** The 0.9.1 census reported four
+files as damaged. Two were password-protected and intact, one was a plain-text memo saved with
+an `.xlsx` extension, and exactly one was genuinely corrupt — so the real corruption rate is
+**1 in 2,240**, not 4, and the previous release overstated it fourfold on a sample of four.
+
+**A fixture that only covers what the code already does cannot fail.** SHA-1 was dropped from
+the decryptor on the reasoning that agile encryption implies Excel 2010+, which writes SHA-512
+— reasoning checked against a fixture this project had generated itself, which used SHA-512.
+The two real 2012 workbooks the feature exists for declare **SHA-1 with 128-bit AES**. The
+feature stopped working on its motivating case and every test stayed green. That is the fourth
+time this cycle a hand-built fixture agreed with the code about something neither had checked.
+
+**Previously — 0.9.1, the Solver path.** An Excel Solver model reads and solves, and the
 reading has been checked against a real corpus rather than against fixtures.
 
 - [x] `SpreadsheetFunction` — a sheet as `([Double]) -> [Double]`: set, recalculate, read
@@ -404,10 +427,12 @@ the motivating application rather than an end in itself.
   write. **lookup (24), financial (27), database (12)** need judgment per function and are where
   the honest `new` and `out of scope` markings will come from. Success is `unreviewed` reaching
   **0** — every row classified — not every row implemented.
-- **v0.10.0 — the oracle checker.** Recompute every formula, compare against Excel's cached value,
-  report the disagreements. *(Renumbered: this was written as v0.9.0, but v0.9.0 shipped as the
-  Solver path instead — the Solver work was not on the roadmap at all when this was written, and
-  it overtook the checker. The plan is left showing that rather than quietly rewritten.)* Gated on
+- **The oracle checker**, unnumbered. Recompute every formula, compare against Excel's cached
+  value, report the disagreements. *(It was written as v0.9.0. v0.9.0 shipped as the Solver path,
+  which was not on the roadmap at all when this was written and overtook it; v0.10.0 was then
+  pencilled in here, and that reservation was an assumption rather than a decision — the owner
+  is not holding a number for it. **Numbers are assigned at release, not reserved in advance**,
+  which is the lesson the Solver already taught and this entry kept failing to learn.)* Gated on
   v0.8.0, and on hand-triaging its corpus findings: a
   disagreement is a finding only where *we* are right, and the ~0.40% where we are not must never
   be reported as a workbook defect.
@@ -464,6 +489,16 @@ from its own resume state, with `--limit N` for batching. The census then ran to
 over all 2,240 workbooks — 1,481 Solver models, all three engines and all six relation codes
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
+
+**Last Updated:** 2026-09-12 — reconciled for 0.9.2: the container layer. Three of the four
+workbooks 0.9.1 called corrupt were nothing of the kind, so a file's bytes are now identified
+before anything parses them and a protected workbook opens instead. SHA-1 was dropped and
+restored, having broken the only files the feature existed for — recorded in Current Status as
+the fourth hand-built-fixture failure this cycle rather than as a fix. The oracle checker is
+unnumbered again: v0.10.0 was an assumption, and numbers here are assigned at release rather
+than reserved. 1,251 tests in the main suite, 23 in `WorkbookContainerTests`.
+
+Earlier:
 
 Earlier: 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings
 measured against three real workbooks rather than taken from documentation, a model with no

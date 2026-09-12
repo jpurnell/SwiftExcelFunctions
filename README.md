@@ -4,9 +4,10 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.9.1 released; it carries the Solver path, with its encodings measured
-against real Excel workbooks and its reader checked against a corpus rather than against
-fixtures. 409 functions registered, 1,251 tests, quality gate 45/45 at 0/0.
+**Status:** 0.9.2 released; it adds the container layer — a file's bytes are identified
+before anything parses them, and a password-protected workbook opens rather than being
+reported as corrupt. 409 functions registered, 1,251 tests in the main suite, quality gate
+45/45 at 0/0.
 
 - **292** of Microsoft's 519 documented worksheet functions.
 - **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**,
