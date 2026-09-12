@@ -133,7 +133,7 @@ files resolve `simplexLP` where the workbook asks for it and decode relation cod
 
 | Measure | Found |
 |---|---|
-| Readable | 2,236; **4 refused**, every one `SwiftZIP.ZIPError 4` |
+| Readable | 2,236; **4 refused** by the ZIP reader — none of them its fault, see below |
 | Workbooks carrying `solver_` names | 339 — **15.2%** |
 | Models | **1,481**, one workbook holding **37**, one per sheet |
 | Engine | 1,264 `grgNonlinear`, 201 `simplexLP`, **16 `evolutionary`** |
@@ -156,10 +156,22 @@ Refusing would have failed on the only files in this corpus that use it.
 Solver dialog was once opened rather than a model anyone built. So the honest figure for real
 models is **260 of 2,236 — 11.6%** — and "15.2% carry Solver models" overstates it.
 
-**Four workbooks are genuinely unreadable**, all with the same `SwiftZIP.ZIPError 4`, and all
-four survived the retry logic, so they are parse refusals rather than transient failures. That
-is an upstream finding for SwiftZIP, the same shape as the lexer crash an earlier census
-turned up, and it is the kind of thing only a census finds.
+**The four "unreadable" workbooks were four different things, and none of them a defect in
+SwiftZIP.** They were recorded here as `SwiftZIP.ZIPError 4` and written up as an upstream
+finding of the same shape as the lexer crash an earlier census turned up. Opening them in
+0.9.2 disproved that:
+
+| File | Actually |
+|---|---|
+| `Order.xlsx`, `Order (version 1).xlsx` | **Encrypted.** ECMA-376 puts the package inside an OLE2 container, so a ZIP reader is handed `D0CF11E0` and correctly reports a broken archive. Both open with the password, in 3ms and 11ms. |
+| `Test 001.xlsx` | **Not a spreadsheet** — a 719-byte plain-text memo saved with an `.xlsx` extension. |
+| `Final Seeso Launch Avails - TV.xlsx` | 2.4MB with no ZIP local header anywhere in it and no compound-file signature. Not a workbook either. |
+
+So the corpus produced **no SwiftZIP defect at all**, and the ticket that was opened against it
+should be closed. The error was reading a reader's refusal as a reader's fault: `ZIPError 4` is
+the correct answer to three of these files and the fourth is a container it was never meant to
+open. A census reports what a component *said*, which is not the same as what is *wrong* — and
+the difference took a file format to see.
 
 **The scan itself had been recording failures that were not failures** — 42 rows of
 `POSIX 60 "Operation timed out"`, a file provider that had not materialised the file yet, every
