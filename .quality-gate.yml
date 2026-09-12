@@ -21,6 +21,14 @@ status:
   guidelinesPath: "."
   masterPlanPath: project/master_plan.md
 
+# Not a suppression: `justified` still reports every weak hash that does not carry a
+# written reason on the line above it. It exists because ECMA-376 encrypted workbooks name
+# SHA-1 inside the file — WorkbookContainer either computes it or cannot open the document,
+# and "use SHA-256 instead" is not a choice anyone here gets to make. The mechanism is the
+# one already required for `@unchecked Sendable`: say why, where a reviewer will read it.
+security:
+  weakCryptoPolicy: justified
+
 consistency:
   corpusPath: /Users/jpurnell/Dropbox/Computer/Development/Swift/Tools/org-judgement-corpus
   projectID: SwiftExcelFunctions

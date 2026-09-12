@@ -28,6 +28,11 @@ let package = Package(
         // which is what an alpha line wants. Revisit when 3.0.0 ships.
         .package(url: "https://github.com/jpurnell/BusinessMath", .upToNextMinor(from: "3.0.0-alpha.3")),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
+        // Already in the graph by way of SwiftExcelCore; named explicitly because
+        // WorkbookContainer needs AES-CBC, which lives in `_CryptoExtras` rather than
+        // `Crypto`. Depending on a transitive package without declaring it is how a build
+        // breaks the day the intermediate drops it.
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.0"),
         // Test-only: FormulaParserIntegrationTests needs SwiftXLSX's parser to feed
         // this package's evaluator. 0.13.0 is the release that removed these
         // functions from SwiftXLSX — anything earlier would import a second
@@ -71,14 +76,18 @@ let package = Package(
         // SwiftExcelFunctions, which promises no dependency on a file format at all.
         .target(
             name: "WorkbookContainer",
-            dependencies: [],
+            dependencies: [
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto")
+            ],
             path: "Sources/WorkbookContainer",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
         .testTarget(
             name: "WorkbookContainerTests",
             dependencies: ["WorkbookContainer"],
-            path: "Tests/WorkbookContainerTests"
+            path: "Tests/WorkbookContainerTests",
+            resources: [.copy("Fixtures")]
         ),
         .target(
             name: "WorkbookAudit",

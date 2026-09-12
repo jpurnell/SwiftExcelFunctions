@@ -66,6 +66,13 @@ struct Census {
     /// rather than guessed at with a stopwatch.
     let limit: Int?
 
+    /// A password to try on encrypted workbooks, or `nil` to record them as locked.
+    ///
+    /// One password for a whole corpus is a blunt instrument, and deliberately so: the
+    /// census is not a cracker. It exists so a scan of a directory whose files share a
+    /// known password can report what is *in* them rather than only that they are shut.
+    let password: String?
+
     /// How many extra attempts a transient read failure is worth.
     private static let retries = 3
 
@@ -156,11 +163,29 @@ struct Census {
         // encrypted workbook and a mislabelled text file both fail as "damaged" otherwise,
         // and neither is damaged.
         let kind = ContainerKind(of: data)
+        var payload = data
         switch kind {
         case .compoundFile:
-            return CensusRow(path: path, outcome: .encryptedWorkbook, solverNames: 0, models: 0,
-                             engines: [], relations: [], milliseconds: elapsed(),
-                             detail: "ECMA-376 encrypted; a password would be needed")
+            // With a password, an encrypted workbook is just a workbook. Without one, being
+            // locked is the finding — and a password that does not fit says so plainly,
+            // rather than being reported as damage.
+            guard let password else {
+                return CensusRow(path: path, outcome: .encryptedWorkbook, solverNames: 0,
+                                 models: 0, engines: [], relations: [], milliseconds: elapsed(),
+                                 detail: "ECMA-376 encrypted; a password would be needed")
+            }
+            do {
+                payload = try WorkbookDecryptor.decrypt(data, password: password)
+            } catch let failure {
+                report("locked \(path): \(failure)")
+                #if canImport(os)
+                Logger(subsystem: "WorkbookCensus", category: "scan")
+                    .error("locked \(path, privacy: .public): \(String(describing: failure), privacy: .public)")
+                #endif
+                return CensusRow(path: path, outcome: .encryptedWorkbook, solverNames: 0,
+                                 models: 0, engines: [], relations: [], milliseconds: elapsed(),
+                                 detail: String(describing: failure))
+            }
         case .unrecognised:
             return CensusRow(path: path, outcome: .notAWorkbook, solverNames: 0, models: 0,
                              engines: [], relations: [], milliseconds: elapsed(),
@@ -171,7 +196,7 @@ struct Census {
 
         let workbook: Workbook
         do {
-            workbook = try Workbook(xlsxData: data)
+            workbook = try Workbook(xlsxData: payload)
         } catch let failure {
             report("unreadable workbook \(path): \(failure)")
             #if canImport(os)
@@ -358,7 +383,8 @@ enum CensusError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .usage: return "usage: workbook-census <root> [--out census.tsv] [--every N] [--limit N]"
+        case .usage:
+            return "usage: workbook-census <root> [--out census.tsv] [--every N] [--limit N] [--password P]"
         case .cannotWrite(let path): return "cannot write \(path)"
         case .notADirectory(let path): return "not a directory: \(path)"
         case .unreachableRoot(let path, let why): return "cannot read \(path): \(why)"
@@ -385,7 +411,8 @@ let census = Census(
     root: URL(fileURLWithPath: rootPath, isDirectory: true),
     output: URL(fileURLWithPath: option("--out", default: "census.tsv")),
     progressEvery: Int(option("--every", default: "100")) ?? 100,
-    limit: arguments.firstIndex(of: "--limit").flatMap { _ in Int(option("--limit", default: "")) })
+    limit: arguments.firstIndex(of: "--limit").flatMap { _ in Int(option("--limit", default: "")) },
+    password: arguments.firstIndex(of: "--password").map { _ in option("--password", default: "") })
 
 do {
     try census.run()
