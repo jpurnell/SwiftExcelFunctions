@@ -57,14 +57,38 @@ struct Census {
     let output: URL
     let progressEvery: Int
 
+    /// How many workbooks to examine this run, or `nil` for all of them.
+    ///
+    /// **Batching needs no state of its own.** The file is the resume state, so a limited
+    /// run is simply a run that stops early and a later one continues — which is also what
+    /// stopping it by hand has always done. The option exists so a batch can be *chosen*
+    /// rather than guessed at with a stopwatch.
+    let limit: Int?
+
+    /// How many extra attempts a transient read failure is worth.
+    private static let retries = 3
+
+    /// Seconds to wait before the first retry, multiplied by the attempt number.
+    ///
+    /// A dataless file takes a moment to fetch and the request is already in flight by the
+    /// time the first attempt fails, so this backs off rather than hammering.
+    private static let backoff = 0.75
+
     /// Runs the census, resuming from whatever the output file already holds.
     func run() throws {
         let already = try completedPaths()
         let books = try workbooks()
         let remaining = books.filter { !already.contains($0) }
 
+        // A limited run is never a silent truncation: what it left behind is stated, so a
+        // partial census cannot be mistaken for a complete one by whoever reads the file.
+        let batch = limit.map { Array(remaining.prefix($0)) } ?? remaining
+
         report("\(books.count) workbooks under \(root.path)")
-        report("\(already.count) already done, \(remaining.count) to go")
+        report("\(already.count) already answered, \(remaining.count) to go")
+        if batch.count < remaining.count {
+            report("limited to \(batch.count) this run; \(remaining.count - batch.count) left for the next")
+        }
         report("writing \(output.path)")
 
         guard let handle = try openForAppending() else {
@@ -73,7 +97,7 @@ struct Census {
         defer { try? handle.close() }
 
         var done = 0
-        for path in remaining {
+        for path in batch {
             let row = examine(path)
             // Written and flushed per workbook. Anything less and stopping the run —
             // which is how both earlier attempts ended — loses the work.
@@ -92,10 +116,11 @@ struct Census {
 
             done += 1
             if done % progressEvery == 0 || row.solverNames > 0 {
-                report("\(done)/\(remaining.count) \(row.line)")
+                report("\(done)/\(batch.count) \(row.line)")
             }
         }
-        report("finished \(done) workbooks")
+        let deferred = remaining.count - batch.count
+        report("finished \(done) workbooks" + (deferred > 0 ? ", \(deferred) left for the next run" : ""))
     }
 
     /// Examines one workbook.
@@ -108,19 +133,23 @@ struct Census {
 
         let url = root.standardized.appendingPathComponent(path)
         let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch let failure {
+        switch readBytes(at: url, path: path) {
+        case .success(let bytes):
+            data = bytes
+        case .failure(let failure):
             // Recorded rather than discarded. "Unreadable" without a reason is a row that
-            // teaches nothing, and a census exists to teach.
-            report("unreadable file \(path): \(failure)")
+            // teaches nothing, and a census exists to teach. But a failure that will clear
+            // on its own is recorded as *deferred*, so resuming retries it rather than
+            // writing it off — see `TransientRead`.
+            let deferrable = TransientRead.isTransient(failure)
+            report("\(deferrable ? "deferring" : "unreadable file") \(path): \(failure)")
             #if canImport(os)
             Logger(subsystem: "WorkbookCensus", category: "scan")
-                .error("unreadable file \(path, privacy: .public): \(String(describing: failure), privacy: .public)")
+                .error("\(deferrable ? "deferring" : "unreadable file", privacy: .public) \(path, privacy: .public): \(String(describing: failure), privacy: .public)")
             #endif
-            return CensusRow(path: path, outcome: .unreadableFile, solverNames: 0,
-                             models: 0, engines: [], relations: [], milliseconds: elapsed(),
-                             detail: String(describing: failure))
+            return CensusRow(path: path, outcome: deferrable ? .transientFailure : .unreadableFile,
+                             solverNames: 0, models: 0, engines: [], relations: [],
+                             milliseconds: elapsed(), detail: String(describing: failure))
         }
         let workbook: Workbook
         do {
@@ -156,6 +185,47 @@ struct Census {
                          // Names present but no model assembled is a defect in the reader
                          // rather than an absence in the file, so it is called out.
                          detail: models.isEmpty ? "names but no model" : "")
+    }
+
+    /// Reads a workbook's bytes, trying again where the failure is one that clears.
+    ///
+    /// A dataless file — one the provider holds in the cloud and materialises on demand —
+    /// fails with `ETIMEDOUT` while the fetch is still in flight, and succeeds seconds
+    /// later. Retrying here is what keeps that out of the census file, and
+    /// ``TransientRead`` is what decides which failures qualify.
+    ///
+    /// - Parameters:
+    ///   - url: The workbook.
+    ///   - path: Its path relative to the root, for reporting.
+    /// - Returns: The bytes, or the last failure if every attempt failed.
+    private func readBytes(at url: URL, path: String) -> Result<Data, Error> {
+        // Bounded by construction: `retries` extra attempts, then one final attempt whose
+        // failure is the one reported. A count that cannot be exceeded is worth more here
+        // than a tidier loop — this runs unattended over thousands of files.
+        for attempt in 0..<Census.retries {
+            do {
+                return .success(try Data(contentsOf: url))
+            } catch let failure {
+                // A permanent failure ends it immediately; there is nothing to wait for.
+                guard TransientRead.isTransient(failure) else { return .failure(failure) }
+                report("retry \(attempt + 1)/\(Census.retries) for \(path): \(failure)")
+                #if canImport(os)
+                Logger(subsystem: "WorkbookCensus", category: "scan")
+                    .error("retry \(attempt + 1, privacy: .public) for \(path, privacy: .public): \(String(describing: failure), privacy: .public)")
+                #endif
+                Thread.sleep(forTimeInterval: Census.backoff * Double(attempt + 1))
+            }
+        }
+        do {
+            return .success(try Data(contentsOf: url))
+        } catch let failure {
+            report("giving up on \(path) after \(Census.retries) retries: \(failure)")
+            #if canImport(os)
+            Logger(subsystem: "WorkbookCensus", category: "scan")
+                .error("giving up on \(path, privacy: .public): \(String(describing: failure), privacy: .public)")
+            #endif
+            return .failure(failure)
+        }
     }
 
     /// Excel's own number for a relation, so the census speaks the file's language.
@@ -233,8 +303,10 @@ struct Census {
         // `whereSeparator:` rather than splitting on "\n": in Swift `\r\n` is a single
         // `Character`, and a file written on another platform would otherwise read as one
         // enormous line and resume from nothing.
+        // `completedPath` rather than `path`: a deferred row is a row, but it is not an
+        // answer, and resuming past it would make a momentary timeout permanent.
         return Set(text.split(whereSeparator: \.isNewline)
-            .compactMap { CensusRow.path(ofLine: String($0)) })
+            .compactMap { CensusRow.completedPath(ofLine: String($0)) })
     }
 
     /// Opens the output for appending, creating it with a header if it is new.
@@ -268,7 +340,7 @@ enum CensusError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .usage: return "usage: workbook-census <root> [--out census.tsv] [--every N]"
+        case .usage: return "usage: workbook-census <root> [--out census.tsv] [--every N] [--limit N]"
         case .cannotWrite(let path): return "cannot write \(path)"
         case .notADirectory(let path): return "not a directory: \(path)"
         case .unreachableRoot(let path, let why): return "cannot read \(path): \(why)"
@@ -294,7 +366,8 @@ func option(_ name: String, default fallback: String) -> String {
 let census = Census(
     root: URL(fileURLWithPath: rootPath, isDirectory: true),
     output: URL(fileURLWithPath: option("--out", default: "census.tsv")),
-    progressEvery: Int(option("--every", default: "100")) ?? 100)
+    progressEvery: Int(option("--every", default: "100")) ?? 100,
+    limit: arguments.firstIndex(of: "--limit").flatMap { _ in Int(option("--limit", default: "")) })
 
 do {
     try census.run()

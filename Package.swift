@@ -82,6 +82,13 @@ let package = Package(
             ],
             path: "Tests/WorkbookAuditTests"
         ),
+        // The census is an executable, and its resume logic is the part worth testing:
+        // a row wrongly recorded as a failure is skipped by every later run, permanently.
+        .testTarget(
+            name: "WorkbookCensusTests",
+            dependencies: ["WorkbookCensus"],
+            path: "Tests/WorkbookCensusTests"
+        ),
         .testTarget(
             name: "SwiftExcelFunctionsTests",
             dependencies: [

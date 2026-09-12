@@ -37,6 +37,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `label(_:)` refuses anything that parses as a `Double`, which makes the order callers try
   them in unnecessary to know.
 
+- **A read that failed was recorded as a workbook that cannot be read**, and the census file
+  is its own resume state, so that verdict was permanent. A run recorded 42 workbooks as
+  `unreadableFile`, every one of them `POSIX 60 "Operation timed out"` — a file provider that
+  had not materialised the file yet — and every one of them read correctly minutes later.
+  Three had read correctly in the run *before*. Nothing in the output said they were
+  different from genuine failures, and no later pass would ever have retried them.
+
+  A 43rd was `POSIX 4 "Interrupted system call"`: the operator stopping the run. Stopping a
+  census was supposed to be free, and instead it wrote off whichever file was in flight.
+
+  Transient failures are now retried, and recorded as `transientFailure` if they still fail.
+  The row is written — leaving it out would make "tried and deferred" identical to "never
+  reached" — but `CensusRow.completedPath(ofLine:)` excludes it, so a resumed run examines
+  the workbook again. `TransientRead` decides what qualifies, and the list is deliberately
+  short: `ETIMEDOUT`, `EAGAIN`, `EINTR`. A code that does not belong there would turn a
+  permanent failure into an unbounded one.
+
 - **A DocC comment named a test that does not exist** — `ExcelSolverReaderRealFileTests`,
   for what shipped as `ExcelSolverReaderParseTests`. The comment's claim is the load-bearing
   part: it says which test exercises the parse rather than assuming it, and a reader who
@@ -57,8 +74,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopping.
 
   ```
-  swift run workbook-census ~/Documents --out census.tsv
+  swift run workbook-census ~/Documents --out census.tsv [--limit N]
   ```
+
+- **`--limit N`**, to take the corpus a batch at a time. Batching needed no new state —
+  stopping the run has always been safe, because every row is flushed as it is written — but
+  a chosen batch beats a stopwatch. What it left behind is always reported, so a partial
+  census cannot be mistaken for a complete one.
+
+  Worth knowing before picking a batch size: **each run re-walks the directory tree, and on
+  this corpus that costs about 24 seconds** against roughly 22 workbooks a minute of actual
+  work. Batches of several dozen spend more time finding the files than reading them; a few
+  hundred at a time amortises it.
 
 ### Changed
 

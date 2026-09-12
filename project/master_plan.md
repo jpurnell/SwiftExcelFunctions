@@ -120,10 +120,18 @@ run is resumable and the file is the resume state):
 Two cautions on those numbers. **Twenty of the fifty carry four `solver_` names or fewer**,
 which is Excel remembering that the Solver dialog was once opened rather than a model anyone
 built — so "26% carry Solver models" overstates what is there, and the honest figure for real
-models is nearer 30 of 189. And **42 of 231 rows are `unreadableFile`, all POSIX 60
-"Operation timed out"** — Dropbox dematerialising files mid-scan, not a defect in the reader.
-Three of those same paths read `ok` in the earlier run, which is how it was identified. They
-are excluded from every figure above.
+models is nearer 30 of 189. And the scan itself was **recording failures that were not
+failures** — 42 rows of `POSIX 60 "Operation timed out"`, a file provider that had not
+materialised the file yet, every one of them readable minutes later and three already read
+`ok` in the previous run. Because the census file is its own resume state, that verdict was
+permanent: no later pass would have retried them. A 43rd was `POSIX 4`, an interrupted system
+call — the operator stopping the run, which was supposed to be free.
+
+That is fixed rather than noted: transient failures are retried, then recorded as
+`transientFailure`, and resume excludes that outcome so the workbook is examined again. The 43
+rows were rewritten in place rather than deleted, because the attempt is part of the record.
+**Analysis must therefore take the last row per path**, which is now a property of the format
+rather than an accident of the repair.
 
 **Constraints are enforced by construction, not by penalty.** This is the correction 0.8.1
 exists for, and it is worth recording as a trap rather than a fix. NelderMead penalises every
@@ -432,7 +440,9 @@ GRG with no constraints; the census found it and then confirmed the fix across 2
 Current Status now carries what the corpus says about Solver, and the two cautions on those
 numbers. The oracle checker is renumbered v0.10.0, because v0.9.0 went to the Solver path
 instead. Also corrected: the Current Status heading still said 0.8.0, and a DocC comment named
-a test that does not exist. 1,251 tests.
+a test that does not exist. The census now retries transient read failures and excludes them
+from its own resume state, with `--limit N` for batching. 1,251 tests in the main suite, and
+10 in a new `WorkbookCensusTests` target.
 
 Earlier: 2026-09-11 (later still) — reconciled for 0.9.0: the Solver encodings
 measured against three real workbooks rather than taken from documentation, a model with no
