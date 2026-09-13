@@ -437,7 +437,7 @@ EXCEL	BITOR	engineering	have	engineering	0	0	number1, number2
 EXCEL	BITRSHIFT	engineering	have	engineering	0	0	number, shift_amount
 EXCEL	BITXOR	engineering	have	engineering	0	0	number1, number2
 EXCEL	COMPLEX	engineering	have	swift-numerics	0	0	real_num, i_num, [suffix]
-EXCEL	CONVERT	engineering	unreviewed		0	0	number,from_unit,to_unit
+EXCEL	CONVERT	engineering	have	SwiftExcelFunctions	0	0	number,from_unit,to_unit
 EXCEL	DEC2BIN	engineering	have	math	0	0	number, [places]
 EXCEL	DEC2HEX	engineering	have	math	0	0	number, [places]
 EXCEL	DEC2OCT	engineering	have	math	0	0	number, [places]

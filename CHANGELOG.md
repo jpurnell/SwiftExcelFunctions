@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`CONVERT`, which closes the engineering bucket.** Excel's unit table: thirteen measures,
+  roughly a hundred spellings, the decimal prefixes, the binary prefixes, and the five
+  temperature scales.
+
+  The arithmetic is one multiplication; everything that can go wrong is in the data. So the
+  factors are **definitional wherever a definition exists** — a foot is exactly `0.3048` m, a
+  pound exactly `453.59237` g, and every derived unit is built from those constants rather
+  than from a rounded decimal, so `1 ft` is `12 in` to the last bit rather than to nine places.
+
+  Three rules were worth writing down because each is quietly wrong by default:
+
+  - **A name is looked up whole before any prefix is considered.** `mn` is a minute, not a
+    milli-newton; `cwt` is a hundredweight, not a centi-watt; `e` is an erg *and* the deka
+    prefix. Stripping prefixes first redefines all three without complaint.
+  - **A prefix on an area or a volume is raised to its dimension** — a square kilometre is
+    10⁶ square metres, because the prefix scales the length the unit is built from.
+  - **Temperature is affine.** Every other conversion is a ratio; these carry an offset, and
+    a scale factor alone is correct only at zero.
+
+  Two choices are inferred rather than documented, and noted where they are made: prefixes
+  are refused on temperature, and an unknown unit gives `#N/A`.
+
 - **The complex family — `COMPLEX` and the twenty-five `IM*` functions.** swift-numerics has
   every operation they need and BusinessMath supplies the `a+bi` codec, so each binding is
   parse → call → format. None of the arithmetic is written here.
@@ -61,9 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admits 3.0.0-alpha.4 and 3.0.0 final without a Package.swift edit."* 1,263 tests in the main
   suite and 1,320 across all four, zero failures; gate 45/45 at zero warnings.
 
-- **Coverage: 466 functions registered, up from 436.** EXCEL `unreviewed` falls from 146 to
-  **116**, and the engineering bucket from 31 rows to **one** — `CONVERT`, a unit table, is
-  all that remains of it.
+- **Coverage: 467 functions registered, up from 436.** EXCEL `unreviewed` falls from 146 to
+  **115**, and **the engineering bucket is closed** — all 48 rows answer. `compatibility` was
+  closed earlier in the same release, so two of the ten categories are now done.
+
+  What remains unreviewed: lookup 24, financial 21, math 20, information 13, database 12,
+  logical 11, text 7, datetime 7.
 
 - **swift-numerics is now a declared dependency** rather than one reached through
   BusinessMath. The `IM*` family binds `Complex` directly, and depending on a transitive

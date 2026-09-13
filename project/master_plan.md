@@ -431,11 +431,13 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket, still.** 116 `EXCEL` rows and 147 `PSI`, down from 266. The
-  engineering bucket is down to **`CONVERT` alone** — the four `BESSEL*` rows bound to
-  BusinessMath `3.0.0-alpha.4`, the 26 complex rows to swift-numerics. Not one of the thirty
-  needed mathematics written, which is what the source table predicted and worth recording as
-  a case where it held. The
+- **The unreviewed bucket, still.** 115 `EXCEL` rows and 147 `PSI`, down from 266.
+  **Engineering and compatibility are both closed**, two categories of the ten. Of the 31
+  engineering rows, not one needed mathematics written: `BESSEL*` bound to BusinessMath
+  `3.0.0-alpha.4`, the 26 complex rows to swift-numerics, and `CONVERT` is a table. That is
+  what the source table predicted, and it is worth recording as a case where it held.
+  Remaining: lookup 24, financial 21, math 20, information 13, database 12, logical 11,
+  text 7, datetime 7. The
   `compatibility` category is **done** — all 26 pre-2010 statistical spellings answer, every one
   delegating to its modern twin rather than reimplementing it, and `BETA.DIST` was written along
   the way because `BETADIST` had nothing to delegate to. Their pairings came from documentation
