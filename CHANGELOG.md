@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The complex family — `COMPLEX` and the twenty-five `IM*` functions.** swift-numerics has
+  every operation they need and BusinessMath supplies the `a+bi` codec, so each binding is
+  parse → call → format. None of the arithmetic is written here.
+
+  **The work is the text**, because Excel's complex numbers are strings and the rules about
+  those strings are entirely Excel's. The suffix is `i` or `j` and never `I` or `J` — and the
+  BusinessMath parser accepts all four, so that strictness had to live in the binding. A
+  result carries the suffix its arguments used. A number with no imaginary part is written as
+  a bare real: `COMPLEX(7, 0)` is `"7"`, not `"7+0i"` — which settles an open question the
+  plan had recorded as *"do not assume it"*, and the codec already agreed. Text that is not a
+  complex number is `#NUM!` rather than `#VALUE!`, and `"3+4"` is not one, because a missing
+  suffix is not an implied suffix.
+
+  The tests assert identities rather than values — `IMTAN("1+1i")` is a number nobody can
+  check by eye, so a table of them would test the transcription. `IMEXP` undoes `IMLN`,
+  `IMSQRT` squares back, sin² + cos² is 1, cosh² − sinh² is 1, and each of the five
+  reciprocal spellings is asserted against a division rather than trusted.
+
+  `IMSEC` and its four relatives stay here rather than going upstream as the Bessel functions
+  did, on the test the plan states: *could a second implementation disagree with the first?*
+  For `1/cos(z)` there is no second algorithm to disagree — no series, no convergence
+  criterion, nothing to get wrong but the division. For a Bessel function there was.
+
 - **`BESSELI`, `BESSELJ`, `BESSELK` and `BESSELY`**, bound to BusinessMath's `besselI`,
   `besselJ`, `besselK` and `besselY`. The mathematics is emphatically not here: a Bessel
   function is a real algorithm — series near the origin, asymptotics far from it — and a
@@ -38,10 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admits 3.0.0-alpha.4 and 3.0.0 final without a Package.swift edit."* 1,263 tests in the main
   suite and 1,320 across all four, zero failures; gate 45/45 at zero warnings.
 
-- **Coverage: 440 functions registered, up from 436.** EXCEL `unreviewed` falls from 146 to
-  142, and the engineering bucket from 31 rows to 27 — the 26 `IM*` complex rows and
-  `CONVERT`, both of which are binding work rather than mathematics: swift-numerics has every
-  complex operation the `IM*` family needs, and `CONVERT` is a unit table.
+- **Coverage: 466 functions registered, up from 436.** EXCEL `unreviewed` falls from 146 to
+  **116**, and the engineering bucket from 31 rows to **one** — `CONVERT`, a unit table, is
+  all that remains of it.
+
+- **swift-numerics is now a declared dependency** rather than one reached through
+  BusinessMath. The `IM*` family binds `Complex` directly, and depending on a transitive
+  package without declaring it breaks the day the intermediate stops needing it.
 
 ### Added
 

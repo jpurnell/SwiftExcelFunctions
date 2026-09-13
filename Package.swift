@@ -28,6 +28,11 @@ let package = Package(
         // which is what an alpha line wants. Revisit when 3.0.0 ships.
         .package(url: "https://github.com/jpurnell/BusinessMath", .upToNextMinor(from: "3.0.0-alpha.3")),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
+        // In the graph by way of BusinessMath, and named here because the `IM*` family
+        // binds `Complex` directly. The master plan puts complex arithmetic under
+        // "Foundation, swift-numerics — primitives", so this is the declared source for
+        // it rather than something reached through an intermediate that could drop it.
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.1.0"),
         // Already in the graph by way of SwiftExcelCore; named explicitly because
         // WorkbookContainer needs AES-CBC, which lives in `_CryptoExtras` rather than
         // `Crypto`. Depending on a transitive package without declaring it is how a build
@@ -47,7 +52,13 @@ let package = Package(
             name: "SwiftExcelFunctions",
             dependencies: [
                 .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
-                .product(name: "BusinessMath", package: "BusinessMath")
+                .product(name: "BusinessMath", package: "BusinessMath"),
+                // The `IM*` family's arithmetic. Named directly rather than reached
+                // through BusinessMath: the master plan puts complex under
+                // "Foundation, swift-numerics — primitives", and depending on a
+                // transitive package without declaring it breaks the day the
+                // intermediate stops needing it.
+                .product(name: "ComplexModule", package: "swift-numerics")
             ],
             path: "Sources/SwiftExcelFunctions",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]

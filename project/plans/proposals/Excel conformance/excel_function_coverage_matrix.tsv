@@ -436,7 +436,7 @@ EXCEL	BITLSHIFT	engineering	have	engineering	0	0	number, shift_amount
 EXCEL	BITOR	engineering	have	engineering	0	0	number1, number2
 EXCEL	BITRSHIFT	engineering	have	engineering	0	0	number, shift_amount
 EXCEL	BITXOR	engineering	have	engineering	0	0	number1, number2
-EXCEL	COMPLEX	engineering	unreviewed		0	0	real_num, i_num, [suffix]
+EXCEL	COMPLEX	engineering	have	swift-numerics	0	0	real_num, i_num, [suffix]
 EXCEL	CONVERT	engineering	unreviewed		0	0	number,from_unit,to_unit
 EXCEL	DEC2BIN	engineering	have	math	0	0	number, [places]
 EXCEL	DEC2HEX	engineering	have	math	0	0	number, [places]
@@ -450,31 +450,31 @@ EXCEL	GESTEP	engineering	have	engineering	0	0	number, [step]
 EXCEL	HEX2BIN	engineering	have	engineering	0	0	number, [places]
 EXCEL	HEX2DEC	engineering	have	math	0	0	number
 EXCEL	HEX2OCT	engineering	have	engineering	0	0	number, [places]
-EXCEL	IMABS	engineering	unreviewed		0	0	inumber
-EXCEL	IMAGINARY	engineering	unreviewed		0	0	inumber
-EXCEL	IMARGUMENT	engineering	unreviewed		0	0	inumber
-EXCEL	IMCONJUGATE	engineering	unreviewed		0	0	inumber
-EXCEL	IMCOS	engineering	unreviewed		0	0	inumber
-EXCEL	IMCOSH	engineering	unreviewed		0	0	inumber
-EXCEL	IMCOT	engineering	unreviewed		0	0	inumber
-EXCEL	IMCSC	engineering	unreviewed		0	0	inumber
-EXCEL	IMCSCH	engineering	unreviewed		0	0	inumber
-EXCEL	IMDIV	engineering	unreviewed		0	0	inumber1, inumber2
-EXCEL	IMEXP	engineering	unreviewed		0	0	inumber
-EXCEL	IMLN	engineering	unreviewed		0	0	inumber
-EXCEL	IMLOG10	engineering	unreviewed		0	0	inumber
-EXCEL	IMLOG2	engineering	unreviewed		0	0	inumber
-EXCEL	IMPOWER	engineering	unreviewed		0	0	inumber, number
-EXCEL	IMPRODUCT	engineering	unreviewed		0	0	inumber1, [inumber2], ...
-EXCEL	IMREAL	engineering	unreviewed		0	0	inumber
-EXCEL	IMSEC	engineering	unreviewed		0	0	inumber
-EXCEL	IMSECH	engineering	unreviewed		0	0	inumber
-EXCEL	IMSIN	engineering	unreviewed		0	0	inumber
-EXCEL	IMSINH	engineering	unreviewed		0	0	inumber
-EXCEL	IMSQRT	engineering	unreviewed		0	0	inumber
-EXCEL	IMSUB	engineering	unreviewed		0	0	inumber1, inumber2
-EXCEL	IMSUM	engineering	unreviewed		0	0	inumber1, [inumber2], ...
-EXCEL	IMTAN	engineering	unreviewed		0	0	inumber
+EXCEL	IMABS	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMAGINARY	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMARGUMENT	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCONJUGATE	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCOS	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCOSH	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCOT	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCSC	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMCSCH	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMDIV	engineering	have	swift-numerics	0	0	inumber1, inumber2
+EXCEL	IMEXP	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMLN	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMLOG10	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMLOG2	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMPOWER	engineering	have	swift-numerics	0	0	inumber, number
+EXCEL	IMPRODUCT	engineering	have	swift-numerics	0	0	inumber1, [inumber2], ...
+EXCEL	IMREAL	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSEC	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSECH	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSIN	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSINH	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSQRT	engineering	have	swift-numerics	0	0	inumber
+EXCEL	IMSUB	engineering	have	swift-numerics	0	0	inumber1, inumber2
+EXCEL	IMSUM	engineering	have	swift-numerics	0	0	inumber1, [inumber2], ...
+EXCEL	IMTAN	engineering	have	swift-numerics	0	0	inumber
 EXCEL	OCT2BIN	engineering	have	engineering	0	0	number, [places]
 EXCEL	OCT2DEC	engineering	have	math	0	0	number
 EXCEL	OCT2HEX	engineering	have	engineering	0	0	number, [places]
