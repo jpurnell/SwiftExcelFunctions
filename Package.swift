@@ -8,7 +8,8 @@ let package = Package(
         .library(name: "SwiftExcelFunctions", targets: ["SwiftExcelFunctions"]),
         .library(name: "WorkbookAudit", targets: ["WorkbookAudit"]),
         .library(name: "WorkbookContainer", targets: ["WorkbookContainer"]),
-        .executable(name: "workbook-census", targets: ["WorkbookCensus"])
+        .executable(name: "workbook-census", targets: ["WorkbookCensus"]),
+        .executable(name: "conformance-workbook", targets: ["ConformanceWorkbook"])
     ],
     dependencies: [
         // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
@@ -58,7 +59,8 @@ let package = Package(
                 // "Foundation, swift-numerics — primitives", and depending on a
                 // transitive package without declaring it breaks the day the
                 // intermediate stops needing it.
-                .product(name: "ComplexModule", package: "swift-numerics")
+                .product(name: "ComplexModule", package: "swift-numerics"),
+                .product(name: "RealModule", package: "swift-numerics")
             ],
             path: "Sources/SwiftExcelFunctions",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
@@ -99,6 +101,19 @@ let package = Package(
             dependencies: ["WorkbookContainer"],
             path: "Tests/WorkbookContainerTests",
             resources: [.copy("Fixtures")]
+        ),
+        // Asks Excel the questions this package has answered on its own. The only
+        // authority on what Excel does is Excel, and documentation has been wrong four
+        // times in this project's life.
+        .executableTarget(
+            name: "ConformanceWorkbook",
+            dependencies: [
+                "SwiftExcelFunctions",
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/ConformanceWorkbook",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
         .target(
             name: "WorkbookAudit",

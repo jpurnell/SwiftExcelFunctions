@@ -1,6 +1,10 @@
 import BusinessMath
 import ComplexModule
 import Foundation
+// `Argument` carries a `Complex<Double>`, and naming that type in an enum's associated
+// value needs the module that gives `Double` its `Real` conformance to be in scope here —
+// importing `ComplexModule` alone compiles but warns on a clean build.
+import RealModule
 import SwiftExcelCore
 
 /// `COMPLEX` and the twenty-five `IM*` functions.
@@ -201,16 +205,16 @@ public enum BuiltinComplexFunctions {
     // MARK: - Arithmetic
 
     /// `IMSUM(inumber1, [inumber2], …)`.
-    public static let imSum = fold("IMSUM", minArgs: 1, maxArgs: nil, +)
+    public static let imSum = fold("IMSUM", minArgs: 1, maxArgs: nil) { $0 + $1 }
 
     /// `IMSUB(inumber1, inumber2)`.
-    public static let imSub = fold("IMSUB", minArgs: 2, maxArgs: 2, -)
+    public static let imSub = fold("IMSUB", minArgs: 2, maxArgs: 2) { $0 - $1 }
 
     /// `IMPRODUCT(inumber1, [inumber2], …)`.
-    public static let imProduct = fold("IMPRODUCT", minArgs: 1, maxArgs: nil, *)
+    public static let imProduct = fold("IMPRODUCT", minArgs: 1, maxArgs: nil) { $0 * $1 }
 
     /// `IMDIV(inumber1, inumber2)` — division by zero arrives as `#NUM!`, not `#DIV/0!`.
-    public static let imDiv = fold("IMDIV", minArgs: 2, maxArgs: 2, /)
+    public static let imDiv = fold("IMDIV", minArgs: 2, maxArgs: 2) { $0 / $1 }
 
     /// `IMPOWER(inumber, number)` — a complex number to a **real** power.
     ///
