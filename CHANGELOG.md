@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`workbook-oracle`** — the Excel oracle as a resumable executable, and `WorkbookOracle` in
+  `WorkbookAudit` as the library it drives.
+
+  It was an `XCTestCase`, and a run against 2,240 workbooks was killed at two and a half
+  minutes having produced **nothing at all**. That is the third time this project has learned
+  the same thing: a test over a large corpus prints only at the end, cannot resume, and gives
+  no way to tell a working run from a hung one. The workbook census was abandoned twice
+  before being rewritten exactly this way.
+
+  Two files. The summary is one row per workbook and doubles as the resume state; the
+  findings file names **every cell that disagreed**, with what we said, what Excel said and
+  which functions the formula calls. A tally says *how many* — triage needs *which*.
+
+  `ExcelOracleTests` now drives the same library rather than its own copy, so the measurement
+  cannot drift between the two.
+
+### Fixed
+
+- **A formula reaching into another workbook is not a disagreement.** Excel writes those as
+  `[1]Sheet!A1`, and the cached value is what that other file said when the link was last
+  live — a file that is not here and often no longer exists anywhere. We answered `blank`,
+  which was counted as differing.
+
+  **It put a floor under the failure rate that no amount of work could lift**, which matters
+  now that the goal is to drive that rate to zero. Reclassified as not comparable, and
+  measured: `differed` fell from 130 to 127 on the sample corpus while `notComparable` rose
+  by the same three.
+
+### Changed
+
+- **`OracleFinding.children(of:)` is the only exhaustive switch over `FormulaAST` in the
+  target.** Finding external references needed a second tree walk, and a second walk written
+  beside the first compiles today and silently skips whatever case the language adds next —
+  in exactly one of the two, with the skipping one going on returning plausible answers.
+  Both now go through one switch, so a new case breaks the build once.
+
 ### Fixed
 
 - **`IMPOWER` with an integer exponent is multiplied out, so it agrees with `IMPRODUCT`.**

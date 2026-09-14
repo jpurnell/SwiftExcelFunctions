@@ -2,6 +2,7 @@ import XCTest
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
+import WorkbookAudit
 
 /// Every formula we can evaluate, checked against the value Excel recorded for it.
 ///
@@ -38,134 +39,14 @@ import SwiftXLSX
 /// opt-in — see ``corpusRoots()``.
 final class ExcelOracleTests: XCTestCase {
 
-    // MARK: - Volatility
-
-    /// Functions whose value cannot be compared to a cached one.
-    ///
-    /// A cached `RAND()` records what Excel drew on some afternoon in 2013. Nothing
-    /// we compute can match it and nothing should try, so these are excluded by name
-    /// rather than by a tolerance wide enough to hide real defects.
-    private static let volatile: Set<String> = [
-        "RAND", "RANDBETWEEN", "RANDARRAY", "NOW", "TODAY", "OFFSET", "INDIRECT",
-        "INFO", "CELL",
-    ]
-
-    /// Whether a function's cached value is a draw rather than an answer.
-    ///
-    /// Risk Solver's `Psi*` family is Monte Carlo. A cached `PsiTriangular(…)` is
-    /// one sample from one simulation run, and `PsiMean(…)` or `PsiPercentile(…)`
-    /// are statistics *of* that run — with no seed anybody published, so nothing can
-    /// reproduce them. Excel writes the names as `_xll.PsiTriangular` when the
-    /// add-in is not loaded, which is how they reach us.
-    ///
-    /// Counting these as disagreements would hold the agreement number down by
-    /// something no amount of work could fix, which is the fastest way to make a
-    /// measurement worth ignoring. They are excluded, and what they *can* tell us —
-    /// which functions appear, with which argument shapes — is structural and is
-    /// measured separately.
-    ///
-    /// - Parameter name: The function name, uppercased.
-    /// - Returns: `true` when its value cannot be reproduced.
-    private static func isStochastic(_ name: String) -> Bool {
-        let bare = name.hasPrefix("_XLL.") ? String(name.dropFirst(5)) : name
-        return bare.hasPrefix("PSI")
-    }
-
-    // MARK: - Reading Excel's answers
-
-    /// A provider whose references resolve to the value Excel recorded.
-    ///
-    /// The two things that make the oracle meaningful. `resolved` turns a formula
-    /// cell into its cached value, so a reference yields a value rather than the
-    /// formula object — without it every reference to a computed cell is wrong.
-    /// And because those values are Excel's, each formula is judged against inputs
-    /// that are correct by definition.
-    private struct ExcelCached: CellValueProvider {
-        let inner: WorkbookValueProvider
-
-        func value(at ref: CellRef) -> CellValue? { inner.value(at: ref)?.resolved }
-
-        func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
-            inner.value(at: ref, inSheet: sheet)?.resolved
-        }
-
-        func lastPopulatedCell() -> CellRef? { inner.lastPopulatedCell() }
-
-        func lastPopulatedCell(inSheet sheet: String) -> CellRef? {
-            inner.lastPopulatedCell(inSheet: sheet)
-        }
-
-        func values(in range: CellRange) -> [CellValue] {
-            inner.values(in: range).map(\.resolved)
-        }
-
-        func values(in range: CellRange, inSheet sheet: String) -> [CellValue] {
-            inner.values(in: range, inSheet: sheet).map(\.resolved)
-        }
-    }
-
-    // MARK: - Judging one workbook
-
-    private func audit(_ workbook: Workbook) -> OracleReport {
-        var report = OracleReport()
-        for sheet in workbook.sheets {
-            let cells = ExcelCached(
-                inner: WorkbookValueProvider(workbook: workbook, currentSheet: sheet.name))
-            for reference in sheet.cellReferences {
-                guard case .formula(let ast, let cached)? = sheet.cell(at: reference) else {
-                    continue
-                }
-                let cell = CellRef(reference)
-                let outcome = judge(ast, cached: cached, cells: cells,
-                                    names: workbook.namedRanges, sheet: sheet.name, cell: cell)
-                report.record(OracleFinding(sheet: sheet.name, cell: cell,
-                                            formula: ast, outcome: outcome))
-            }
-        }
-        return report
-    }
-
-    private func judge(
-        _ ast: FormulaAST, cached: CellValue?, cells: CellValueProvider,
-        names: NameResolver, sheet: String, cell: CellRef
-    ) -> OracleOutcome {
-        // Markers the reader leaves for structure rather than for arithmetic.
-        if case .function(let name, _) = ast,
-           name == "_RAW" || name == "_ARRAY" || name == "_DATATABLE" {
-            return .notComparable(name)
-        }
-        let named = Set(OracleFinding.functionNames(in: ast))
-        if let volatile = named.first(where: { Self.volatile.contains($0) }) {
-            return .notComparable("volatile: \(volatile)")
-        }
-        if let stochastic = named.first(where: { Self.isStochastic($0) }) {
-            return .notComparable("stochastic: \(stochastic)")
-        }
-        guard let excel = cached else { return .notComparable("no cached value") }
-
-        do {
-            let ours = try FormulaEvaluator.evaluate(
-                ast, cells: cells, names: names,
-                at: CellAddress(sheet: sheet, cell: cell), inSheet: sheet)
-
-            if case .error(let excelError) = excel {
-                if case .error(let ourError) = ours, ourError == excelError {
-                    return .agreedOnError(excelError)
-                }
-                return .differed(ours: ours, excel: excel)
-            }
-            // An iterative solver is compared against the band Excel documents for
-            // itself, not against the general float tolerance.
-            let tolerance = named.contains(where: {
-                OracleTolerance.iterativeFunctions.contains($0)
-            }) ? OracleTolerance.iterative : nil
-            if OracleTolerance.agree(ours, excel, tolerance: tolerance) { return .agreed }
-            if case .error(let kind) = ours { return .refused(kind) }
-            return .differed(ours: ours, excel: excel)
-        } catch {
-            return .threw("\(error)")
-        }
-    }
+    // MARK: - Judging
+    //
+    // `WorkbookOracle` in `WorkbookAudit` holds the volatility rules, the cached-value
+    // provider and the judgement itself. They were here, and a 2,240-workbook run of this
+    // test was killed at two and a half minutes having printed nothing — an XCTestCase
+    // cannot report as it goes, cannot resume, and leaves nothing behind when stopped. The
+    // measurement moved to a library so a tool could drive it; this test still runs it, on
+    // whatever corpus is configured.
 
     // MARK: - The measurement
 
@@ -177,7 +58,7 @@ final class ExcelOracleTests: XCTestCase {
         for url in workbooks {
             guard let workbook = try? Workbook(contentsOf: url) else { continue }
             read += 1
-            report.absorb(audit(workbook))
+            report.absorb(WorkbookOracle.audit(workbook))
         }
 
         let tally = report.tally
@@ -215,7 +96,7 @@ final class ExcelOracleTests: XCTestCase {
             throw XCTSkip("\(name) is not in the configured roots")
         }
         let workbook = try Workbook(contentsOf: url)
-        let report = audit(workbook)
+        let report = WorkbookOracle.audit(workbook)
 
         let cell = report.findings.first {
             $0.sheet == "Lease Renewal" && $0.cell.reference == "L77"

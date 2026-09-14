@@ -6,7 +6,7 @@ import SwiftExcelCore
 /// Every formula cell in a saved workbook carries the value Excel last computed
 /// for it. That value is the strongest oracle this project has: it was produced by
 /// the specification itself, on files nobody wrote for us.
-enum OracleOutcome: Equatable {
+public enum OracleOutcome: Equatable {
 
     /// We produced Excel's value, within tolerance.
     case agreed
@@ -35,64 +35,121 @@ enum OracleOutcome: Equatable {
 }
 
 /// One cell's verdict, with enough context to act on it.
-struct OracleFinding {
-    let sheet: String
-    let cell: CellRef
-    let formula: FormulaAST
-    let outcome: OracleOutcome
+public struct OracleFinding {
+    /// The sheet the cell sits on.
+    public let sheet: String
+    /// The cell itself.
+    public let cell: CellRef
+    /// What the cell computes.
+    public let formula: FormulaAST
+    /// What became of comparing it to Excel's cached value.
+    public let outcome: OracleOutcome
+
+    /// Creates a finding.
+    ///
+    /// - Parameters:
+    ///   - sheet: The sheet the cell is on.
+    ///   - cell: The cell.
+    ///   - formula: What it computes.
+    ///   - outcome: What came of comparing it to Excel's cached value.
+    public init(sheet: String, cell: CellRef, formula: FormulaAST, outcome: OracleOutcome) {
+        self.sheet = sheet
+        self.cell = cell
+        self.formula = formula
+        self.outcome = outcome
+    }
 
     /// The function names the formula mentions, at any depth.
     ///
     /// What turns a list of cells into a list of things to fix: twenty failures in
     /// one function is one defect, twenty failures in twenty functions is twenty.
-    var functions: [String] { OracleFinding.functionNames(in: formula) }
+    public var functions: [String] { OracleFinding.functionNames(in: formula) }
 
     /// Every function named anywhere in a formula.
     ///
     /// - Parameter ast: The formula.
     /// - Returns: The names, in no particular order, with duplicates.
-    static func functionNames(in ast: FormulaAST) -> [String] {
+    public static func functionNames(in ast: FormulaAST) -> [String] {
         var found: [String] = []
+        for node in nodes(in: ast) {
+            if case .function(let name, _) = node { found.append(name.uppercased()) }
+        }
+        return found
+    }
+
+    /// The direct children of a node.
+    ///
+    /// **The only exhaustive switch over `FormulaAST` in this target, deliberately.** A
+    /// second walker written beside it would compile today and quietly skip whatever case
+    /// the language adds next, in exactly one of the two — and the one that skipped would go
+    /// on returning plausible answers. Everything that needs to walk a formula goes through
+    /// here, so a new case breaks the build in one place and is fixed once.
+    ///
+    /// - Parameter ast: A node.
+    /// - Returns: Its children, in no particular order.
+    public static func children(of ast: FormulaAST) -> [FormulaAST] {
+        switch ast {
+        case .function(_, let arguments):
+            return arguments
+        case .add(let lhs, let rhs), .subtract(let lhs, let rhs),
+             .multiply(let lhs, let rhs), .divide(let lhs, let rhs),
+             .power(let lhs, let rhs), .concatenate(let lhs, let rhs),
+             .equal(let lhs, let rhs), .notEqual(let lhs, let rhs),
+             .greaterThan(let lhs, let rhs), .lessThan(let lhs, let rhs),
+             .greaterOrEqual(let lhs, let rhs), .lessOrEqual(let lhs, let rhs):
+            return [lhs, rhs]
+        case .negate(let operand):
+            return [operand]
+        case .cellRef, .cellRange, .sheetRef, .namedRange,
+             .number, .text, .bool, .error, .missing:
+            return []
+        }
+    }
+
+    /// Every node of a formula, the root included.
+    ///
+    /// - Parameter ast: The formula.
+    /// - Returns: All of its nodes.
+    public static func nodes(in ast: FormulaAST) -> [FormulaAST] {
+        var found: [FormulaAST] = []
         var stack = [ast]
+        // Bounded by the tree: each node is pushed once by its parent and popped once.
         while let node = stack.popLast() {
-            switch node {
-            case .function(let name, let arguments):
-                found.append(name.uppercased())
-                stack.append(contentsOf: arguments)
-            case .add(let lhs, let rhs), .subtract(let lhs, let rhs),
-                 .multiply(let lhs, let rhs), .divide(let lhs, let rhs),
-                 .power(let lhs, let rhs), .concatenate(let lhs, let rhs),
-                 .equal(let lhs, let rhs), .notEqual(let lhs, let rhs),
-                 .greaterThan(let lhs, let rhs), .lessThan(let lhs, let rhs),
-                 .greaterOrEqual(let lhs, let rhs), .lessOrEqual(let lhs, let rhs):
-                stack.append(lhs)
-                stack.append(rhs)
-            case .negate(let operand):
-                stack.append(operand)
-            case .cellRef, .cellRange, .sheetRef, .namedRange,
-                 .number, .text, .bool, .error, .missing:
-                break
-            }
+            found.append(node)
+            stack.append(contentsOf: children(of: node))
         }
         return found
     }
 }
 
 /// What a run of the oracle found.
-struct OracleReport {
+public struct OracleReport {
 
-    private(set) var findings: [OracleFinding] = []
+    /// An empty report.
+    public init() {}
 
-    mutating func record(_ finding: OracleFinding) {
+    /// Every cell judged, in the order they were judged.
+    ///
+    /// Kept whole rather than tallied on the way in, because triage needs *which*
+    /// cells disagreed and a counter can only say how many.
+    public private(set) var findings: [OracleFinding] = []
+
+    /// Records one cell's verdict.
+    ///
+    /// - Parameter finding: What became of comparing that cell to Excel's answer.
+    public mutating func record(_ finding: OracleFinding) {
         findings.append(finding)
     }
 
-    mutating func absorb(_ other: OracleReport) {
+    /// Folds another report into this one.
+    ///
+    /// - Parameter other: A report over different cells, usually another workbook.
+    public mutating func absorb(_ other: OracleReport) {
         findings.append(contentsOf: other.findings)
     }
 
     /// Cells where we and Excel both produced a value we could compare.
-    var comparable: Int {
+    public var comparable: Int {
         findings.filter {
             switch $0.outcome {
             case .notComparable: return false
@@ -101,7 +158,8 @@ struct OracleReport {
         }.count
     }
 
-    var agreed: Int {
+    /// How many cells this package got right, errors included.
+    public var agreed: Int {
         findings.filter {
             switch $0.outcome {
             case .agreed, .agreedOnError: return true
@@ -116,8 +174,13 @@ struct OracleReport {
     /// compared, and some cached values were written by a version of Excel making
     /// choices we may never match. A number that goes up is the goal; a number that
     /// reaches 100% would mean the harness had stopped looking.
-    var agreement: Double {
-        comparable == 0 ? 1 : Double(agreed) / Double(comparable)
+    public var agreement: Double {
+        // The divisor is bound and then guarded, rather than guarded through `comparable`:
+        // the fp-safety checker follows the divisor's own symbol, and it is right to — a
+        // guard on something the divisor is *derived* from is a guard on a different value.
+        let divisor = Double(comparable)
+        guard divisor > 0 else { return 1 }
+        return Double(agreed) / divisor
     }
 
     /// Disagreements grouped by the functions their formulas call.
@@ -125,7 +188,7 @@ struct OracleReport {
     /// A formula calling three functions counts once against each: the harness
     /// cannot say which one is at fault, and pretending otherwise would hide the
     /// other two.
-    var byFunction: [String: Int] {
+    public var byFunction: [String: Int] {
         var counts: [String: Int] = [:]
         for finding in findings {
             switch finding.outcome {
@@ -141,7 +204,7 @@ struct OracleReport {
     }
 
     /// Counts by outcome kind, for the summary line.
-    var tally: (agreed: Int, agreedOnError: Int, differed: Int,
+    public var tally: (agreed: Int, agreedOnError: Int, differed: Int,
                 refused: Int, threw: Int, notComparable: Int) {
         var result = (0, 0, 0, 0, 0, 0)
         for finding in findings {
@@ -159,7 +222,7 @@ struct OracleReport {
 }
 
 /// How close is close enough.
-enum OracleTolerance {
+public enum OracleTolerance {
 
     /// Relative agreement, with an absolute floor.
     ///
@@ -173,8 +236,12 @@ enum OracleTolerance {
     /// the numerical dust real models leave behind. The corpus contains a cached
     /// `-1.1224406979409424e-239`, which is a zero that took a long route; calling
     /// it different from zero would be true and useless.
-    static let relative = 1e-9
-    static let floor = 1e-12
+    public static let relative = 1e-9
+    /// The absolute floor below which two values are the same number.
+    ///
+    /// A relative tolerance is meaningless near zero — everything is infinitely far
+    /// from nothing in proportional terms — so comparison falls back to this.
+    public static let floor = 1e-12
 
     /// The band inside which an iterative solver's answer counts as agreement.
     ///
@@ -202,10 +269,10 @@ enum OracleTolerance {
     /// not hold. It is still four orders tighter than any real disagreement, which
     /// would show up in the second or third significant figure rather than the
     /// eighth.
-    static let iterative = 1e-6
+    public static let iterative = 1e-6
 
     /// Functions whose answer is found by iterating rather than by evaluating.
-    static let iterativeFunctions: Set<String> = ["XIRR", "IRR", "MIRR", "RATE", "YIELD"]
+    public static let iterativeFunctions: Set<String> = ["XIRR", "IRR", "MIRR", "RATE", "YIELD"]
 
     /// Whether two numbers agree.
     ///
@@ -213,7 +280,7 @@ enum OracleTolerance {
     ///   - ours: What we computed.
     ///   - excel: What Excel recorded.
     /// - Returns: `true` when the difference is below both thresholds' allowance.
-    static func agree(_ ours: Double, _ excel: Double, tolerance: Double? = nil) -> Bool {
+    public static func agree(_ ours: Double, _ excel: Double, tolerance: Double? = nil) -> Bool {
         if ours == excel { return true }
         guard ours.isFinite, excel.isFinite else { return false }
         let difference = abs(ours - excel)
@@ -233,7 +300,7 @@ enum OracleTolerance {
     ///   - ours: What we computed.
     ///   - excel: What Excel recorded.
     /// - Returns: `true` when they are the same answer.
-    static func agree(_ ours: CellValue, _ excel: CellValue, tolerance: Double? = nil) -> Bool {
+    public static func agree(_ ours: CellValue, _ excel: CellValue, tolerance: Double? = nil) -> Bool {
         switch (ours, excel) {
         case (.number(let a), .number(let b)):
             return agree(a, b, tolerance: tolerance)

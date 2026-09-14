@@ -9,7 +9,8 @@ let package = Package(
         .library(name: "WorkbookAudit", targets: ["WorkbookAudit"]),
         .library(name: "WorkbookContainer", targets: ["WorkbookContainer"]),
         .executable(name: "workbook-census", targets: ["WorkbookCensus"]),
-        .executable(name: "conformance-workbook", targets: ["ConformanceWorkbook"])
+        .executable(name: "conformance-workbook", targets: ["ConformanceWorkbook"]),
+        .executable(name: "workbook-oracle", targets: ["WorkbookOracleTool"])
     ],
     dependencies: [
         // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
@@ -115,6 +116,20 @@ let package = Package(
             path: "Sources/ConformanceWorkbook",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
+        // Drives the Excel oracle over a corpus. An executable rather than a test, because
+        // a test of this prints only at the end and leaves nothing behind when stopped —
+        // which is how a 2,240-workbook run came to be killed having produced nothing.
+        .executableTarget(
+            name: "WorkbookOracleTool",
+            dependencies: [
+                "SwiftExcelFunctions",
+                "WorkbookAudit",
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/WorkbookOracleTool",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
         .target(
             name: "WorkbookAudit",
             dependencies: [
@@ -144,6 +159,8 @@ let package = Package(
             name: "SwiftExcelFunctionsTests",
             dependencies: [
                 "SwiftExcelFunctions",
+                // The oracle lives in WorkbookAudit now, so a tool can drive it too.
+                "WorkbookAudit",
                 .product(name: "SwiftXLSX", package: "SwiftXLSX")
             ],
             path: "Tests/SwiftExcelFunctionsTests"
