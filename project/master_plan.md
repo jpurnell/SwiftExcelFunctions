@@ -457,34 +457,43 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket, still.** 115 `EXCEL` rows and 147 `PSI`, down from 266.
-  **Engineering and compatibility are both closed**, two categories of the ten. Of the 31
-  engineering rows, not one needed mathematics written: `BESSEL*` bound to BusinessMath
-  `3.0.0-alpha.4`, the 26 complex rows to swift-numerics, and `CONVERT` is a table. That is
-  what the source table predicted, and it is worth recording as a case where it held.
-  Remaining: lookup 24, financial 21, math 20, information 13, database 12, logical 11,
-  text 7, datetime 7. The
-  `compatibility` category is **done** — all 26 pre-2010 statistical spellings answer, every one
-  delegating to its modern twin rather than reimplementing it, and `BETA.DIST` was written along
-  the way because `BETADIST` had nothing to delegate to. Their pairings came from documentation
-  and no corpus workbook calls them, so the five that are not plain aliases are unverified
-  against Excel itself. The
-  original framing below still holds; only the version number it was attached to has moved.
-  Written at the time as:
-  **engineering (48)** and **text (32)** are the near-free ones, like math was — base conversion,
-  bitwise, `CHAR`/`CODE`/`EXACT`. **statistical (46)** belongs to BusinessMath and is not ours to
-  write. **lookup (24), financial (27), database (12)** need judgment per function and are where
-  the honest `new` and `out of scope` markings will come from. Success is `unreviewed` reaching
-  **0** — every row classified — not every row implemented.
-- **The oracle checker**, unnumbered. Recompute every formula, compare against Excel's cached
-  value, report the disagreements. *(It was written as v0.9.0. v0.9.0 shipped as the Solver path,
-  which was not on the roadmap at all when this was written and overtook it; v0.10.0 was then
-  pencilled in here, and that reservation was an assumption rather than a decision — the owner
-  is not holding a number for it. **Numbers are assigned at release, not reserved in advance**,
-  which is the lesson the Solver already taught and this entry kept failing to learn.)* Gated on
-  v0.8.0, and on hand-triaging its corpus findings: a
-  disagreement is a finding only where *we* are right, and the ~0.40% where we are not must never
-  be reported as a workbook defect.
+- **The unreviewed bucket.** **115 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
+  is `unreviewed` reaching **0** — every row *classified*, not every row implemented. Two of
+  the ten EXCEL categories are now closed: `compatibility` and `engineering`.
+
+  | Category | Rows | What the work is |
+  |---|---|---|
+  | lookup | 24 | **Gated.** 18 return arrays and need the array-shape decision first |
+  | financial | 21 | Judgment per function; where the honest `out of scope` marks will come from |
+  | math | 20 | Mostly primitives, in the way the first math tranche was |
+  | information | 13 | `IS*` predicates — this package's own semantics, not arithmetic |
+  | database | 12 | `DSUM` and relatives; one criteria-range design serves all twelve |
+  | logical | 11 | This package's semantics again |
+  | text | 7 | Near-free, like the text rows already done |
+  | datetime | 7 | Near-free |
+
+  The original framing — *"engineering and text are the near-free ones, statistical belongs to
+  BusinessMath, lookup and financial and database need judgment"* — held everywhere it has
+  been tested. Engineering turned out to need **no mathematics written at all**.
+
+- **Lookup's array-shape decision.** The gate on the largest remaining category, and unchanged:
+  `UNIQUE` and `FILTER` first as the spike, because `HSTACK`/`VSTACK` have statically known
+  shapes and would settle nothing.
+
+- **The oracle checker**, unnumbered. Recompute every formula in a real workbook, compare
+  against the value Excel cached, report the disagreements.
+
+  *(Written as v0.9.0, which the Solver path took. v0.10.0 was then pencilled in here, and
+  that was this session's assumption rather than anyone's decision. **Numbers are assigned at
+  release, not reserved in advance.**)*
+
+  **`conformance-workbook` is a third of this already built.** It puts formulas to Excel and
+  reads the answers back; the oracle checker does the same against cached values in workbooks
+  nobody wrote for the purpose. What 0.10.0 added is the harder half — the rules for reading
+  a disagreement. Both directions are now known and recorded in Known traps: the ~0.40% where
+  we are wrong must never be reported as a workbook defect, and neither must the cases where
+  **we are right and Excel is not**, of which ten are catalogued.
+
 - **v1.0 — `xlsx-audit`.** The motivating application, runnable by someone who is not us.
 
 ### Carried, unscheduled
