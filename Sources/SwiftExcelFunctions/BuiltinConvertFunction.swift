@@ -275,21 +275,30 @@ public enum BuiltinConvertFunction {
 
     // MARK: - Temperature
 
+    /// The temperature scales a prefix may be attached to.
+    ///
+    /// **`K` and nothing else, which took two measurements to establish.** This first
+    /// refused prefixes everywhere, reasoning that a prefix and an offset do not compose —
+    /// what is a milli-degree-Celsius? Excel answered `CONVERT(1, "mK", "K")` with `0.001`,
+    /// so that was wrong. The correction then allowed them everywhere, and Excel answered
+    /// `CONVERT(1, "mC", "C")` with `#N/A`.
+    ///
+    /// So the original reasoning was right about `C` and `F` and wrong about `K`, which no
+    /// amount of thinking was going to produce. A prefix scales a magnitude, and only an
+    /// absolute scale has one to scale.
+    ///
+    /// `Rank` is absolute too and is **not** listed, because it has not been measured — the
+    /// pattern suggests it belongs here and the pattern has now been wrong twice on this
+    /// exact question. It goes to Excel in the next round instead.
+    private static let prefixableTemperatures: Set<String> = ["K", "kel"]
+
     /// A temperature unit with any prefix it carries.
-    ///
-    /// **Prefixes are allowed here, which was measured after being guessed wrong.** This
-    /// originally refused them on the reasoning that a prefix and an offset do not compose —
-    /// what would a milli-degree-Celsius be? Excel answers `CONVERT(1, "mK", "K")` with
-    /// `0.001`, so it allows them and scales the magnitude.
-    ///
-    /// Only `mK` is evidenced. The prefix is applied to the magnitude in the named scale,
-    /// which is unambiguous for an absolute scale and a guess for `C` and `F` — a guess
-    /// flagged rather than buried, and put to Excel in the next conformance round.
     private static func temperatureScale(_ name: String) -> (unit: String, scale: Double)? {
         if kelvin(0, from: name) != nil { return (name, 1) }
         for (prefix, scale) in decimalPrefixes where name.hasPrefix(prefix) {
             let remainder = String(name.dropFirst(prefix.count))
-            if kelvin(0, from: remainder) != nil { return (remainder, scale) }
+            guard prefixableTemperatures.contains(remainder) else { continue }
+            return (remainder, scale)
         }
         return nil
     }

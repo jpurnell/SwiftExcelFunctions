@@ -30,7 +30,7 @@ struct ConformanceCase: Sendable {
 enum ConformanceCases {
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -188,6 +188,30 @@ enum ConformanceCases {
               note: "another point, to say whether the Y error is systematic"),
         .init(family: "round2", formula: "BESSELK(1, 1)",
               note: "K agreed last round; a second point to confirm"),
+    ]
+
+    // MARK: - Round three: what round two raised
+
+    /// Round two answered `mK` yes and `mC`/`mF` no, which leaves the absolute scales that
+    /// are not kelvin unmeasured. The pattern says `Rank` should take a prefix and `Reau`
+    /// should not; the pattern has been wrong twice on this exact question, so it is asked.
+    static let roundThree: [ConformanceCase] = [
+        .init(family: "round3", formula: "CONVERT(1, \"mRank\", \"Rank\")",
+              note: "Rank is absolute — does it take a prefix as K does?"),
+        .init(family: "round3", formula: "CONVERT(1, \"mReau\", \"Reau\")",
+              note: "Reau has an offset — refused as C and F are?"),
+        .init(family: "round3", formula: "CONVERT(1, \"kK\", \"mK\")",
+              note: "a prefix on both sides at once"),
+        .init(family: "round3", formula: "IMSQRT(\"-4\")",
+              note: "does Excel keep the polar rounding error here too, or only at -1?"),
+        .init(family: "round3", formula: "IMLN(\"-1\")",
+              note: "the same question for a logarithm landing on pi"),
+        .init(family: "round3", formula: "IMPOWER(\"i\", 2)",
+              note: "i squared is exactly -1; does Excel say so?"),
+        .init(family: "round3", formula: "BESSELJ(1, 0)",
+              note: "one more point to size Excel's Bessel error"),
+        .init(family: "round3", formula: "BESSELY(0.5, 0)",
+              note: "Y near the origin, where it diverges fastest"),
     ]
 
     // MARK: - Bessel

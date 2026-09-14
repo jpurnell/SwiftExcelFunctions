@@ -122,6 +122,17 @@ final class ConvertFunctionTests: XCTestCase {
         try assertConverts(1000, "mK", "K", 1, accuracy: 1e-12)
     }
 
+    /// …but only on the absolute scale, which took a second measurement to learn.
+    ///
+    /// Refusing prefixes everywhere was wrong; allowing them everywhere was also wrong.
+    /// Excel answers `CONVERT(1, "mC", "C")` with `#N/A` and `CONVERT(1, "mK", "K")` with
+    /// `0.001`. A prefix scales a magnitude, and only an absolute scale has one.
+    func testAPrefixOnAnOffsetTemperatureScaleIsRefused() throws {
+        XCTAssertEqual(try call(1, "mC", "C"), .error(.na))
+        XCTAssertEqual(try call(1000, "mC", "C"), .error(.na))
+        XCTAssertEqual(try call(1, "mF", "F"), .error(.na))
+    }
+
     func testAPrefixOnANonMetricUnitIsRefused() throws {
         // There is no such thing as a kilo-foot in Excel's table.
         XCTAssertEqual(try call(1, "kft", "m"), .error(.na))

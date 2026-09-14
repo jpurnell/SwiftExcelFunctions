@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-**Excel answered 76 questions, and disagreed with this package seventeen times.** Eight of
+**Round two: Excel answered 90 questions and disagreed eleven times, down from seventeen.**
+The eight `#NAME?` rows are answered and agree. All five fixes below hold. Of the eleven
+that remain, **eight are places where Excel is less accurate than this package** — seven
+Bessel points and `IMSQRT("-1")` — and three were an over-correction fixed below.
+
+**Round one: Excel answered 76 questions, and disagreed with this package seventeen times.** Eight of
 those were the harness's fault, four are an upstream accuracy question, and five were real
 defects here. All five are fixed. The workbook Excel calculated is committed beside the
 coverage matrix as the evidence.
@@ -34,13 +39,27 @@ coverage matrix as the evidence.
   of it — and the distinction is coherent: unreadable *text* is `#NUM!` however it fails,
   while an argument of the wrong kind is `#VALUE!`.
 
-- **`CONVERT` allows a prefix on a temperature unit.** This refused them, reasoning that a
-  prefix and an offset do not compose. Excel answers `CONVERT(1, "mK", "K")` with `0.001`.
-  The reasoning was sound and the answer was wrong, which is the argument for asking rather
-  than reasoning. Whether the same holds for the offset scales is put to Excel in the next
-  round rather than guessed at twice.
+- **`CONVERT` allows a prefix on `K`, and on nothing else that measures temperature.** It
+  took two measurements and two wrong answers to land on that.
+
+  This first refused prefixes everywhere, reasoning that a prefix and an offset do not
+  compose — what is a milli-degree-Celsius? Excel answered `CONVERT(1, "mK", "K")` with
+  `0.001`, so the refusal was wrong. The correction allowed them everywhere, and Excel
+  answered `CONVERT(1, "mC", "C")` with `#N/A`.
+
+  The original reasoning was right about `C` and `F` and wrong about `K`: a prefix scales a
+  magnitude, and only an absolute scale has one. `Rank` is absolute too and is deliberately
+  **not** included, because it has not been measured and the pattern has already been wrong
+  twice on this exact question.
 
 ### Added
+
+- **This package is sometimes more accurate than Excel, and that is now recorded as a trap
+  rather than a triumph.** `IMSQRT("-1")` returns `"i"` here and
+  `"6.12323399573677E-17+i"` in Excel, which computes it through polar form and keeps the
+  rounding error. Being right is the correct behaviour, and it has a consequence for the
+  workbook checker this project is building towards: a disagreement is **not** a workbook
+  defect merely because the two sides differ. See `project/master_plan.md`.
 
 - **`conformance-workbook` knows about `_xlfn.`** Eight of the seventeen disagreements were
   this: every function introduced after Excel 2007 must be stored in the file as
@@ -54,10 +73,19 @@ coverage matrix as the evidence.
 
 ### Changed
 
-- **Four Bessel values disagree with Excel by more than rounding**, between 2.4 × 10⁻⁹ and
-  1.6 × 10⁻⁷ relative — `BESSELY` and `BESSELI` at two points each, while `BESSELJ` and
-  `BESSELK` agreed. That is upstream in BusinessMath `3.0.0-alpha.4` rather than in the
-  binding, and it is recorded rather than papered over by widening a tolerance.
+- **Seven Bessel values disagree with Excel, and Excel is the one that is wrong.**
+
+  The first round recorded this as an accuracy problem in BusinessMath. That was a guess
+  dressed as a finding — two implementations disagreed and the newer one was assumed at
+  fault. A third implementation settles it: **scipy agrees with BusinessMath to machine
+  precision (≤ 1.0 × 10⁻¹⁵) on all seven points, while Excel is off by 2.4 × 10⁻⁹ to
+  1.6 × 10⁻⁷.**
+
+  `BESSELJ(0, 0)` makes it plain without any reference at all: J₀(0) is exactly 1 by
+  definition, this package returns exactly 1, and Excel returns `1.00000000283141`.
+
+  So Excel's Bessel functions carry roughly eight or nine correct significant digits, and
+  nothing needs fixing here or upstream.
 
 ### Added
 
