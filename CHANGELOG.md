@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+**Excel answered 76 questions, and disagreed with this package seventeen times.** Eight of
+those were the harness's fault, four are an upstream accuracy question, and five were real
+defects here. All five are fixed. The workbook Excel calculated is committed beside the
+coverage matrix as the evidence.
+
+- **Complex components are written to fifteen significant digits, as Excel writes them.**
+  `IMPOWER("1+1i", 3)` returned `"-1.9999999999999996+2i"` where Excel returns `"-2+2i"`, and
+  `IMEXP("1+1i")` carried seventeen digits per component against Excel's fifteen. Rounding
+  each component to fifteen significant figures reproduces every component of Excel's answers
+  exactly — one rule, three disagreements.
+
+  This is not cosmetic. These functions return **text**, so the digits *are* the value:
+  `-1.9999999999999996+2i` and `-2+2i` are different answers to anyone comparing strings,
+  which is the only comparison `IM*` output supports.
+
+  Rounded through a decimal representation rather than by arithmetic, because scaling by a
+  power of ten and rounding double-rounds — it put one component a digit out.
+
+- **An uppercase suffix inside an `inumber` is `#NUM!`, not `#VALUE!`.** Microsoft states
+  *"Using uppercase results in the #VALUE! error value"*; Excel returns `#NUM!` for
+  `IMABS("3+4I")`. **The fifth documented behaviour this project has measured and found
+  wrong.** `COMPLEX(3, 4, "I")` really is `#VALUE!`, so the documentation is right about half
+  of it — and the distinction is coherent: unreadable *text* is `#NUM!` however it fails,
+  while an argument of the wrong kind is `#VALUE!`.
+
+- **`CONVERT` allows a prefix on a temperature unit.** This refused them, reasoning that a
+  prefix and an offset do not compose. Excel answers `CONVERT(1, "mK", "K")` with `0.001`.
+  The reasoning was sound and the answer was wrong, which is the argument for asking rather
+  than reasoning. Whether the same holds for the offset scales is put to Excel in the next
+  round rather than guessed at twice.
+
+### Added
+
+- **`conformance-workbook` knows about `_xlfn.`** Eight of the seventeen disagreements were
+  this: every function introduced after Excel 2007 must be stored in the file as
+  `_xlfn.BETA.DIST`, and one written plainly is a function Excel does not have. All eight
+  came back `#NAME?`, and the correlation was exact — the pre-2007 `BETADIST` answered while
+  the 2010 `BETA.DIST` beside it did not. Those eight rows said nothing about this package
+  and are asked again.
+
+  The prefix is applied to the parsed tree rather than the text, because `FormulaParser`
+  uppercases function names and `_XLFN.` is not what the format documents.
+
+### Changed
+
+- **Four Bessel values disagree with Excel by more than rounding**, between 2.4 × 10⁻⁹ and
+  1.6 × 10⁻⁷ relative — `BESSELY` and `BESSELI` at two points each, while `BESSELJ` and
+  `BESSELK` agreed. That is upstream in BusinessMath `3.0.0-alpha.4` rather than in the
+  binding, and it is recorded rather than papered over by widening a tolerance.
+
 ### Added
 
 - **`CONVERT`, which closes the engineering bucket.** Excel's unit table: thirteen measures,

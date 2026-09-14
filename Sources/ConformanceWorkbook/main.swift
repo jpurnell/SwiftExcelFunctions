@@ -56,8 +56,9 @@ enum ConformanceWorkbook {
             sheet.write(testCase.family, to: "\(Column.family)\(row)")
             // The formula as text, so it is readable without clicking into a cell.
             sheet.write(testCase.formula, to: "\(Column.formula)\(row)")
-            // The same string as a formula, for Excel to answer.
-            sheet.writeFormula(testCase.formula, to: "\(Column.excel)\(row)")
+            // The same string as a formula, for Excel to answer — with the prefix the
+            // file format requires for anything newer than Excel 2007.
+            writeQuestion(testCase.formula, to: "\(Column.excel)\(row)", in: sheet)
             writeOurAnswer(for: testCase, to: "\(Column.ours)\(row)", in: sheet)
             sheet.writeFormula(agreementFormula(row: row), to: "\(Column.agree)\(row)")
             sheet.write(testCase.note, to: "\(Column.note)\(row)")
@@ -66,6 +67,58 @@ enum ConformanceWorkbook {
         try workbook.save(to: URL(fileURLWithPath: path))
         report("wrote \(ConformanceCases.all.count) cases to \(path)")
         report("open it in Excel, let it calculate, and save — then run `check`")
+    }
+
+    /// Functions that postdate Excel 2007 and must be stored with an `_xlfn.` prefix.
+    ///
+    /// **This cost the first conformance round eight of its rows.** Every one came back
+    /// `#NAME?`, and the correlation was exact: the eight were the only post-2007 names
+    /// among the cases. A workbook stores `BETA.DIST` as `_xlfn.BETA.DIST`, and a file that
+    /// spells it plainly is asking for a function Excel does not have — so the answer says
+    /// nothing whatever about whether this package computes `BETA.DIST` correctly.
+    ///
+    /// The legacy spellings were unaffected, which is what made the pattern visible: the
+    /// pre-2007 `BETADIST` answered while the 2010 `BETA.DIST` beside it did not.
+    private static let requiringPrefix: Set<String> = [
+        "BETA.DIST", "BETA.INV", "BINOM.DIST", "BINOM.INV", "CHISQ.DIST", "CHISQ.DIST.RT",
+        "CHISQ.INV", "CHISQ.INV.RT", "CHISQ.TEST", "CONFIDENCE.NORM", "CONFIDENCE.T",
+        "EXPON.DIST", "F.DIST", "F.DIST.RT", "F.INV", "F.INV.RT", "F.TEST", "GAMMA.DIST",
+        "GAMMA.INV", "HYPGEOM.DIST", "LOGNORM.DIST", "LOGNORM.INV", "NEGBINOM.DIST",
+        "NORM.DIST", "NORM.INV", "NORM.S.DIST", "NORM.S.INV", "PERCENTRANK.EXC",
+        "PERCENTRANK.INC", "POISSON.DIST", "QUARTILE.EXC", "QUARTILE.INC", "T.DIST",
+        "T.DIST.2T", "T.DIST.RT", "T.INV", "T.INV.2T", "T.TEST", "WEIBULL.DIST", "Z.TEST",
+        "IMSEC", "IMSECH", "IMCSC", "IMCSCH", "IMCOT", "IMTAN",
+    ]
+
+    /// Writes the question for Excel, prefixed where the file format requires it.
+    ///
+    /// The prefix has to be applied to the **parsed tree** rather than to the text, because
+    /// `FormulaParser` uppercases every function name it reads — so a formula written as
+    /// `_xlfn.BETA.DIST(…)` is stored as `_XLFN.BETA.DIST(…)`, and whether Excel accepts
+    /// that is a question nobody needs to have. Naming the function in the tree keeps the
+    /// spelling the format documents.
+    private static func writeQuestion(_ formula: String, to ref: String, in sheet: Worksheet) {
+        let ast: FormulaAST
+        do {
+            ast = try FormulaParser.parse(formula)
+        } catch let failure {
+            // A case this package cannot even parse is a case it cannot answer, so the
+            // cell becomes text and the row will read as a disagreement — which is the
+            // honest outcome rather than a silently missing question.
+            report("could not parse \(formula) — writing it as text instead: \(failure)")
+            #if canImport(os)
+            Logger(subsystem: "ConformanceWorkbook", category: "emit")
+                .error("could not parse \(formula, privacy: .public): \(String(describing: failure), privacy: .public)")
+            #endif
+            sheet.write(formula, to: ref)
+            return
+        }
+        guard case .function(let name, let arguments) = ast,
+              requiringPrefix.contains(name) else {
+            sheet.writeFormula(formula, to: ref)
+            return
+        }
+        sheet.write(FormulaAST.function("_xlfn." + name, arguments), to: ref)
     }
 
     /// Writes this package's answer as a value Excel will not recompute.

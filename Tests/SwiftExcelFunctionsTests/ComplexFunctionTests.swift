@@ -99,12 +99,31 @@ final class ComplexFunctionTests: XCTestCase {
         XCTAssertEqual(try text("IMCONJUGATE", .text("3+4j")), "3-4j")
     }
 
-    /// Microsoft: *"All complex number functions accept 'i' and 'j' for suffix, but neither
-    /// 'I' nor 'J'. Using uppercase results in the #VALUE! error value."*
-    func testAnUppercaseSuffixIsAValueError() throws {
-        XCTAssertEqual(try call("IMABS", .text("3+4I")), .error(.value))
-        XCTAssertEqual(try call("IMABS", .text("3+4J")), .error(.value))
+    /// Uppercase is refused — but the two ways of writing it give *different* errors.
+    ///
+    /// Microsoft says both are `#VALUE!`. Measured against Excel for Mac, an uppercase
+    /// suffix inside an `inumber` is **`#NUM!`**, while an uppercase `suffix` argument to
+    /// `COMPLEX` really is `#VALUE!`. The documentation is right about the refusal and
+    /// wrong about half the error codes.
+    ///
+    /// The distinction is coherent once seen: text that cannot be read as a complex number
+    /// is `#NUM!` however it fails, and `"banana"` and `"3+4"` already returned that. An
+    /// argument of the wrong kind is `#VALUE!`, and `COMPLEX`'s suffix is an argument.
+    func testAnUppercaseSuffixIsRefused() throws {
+        XCTAssertEqual(try call("IMABS", .text("3+4I")), .error(.num))
+        XCTAssertEqual(try call("IMABS", .text("3+4J")), .error(.num))
         XCTAssertEqual(try call("COMPLEX", .number(3), .number(4), .text("I")), .error(.value))
+    }
+
+    /// Excel writes each component to fifteen significant digits, and these return text, so
+    /// the digits are the value rather than a presentation of it.
+    func testComponentsAreWrittenToFifteenSignificantDigits() throws {
+        // Measured: Excel gives "-2+2i" here, not "-1.9999999999999996+2i".
+        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(3)), "-2+2i")
+        XCTAssertEqual(try text("IMEXP", .text("1+1i")),
+                       "1.46869393991589+2.28735528717884i")
+        XCTAssertEqual(try text("IMLOG2", .text("3+4i")),
+                       "2.32192809488736+1.33780421245098i")
     }
 
     func testTextThatIsNotAComplexNumberIsANumError() throws {

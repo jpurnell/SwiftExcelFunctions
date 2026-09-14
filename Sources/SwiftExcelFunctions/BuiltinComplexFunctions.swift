@@ -61,11 +61,17 @@ public enum BuiltinComplexFunctions {
         case .blank:
             return .ready(Complex(0, 0), suffix: nil)
         case .text(let written):
-            // Microsoft: "All complex number functions accept 'i' and 'j' for suffix, but
-            // neither 'I' nor 'J'. Using uppercase results in the #VALUE! error value."
-            // The BusinessMath parser accepts all four, so this refusal is Excel's alone.
+            // Microsoft says uppercase gives #VALUE!. **Excel gives #NUM!**, measured:
+            // `IMABS("3+4I")` returns #NUM! in Excel for Mac. The documentation is right
+            // about the refusal and wrong about the error, which is the fifth time this
+            // project has found it wrong about something checkable.
+            //
+            // #NUM! is also the more coherent answer. An argument of the wrong *kind* is
+            // #VALUE!; text that is the right kind and cannot be read is #NUM!, which is
+            // already what `"banana"` and `"3+4"` return. An uppercase suffix is the third
+            // way of writing something unreadable, not a different sort of mistake.
             guard !written.contains("I"), !written.contains("J") else {
-                return .refused(.error(.value))
+                return .refused(.error(.num))
             }
             guard let number = Complex<Double>(notation: written) else {
                 // Not a complex number is #NUM!, not #VALUE! — Excel distinguishes text
@@ -91,13 +97,43 @@ public enum BuiltinComplexFunctions {
         return stated.first ?? "i"
     }
 
+    /// A component as Excel writes it: fifteen significant digits.
+    ///
+    /// Measured, not assumed. Excel returned `"-2+2i"` for `IMPOWER("1+1i", 3)` where this
+    /// package wrote `"-1.9999999999999996+2i"`, and `"1.46869393991589+2.28735528717884i"`
+    /// for `IMEXP("1+1i")` against seventeen digits here. Rounding each component to fifteen
+    /// significant figures reproduces all five components of those answers exactly.
+    ///
+    /// It matters more than tidiness: these functions return **text**, so the digits are the
+    /// value. `-1.9999999999999996+2i` and `-2+2i` are different answers, and any caller
+    /// comparing strings — which is the only thing `IM*` output supports — sees two
+    /// different complex numbers.
+    /// Rounded through a decimal representation rather than by arithmetic, because the
+    /// arithmetic is subtly wrong: scaling by a power of ten, rounding and scaling back
+    /// double-rounds, and it put `1.4686939399158851` one digit out at
+    /// `1.46869393991588` against Excel's `…89`. A decimal round-trip is the operation
+    /// actually being asked for.
+    ///
+    /// The locale is fixed: this produces a number to be parsed, not read, and a decimal
+    /// comma would make it unparseable in about half the world.
+    private static func fifteenSignificantDigits(_ value: Double) -> Double {
+        guard value.isFinite else { return value }
+        let decimal = value.formatted(
+            .number.precision(.significantDigits(15))
+                .grouping(.never)
+                .locale(Locale(identifier: "en_US_POSIX")))
+        return Double(decimal) ?? value
+    }
+
     /// Writes a complex number in Excel's text form.
     private static func written(_ number: Complex<Double>, suffix: Character) -> CellValue {
         // A non-finite result is a domain Excel reports rather than a string it writes, and
         // this is what turns `IMLN("0")` and division by zero into `#NUM!` without either
         // needing a guard of its own.
         guard number.isFinite else { return .error(.num) }
-        var text = number.notation
+        let rounded = Complex(fifteenSignificantDigits(number.real),
+                              fifteenSignificantDigits(number.imaginary))
+        var text = rounded.notation
         // The codec writes `i` only, by design: one canonical form. Excel lets the caller
         // choose, and the choice is only ever the final character.
         if suffix == "j", text.hasSuffix("i") {

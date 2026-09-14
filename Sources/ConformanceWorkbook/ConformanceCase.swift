@@ -30,7 +30,7 @@ struct ConformanceCase: Sendable {
 enum ConformanceCases {
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -151,6 +151,43 @@ enum ConformanceCases {
         .init(family: "convert", formula: "CONVERT(1, \"us_acre\", \"m2\")", note: "and this is the other"),
         .init(family: "convert", formula: "CONVERT(1, \"kn\", \"m/s\")", note: "a knot"),
         .init(family: "convert", formula: "CONVERT(1, \"admkn\", \"m/s\")", note: "the admiralty knot"),
+    ]
+
+    // MARK: - Round two: what the first round raised
+
+    /// Questions the first round created rather than answered.
+    ///
+    /// Excel allowed `mK`, which this package had refused. It scales the magnitude, which is
+    /// unambiguous on an absolute scale and a guess on a scale with an offset — so the guess
+    /// goes back to Excel rather than into the source as a comment.
+    static let roundTwo: [ConformanceCase] = [
+        .init(family: "round2", formula: "CONVERT(1, \"mC\", \"C\")",
+              note: "does a prefix compose with an offset scale, or only an absolute one?"),
+        .init(family: "round2", formula: "CONVERT(1000, \"mC\", \"C\")",
+              note: "and if it does, is it a plain scaling of the magnitude?"),
+        .init(family: "round2", formula: "CONVERT(1, \"mF\", \"F\")",
+              note: "the same question for Fahrenheit"),
+        .init(family: "round2", formula: "CONVERT(1, \"kK\", \"K\")",
+              note: "a prefix upward, to check it is not milli-only"),
+        .init(family: "round2", formula: "IMABS(\"3+4J\")",
+              note: "uppercase J — #NUM! like uppercase I, measured last round?"),
+        .init(family: "round2", formula: "IMSUM(\"1+1i\", \"2\")",
+              note: "a suffixed and an unsuffixed argument together — not a disagreement"),
+        .init(family: "round2", formula: "IMPRODUCT(\"2i\", \"2i\")",
+              note: "a purely imaginary product, which should land on a bare real -4"),
+        .init(family: "round2", formula: "IMSQRT(\"-1\")",
+              note: "the principal root of a negative real"),
+        .init(family: "round2", formula: "IMPOWER(\"1+1i\", 0.5)",
+              note: "a fractional power, which takes the other code path"),
+        .init(family: "round2", formula: "IMLN(\"-1\")",
+              note: "a logarithm landing exactly on a multiple of pi"),
+        .init(family: "round2", formula: "BESSELJ(0, 0)", note: "J at the origin is exactly 1"),
+        .init(family: "round2", formula: "BESSELI(0.5, 1)",
+              note: "a small argument, where the series should be most accurate"),
+        .init(family: "round2", formula: "BESSELY(1, 1)",
+              note: "another point, to say whether the Y error is systematic"),
+        .init(family: "round2", formula: "BESSELK(1, 1)",
+              note: "K agreed last round; a second point to confirm"),
     ]
 
     // MARK: - Bessel

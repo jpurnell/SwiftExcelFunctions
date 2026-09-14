@@ -112,6 +112,16 @@ final class ConvertFunctionTests: XCTestCase {
         try assertConverts(1, "Mibyte", "byte", 1048576, accuracy: 1e-6)
     }
 
+    /// Excel allows a prefix on a temperature unit, which this originally refused.
+    ///
+    /// Measured: `CONVERT(1, "mK", "K")` is `0.001`. The reasoning for refusing — that a
+    /// prefix and an offset do not compose — was sound and wrong, which is why it was put to
+    /// Excel rather than left as a comment.
+    func testAPrefixOnATemperatureUnitIsAllowed() throws {
+        try assertConverts(1, "mK", "K", 0.001, accuracy: 1e-12)
+        try assertConverts(1000, "mK", "K", 1, accuracy: 1e-12)
+    }
+
     func testAPrefixOnANonMetricUnitIsRefused() throws {
         // There is no such thing as a kilo-foot in Excel's table.
         XCTAssertEqual(try call(1, "kft", "m"), .error(.na))

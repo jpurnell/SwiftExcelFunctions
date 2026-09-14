@@ -275,6 +275,25 @@ public enum BuiltinConvertFunction {
 
     // MARK: - Temperature
 
+    /// A temperature unit with any prefix it carries.
+    ///
+    /// **Prefixes are allowed here, which was measured after being guessed wrong.** This
+    /// originally refused them on the reasoning that a prefix and an offset do not compose —
+    /// what would a milli-degree-Celsius be? Excel answers `CONVERT(1, "mK", "K")` with
+    /// `0.001`, so it allows them and scales the magnitude.
+    ///
+    /// Only `mK` is evidenced. The prefix is applied to the magnitude in the named scale,
+    /// which is unambiguous for an absolute scale and a guess for `C` and `F` — a guess
+    /// flagged rather than buried, and put to Excel in the next conformance round.
+    private static func temperatureScale(_ name: String) -> (unit: String, scale: Double)? {
+        if kelvin(0, from: name) != nil { return (name, 1) }
+        for (prefix, scale) in decimalPrefixes where name.hasPrefix(prefix) {
+            let remainder = String(name.dropFirst(prefix.count))
+            if kelvin(0, from: remainder) != nil { return (remainder, scale) }
+        }
+        return nil
+    }
+
     /// A temperature in kelvin, from whichever scale it was written in.
     private static func kelvin(_ value: Double, from unit: String) -> Double? {
         switch unit {
@@ -315,13 +334,17 @@ public enum BuiltinConvertFunction {
 
         // Temperature first: it is the one measure that does not convert by ratio, and
         // routing it through the ordinary path would drop the offset.
-        if let asKelvin = kelvin(amount, from: from) {
-            guard let result = temperature(asKelvin, as: to) else { return .error(.na) }
-            return .number(result)
+        if let source = temperatureScale(from) {
+            guard let target = temperatureScale(to) else { return .error(.na) }
+            let asKelvin = kelvin(amount * source.scale, from: source.unit)
+            guard let asKelvin, let result = temperature(asKelvin, as: target.unit) else {
+                return .error(.na)
+            }
+            return .number(result / target.scale)
         }
         // The other half of that: a temperature asked for from a non-temperature unit is a
         // measure mismatch, not an unknown unit, and both are `#N/A` anyway.
-        guard temperature(0, as: to) == nil else { return .error(.na) }
+        guard temperatureScale(to) == nil else { return .error(.na) }
 
         guard let source = resolve(from), let target = resolve(to) else { return .error(.na) }
         guard source.measure == target.measure else { return .error(.na) }
