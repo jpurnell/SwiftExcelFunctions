@@ -27,6 +27,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`TEXT` understands date and time format codes.** `TEXT(41583, "ddd")` returned `"41583"`
+  — the serial, formatted as the number it is rather than the weekday it was asked for,
+  because no branch recognised the code and the numeric path took it.
+
+  **The oracle found 127 cells doing this across 46 real workbooks**, and recorded what Excel
+  had cached for every one. Those pairs are now the test, which matters because a weekday is
+  exactly the sort of value that can be wrong by one and look entirely plausible: every answer
+  is a real day of the week.
+
+  Measured after the fix: **agreement 99.68% → 99.75%, and `differed` fell to zero.** Every
+  remaining disagreement in that corpus is a *refusal* — a cell where this package declines
+  to compute — with not one case left where it computes a different number than Excel.
+
+  `ExcelDateFormat` carries the family: `d`/`dd`/`ddd`/`dddd`, `m` through `mmmmm`, `yy` and
+  `yyyy`, `h`/`hh`, `s`/`ss`, and `AM/PM`. Two parts of it are worth knowing about.
+
+  **`m` means minutes or months depending on what surrounds it** — minutes after an hour code
+  or before a seconds code, months otherwise. `"h:mm"` and `"mm/dd"` are the same two
+  characters meaning different things, and reading them alike is wrong in one case without
+  ever looking wrong: both produce a small number where a small number belongs.
+
+  **The weekday comes from the serial, not from a `Calendar`.** `WEEKDAY` already derives it
+  arithmetically, which is exact across Excel's phantom 29 February 1900 — the bug lives in
+  the serial numbering, so arithmetic on serials inherits it and a real calendar does not.
+  There is a test asserting the two agree across a range, because two routes to one answer
+  that can disagree is what `IMPOWER` and `IMPRODUCT` had just been caught doing.
+
 - **A formula reaching into another workbook is not a disagreement.** Excel writes those as
   `[1]Sheet!A1`, and the cached value is what that other file said when the link was last
   live — a file that is not here and often no longer exists anywhere. We answered `blank`,

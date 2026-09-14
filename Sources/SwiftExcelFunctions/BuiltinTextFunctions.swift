@@ -242,11 +242,21 @@ public enum BuiltinTextFunctions {
     /// - `"0%"` — percentage, no decimals
     /// - `"0.00%"` — percentage, 2 decimals
     ///
+    /// Date and time codes — `d`, `ddd`, `mmm`, `yyyy`, `h:mm:ss`, `AM/PM` — are handled by
+    /// ``ExcelDateFormat``, which is where the `m`-means-minutes rule lives.
+    ///
     /// For unsupported formats, returns `String(number)`.
     static let text = ExcelFunction(name: "TEXT", minArgs: 2, maxArgs: 2) { args in
         catching {
             let n = try toNumber(args[0])
             let fmt = try toString(args[1])
+            // A date code first: it is decided by the letters present, and a number format
+            // never contains them. Before this, `TEXT(41583, "ddd")` fell through to the
+            // numeric path and returned "41583" — the serial, formatted as what it is
+            // rather than as what was asked for. 127 cells in 46 real workbooks did that.
+            if ExcelDateFormat.isDateFormat(fmt), let formatted = ExcelDateFormat.format(serial: n, fmt) {
+                return .text(formatted)
+            }
             return .text(applyFormat(n, fmt))
         }
     }
