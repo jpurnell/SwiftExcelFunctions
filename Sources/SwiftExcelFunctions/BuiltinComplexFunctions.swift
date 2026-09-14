@@ -133,7 +133,16 @@ public enum BuiltinComplexFunctions {
         guard number.isFinite else { return .error(.num) }
         let rounded = Complex(fifteenSignificantDigits(number.real),
                               fifteenSignificantDigits(number.imaginary))
+        // Excel writes the exponent marker in upper case: `1.22464679914735E-16`, against
+        // Swift's `e-16`. Measured on `IMPOWER("i", 2)`, where every digit of the two
+        // answers matched and only the letter differed — and since these functions return
+        // text, a letter is as much of a difference as a digit.
+        //
+        // `e+` and `e-` can only be an exponent here: the rest of the string is digits, a
+        // sign, a point, and the suffix at the very end.
         var text = rounded.notation
+            .replacingOccurrences(of: "e-", with: "E-")
+            .replacingOccurrences(of: "e+", with: "E+")
         // The codec writes `i` only, by design: one canonical form. Excel lets the caller
         // choose, and the choice is only ever the final character.
         if suffix == "j", text.hasSuffix("i") {

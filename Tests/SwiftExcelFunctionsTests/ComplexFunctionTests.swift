@@ -115,6 +115,17 @@ final class ComplexFunctionTests: XCTestCase {
         XCTAssertEqual(try call("COMPLEX", .number(3), .number(4), .text("I")), .error(.value))
     }
 
+    /// Excel writes the exponent marker in upper case.
+    ///
+    /// Measured on `IMPOWER("i", 2)`: Excel gives `"-1+1.22464679914735E-16i"` and this
+    /// package gave the same digits with a lower-case `e`. These functions return text, so a
+    /// letter is as much of a difference as a digit.
+    func testAnExponentMarkerIsUppercase() throws {
+        let squared = try text("IMPOWER", .text("i"), .number(2))
+        XCTAssertEqual(squared, "-1+1.22464679914735E-16i")
+        XCTAssertFalse(squared.contains("e-"), "the marker must not be lower case")
+    }
+
     /// Excel writes each component to fifteen significant digits, and these return text, so
     /// the digits are the value rather than a presentation of it.
     func testComponentsAreWrittenToFifteenSignificantDigits() throws {

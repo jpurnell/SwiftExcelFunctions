@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+**Round three: 98 questions, 87 agreed, and the loop converged.** Every remaining
+disagreement is now catalogued: **ten are places where Excel is less accurate than this
+package**, each attributed against a third implementation or a definition, and one was a
+formatting defect fixed below.
+
+- **The exponent marker is upper case, as Excel writes it.** `IMPOWER("i", 2)` produced the
+  same fifteen digits as Excel and spelled the exponent `e-16` against Excel's `E-16`. These
+  functions return text, so a letter is as much of a difference as a digit.
+
+- **`CONVERT` refuses a prefix on `Rank` and `Reau`, which is confirmed rather than assumed.**
+  The previous release deliberately left `Rank` out despite the pattern — "absolute scales
+  take prefixes" — suggesting it belonged. Excel answers `CONVERT(1, "mRank", "Rank")` with
+  `#N/A`. The pattern would have been wrong a **third** time on this one function; the
+  prefix belongs to `K` alone.
+
 **Round two: Excel answered 90 questions and disagreed eleven times, down from seventeen.**
 The eight `#NAME?` rows are answered and agree. All five fixes below hold. Of the eleven
 that remain, **eight are places where Excel is less accurate than this package** — seven
@@ -53,6 +68,15 @@ coverage matrix as the evidence.
   twice on this exact question.
 
 ### Added
+
+- **`conformance-workbook check` distinguishes a known divergence from a new one**, and exits
+  non-zero only for the latter. Ten cases are recorded as places where the two differ and
+  this package is right, each with its attribution. Without that list every run shows the
+  same ten disagreements and a new one hides among them; with it, the tool is a gate that can
+  be run after any change to the functions it covers rather than a report to be read once.
+
+  A row Excel never calculated also fails, for the same reason it is reported separately: an
+  unopened workbook must never look like a clean bill of health.
 
 - **This package is sometimes more accurate than Excel, and that is now recorded as a trap
   rather than a triumph.** `IMSQRT("-1")` returns `"i"` here and

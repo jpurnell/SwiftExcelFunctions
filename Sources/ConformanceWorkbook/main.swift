@@ -188,7 +188,7 @@ enum ConformanceWorkbook {
             throw Failure.noConformanceSheet
         }
 
-        var agreed = 0, differed = 0, uncalculated = 0
+        var agreed = 0, differed = 0, uncalculated = 0, diverged = 0
         for (offset, testCase) in ConformanceCases.all.enumerated() {
             let row = firstRow + offset
             let excel = cached(sheet.cell(at: "\(Column.excel)\(row)"))
@@ -202,6 +202,15 @@ enum ConformanceWorkbook {
             }
             if let ours, agree(excel, ours) {
                 agreed += 1
+            } else if let why = ConformanceCases.knownDivergences[testCase.formula] {
+                // A disagreement that has already been chased down and attributed. Counted
+                // and named, never silently skipped: a divergence that quietly stopped
+                // happening would be worth knowing about too.
+                diverged += 1
+                say("KNOWN   [\(testCase.family)]  \(testCase.formula)")
+                say("        excel: \(describe(excel))")
+                say("        ours:  \(ours.map(describe) ?? "—")")
+                say("        \(why)")
             } else {
                 differed += 1
                 say("DIFFER  [\(testCase.family)]  \(testCase.formula)")
@@ -212,10 +221,16 @@ enum ConformanceWorkbook {
         }
 
         say("")
-        say("agreed \(agreed), differed \(differed), not calculated \(uncalculated)")
+        say("agreed \(agreed), known divergence \(diverged), differed \(differed), "
+            + "not calculated \(uncalculated)")
         if uncalculated > 0 {
             say("`not calculated` means Excel has not opened and saved this file yet —")
             say("those rows are unanswered, not agreed.")
+        }
+        if differed > 0 || uncalculated > 0 {
+            // The exit code is what makes this runnable as a check rather than read as a
+            // report. A known divergence is not a failure; anything else is.
+            throw Failure.disagreed(differed: differed, uncalculated: uncalculated)
         }
     }
 
@@ -274,11 +289,17 @@ enum ConformanceWorkbook {
     enum Failure: Error, CustomStringConvertible {
         case usage
         case noConformanceSheet
+        case disagreed(differed: Int, uncalculated: Int)
 
         var description: String {
             switch self {
             case .usage: return "usage: conformance-workbook <emit|check> <path.xlsx>"
             case .noConformanceSheet: return "no sheet named Conformance in that file"
+            case .disagreed(let differed, let uncalculated):
+                var reasons: [String] = []
+                if differed > 0 { reasons.append("\(differed) unexplained disagreement(s)") }
+                if uncalculated > 0 { reasons.append("\(uncalculated) row(s) Excel never answered") }
+                return reasons.joined(separator: ", ")
             }
         }
     }

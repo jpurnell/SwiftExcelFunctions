@@ -29,6 +29,35 @@ struct ConformanceCase: Sendable {
 /// where this package made a judgement rather than followed a delegation.
 enum ConformanceCases {
 
+    /// Cases where this package and Excel disagree **and this package is right**.
+    ///
+    /// ## Why these are recorded rather than fixed
+    ///
+    /// Matching Excel here would mean reproducing its arithmetic error on purpose. Every one
+    /// was checked against a third implementation or against a definition, so "we are right"
+    /// is measured rather than asserted: scipy agrees with this package to 1.0 × 10⁻¹⁵ or
+    /// better on all eight Bessel points while Excel is off by up to 1.6 × 10⁻⁷, and
+    /// `BESSELJ(0, 0)` needs no reference at all because J₀(0) is exactly 1.
+    ///
+    /// ## What this list is for
+    ///
+    /// It is the difference between a report and a gate. Without it every run shows the same
+    /// ten disagreements and a new one hides in the noise; with it, **a new disagreement is
+    /// the only thing `check` reports as a failure**, and the tool can be run after any
+    /// change to the functions it covers.
+    static let knownDivergences: [String: String] = [
+        "BESSELJ(0, 0)": "J₀(0) is exactly 1 by definition. Excel returns 1.00000000283141.",
+        "BESSELJ(1, 0)": "scipy agrees with this package to 1e-15; Excel is off by 3.7e-9.",
+        "BESSELY(2.5, 0)": "scipy agrees with this package to 1e-15; Excel is off by 2.4e-9.",
+        "BESSELY(7, 2)": "scipy agrees with this package to 1e-15; Excel is off by 1.6e-7.",
+        "BESSELI(2.5, 0)": "scipy agrees with this package to 8e-16; Excel is off by 8.6e-9.",
+        "BESSELI(7, 3)": "scipy agrees with this package to 7e-16; Excel is off by 4.4e-9.",
+        "BESSELI(0.5, 1)": "scipy agrees with this package to 4e-16; Excel is off by 8.2e-9.",
+        "BESSELK(1, 1)": "scipy agrees with this package to 4e-16; Excel is off by 2.4e-9.",
+        "IMSQRT(\"-1\")": "√-1 is exactly i. Excel goes through polar form and keeps 6.1e-17.",
+        "IMSQRT(\"-4\")": "√-4 is exactly 2i. Excel keeps 1.2e-16 of polar rounding.",
+    ]
+
     /// Every case, in the order they are written to the sheet.
     static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree
 
