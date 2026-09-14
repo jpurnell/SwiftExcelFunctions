@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`IMPOWER` with an integer exponent is multiplied out, so it agrees with `IMPRODUCT`.**
+  `IMPOWER("i", 2)` returned `"-1+1.22464679914735E-16i"` while `IMPRODUCT("i", "i")`
+  returned `"-1"` — **two routes to one answer inside this package, disagreeing.** That is
+  the failure this whole arrangement exists to prevent, and it outranks agreeing with Excel,
+  which produces the same artefact for the same reason.
+
+  The cause is swift-numerics: `pow(z, n: Int)` is `exp(log(z) · n)` despite taking an `Int`,
+  so `i²` is `exp(iπ)` — and since the nearest `Double` to π is not π, `sin` of it is
+  `1.2246467991473532e-16` rather than nought. That single value is the whole artefact, in
+  both implementations.
+
+  Integer exponents now go through repeated squaring: ⌈log₂ n⌉ multiplications rather than a
+  logarithm and back. A fractional exponent still takes the principal branch, which is the
+  logarithm however one feels about it.
+
+  **A comment claiming the opposite has been corrected.** It said the integer overload
+  "multiplies rather than taking a logarithm and back" — it does not, and nothing tested the
+  claim because the assertion compared the two routes at `1e-9` where they differ at `1e-16`.
+
 ### Added
 
 - **`conformance-workbook divergences`** — a workbook showing every point where this package

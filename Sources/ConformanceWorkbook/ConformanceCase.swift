@@ -56,6 +56,8 @@ enum ConformanceCases {
         "BESSELK(1, 1)": "scipy agrees with this package to 4e-16; Excel is off by 2.4e-9.",
         "IMSQRT(\"-1\")": "√-1 is exactly i. Excel goes through polar form and keeps 6.1e-17.",
         "IMSQRT(\"-4\")": "√-4 is exactly 2i. Excel keeps 1.2e-16 of polar rounding.",
+        "IMPOWER(\"i\", 2)": "i² is exactly -1. Excel returns -1+1.22464679914735E-16i, "
+            + "computing it as exp(log(i)·2); this multiplies instead.",
     ]
 
     /// Every case, in the order they are written to the sheet.

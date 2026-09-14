@@ -117,13 +117,35 @@ final class ComplexFunctionTests: XCTestCase {
 
     /// Excel writes the exponent marker in upper case.
     ///
-    /// Measured on `IMPOWER("i", 2)`: Excel gives `"-1+1.22464679914735E-16i"` and this
-    /// package gave the same digits with a lower-case `e`. These functions return text, so a
-    /// letter is as much of a difference as a digit.
+    /// Measured on `IMPOWER("i", 2)`, which at the time produced an exponent in both. It no
+    /// longer does — integer powers are multiplied out now — so the rule is pinned on a
+    /// component small enough to need the notation on its own.
     func testAnExponentMarkerIsUppercase() throws {
-        let squared = try text("IMPOWER", .text("i"), .number(2))
-        XCTAssertEqual(squared, "-1+1.22464679914735E-16i")
-        XCTAssertFalse(squared.contains("e-"), "the marker must not be lower case")
+        XCTAssertEqual(try text("COMPLEX", .number(1e-20), .number(1)), "1E-20+i")
+        XCTAssertEqual(try text("COMPLEX", .number(1), .number(1e-20)), "1+1E-20i")
+    }
+
+    /// Two routes to one answer must not disagree, which is this package's first principle.
+    ///
+    /// `IMPOWER("i", 2)` used to return `"-1+1.22464679914735E-16i"` while
+    /// `IMPRODUCT("i", "i")` returned `"-1"`. Excel returns the artefact too, so this is a
+    /// place where agreeing with Excel would have meant disagreeing with ourselves.
+    ///
+    /// The cause was swift-numerics: its `pow(z, n: Int)` is `exp(log(z) · n)` despite
+    /// taking an `Int`, and `exp(iπ)` carries `sin` of the nearest `Double` to π, which is
+    /// `1.2246e-16` rather than nought.
+    func testAnIntegerPowerIsTheProductAndNotALogarithm() throws {
+        XCTAssertEqual(try text("IMPOWER", .text("i"), .number(2)), "-1")
+        XCTAssertEqual(try text("IMPOWER", .text("i"), .number(2)),
+                       try text("IMPRODUCT", .text("i"), .text("i")))
+        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(3)),
+                       try text("IMPRODUCT", .text("1+1i"), .text("1+1i"), .text("1+1i")))
+    }
+
+    func testAnIntegerPowerHandlesZeroAndNegativeExponents() throws {
+        XCTAssertEqual(try text("IMPOWER", .text("2+3i"), .number(0)), "1")
+        // (1+i)² is 2i, so its reciprocal is −0.5i.
+        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(-2)), "-0.5i")
     }
 
     /// Excel writes each component to fifteen significant digits, and these return text, so

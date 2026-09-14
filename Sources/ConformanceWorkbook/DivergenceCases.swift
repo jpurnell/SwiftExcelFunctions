@@ -107,6 +107,8 @@ enum DivergenceCases {
         .init(formula: "IMLN(\"-1\")", truth: "3.14159265358979i",
               note: "Both agree here — included so the sheet shows agreement as well as not."),
         .init(formula: "IMPOWER(\"i\", 2)", truth: "-1",
-              note: "i² is exactly −1. BOTH miss it by 1.2e-16 — this package is not always the closer one."),
+              note: "i² is exactly −1. Excel computes exp(log(i)·2) and keeps sin(π) = 1.2e-16; "
+                  + "this multiplies i by itself. Both answers agreed until this package's own "
+                  + "IMPRODUCT was found to disagree with its IMPOWER."),
     ]
 }

@@ -261,11 +261,46 @@ public enum BuiltinComplexFunctions {
     /// `IMDIV(inumber1, inumber2)` — division by zero arrives as `#NUM!`, not `#DIV/0!`.
     public static let imDiv = fold("IMDIV", minArgs: 2, maxArgs: 2) { $0 / $1 }
 
+    /// Raises a complex number to an integer power by repeated squaring.
+    ///
+    /// **Written here because swift-numerics does not do this.** Its `pow(z, n: Int)` is
+    /// `exp(log(z) · n)` — the same polar round-trip as the general case, despite taking an
+    /// `Int`. For `i²` that is `exp(iπ)`, and since the nearest `Double` to π is not π,
+    /// `sin` of it is `1.2246467991473532e-16` rather than zero. The answer comes back as
+    /// `-1 + 1.2246e-16i` instead of `-1`.
+    ///
+    /// Excel does exactly the same thing and returns exactly the same artefact, so matching
+    /// it was never the problem. **The problem was that this package disagreed with
+    /// itself**: `IMPRODUCT("i", "i")` multiplies and returned `-1`, while `IMPOWER("i", 2)`
+    /// went through the logarithm and did not. Two routes to one answer that can disagree is
+    /// the failure this whole arrangement exists to prevent, and it outranks agreeing with
+    /// Excel on a value Excel gets wrong.
+    ///
+    /// Squaring rather than a loop of multiplications: ⌈log₂ n⌉ operations accumulate less
+    /// error than n of them, and for the exponents anyone writes in a spreadsheet the
+    /// difference is exactness rather than speed.
+    private static func raised(_ base: Complex<Double>, toInteger exponent: Int)
+    -> Complex<Double> {
+        guard exponent != 0 else { return Complex(1, 0) }
+        var result = Complex<Double>(1, 0)
+        var factor = exponent < 0 ? Complex<Double>(1, 0) / base : base
+        // Bounded by construction: the magnitude halves every pass and cannot not reach zero.
+        var remaining = exponent.magnitude
+        while remaining > 0 {
+            if remaining & 1 == 1 { result *= factor }
+            factor *= factor
+            remaining >>= 1
+        }
+        return result
+    }
+
     /// `IMPOWER(inumber, number)` — a complex number to a **real** power.
     ///
-    /// An integral exponent goes through the integer overload, which multiplies rather than
-    /// taking a logarithm and back; `IMPOWER(z, 3)` and `IMPRODUCT(z, z, z)` agree exactly
-    /// that way and only approximately otherwise.
+    /// An integral exponent is multiplied out rather than handed to `pow`, so
+    /// `IMPOWER(z, 3)` and `IMPRODUCT(z, z, z)` are the same number rather than two numbers
+    /// that happen to round to the same text. `raised(_:toInteger:)` says why that is not
+    /// academic — swift-numerics takes a logarithm even when the exponent is an `Int`, and
+    /// `IMPOWER("i", 2)` came back as `-1 + 1.2246e-16i` because of it.
     public static let imPower = ExcelFunction(
         name: "IMPOWER", minArgs: 2, maxArgs: 2
     ) { values in
@@ -278,9 +313,11 @@ public enum BuiltinComplexFunctions {
             return error
         case .ready(let number, let suffix):
             let result: Complex<Double>
-            if exponent == exponent.rounded(), abs(exponent) <= 1024 {
-                result = Complex.pow(number, Int(exponent))
+            if exponent == exponent.rounded(), exponent.magnitude <= 1024 {
+                result = raised(number, toInteger: Int(exponent))
             } else {
+                // A fractional power has no meaning but the principal branch, which is the
+                // logarithm and back whatever this package would prefer.
                 result = Complex.pow(number, Complex(exponent, 0))
             }
             return written(result, suffix: suffix ?? "i")

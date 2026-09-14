@@ -247,7 +247,7 @@ enum ConformanceWorkbook {
 
     private static func writeExactSheet(_ sheet: Worksheet) throws {
         sheet.write("Values that are exact by definition, where no reference is needed", to: "A1")
-        sheet.write("the last row is one both get wrong — this package is not always closer.",
+        sheet.write("each of these has an exactly known answer, so no reference is needed.",
                     to: "A2")
 
         for (index, title) in ["formula", "Excel", "this package", "the exact answer",
