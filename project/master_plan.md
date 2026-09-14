@@ -76,8 +76,34 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**0.9.2 — the container layer.** A file's bytes are identified before anything parses them,
-and a password-protected workbook opens rather than being called corrupt.
+**0.10.0 — measured against Excel.** Two categories closed, and a way of settling what Excel
+actually does rather than what it is documented to do.
+
+- [x] **`compatibility` closed** — all 26 pre-2010 statistical spellings, every one
+      delegating to its modern twin rather than reimplementing it
+- [x] **`engineering` closed** — `BESSEL*` bound to BusinessMath, the 26 complex rows to
+      swift-numerics, and `CONVERT`'s unit table. Not one needed mathematics written
+- [x] `conformance-workbook` — emits a spreadsheet of formulas, reads back what Excel
+      answered, and fails only on a disagreement that is not already accounted for
+- [x] 467 functions registered, 1,319 tests in the main suite, gate 45/45 at 0/0
+
+**Nine defects were found by asking Excel, and none of them by any other means.** Three
+rounds and 264 questions: fifteen-significant-digit formatting for complex components, the
+upper-case exponent marker, the error code for an upper-case suffix, and `CONVERT`'s
+temperature prefix — which was wrong twice, in opposite directions, before one measurement in
+each direction settled it on `K` alone.
+
+Every one of those passed the unit tests throughout, and the corpus could not help because it
+calls none of these functions. **Documentation was wrong five times**; the fifth was
+Microsoft stating that an upper-case suffix gives `#VALUE!` where Excel gives `#NUM!`.
+
+**Ten disagreements remain and are recorded rather than fixed**, because in each one Excel is
+the less accurate party — attributed against scipy or against a definition, not asserted. See
+the trap on this in Known traps: for the checker this project is building towards, *being
+right is not a workbook defect either*.
+
+**Previously — 0.9.2, the container layer.** A file's bytes are identified before anything
+parses them, and a password-protected workbook opens rather than being called corrupt.
 
 - [x] `ContainerKind` — ZIP, OLE2 compound file, or neither, from the leading signature
 - [x] `CompoundFile` — the OLE2 container, both the FAT and mini-FAT paths, chains guarded
@@ -545,7 +571,15 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-12 — reconciled for 0.9.2: the container layer. Three of the four
+**Last Updated:** 2026-09-14 — reconciled for 0.10.0: the compatibility and engineering
+categories both closed, and `conformance-workbook` built to settle what Excel does rather
+than what it is documented to do. Three rounds, 264 questions, nine defects fixed, two
+inferences corrected, and one claim about BusinessMath's Bessel accuracy retracted — scipy
+showed Excel was the inaccurate one. Two traps added: a third opinion settles which of two
+implementations is wrong, and being more accurate than the file is not a defect in the file.
+Also repaired: 0.9.3 shipped without a CHANGELOG link reference. 467 functions, 1,319 tests.
+
+Earlier: 2026-09-12 — reconciled for 0.9.2: the container layer. Three of the four
 workbooks 0.9.1 called corrupt were nothing of the kind, so a file's bytes are now identified
 before anything parses them and a protected workbook opens instead. SHA-1 was dropped and
 restored, having broken the only files the feature existed for — recorded in Current Status as
