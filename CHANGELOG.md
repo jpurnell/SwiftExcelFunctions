@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`conformance-workbook divergences`** — a workbook showing every point where this package
+  and Excel disagree, with an independent reference beside each so the claim can be checked
+  rather than believed.
+
+  The error columns are **formulas**, so Excel computes its own distance from scipy's answer
+  in front of whoever opens the file. That is a different kind of evidence from being told
+  the number, and it matters here because the first conformance round got this exact question
+  backwards — four differences were written up as an accuracy problem in BusinessMath on no
+  evidence beyond its being the newer implementation.
+
+  Two sheets. **Bessel** puts 45 points against scipy 1.18.1 — a grid rather than the eight
+  that happened to surface, because a systematic error looks quite different from a few
+  unlucky values, and the sheet totals which side is closer. **Exact values** covers answers
+  that need no reference at all: J₀(0) is 1 because the series has only its first term at
+  zero, and √−1 is i because that is what i means.
+
+  The last row of that second sheet is `IMPOWER("i", 2)`, where **both** miss exactly −1 by
+  1.2 × 10⁻¹⁶. It is there deliberately: a sheet about being right that only listed wins
+  would be advocacy rather than evidence.
+
 ## [0.10.0] - 2026-09-14
 
 ### Fixed

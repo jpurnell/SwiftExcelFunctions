@@ -128,16 +128,22 @@ enum ConformanceWorkbook {
     /// agreement column would call every error a disagreement.
     private static func writeOurAnswer(for testCase: ConformanceCase, to ref: String,
                                        in sheet: Worksheet) {
+        writeOurAnswer(forFormula: testCase.formula, to: ref, in: sheet)
+    }
+
+    /// Writes this package's answer to one formula as a value Excel will not recompute.
+    private static func writeOurAnswer(forFormula formula: String, to ref: String,
+                                       in sheet: Worksheet) {
         let answer: CellValue
         do {
             answer = try FormulaEvaluator.evaluate(
-                try FormulaParser.parse(testCase.formula),
+                try FormulaParser.parse(formula),
                 cells: NoCells(), names: NoNames())
         } catch let failure {
-            report("could not evaluate \(testCase.formula): \(failure)")
+            report("could not evaluate \(formula): \(failure)")
             #if canImport(os)
             Logger(subsystem: "ConformanceWorkbook", category: "emit")
-                .error("could not evaluate \(testCase.formula, privacy: .public): \(String(describing: failure), privacy: .public)")
+                .error("could not evaluate \(formula, privacy: .public): \(String(describing: failure), privacy: .public)")
             #endif
             sheet.write("!evaluation failed", to: ref)
             return
@@ -178,6 +184,89 @@ enum ConformanceWorkbook {
         IF(ABS(\(excel)-\(ours))<=0.000000001*MAX(1,ABS(\(ours))), "ok", "DIFFER"), \
         IF(EXACT(\(excel),\(ours)), "ok", "DIFFER"))))
         """
+    }
+
+    // MARK: - Divergences
+
+    /// Emits a sheet showing every point where this package and Excel disagree, with an
+    /// independent reference so Excel can compute its own error.
+    ///
+    /// The error columns are **formulas**, not values. Excel works out how far it is from
+    /// scipy's answer itself, in front of whoever opens the file, which is a different kind
+    /// of evidence from being told the number.
+    static func divergences(to path: String) throws {
+        let workbook = Workbook()
+        try writeBesselSheet(workbook.addSheet(name: "Bessel"))
+        try writeExactSheet(workbook.addSheet(name: "Exact values"))
+        try workbook.save(to: URL(fileURLWithPath: path))
+        say("wrote \(DivergenceCases.bessel.count) Bessel points and "
+            + "\(DivergenceCases.exact.count) exact cases to \(path)")
+        say("open it in Excel — the error columns are formulas, so Excel computes its own.")
+    }
+
+    private static func writeBesselSheet(_ sheet: Worksheet) throws {
+        sheet.write("Excel's Bessel functions against an independent reference", to: "A1")
+        sheet.write("reference values: scipy 1.18.1. error columns are relative, "
+                    + "and Excel computes them.", to: "A2")
+
+        let headers = ["formula", "Excel", "this package", "scipy (reference)",
+                       "Excel's error", "our error", "closer to the reference"]
+        for (index, title) in headers.enumerated() {
+            sheet.write(title, to: "\(columnLetter(index))4")
+        }
+
+        for (offset, point) in DivergenceCases.bessel.enumerated() {
+            let row = 5 + offset
+            sheet.write(point.formula, to: "A\(row)")
+            writeQuestion(point.formula, to: "B\(row)", in: sheet)
+            writeOurAnswer(forFormula: point.formula, to: "C\(row)", in: sheet)
+            sheet.write(point.reference, to: "D\(row)")
+            // Relative error, guarded so a reference of zero does not divide by it.
+            sheet.writeFormula("IF(D\(row)=0,ABS(B\(row)),ABS(B\(row)-D\(row))/ABS(D\(row)))",
+                               to: "E\(row)")
+            sheet.writeFormula("IF(D\(row)=0,ABS(C\(row)),ABS(C\(row)-D\(row))/ABS(D\(row)))",
+                               to: "F\(row)")
+            sheet.writeFormula("IF(E\(row)<F\(row),\"Excel\",IF(F\(row)<E\(row),\"this package\",\"tie\"))",
+                               to: "G\(row)")
+        }
+
+        let last = 4 + DivergenceCases.bessel.count
+        let summary = last + 2
+        sheet.write("how many points each is closer on", to: "A\(summary)")
+        sheet.write("Excel", to: "A\(summary + 1)")
+        sheet.writeFormula("COUNTIF(G5:G\(last),\"Excel\")", to: "B\(summary + 1)")
+        sheet.write("this package", to: "A\(summary + 2)")
+        sheet.writeFormula("COUNTIF(G5:G\(last),\"this package\")", to: "B\(summary + 2)")
+        sheet.write("tie", to: "A\(summary + 3)")
+        sheet.writeFormula("COUNTIF(G5:G\(last),\"tie\")", to: "B\(summary + 3)")
+        sheet.write("Excel's worst relative error", to: "A\(summary + 5)")
+        sheet.writeFormula("MAX(E5:E\(last))", to: "B\(summary + 5)")
+        sheet.write("ours, worst", to: "A\(summary + 6)")
+        sheet.writeFormula("MAX(F5:F\(last))", to: "B\(summary + 6)")
+    }
+
+    private static func writeExactSheet(_ sheet: Worksheet) throws {
+        sheet.write("Values that are exact by definition, where no reference is needed", to: "A1")
+        sheet.write("the last row is one both get wrong — this package is not always closer.",
+                    to: "A2")
+
+        for (index, title) in ["formula", "Excel", "this package", "the exact answer",
+                               "what it shows"].enumerated() {
+            sheet.write(title, to: "\(columnLetter(index))4")
+        }
+        for (offset, item) in DivergenceCases.exact.enumerated() {
+            let row = 5 + offset
+            sheet.write(item.formula, to: "A\(row)")
+            writeQuestion(item.formula, to: "B\(row)", in: sheet)
+            writeOurAnswer(forFormula: item.formula, to: "C\(row)", in: sheet)
+            sheet.write(item.truth, to: "D\(row)")
+            sheet.write(item.note, to: "E\(row)")
+        }
+    }
+
+    /// `A`, `B`, `C`… for a zero-based column index. Seven columns; no need for `AA`.
+    private static func columnLetter(_ index: Int) -> String {
+        String(UnicodeScalar(UInt8(65 + index)))
     }
 
     // MARK: - Check
@@ -293,7 +382,8 @@ enum ConformanceWorkbook {
 
         var description: String {
             switch self {
-            case .usage: return "usage: conformance-workbook <emit|check> <path.xlsx>"
+            case .usage:
+                return "usage: conformance-workbook <emit|check|divergences> <path.xlsx>"
             case .noConformanceSheet: return "no sheet named Conformance in that file"
             case .disagreed(let differed, let uncalculated):
                 var reasons: [String] = []
@@ -332,6 +422,7 @@ do {
     switch arguments[0] {
     case "emit": try ConformanceWorkbook.emit(to: arguments[1])
     case "check": try ConformanceWorkbook.check(arguments[1])
+    case "divergences": try ConformanceWorkbook.divergences(to: arguments[1])
     default: throw ConformanceWorkbook.Failure.usage
     }
 } catch let failure {
