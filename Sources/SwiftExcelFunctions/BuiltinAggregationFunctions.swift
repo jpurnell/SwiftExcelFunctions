@@ -46,8 +46,11 @@ public enum BuiltinAggregationFunctions {
         for index in 0..<width {
             var product = 1.0
             for array in arrays {
-                // Anything that is not a number contributes zero, so the whole
-                // term drops out rather than the whole sum failing.
+                // **An error is the answer, not a dropped term.** Text and blanks
+                // contribute zero so the term falls out, but `#N/A` anywhere in the
+                // rectangle makes the whole sum `#N/A` — which is what Excel does, and what
+                // stops a total quietly reading low because one input is missing.
+                if case .error = array[index] { return array[index] }
                 guard case .number(let value) = array[index] else {
                     product = 0
                     break
@@ -209,18 +212,34 @@ public enum BuiltinAggregationFunctions {
 
         // Try numeric comparison first
         if let criteriaNum = Double(operand) {
-            guard let valueNum = numericValue(value) else {
+            // **`COUNTIF` coerces text that reads as a number**, unlike a plain comparison:
+            // `COUNTIF(H2:H23, "1")` counts the cells holding the *text* "1" as well as
+            // those holding the number. Measured: 11 in Excel where this answered 6.
+            let coerced: Double?
+            if case .text(let text) = value.resolved {
+                coerced = Double(text.trimmingCharacters(in: .whitespaces))
+            } else {
+                coerced = numericValue(value)
+            }
+            guard let valueNum = coerced else {
                 // Non-numeric value vs numeric criteria
                 // For equality, non-numeric != number
                 return op == "<>" ? true : false
             }
+            // **Excel's comparison rule applies wherever Excel compares**, and a criterion
+            // is a comparison. `COUNTIF(H2:H23, "1")` counts 0.99999999999999978 as a 1,
+            // because the difference is negligible against the operands — the same rule
+            // that makes `0.1+0.2=0.3` true. Comparing the raw doubles instead answered 6
+            // where Excel answered 11.
+            let difference = ExcelFinalRounding.corrected(
+                valueNum - criteriaNum, lhs: valueNum, rhs: criteriaNum)
             switch op {
-            case ">": return valueNum > criteriaNum
-            case ">=": return valueNum >= criteriaNum
-            case "<": return valueNum < criteriaNum
-            case "<=": return valueNum <= criteriaNum
-            case "<>": return valueNum != criteriaNum
-            case "=": return valueNum == criteriaNum
+            case ">": return difference > 0
+            case ">=": return difference >= 0
+            case "<": return difference < 0
+            case "<=": return difference <= 0
+            case "<>": return difference != 0
+            case "=": return difference == 0
             default: return false
             }
         }

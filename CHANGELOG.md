@@ -161,6 +161,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   old refusal is reversed, with the reasoning it encoded kept beside the rule that replaced
   it.
 
+- **Five more, found by widening the census from 38 workbooks to 488.**
+
+  - **Excel's comparison rule applies wherever Excel compares** — a criterion included.
+    `COUNTIF(H2:H23, "1")` counts `0.99999999999999978` as a 1, because the difference is
+    negligible against the operands: the same rule that makes `0.1+0.2=0.3` true. Comparing
+    the raw doubles answered 6 where Excel answered 11.
+  - **A number becomes text at fifteen significant digits.** `"Donations: " & SUM(D2:D389)`
+    answered `"Donations: 1052.949999999999"` where Excel writes `"Donations: 1052.95"` — a
+    `Double` carries seventeen digits and Excel shows fifteen. This is Excel *displaying* a
+    number rather than *storing* one, which is the distinction ADR-003 turns on.
+  - **Arithmetic that leaves the reals is `#NUM!`**, not infinity. A spreadsheet has no way
+    to show an infinity and every function downstream would have to invent an answer for it.
+  - **`SUMPRODUCT` propagates an error** rather than dropping the term. Text and blanks
+    contribute zero so their term falls out; `#N/A` makes the whole sum `#N/A`, which is
+    what stops a total quietly reading low because one input is missing.
+  - **Implicit intersection is not modelled, so it is not judged.** `=annRevenue - annCost`
+    where those names span fifteen columns is, in Excel's pre-dynamic-array semantics, the
+    one column that lines up with the formula's own position; this package returns the whole
+    row, because the alignment needs the array's origin on the sheet and a `CellMatrix` does
+    not carry one. Comparing the first element instead would be right one time in fifteen —
+    214 cells in one sweep — so the oracle declines to compare them at all.
+
 - **Two reading rules in the oracle, so the checker does not accuse a workbook of our gaps.**
 
   **A line break is stored two ways in the same file** — a newline in the shared-string
@@ -188,6 +210,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   findings are its own author's bugs is still a good checker — it is a test suite that
   writes its own cases from real files. What it must never do is report them as somebody
   else's.
+
+  **The number it ships on: 488 workbooks, 486 clean, 2 findings.** One is an `NPV` that
+  differs in the fourth significant figure and has not been attributed to either side; the
+  other is a genuine one. Getting there took fifteen fixes to this package and five reading
+  rules in the oracle, which is the census doing its job.
 
   `stale-value` ships **opt-in** (`--experimental`) rather than enabled, for the reason
   `PROPOSAL_workbook_validator.md` §9 gives: a checker needs a false-positive number before

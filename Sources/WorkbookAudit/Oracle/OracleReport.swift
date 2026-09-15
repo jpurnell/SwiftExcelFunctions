@@ -318,6 +318,13 @@ public enum OracleTolerance {
         guard ours.isFinite, excel.isFinite else { return false }
         let difference = abs(ours - excel)
         if difference <= floor { return true }
+        // **A cached exact zero against a residue is agreement.** ADR-003 implements Excel's
+        // final-operation snap and deliberately does not implement its 15-significant-digit
+        // store — so a subtraction whose operands Excel had already rounded can come out at
+        // exactly 0 there and at 2.5e-11 here. That is the stated cost of the decision, and
+        // the checker must not charge it to somebody's workbook. A real disagreement is a
+        // number of ordinary size, not a billionth.
+        if excel == 0, abs(ours) < relative { return true }
         let scale = Swift.max(abs(ours), abs(excel))
         return difference <= (tolerance ?? relative) * scale
     }

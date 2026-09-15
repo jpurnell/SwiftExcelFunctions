@@ -438,6 +438,21 @@ public enum WorkbookOracle {
                 }
                 return .differed(ours: ours, excel: excel)
             }
+            // **Implicit intersection is not modelled, so it is not judged.**
+            //
+            // `=annRevenue - annCost` where those names span fifteen columns is, in Excel's
+            // pre-dynamic-array semantics, the *one* column that lines up with the formula's
+            // own position. This package returns the whole row: the alignment needs the
+            // array's origin on the sheet, and a `CellMatrix` does not carry one.
+            //
+            // Comparing the first element instead would be right one time in fifteen and
+            // wrong the rest, and every one of those is a cell the checker would accuse a
+            // workbook over. 214 of them in one corpus sweep.
+            if case .array(let matrix) = ours, matrix.elements.count > 1 {
+                if case .array = excel {} else {
+                    return .notComparable("implicit intersection: \(matrix.rows)×\(matrix.columns)")
+                }
+            }
             // An iterative solver is compared against the band Excel documents for itself,
             // not against the general float tolerance.
             let tolerance = named.contains(where: {

@@ -126,6 +126,68 @@ final class CorpusFoundSemanticsTests: XCTestCase {
                        try number("PMT(0.05/12,360,500000)"), accuracy: 1e-9)
     }
 
+    // MARK: - What the last corpus sweep left
+
+    /// Excel answers `#NUM!` for an overflow, not infinity.
+    ///
+    /// A spreadsheet has no way to show an infinity, and every function downstream would
+    /// have had to invent an answer for one. `B11*EXP(B12*B13)` in a corpus workbook caches
+    /// `#NUM!` where this answered `inf`.
+    func testArithmeticThatLeavesTheRealsIsRefused() throws {
+        // Written as powers rather than as `1E+300`: the parser does not read a
+        // scientific-notation literal, which is a separate gap and is recorded as one.
+        XCTAssertEqual(try evaluate("(10^300)*(10^300)"), .error(.num))
+        XCTAssertEqual(try evaluate("-(10^300)*(10^300)"), .error(.num))
+        XCTAssertEqual(try evaluate("(10^300)+(10^300)"), .number(2e300))
+        XCTAssertEqual(try evaluate("(10^308)*10"), .error(.num))
+    }
+
+    /// A number becomes text at **fifteen significant digits**, which is what Excel writes.
+    ///
+    /// `"Donations: " & SUM(D2:D389)` cached `"Donations: 1052.95"` and answered
+    /// `"Donations: 1052.949999999999"` — a `Double` carries seventeen digits and Excel
+    /// shows fifteen. This is Excel *displaying* a number rather than *storing* one, which
+    /// is why ADR-003 declines the storage limit and this is implemented.
+    func testANumberBecomesTextAtFifteenDigits() throws {
+        XCTAssertEqual(try evaluate("\"x\"&(0.1+0.2)"), .text("x0.3"))
+        XCTAssertEqual(try evaluate("\"x\"&(77.1)"), .text("x77.1"))
+        XCTAssertEqual(try evaluate("\"x\"&(1/3)"), .text("x0.333333333333333"))
+        // A whole number keeps its integer form.
+        XCTAssertEqual(try evaluate("\"x\"&42"), .text("x42"))
+    }
+
+    /// Excel's comparison rule applies wherever Excel compares — a criterion included.
+    ///
+    /// `COUNTIF(H2:H23, "1")` counts `0.99999999999999978` as a 1, because the difference is
+    /// negligible against the operands. Comparing the raw doubles answered 6 where Excel
+    /// answered 11.
+    func testACriterionComparesTheWayExcelCompares() throws {
+        let column = CellValue.array(CellMatrix(row: [
+            .number(0.99999999999999978), .number(1), .number(0.98), .number(1),
+        ]))
+        guard let countif = FunctionRegistry.builtin.function(named: "COUNTIF") else {
+            return XCTFail("COUNTIF is not registered")
+        }
+        XCTAssertEqual(try countif.evaluate([column, .text("1")]), .number(3))
+        XCTAssertEqual(try countif.evaluate([column, .text("<1")]), .number(1))
+    }
+
+    /// `SUMPRODUCT` propagates an error rather than dropping the term.
+    ///
+    /// Text and blanks contribute zero so their term falls out; `#N/A` makes the whole sum
+    /// `#N/A`, which is what stops a total quietly reading low because one input is missing.
+    func testSumproductPropagatesAnError() throws {
+        let good = CellValue.array(CellMatrix(row: [.number(1), .number(2)]))
+        let missing = CellValue.array(CellMatrix(row: [.number(1), .error(.na)]))
+        let texty = CellValue.array(CellMatrix(row: [.number(1), .text("x")]))
+        guard let sumproduct = FunctionRegistry.builtin.function(named: "SUMPRODUCT") else {
+            return XCTFail("SUMPRODUCT is not registered")
+        }
+        XCTAssertEqual(try sumproduct.evaluate([good, good]), .number(5))
+        XCTAssertEqual(try sumproduct.evaluate([good, missing]), .error(.na))
+        XCTAssertEqual(try sumproduct.evaluate([good, texty]), .number(1))
+    }
+
     private func number(_ formula: String) throws -> Double {
         guard case .number(let value) = try evaluate(formula) else {
             XCTFail("\(formula) did not produce a number"); return .nan

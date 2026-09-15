@@ -480,7 +480,15 @@ public enum FormulaEvaluator {
             if n.truncatingRemainder(dividingBy: 1) == 0 && Swift.abs(n) < 1e15 {
                 return String(Int(n))
             }
-            return String(n)
+            // **Fifteen significant digits, which is what Excel writes.** `"x" & 1052.95`
+            // is "x1052.95" in Excel and was "x1052.949999999999" here, because a `Double`
+            // carries seventeen digits and Excel shows fifteen.
+            //
+            // This is Excel *displaying* a number, not Excel *storing* one — ADR-003
+            // declines to reproduce the storage limit, which makes arithmetic less
+            // accurate, and this is the opposite: text that does not match Excel's is a
+            // difference a caller sees directly, in a label they read.
+            return fifteenSignificantDigits(n)
         case .bool(let b):
             return b ? "TRUE" : "FALSE"
         case .blank:
@@ -499,13 +507,31 @@ public enum FormulaEvaluator {
         }
     }
 
+    /// A number written as Excel writes it: fifteen significant digits.
+    ///
+    /// `FloatingPointFormatStyle` rather than `String(format:)`, which the safety auditor
+    /// rejects — a C format string carries its own type expectations and nothing checks
+    /// them. The locale is fixed to POSIX for the same reason the complex functions fix
+    /// theirs: this is a number to be parsed by whatever reads the cell, and a decimal comma
+    /// would make it unparseable in about half the world.
+    ///
+    /// - Parameter value: The number.
+    /// - Returns: Its text.
+    private static func fifteenSignificantDigits(_ value: Double) -> String {
+        guard value.isFinite else { return String(value) }
+        return value.formatted(
+            .number.precision(.significantDigits(1...15))
+                .grouping(.never)
+                .locale(Locale(identifier: "en_US_POSIX")))
+    }
+
     // MARK: - Arithmetic Operations
 
     private static func addValues(_ left: CellValue, _ right: CellValue) throws -> CellValue {
         do {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
-            return .number(l + r)
+            return overflowChecked(l + r)
         } catch {
             return .error(.value)
         }
@@ -515,7 +541,7 @@ public enum FormulaEvaluator {
         do {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
-            return .number(l - r)
+            return overflowChecked(l - r)
         } catch {
             return .error(.value)
         }
@@ -525,7 +551,7 @@ public enum FormulaEvaluator {
         do {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
-            return .number(l * r)
+            return overflowChecked(l * r)
         } catch {
             return .error(.value)
         }
@@ -536,7 +562,7 @@ public enum FormulaEvaluator {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
             guard r != 0 else { return .error(.div0) }
-            return .number(l / r)
+            return overflowChecked(l / r)
         } catch {
             return .error(.value)
         }
@@ -552,6 +578,19 @@ public enum FormulaEvaluator {
         } catch {
             return .error(.value)
         }
+    }
+
+    /// An arithmetic result, or `#NUM!` where it left the reals.
+    ///
+    /// **Excel answers `#NUM!` for an overflow, not infinity.** `B11*EXP(B12*B13)` in a
+    /// corpus workbook caches `#NUM!` where this answered `inf`, and a spreadsheet has no
+    /// way to show an infinity — every function downstream would have had to invent an
+    /// answer for it.
+    ///
+    /// - Parameter value: What the arithmetic produced.
+    /// - Returns: The value, or the error Excel gives.
+    private static func overflowChecked(_ value: Double) -> CellValue {
+        value.isFinite ? .number(value) : .error(.num)
     }
 
     private static func negateValue(_ value: CellValue) throws -> CellValue {
