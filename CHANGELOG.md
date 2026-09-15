@@ -27,6 +27,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A whole-row reference keeps its full width** — SwiftExcelCore moved to `0.9.0`, where
+  `clipped(to:)` no longer pulls `$3:$3` back to the last populated column.
+
+  Everything that counts *positions* depended on it. `INDEX('Raw'!$C$4:$XFD$4, 24)` answered
+  `#REF!` against a fourteen-column matrix where Excel reads the blank at column Z, and
+  `COLUMNS($A$1:$XFD$1)` answered `0` rather than `16384`.
+
+  A whole column still pulls back, because there the original reasoning is right: `$B:$B`
+  really does mean "whatever is in column B" rather than 1,048,576 cells. **A row is 16,384
+  at most**, so the premise never applied to it, and the cost was correctness rather than
+  memory. Two tests upstream asserted the old behaviour and were reversed, each recording why.
+
+  **Measured: the corpus that drove this work reaches 100.00% — every one of 170,524
+  comparable cells.** A second corpus of 150 workbooks that none of this work has seen sits
+  at **99.89%**, which is the more useful number: what remains there is a long tail across
+  `VLOOKUP`, `SKEW`, `GETPIVOTDATA` and a dozen others rather than the four concentrated
+  causes this effort cleared.
+
 - **A scalar function handed a range now applies to every element.** Excel does this without
   being asked — `RIGHT($BQ$1:$BW$1, 1)` is seven last-characters, not an error — and
   `SUMPRODUCT(BQ10:BW10, VALUE(RIGHT($BQ$1:$BW$1, 1)))` depends on it: the inner call has to
