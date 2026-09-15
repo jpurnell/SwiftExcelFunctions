@@ -10,7 +10,8 @@ let package = Package(
         .library(name: "WorkbookContainer", targets: ["WorkbookContainer"]),
         .executable(name: "workbook-census", targets: ["WorkbookCensus"]),
         .executable(name: "conformance-workbook", targets: ["ConformanceWorkbook"]),
-        .executable(name: "workbook-oracle", targets: ["WorkbookOracleTool"])
+        .executable(name: "workbook-oracle", targets: ["WorkbookOracleTool"]),
+        .executable(name: "xlsx-audit", targets: ["XlsxAudit"])
     ],
     dependencies: [
         // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
@@ -128,6 +129,20 @@ let package = Package(
                 .product(name: "SwiftXLSX", package: "SwiftXLSX")
             ],
             path: "Sources/WorkbookOracleTool",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
+        // The motivating application: the checks, runnable by someone who is not us.
+        // An executable over the library rather than a test, for the same reason the
+        // census and the oracle are — and because a validator nobody outside this repo
+        // can run is a library, not a tool.
+        .executableTarget(
+            name: "XlsxAudit",
+            dependencies: [
+                "WorkbookAudit",
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/XlsxAudit",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
         .target(

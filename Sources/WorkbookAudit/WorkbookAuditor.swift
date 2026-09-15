@@ -49,7 +49,9 @@ public struct WorkbookAuditor: Sendable {
     /// ```swift
     /// WorkbookAuditor(checkers: WorkbookAuditor.standard + WorkbookAuditor.experimental)
     /// ```
-    public static let experimental: [any WorkbookChecker] = [ConsistencyChecker()]
+    public static let experimental: [any WorkbookChecker] = [
+        ConsistencyChecker(), StaleValueChecker(),
+    ]
 
     /// Audits a workbook.
     ///
@@ -81,9 +83,14 @@ public struct WorkbookAuditor: Sendable {
         let provider = WorkbookValueProvider(
             workbook: workbook, currentSheet: workbook.sheets.first?.name ?? "")
 
+        // Bound to a constant before the closure captures it: a `var` captured by an
+        // escaping @Sendable closure is a mutable value crossing an isolation boundary,
+        // which Swift 6 refuses and is right to.
+        let cells = addresses
         return AuditModel(
             cells: provider,
-            addresses: addresses,
-            graph: DependencyGraph(cells: addresses, provider: provider))
+            addresses: cells,
+            workbook: workbook,
+            graph: { DependencyGraph(cells: cells, provider: provider) })
     }
 }

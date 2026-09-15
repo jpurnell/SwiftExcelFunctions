@@ -118,37 +118,47 @@ public enum BuiltinFinancialFunctions {
         return .number(result)
     }
 
-    /// Core IPMT calculation.
+    /// The interest part of one payment, with Excel's sign convention.
+    ///
+    /// **A positive `pv` gives a negative answer**, because the money leaves. Microsoft's
+    /// own example says so: `IPMT(0.1/12, 1, 3*12, 8000)` is −66.67, which is exactly
+    /// −(8000 × 0.1/12). This was inverted for years and no test caught it, because every
+    /// test used a *negative* `pv` — where the inverted answer looks entirely plausible and
+    /// the two errors cancel in `IPMT + PPMT = PMT`.
+    ///
+    /// Found by the workbook checker: a mortgage schedule in a real file cached −492.61 for
+    /// a `PPMT` where this answered −7807.61 — the interest and the principal swapped over,
+    /// 720 cells of it.
+    ///
+    /// ## Closed form rather than a loop
+    ///
+    /// The balance after `k` payments is `pv(1+r)^k + pmt · s(k)`, where `s(k)` is the
+    /// annuity factor — `((1+r)^k − 1)/r`, times `(1+r)` when payments fall at the start of
+    /// the period. The interest for period `per` is that balance at `per − 1`, times the
+    /// rate, negated. A loop accumulating the same thing drifts, and is `O(per)` for an
+    /// answer that is `O(1)`.
+    ///
+    /// - Parameters:
+    ///   - rate: The rate per period.
+    ///   - per: Which payment, counting from 1.
+    ///   - nper: How many payments in all.
+    ///   - pv: The present value.
+    ///   - fv: The value left at the end.
+    ///   - type: 0 for payments at the end of the period, 1 for the start.
+    /// - Returns: The interest part of that payment.
     private static func computeIPMT(
         rate: Double, per: Double, nper: Double, pv: Double, fv: Double, type: Double
     ) -> Double {
+        guard rate != 0 else { return 0.0 }
+        // A payment made at the start of the first period has accrued nothing.
+        if type != 0, per <= 1 { return 0.0 }
+
         let payment = computePMT(rate: rate, nper: nper, pv: pv, fv: fv, type: type)
-
-        if rate == 0 {
-            return 0.0
-        }
-
-        // Calculate remaining balance at the start of the period
-        var balance = pv
-        let intPer = Int(per)
-        if type != 0 {
-            // Beginning of period: for period 1 the interest is 0
-            if intPer == 1 {
-                return 0.0
-            }
-            for _ in 1..<intPer {
-                let interest = balance * rate
-                balance += payment * (1.0 + rate) + interest
-            }
-            return balance * rate / (1.0 + rate)
-        } else {
-            // End of period
-            for _ in 1..<intPer {
-                let interest = balance * rate
-                balance += payment + interest
-            }
-            return balance * rate
-        }
+        let elapsed = per - 1
+        let growth = pow(1.0 + rate, elapsed)
+        let annuity = (growth - 1.0) / rate * (type != 0 ? 1.0 + rate : 1.0)
+        let balance = pv * growth + payment * annuity
+        return -balance * rate
     }
 
     // MARK: - PPMT

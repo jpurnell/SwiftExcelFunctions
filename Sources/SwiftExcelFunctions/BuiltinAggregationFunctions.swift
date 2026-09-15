@@ -251,6 +251,21 @@ public enum BuiltinAggregationFunctions {
             return false
         }
 
+        // `*` and `?` are Excel's wildcards, and three things are true about them that a
+        // straight pattern match would get wrong:
+        //
+        // - only equality reads them — `">a*"` compares against three characters;
+        // - they match **text**, so `COUNTIF(range, "*")` counts the cells holding text and
+        //   passes over the numbers, which is what makes it "how many are filled in";
+        // - a blank is not matched by `*` at all, having been answered above.
+        // A tilde with no wildcard after it still needs the matcher, which is the only
+        // thing that knows `~*` means one asterisk rather than two characters.
+        if ExcelWildcard.isPattern(operand) || operand.contains("~"), op == "=" || op == "<>" {
+            guard case .text = value else { return op == "<>" }
+            let matched = ExcelWildcard.matches(valueText, pattern: operand)
+            return op == "=" ? matched : !matched
+        }
+
         switch op {
         case "=":
             return valueText.caseInsensitiveCompare(operand) == .orderedSame
@@ -285,6 +300,18 @@ public enum BuiltinAggregationFunctions {
             return String(n)
         case .bool(let b):
             return b ? "TRUE" : "FALSE"
+        case .date(let date):
+            // A date criterion is its serial, because that is what the cells it will be
+            // compared against hold. Left out, `SUMIFS(amounts, month, I$1, …)` refused the
+            // whole call — 200 cells in one corpus workbook, every one wrapped in an
+            // `IFERROR` that turned the refusal into a plausible zero.
+            return criteriaString(from: .number(BuiltinDateTimeFunctions.dateToSerial(date)))
+        case .blank:
+            // An empty criterion cell matches the empty cells, which is what Excel does
+            // and is occasionally what a half-filled template means to ask.
+            return ""
+        case .formula(_, let cached):
+            return cached.flatMap(criteriaString)
         default:
             return nil
         }

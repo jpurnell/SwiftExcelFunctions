@@ -274,6 +274,39 @@ public enum OracleTolerance {
     /// Functions whose answer is found by iterating rather than by evaluating.
     public static let iterativeFunctions: Set<String> = ["XIRR", "IRR", "MIRR", "RATE", "YIELD"]
 
+    /// Text with its line breaks written one way.
+    ///
+    /// **Excel stores the same line break two ways in the same file.** A cell holding one is
+    /// a newline in the shared-string table:
+    ///
+    /// ```xml
+    /// <si><t>Nassau Inn
+    /// 10 Palmer Square</t></si>
+    /// ```
+    ///
+    /// while the *cached value* of a formula that copies that cell is a carriage return,
+    /// escaped:
+    ///
+    /// ```xml
+    /// <c r="D24"><f>D21</f><v>Nassau Inn_x000D_10 Palmer Square</v></c>
+    /// ```
+    ///
+    /// So `=D21` appears to disagree with itself. Three cells in one corpus workbook, and a
+    /// false accusation each — they were about to be reported as somebody's stale values.
+    ///
+    /// Every form is read as a newline, on both sides, so the comparison stays symmetric
+    /// whichever encoding turns up where.
+    ///
+    /// - Parameter text: The text as read.
+    /// - Returns: The text with `_x000D_`, `\r\n` and `\r` all as `\n`.
+    static func readable(_ text: String) -> String {
+        guard text.contains("_x000D_") || text.contains("\r") else { return text }
+        return text
+            .replacingOccurrences(of: "_x000D_", with: "\n")
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+    }
+
     /// Whether two numbers agree.
     ///
     /// - Parameters:
@@ -312,7 +345,7 @@ public enum OracleTolerance {
             guard let first = matrix.elements.first else { return false }
             return agree(first, excel, tolerance: tolerance)
         case (.text(let a), .text(let b)):
-            return a == b
+            return readable(a) == readable(b)
         case (.bool(let a), .bool(let b)):
             return a == b
         case (.error(let a), .error(let b)):

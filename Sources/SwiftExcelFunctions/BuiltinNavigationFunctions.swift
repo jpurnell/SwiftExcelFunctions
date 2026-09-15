@@ -552,8 +552,13 @@ public enum BuiltinNavigationFunctions {
     static let index = ExcelFunction(name: "INDEX", minArgs: 2, maxArgs: 4) { args in
         catching {
             let array = asMatrix(args[0])
-            let rowNum = Int(try toNumber(args[1]))
-            guard rowNum >= 1 else { return .error(.value) }
+            // **Zero means "all of them", and so does an omitted argument.** `INDEX(a,0,2)`
+            // is the whole of column 2 and `INDEX(a,,2)` is the same thing written shorter.
+            // Requiring 1 or more refused `IFERROR("C"&INDEX(MATCH(F5,C:C,0),,1),"")` — 119
+            // cells in one corpus workbook, every one falling through to the `IFERROR` and
+            // answering "" where Excel answered "C50".
+            let rowNum = try position(args, at: 1)
+            guard rowNum >= 0 else { return .error(.value) }
 
             // `INDEX(reference, row, column, area)` — the reference form's fourth argument
             // chooses among the areas of a multi-area reference. This package has no
@@ -570,6 +575,7 @@ public enum BuiltinNavigationFunctions {
 
             // Two arguments is the one-index form; three or four supply a column as well.
             guard args.count >= 3 else {
+                guard rowNum >= 1 else { return .array(array) }
                 // One index. Along a vector it counts cells; across a block Excel
                 // means the whole row, which is now a value this can return.
                 if array.isVector {
@@ -580,14 +586,37 @@ public enum BuiltinNavigationFunctions {
                 return .array(CellMatrix(row: row))
             }
 
-            let colNum = Int(try toNumber(args[2]))
-            guard colNum >= 1 else { return .error(.value) }
+            let colNum = try position(args, at: 2)
+            guard colNum >= 0 else { return .error(.value) }
 
-            guard let value = array.element(row: rowNum - 1, column: colNum - 1) else {
-                return .error(.ref)
+            switch (rowNum, colNum) {
+            case (0, 0):
+                return .array(array)
+            case (0, _):
+                guard let column = array.column(colNum - 1) else { return .error(.ref) }
+                return column.count == 1 ? column[0] : .array(CellMatrix(column: column))
+            case (_, 0):
+                guard let row = array.row(rowNum - 1) else { return .error(.ref) }
+                return row.count == 1 ? row[0] : .array(CellMatrix(row: row))
+            default:
+                guard let value = array.element(row: rowNum - 1, column: colNum - 1) else {
+                    return .error(.ref)
+                }
+                return value
             }
-            return value
         }
+    }
+
+    /// An `INDEX` position argument, where omitted and zero mean the same thing.
+    ///
+    /// - Parameters:
+    ///   - args: The call's arguments.
+    ///   - index: Which one to read.
+    /// - Returns: The position, or 0 for "all of them".
+    private static func position(_ args: [CellValue], at index: Int) throws -> Int {
+        guard index < args.count else { return 0 }
+        if case .blank = args[index] { return 0 }
+        return Int(try toNumber(args[index]))
     }
 
     // MARK: - XLOOKUP

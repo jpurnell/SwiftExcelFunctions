@@ -154,10 +154,29 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         assertError(result, .ref)
     }
 
-    func testINDEXZeroReturnsError() throws {
-        let arr = column([.number(10)])
-        let result = try eval("INDEX", arr, .number(0))
-        assertError(result, .value)
+    /// **Zero means "all of them", not an error.**
+    ///
+    /// Microsoft: "If `row_num` is set to 0, `INDEX` returns the array of values for the
+    /// entire column." An omitted argument means the same thing, which is what
+    /// `INDEX(MATCH(F5,C:C,0),,1)` relies on — 119 cells in one corpus workbook wrote that
+    /// shape, and this package refused every one of them.
+    ///
+    /// This test asserted `#VALUE!` and passed for months. Reversed rather than deleted,
+    /// because the reasoning it encoded — that a position argument below 1 is nonsense —
+    /// is worth seeing beside the rule that replaced it.
+    func testINDEXZeroMeansTheWholeArray() throws {
+        let single = try eval("INDEX", column([.number(10)]), .number(0))
+        XCTAssertEqual(single, .array(CellMatrix(column: [.number(10)])))
+
+        // With a column given, a row of 0 is that whole column; one cell of it is the cell.
+        let grid2 = grid([[.number(1), .number(2)], [.number(3), .number(4)]])
+        XCTAssertEqual(try eval("INDEX", grid2, .number(0), .number(2)),
+                       .array(CellMatrix(column: [.number(2), .number(4)])))
+        XCTAssertEqual(try eval("INDEX", grid2, .number(2), .number(0)),
+                       .array(CellMatrix(row: [.number(3), .number(4)])))
+
+        // A negative position is still nonsense.
+        assertError(try eval("INDEX", column([.number(10)]), .number(-1)), .value)
     }
 
     func testINDEX2D() throws {

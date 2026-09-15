@@ -90,19 +90,54 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
 
     // MARK: - IPMT / PPMT Tests
 
+    /// Microsoft's published example, and the sign it establishes.
+    ///
+    /// `IPMT(0.1/12, 1, 3*12, 8000)` is documented as **−66.67**, which is exactly
+    /// −(8000 × 0.1/12): a positive present value is money you owe, so the interest on it
+    /// leaves, so the answer is negative.
+    ///
+    /// **This test asserted the opposite sign and passed for months.** It used a *negative*
+    /// `pv`, where an inverted answer looks entirely plausible — and the inversion cancels
+    /// in `IPMT + PPMT = PMT`, so the identity test beside it passed too. The workbook
+    /// checker found it in a real mortgage schedule: 720 cells where the interest and the
+    /// principal had swapped places. Both cases are asserted now, and the published one
+    /// first.
     func testIPMT_FirstPeriod() throws {
-        // IPMT(0.065/12, 1, 360, -500000)
-        let result = try eval(
+        let published = try eval(
+            BuiltinFinancialFunctions.ipmt,
+            .number(0.1 / 12.0), .number(1), .number(36), .number(8_000)
+        )
+        XCTAssertEqual(number(published), -66.67, accuracy: 0.01)
+
+        // The same rule with the sign of `pv` reversed: money lent rather than borrowed.
+        let lent = try eval(
             BuiltinFinancialFunctions.ipmt,
             .number(0.065 / 12.0), .number(1), .number(360), .number(-500_000)
         )
-        let interest = number(result)
-        // First month interest on $500K at 6.5%/12 = 500000 * 0.065/12 = 2708.33
-        // But sign: PV is negative (you owe), interest should be negative (paying interest)
-        // Actually with our sign convention: PV = -500000 means you borrowed it
-        // IPMT for period 1 = balance * rate = -500000 * (0.065/12) = -2708.33
-        // But the function returns a positive or negative value based on convention
-        XCTAssertEqual(interest, -2708.33, accuracy: 0.01)
+        XCTAssertEqual(number(lent), 2_708.33, accuracy: 0.01)
+    }
+
+    /// Microsoft's published `PPMT` example: **−75.62** for the first payment.
+    ///
+    /// The principal part of a first payment on a two-year loan, which is the small half —
+    /// the interest is the large one. Reversing them is exactly the defect above, and this
+    /// is the assertion that pins which is which.
+    func testPPMT_FirstPeriodMatchesThePublishedExample() throws {
+        let result = try eval(
+            BuiltinFinancialFunctions.ppmt,
+            .number(0.1 / 12.0), .number(1), .number(24), .number(2_000)
+        )
+        XCTAssertEqual(number(result), -75.62, accuracy: 0.01)
+
+        // And the interest for the same payment is the larger part.
+        let interest = try eval(
+            BuiltinFinancialFunctions.ipmt,
+            .number(0.1 / 12.0), .number(1), .number(24), .number(2_000)
+        )
+        XCTAssertEqual(number(interest), -16.67, accuracy: 0.01)
+        XCTAssertLessThan(number(interest), 0)
+        XCTAssertGreaterThan(abs(number(result)), abs(number(interest)),
+                             "on a two-year loan the principal part is the larger one")
     }
 
     func testIPMT_PPMT_SumEquals_PMT() throws {
@@ -152,12 +187,13 @@ final class BuiltinFinancialFunctionTests: XCTestCase {
             .number(rate), .number(119), .number(nper), .number(pv)
         )
 
-        // Both should be negative (paying interest), early more negative than late
+        // `pv` is negative here — money lent — so the interest arrives and is positive.
+        // What the test is really about is the *magnitude*, which falls as the balance
+        // does, and stating it that way is true whichever way round `pv` is.
         let earlyVal = number(earlyInterest)
         let lateVal = number(lateInterest)
-        // For a standard amortizing loan, early interest magnitude > late interest magnitude
-        XCTAssertLessThan(earlyVal, lateVal,
-                          "Early period interest should be more negative than late period")
+        XCTAssertGreaterThan(abs(earlyVal), abs(lateVal),
+                             "interest is charged on a balance that shrinks")
     }
 
     func testPPMT_InvalidPeriod() throws {

@@ -293,6 +293,28 @@ public enum BuiltinTextFunctions {
             return formatter.string(from: NSNumber(value: number)) ?? formatNumber(number)
         }
 
+        // A format made only of `#` shows nothing for zero.
+        //
+        // `#` means "a digit, if there is one to show" and `0` means "a digit, and a zero
+        // if there is nothing else" — so `TEXT(0, "####")` is the empty string in Excel
+        // while `TEXT(0, "0000")` is "0000". A workbook in the corpus writes
+        // `"… as of June 30, " & TEXT(Reunion_Class + Reunion_year, "####") & ")"` and
+        // Excel's cached answer ends `", )"`, with the zero shown as nothing at all.
+        if !format.isEmpty, format.allSatisfy({ $0 == "#" }) {
+            let rounded = number.rounded()
+            return rounded == 0 ? "" : formatDecimal(rounded, decimals: 0)
+        }
+
+        // A format of nothing but zeros pads to its own width: `TEXT(5, "0000")` is
+        // "0005". One `0` is the ordinary integer format and needs no padding, which is
+        // why the width is only applied above one.
+        if format.count > 1, format.allSatisfy({ $0 == "0" }) {
+            let rounded = number.rounded()
+            let digits = formatDecimal(abs(rounded), decimals: 0)
+            let padding = Swift.max(0, format.count - digits.count)
+            return (rounded < 0 ? "-" : "") + String(repeating: "0", count: padding) + digits
+        }
+
         // Plain decimal formats like "0", "0.00", "0.0"
         if let decimals = decimalPlaces(from: format) {
             return formatDecimal(number, decimals: decimals)

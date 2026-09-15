@@ -59,8 +59,15 @@ enum ExcelDateFormat {
     /// - Returns: The formatted text, or `nil` if the serial is not a date Excel can show.
     static func format(serial: Double, _ format: String) -> String? {
         let days = Int(serial.rounded(.down))
-        guard days >= 1 else { return nil }
-        let (year, month, day) = BuiltinDateTimeFunctions.serialToComponents(days)
+        guard days >= 0 else { return nil }
+        // **Serial 0 is "1900-01-00"** — a day that does not exist, which Excel shows
+        // anyway. It is what an empty cell formatted as a date renders as, and that is a
+        // common thing for a template to contain: 176 cells in one corpus workbook build a
+        // JSON string out of `TEXT(R30, "yyyy-mm-ddThh:MM:ss")` over blank cells, and Excel
+        // cached `1900-01-00T00:00:00` for every one.
+        let (year, month, day) = days == 0
+            ? (1900, 1, 0)
+            : BuiltinDateTimeFunctions.serialToComponents(days)
 
         // The same arithmetic `WEEKDAY` uses: 1 = Sunday.
         let weekday = ((days % 7) + 6) % 7

@@ -457,44 +457,56 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket.** **115 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
+- **The unreviewed bucket.** **107 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
   is `unreviewed` reaching **0** — every row *classified*, not every row implemented. Two of
-  the ten EXCEL categories are now closed: `compatibility` and `engineering`.
+  the ten EXCEL categories are now closed: `compatibility` and `engineering`. `datetime`
+  closed with the 0.11 tranche.
 
   | Category | Rows | What the work is |
   |---|---|---|
-  | lookup | 24 | **Gated.** 18 return arrays and need the array-shape decision first |
+  | lookup | 24 | **Ungated.** The array shape is decided — matrix only, no `#SPILL!` |
   | financial | 21 | Judgment per function; where the honest `out of scope` marks will come from |
-  | math | 20 | Mostly primitives, in the way the first math tranche was |
+  | math | 19 | Mostly primitives, in the way the first math tranche was |
   | information | 13 | `IS*` predicates — this package's own semantics, not arithmetic |
   | database | 12 | `DSUM` and relatives; one criteria-range design serves all twelve |
-  | logical | 11 | This package's semantics again |
+  | logical | 11 | This package's semantics again, plus the `LAMBDA` family, which is not |
   | text | 7 | Near-free, like the text rows already done |
-  | datetime | 7 | Near-free |
 
   The original framing — *"engineering and text are the near-free ones, statistical belongs to
   BusinessMath, lookup and financial and database need judgment"* — held everywhere it has
   been tested. Engineering turned out to need **no mathematics written at all**.
 
+  **And the bucket is not where the demand is.** A sweep of 2,236 workbooks found **eighteen**
+  function names this package could not answer, of which six were Crystal Ball's or somebody's
+  own macros. The other twelve barely intersect the 107: `WEEKNUM` (209 calls), `AVERAGEIFS`
+  (35), `NETWORKDAYS` (12), `SUBTOTAL` (8), `SKEW` (7), `CORREL` (2) — nine of the twelve now
+  answer. **The rest of the bucket measures zero calls across the whole corpus**, which makes
+  it completeness work rather than demand work, and that is worth knowing before spending a
+  week on it.
+
 - **Lookup's array-shape decision.** The gate on the largest remaining category, and unchanged:
   `UNIQUE` and `FILTER` first as the spike, because `HSTACK`/`VSTACK` have statically known
   shapes and would settle nothing.
 
-- **The oracle checker**, unnumbered. Recompute every formula in a real workbook, compare
-  against the value Excel cached, report the disagreements.
+- ~~**The oracle checker**, unnumbered.~~ **Shipped as `stale-value`**, and `xlsx-audit`
+  with it: `swift run xlsx-audit <path>…`, exit 1 on an error finding.
 
-  *(Written as v0.9.0, which the Solver path took. v0.10.0 was then pencilled in here, and
-  that was this session's assumption rather than anyone's decision. **Numbers are assigned at
-  release, not reserved in advance.**)*
+  Both halves of the honesty rule are implemented rather than merely recorded. A refusal or a
+  throw is ours by definition and never reported; twelve function names are excluded by name,
+  each with its citation — the Bessel family and `IMSQRT`/`IMPOWER`, where Excel is the
+  imprecise party, and `YEARFRAC` with the four bond functions that share its day count,
+  where we are. What was skipped is *counted*, so the silence is auditable.
 
-  **`conformance-workbook` is a third of this already built.** It puts formulas to Excel and
-  reads the answers back; the oracle checker does the same against cached values in workbooks
-  nobody wrote for the purpose. What 0.10.0 added is the harder half — the rules for reading
-  a disagreement. Both directions are now known and recorded in Known traps: the ~0.40% where
-  we are wrong must never be reported as a workbook defect, and neither must the cases where
-  **we are right and Excel is not**, of which ten are catalogued.
+  **Its first corpus run reported 559 findings and every one of them was ours.** Four
+  defects, none of which 1,400 unit tests had asked about: operators did not broadcast over
+  rectangles (407 cells), nor did unary negation (176), a formula cell with an empty result
+  read as blank so `ISBLANK` lied (147), and criteria took no wildcards (4). After the fixes,
+  the same 38 workbooks report **zero**. A checker whose first findings are its own author's
+  bugs is still a good checker; what it must never do is report them as somebody else's.
 
-- **v1.0 — `xlsx-audit`.** The motivating application, runnable by someone who is not us.
+- **v1.0 — `xlsx-audit` in someone else's hands.** The executable exists. What v1.0 wants is
+  Tier 2 — `unreachable`, `duplication`, `complexity`, `smells` — each with a census number
+  before it ships, and `consistency` brought below its false-positive rate.
 
 ### Carried, unscheduled
 

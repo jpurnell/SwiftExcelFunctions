@@ -253,49 +253,56 @@ public enum FormulaEvaluator {
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return correctedIfFinal(try addValues(left, right),
-                                    left: left, right: right, depth: depth)
+            return correctedIfFinal(
+                try ArrayBroadcast.combine(left, right) { try addValues($0, $1) },
+                left: left, right: right, depth: depth)
 
         case .subtract(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return correctedIfFinal(try subtractValues(left, right),
-                                    left: left, right: right, depth: depth)
+            return correctedIfFinal(
+                try ArrayBroadcast.combine(left, right) { try subtractValues($0, $1) },
+                left: left, right: right, depth: depth)
 
         case .multiply(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return try multiplyValues(left, right)
+            return try ArrayBroadcast.combine(left, right) { try multiplyValues($0, $1) }
 
         case .divide(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return try divideValues(left, right)
+            return try ArrayBroadcast.combine(left, right) { try divideValues($0, $1) }
 
         case .power(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return try powerValues(left, right)
+            return try ArrayBroadcast.combine(left, right) { try powerValues($0, $1) }
 
         case .negate(let expr):
             let value = try evaluateNode(expr, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = value { return value }
-            return try negateValue(value)
+            // A rectangle negates element by element, which is what makes the `--(…)`
+            // idiom work: `--(range=x)` is a column of ones and zeros, and it is the
+            // commonest way a spreadsheet writes a conditional count.
+            return try ArrayBroadcast.mapped(value) { try negateValue($0) }
 
         case .concatenate(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return .text(coerceToString(left) + coerceToString(right))
+            return ArrayBroadcast.combine(left, right) {
+                .text(coerceToString($0) + coerceToString($1))
+            }
 
         // MARK: Comparison
         case .equal(let lhs, let rhs):
@@ -303,44 +310,56 @@ public enum FormulaEvaluator {
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return .bool(compareValues(left, right) == .orderedSame)
+            return ArrayBroadcast.combine(left, right) {
+                .bool(compareValues($0, $1) == .orderedSame)
+            }
 
         case .notEqual(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return .bool(compareValues(left, right) != .orderedSame)
+            return ArrayBroadcast.combine(left, right) {
+                .bool(compareValues($0, $1) != .orderedSame)
+            }
 
         case .greaterThan(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return .bool(compareValues(left, right) == .orderedDescending)
+            return ArrayBroadcast.combine(left, right) {
+                .bool(compareValues($0, $1) == .orderedDescending)
+            }
 
         case .lessThan(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return .bool(compareValues(left, right) == .orderedAscending)
+            return ArrayBroadcast.combine(left, right) {
+                .bool(compareValues($0, $1) == .orderedAscending)
+            }
 
         case .greaterOrEqual(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            let cmp = compareValues(left, right)
-            return .bool(cmp == .orderedDescending || cmp == .orderedSame)
+            return ArrayBroadcast.combine(left, right) {
+                let order = compareValues($0, $1)
+                return .bool(order == .orderedDescending || order == .orderedSame)
+            }
 
         case .lessOrEqual(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            let cmp = compareValues(left, right)
-            return .bool(cmp == .orderedAscending || cmp == .orderedSame)
+            return ArrayBroadcast.combine(left, right) {
+                let order = compareValues($0, $1)
+                return .bool(order == .orderedAscending || order == .orderedSame)
+            }
 
         // MARK: Function Call
         case .function(let name, let args):
@@ -468,9 +487,11 @@ public enum FormulaEvaluator {
             return ""
         case .error(let e):
             return e.rawValue
-        case .date(let d):
-            let formatter = ISO8601DateFormatter()
-            return formatter.string(from: d)
+        case .date(let date):
+            // A date *is* a number in Excel — the serial — and `&` sees the number. An ISO
+            // string here made `">=" & I4` a criterion no date could match, so
+            // `SUMIFS(amounts, dates, ">="&I$4, …)` summed nothing while looking right.
+            return coerceToString(.number(BuiltinDateTimeFunctions.dateToSerial(date)))
         case .formula(_, let cached):
             return coerceToString(cached ?? .blank)
         case .array:
@@ -569,16 +590,16 @@ public enum FormulaEvaluator {
                                          right: CellValue, depth: Int) -> CellValue {
         guard depth == 0,
               case .number(let value) = result,
-              case .number(let lhs) = normalizeForComparison(left),
-              case .number(let rhs) = normalizeForComparison(right) else {
+              case .number(let lhs) = normalizeForComparison(left, against: right),
+              case .number(let rhs) = normalizeForComparison(right, against: left) else {
             return result
         }
         return .number(ExcelFinalRounding.corrected(value, lhs: lhs, rhs: rhs))
     }
 
     private static func compareValues(_ left: CellValue, _ right: CellValue) -> ComparisonResult {
-        let lNorm = normalizeForComparison(left)
-        let rNorm = normalizeForComparison(right)
+        let lNorm = normalizeForComparison(left, against: right)
+        let rNorm = normalizeForComparison(right, against: left)
 
         switch (lNorm, rNorm) {
         case (.number(let a), .number(let b)):
@@ -613,14 +634,38 @@ public enum FormulaEvaluator {
     }
 
     /// Normalizes a value for comparison, converting blank to its default comparand.
-    private static func normalizeForComparison(_ value: CellValue) -> CellValue {
+    /// A value as the comparison should see it.
+    ///
+    /// **An empty cell is both `0` and `""`**, and which one depends on what it is being
+    /// compared against. Excel answers TRUE to `A1=0` and to `A1=""` for the same empty
+    /// `A1`, which no single normalisation can do: mapping blank to `0` made `A1=""` a
+    /// number against a text and therefore FALSE.
+    ///
+    /// `IF(AND(E20="",G20="No"),1,2)` is how a spreadsheet asks "has this been filled in
+    /// yet", and it answered 2 where Excel cached 1 — found by the workbook checker in a
+    /// real file.
+    ///
+    /// - Parameters:
+    ///   - value: The operand to normalise.
+    ///   - other: What it is being compared against, which decides how a blank reads.
+    /// - Returns: The value to compare.
+    private static func normalizeForComparison(
+        _ value: CellValue, against other: CellValue
+    ) -> CellValue {
         switch value {
         case .blank:
+            if case .text = resolvedForComparison(other) { return .text("") }
             return .number(0)
         case .formula(_, let cached):
-            return normalizeForComparison(cached ?? .blank)
+            return normalizeForComparison(cached ?? .blank, against: other)
         default:
             return value
         }
+    }
+
+    /// The other operand, far enough resolved to say what type it is.
+    private static func resolvedForComparison(_ value: CellValue) -> CellValue {
+        if case .formula(_, let cached) = value { return resolvedForComparison(cached ?? .blank) }
+        return value
     }
 }

@@ -9,6 +9,154 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`xlsx-audit` — the checks, runnable by someone who is not us.**
+
+  ```
+  swift run xlsx-audit Model.xlsx
+  swift run xlsx-audit ~/models --experimental --tsv findings.tsv
+  ```
+
+  Exit `0` clean, `1` at least one error finding, `2` nothing could be read — so CI can gate
+  on it. A warning or a note does not fail the run: those are for a person to judge, and a
+  check that fails a build on a judgement call is a check that gets switched off.
+
+  `--only NAME` runs a single checker, which is what a false-positive census needs; `--tsv`
+  is written **as the run goes** rather than at the end, because this project has three
+  times killed a long corpus run that had produced nothing.
+
+- **`stale-value` — the check nobody else can make.** Excel caches the result of every
+  formula cell, so a saved workbook carries both a program and its claimed output. Recompute
+  the program from the file's own inputs and a disagreement means the number on the screen
+  does not follow from the formula beside it: calculation left on manual, a formula edited
+  and never recalculated, a value pasted over a result.
+
+  **It finds the origin, not the cascade.** Each formula is judged against Excel's cached
+  inputs rather than our recomputation of them, so a stale cell does not poison its
+  dependents — they agree with their own caches and stay silent. One stale edit is one
+  finding, at the cell that was edited.
+
+  The honesty rule is most of the implementation: a disagreement is reported only where *we*
+  are right. Refusals and throws are ours by definition; twelve function names are excluded
+  by name with a citation each — the Bessel family and `IMSQRT`/`IMPOWER`, where Excel is
+  the imprecise party against SciPy and against definitions, and `YEARFRAC` and the four
+  bond functions that share its day count, where **we** are. `Skipped` counts what was
+  passed over and on whose account, so the silence is auditable.
+
+### Fixed
+
+- **Excel's operators apply to rectangles, and did not.**
+
+  `A1:A10*2` is ten products; `--(area=$C4)` is ten ones and zeros. Every binary operator
+  coerced a rectangle to a single number instead, so a comparison against a range collapsed
+  to one `FALSE` and the commonest conditional-count idiom in spreadsheets —
+
+  ```
+  SUMPRODUCT(--(LEN(steps)>1), --(area=$C4), --(dates>=S$3), --(dates<=EOMONTH(S$3,0)))
+  ```
+
+  — answered `0` while looking entirely healthy. Unary negation had the same gap, which is
+  the other half of `--(…)`.
+
+  Now: the result is as tall as the taller operand and as wide as the wider one, a single
+  row is reused down the rectangle and a single column across it — so **a row against a
+  column is a matrix**, which is Excel's answer and surprises most people once — and where
+  a side does not reach, the element is `#N/A` rather than clipped or repeated.
+
+  **Measured: 583 cells in one workbook**, all answering zero.
+
+- **A cell holding a formula is never blank**, whatever the formula produced.
+
+  `IF(…, A3, "")` leaves `<c t="str"><f>…</f><v/></c>` — a formula whose result is the empty
+  string. `ISBLANK` of it is FALSE in Excel, because there is a formula in there. It read as
+  blank here, so `IF(NOT(ISBLANK(G3)),1,0)` answered 0 where Excel cached 1: **147 cells in
+  one workbook.**
+
+  The reader cannot distinguish an empty `<v/>` from a missing `<v>`, so the rule is applied
+  where a reference is read rather than where the file is parsed.
+
+- **`*` and `?` in a criterion.** `COUNTIFS(volunteers, "*")` cached 38 and answered 0,
+  because the criterion was compared as the literal text. Excel's two wildcards and the
+  tilde that escapes them now work across the whole criteria family — `COUNTIF`, `SUMIF(S)`,
+  `AVERAGEIF(S)`, `MAXIFS`, `MINIFS` — with the three rules that are easy to get wrong:
+  only equality reads them, they match **text** so `"*"` passes over the numbers, and the
+  match is anchored at both ends.
+
+- **`TEXT(0, "####")` is the empty string**, and `TEXT(5, "0000")` is `"0005"`. `#` means "a
+  digit if there is one" and `0` means "a digit, or a zero"; the difference shows only at
+  zero, and at zero it is the difference between `", )"` and `", 0)"` in a heading somebody
+  reads.
+
+- **`IPMT` and `PPMT` had swapped places.** A positive present value is money owed, so both
+  parts of a payment are negative — Microsoft's own example says `IPMT(0.1/12, 1, 3*12,
+  8000)` is −66.67, which is exactly −(8000 × 0.1/12). The sign was inverted, so the
+  interest came back as the principal and the principal as the interest.
+
+  **Every test used a negative `pv`**, where an inverted answer looks entirely plausible,
+  and the two inversions cancel in `IPMT + PPMT = PMT` — so the identity test beside it
+  passed throughout. A mortgage schedule in a real file cached −492.61 for a `PPMT` where
+  this answered −7807.61: **720 cells.**
+
+  Also rewritten as a closed form. The balance after *k* payments is `pv(1+r)^k + pmt·s(k)`;
+  the loop that accumulated it was `O(per)` for an answer that is `O(1)`.
+
+- **An empty cell is both `0` and `""`.** Excel answers TRUE to `A1=0` and to `A1=""` for
+  the same empty `A1`, which no single normalisation can do — mapping blank to `0` made
+  `A1=""` a number against a text, and therefore FALSE. Which one a blank reads as now
+  depends on what it is compared against.
+
+  `IF(AND(E20="",G20="No"),1,2)` is how a spreadsheet asks "has this been filled in yet".
+
+- **A date concatenates as its serial**, because that is what a date is in Excel. An ISO
+  string made `">=" & I4` a criterion no date could match, so
+  `SUMIFS(amounts, dates, ">="&I$4, …)` summed nothing while looking right. A date *criterion*
+  reads the same way — `SUMIFS(amounts, month, I$1, …)` had been refusing the whole call.
+
+- **`TEXT(0, "yyyy-mm-dd")` is `"1900-01-00"`** — a day that does not exist, which Excel
+  shows anyway. It is what an empty cell formatted as a date renders as, and a template full
+  of unfilled date cells produces it by the hundred: 176 cells in one workbook built a JSON
+  string out of one.
+
+- **`INDEX` reads 0 and an omitted argument as "all of them"**, which is what Microsoft
+  documents. `IFERROR("C"&INDEX(MATCH(F5,C:C,0),,1),"")` was refused and fell through to its
+  `IFERROR` — 119 cells answering `""` where Excel answered `"C50"`. A test asserting the
+  old refusal is reversed, with the reasoning it encoded kept beside the rule that replaced
+  it.
+
+- **Two reading rules in the oracle, so the checker does not accuse a workbook of our gaps.**
+
+  **A line break is stored two ways in the same file** — a newline in the shared-string
+  table, `_x000D_` in a formula's cached value — so `=D21` appeared to disagree with itself.
+  Both are read as a newline now.
+
+  **A whole-column defined name does not resolve.** `amounts = Expenditures!$D:$D` comes
+  back as unparsed text, because the reader's reference test wants a letter *and* a digit in
+  each half and `$D` has no digit. The name then evaluates to its own text and
+  `SUMIFS(amounts, …)` sums nothing — **1,058 cells in one workbook.** The parser is
+  upstream in SwiftXLSX and a second one here is what the package split exists to prevent,
+  so the defect is recorded and the oracle declines to *judge* a formula it knowingly cannot
+  evaluate. A cell we cannot compare is not a cell that disagrees.
+
+### Changed
+
+- **`AuditModel.graph` is built when a checker asks for it, not before.** The dependency
+  graph is the expensive part of assembling a model, and `stale-value` needs none of it —
+  it judges each formula against cached inputs, so there is no precedent order to compute.
+  Measured on 38 real workbooks: **2 minutes 30 → 7.8 seconds.**
+
+  **Every fix above was found by the checker's own census**, not by a test. Its first run
+  reported 559 findings across 38 workbooks and all 559 were ours; widened to four corpora
+  it found another ten classes, and all of those were ours too. A checker whose first
+  findings are its own author's bugs is still a good checker — it is a test suite that
+  writes its own cases from real files. What it must never do is report them as somebody
+  else's.
+
+  `stale-value` ships **opt-in** (`--experimental`) rather than enabled, for the reason
+  `PROPOSAL_workbook_validator.md` §9 gives: a checker needs a false-positive number before
+  it earns a default, and the number it has so far is *zero findings on the corpora it has
+  been triaged against* — which is not the same as zero false positives on a corpus nobody
+  has looked at.
+
+
 - **Twenty-nine functions, chosen by what the corpus actually calls.**
 
   A sweep of **2,236 workbooks** asked one question — which function names does this

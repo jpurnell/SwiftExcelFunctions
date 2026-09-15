@@ -79,6 +79,45 @@ public enum WorkbookOracle {
         return nil
     }
 
+    /// A defined name in the formula that this package cannot turn into a reference.
+    ///
+    /// **A whole-column name does not resolve.** `amounts = Expenditures!$D:$D` is read by
+    /// SwiftXLSX's `DefinedNameResolver` as an unparsed formula string, because its
+    /// reference test requires a letter *and* a digit in each half and `$D` has no digit.
+    /// The name then evaluates to its own text, and `SUMIFS(amounts, dates, …)` sums
+    /// nothing — 1,058 cells in one corpus workbook, every one of which the checker was
+    /// about to report as somebody's stale value.
+    ///
+    /// **The defect is upstream and is recorded rather than worked around**: the parser
+    /// lives in SwiftXLSX and a second one here is exactly what the package split exists to
+    /// prevent. What belongs here is refusing to *judge* a formula we knowingly cannot
+    /// evaluate. A cell we cannot compare is not a cell that disagrees.
+    ///
+    /// A name whose target is a text *constant* is not this case: the file writes those
+    /// quoted, so the quote is what tells the two apart.
+    ///
+    /// - Parameters:
+    ///   - ast: The formula.
+    ///   - names: The workbook's defined names.
+    ///   - sheet: The sheet the formula is on, for a sheet-scoped name.
+    /// - Returns: The first such name, or `nil`.
+    static func unresolvableName(
+        in ast: FormulaAST, names: NameResolver, sheet: String
+    ) -> String? {
+        for node in OracleFinding.nodes(in: ast) {
+            guard case .namedRange(let name) = node else { continue }
+            guard let target = names.resolve(name, inSheet: sheet.isEmpty ? nil : sheet) else {
+                // No definition at all. Excel cached a value, so it resolved for Excel.
+                return name
+            }
+            if case .formula(.text(let literal)) = target,
+               literal.contains("!"), !literal.contains("\"") {
+                return name
+            }
+        }
+        return nil
+    }
+
     // MARK: - Reading Excel's answers
 
     /// A provider whose references resolve to the value Excel recorded.
@@ -90,10 +129,38 @@ public enum WorkbookOracle {
     struct ExcelCached: CellValueProvider {
         let inner: WorkbookValueProvider
 
-        func value(at ref: CellRef) -> CellValue? { inner.value(at: ref)?.resolved }
+        func value(at ref: CellRef) -> CellValue? { Self.reading(inner.value(at: ref)) }
 
         func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
-            inner.value(at: ref, inSheet: sheet)?.resolved
+            Self.reading(inner.value(at: ref, inSheet: sheet))
+        }
+
+        /// What Excel recorded in a cell, read the way Excel reads it.
+        ///
+        /// `resolved` alone is not enough for one case, and it is a common one: **a cell
+        /// holding a formula is never blank**, whatever the formula produced.
+        ///
+        /// ```xml
+        /// <c r="G3" t="str"><f>IF(…,A3,"")</f><v/></c>
+        /// ```
+        ///
+        /// That cell's result is the empty string, and `ISBLANK(G3)` is FALSE in Excel
+        /// because there is a formula in it. `resolved` gives `.blank` — the reader cannot
+        /// distinguish an empty `<v/>` from a `<v>` that is not there — so `ISBLANK`
+        /// answered TRUE and **147 cells in one workbook** were reported as disagreeing
+        /// with their own cached values.
+        ///
+        /// Found by the workbook checker on its first corpus run, which is what the census
+        /// is for: they were about to be reported as defects in someone's spreadsheet.
+        ///
+        /// - Parameter value: The cell as the reader gives it.
+        /// - Returns: The value a formula referring to that cell should see.
+        static func reading(_ value: CellValue?) -> CellValue? {
+            guard case .formula(_, let cached)? = value else { return value?.resolved }
+            // An uncached formula cell is empty *text*, not an empty cell. The distinction
+            // only matters to the handful of functions that ask — `ISBLANK`, `COUNTA`,
+            // `COUNTBLANK` — and it matters completely to those.
+            return cached ?? .text("")
         }
 
         func lastPopulatedCell() -> CellRef? { inner.lastPopulatedCell() }
@@ -164,6 +231,9 @@ public enum WorkbookOracle {
         }
         if let external = externalReference(in: ast) {
             return .notComparable("external workbook: \(external)")
+        }
+        if let name = unresolvableName(in: ast, names: names, sheet: sheet) {
+            return .notComparable("unresolved name: \(name)")
         }
         guard let excel = cached else { return .notComparable("no cached value") }
 

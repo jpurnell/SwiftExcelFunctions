@@ -265,8 +265,8 @@ the validator imports SwiftXLSX regardless, because it reads files.
 | **1** | `WorkbookAudit` target, `Finding`, `WorkbookChecker`, and `recursion` over `DependencyGraph.cycles` | A real workbook produces a real finding. One checker, end to end |
 | **2** | The false-positive census harness | Every subsequent checker has a number before it ships |
 | **3** | `consistency` with R1C1 normalisation | It finds the planted defect and does not fire across the corpus |
-| **4** | `xlsx-audit` executable and a report format | Someone who is not us can run it |
-| **5** | The oracle checker, hand-triaged | Its corpus findings are workbook defects, not ours |
+| ~~**4**~~ | ~~`xlsx-audit` executable and a report format~~ | **Shipped.** `swift run xlsx-audit <path>…`, exit 1 on an error finding, `--tsv` written as the run goes |
+| ~~**5**~~ | ~~The oracle checker, hand-triaged~~ | **Shipped as `stale-value`.** See below — the triage found four defects, all of them ours |
 | **6** | Tier 2, then the simulation tier starting with errored-trial diagnosis | — |
 
 Step 2 before step 3 is the point. A checker built without a false-positive number is a checker
@@ -274,6 +274,40 @@ that ships noisy and gets disabled.
 
 ---
 
-**Next action:** step 1. `recursion` is the cheapest possible first checker — `DependencyGraph`
-already computes the cycles — so it exercises the whole path, from file to finding, without any
-new analysis to get wrong.
+### What the hand triage actually found
+
+Step 5 said "its corpus findings are workbook defects, not ours". On the first corpus run,
+**559 findings across 38 workbooks, and every one of them was ours.** Four defects, each
+invisible to 1,400 unit tests and each found only by putting a real file to the checker:
+
+| Cells | Defect |
+|---|---|
+| 407 | **Operators did not broadcast over rectangles.** `--(area=$C4)` collapsed to one `FALSE`, so the `SUMPRODUCT` idiom answered `0` while looking healthy |
+| 176 | **Unary negation did not broadcast either**, which is the other half of `--(…)` |
+| 147 | **A formula cell with an empty result read as blank**, so `ISBLANK` lied and `IF(NOT(ISBLANK(G3)),1,0)` answered 0 where Excel cached 1 |
+| 4 | **No wildcards in criteria** (`COUNTIF(range,"*")` counted nothing) and `TEXT(0,"####")` showed `0` where Excel shows nothing |
+
+After the four fixes: **0 findings across the same 38 workbooks.** That is the number the
+checker ships on, and it is the strongest argument for the tool: its first run paid for
+itself in defects found in *us*, before it ever accused anybody's spreadsheet.
+
+The lesson is worth keeping in the proposal because it generalises: **a checker whose
+findings are mostly its own author's bugs is still a good checker** — it is a test suite
+that writes its own cases from real files. What it must never do is *report* them as
+somebody else's.
+
+### One more thing the census forced
+
+The first run took **2 minutes 30 for 38 workbooks**. Almost all of it was building a
+dependency graph that `stale-value` does not use: it judges each formula against Excel's own
+cached inputs, so it needs no precedent order at all. `AuditModel.graph` is now built on
+first access, and the same run takes **7.8 seconds**. The `Requirement` ladder in §3.2 says
+recomputation implies structure; that is wrong for this checker and the laziness is what
+makes the ladder's promise — "a run that only wants `circular-reference` must not pay for a
+Monte Carlo" — true in the other direction too.
+
+---
+
+**Next action:** Tier 2 — `unreachable`, `duplication`, `complexity`, `smells` — each with
+its census number before it ships, and the `consistency` false-positive rate still the one
+number standing between that checker and a default.
