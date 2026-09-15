@@ -1,5 +1,6 @@
 import Foundation
 import SwiftExcelCore
+import SwiftXLSX
 import WorkbookAudit
 
 /// One workbook's result, as a line of the summary file.
@@ -79,8 +80,15 @@ struct Finding {
     let ours: String
     let excel: String
     let functions: String
+    /// The formula itself, written back out.
+    ///
+    /// Without it a row says a cell disagreed and not what it was trying to do, which is
+    /// most of what triage needs — the first pass at these findings had to open the
+    /// workbooks by hand to learn that four hundred of them were one formula shape.
+    let formula: String
 
     init(path: String, finding: OracleFinding) {
+        self.formula = FormulaSerializer.serialize(finding.formula)
         self.path = path
         self.sheet = finding.sheet
         self.cell = finding.cell.reference
@@ -116,11 +124,11 @@ struct Finding {
         }
     }
 
-    static let header = ["path", "sheet", "cell", "outcome", "ours", "excel", "functions"]
-        .joined(separator: "\t")
+    static let header = ["path", "sheet", "cell", "outcome", "ours", "excel", "functions",
+                         "formula"].joined(separator: "\t")
 
     var line: String {
-        [path, sheet, cell, outcome, ours, excel, functions]
+        [path, sheet, cell, outcome, ours, excel, functions, formula]
             .map { $0.replacingOccurrences(of: "\t", with: " ")
                      .replacingOccurrences(of: "\n", with: " ") }
             .joined(separator: "\t")

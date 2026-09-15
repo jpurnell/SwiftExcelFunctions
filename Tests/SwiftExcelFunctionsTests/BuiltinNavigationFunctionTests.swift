@@ -231,10 +231,14 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         XCTAssertEqual(fn.maxArgs, 4)
     }
 
+    /// Four, not three: the reference form takes an `area_num` after the column.
+    ///
+    /// Raised from three when the oracle found seven cells in real workbooks writing
+    /// `INDEX(…, 1, 1, 1)`, which this refused on its argument count alone.
     func testINDEXMetadata() {
         let fn = function(named: "INDEX")
         XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 3)
+        XCTAssertEqual(fn.maxArgs, 4)
     }
 
     func testMATCHMetadata() {

@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`INDEX` accepts the `area_num` argument its reference form takes.** Seven cells in real
+  workbooks write `INDEX(…, 1, 1, 1)`, and this package refused the call on its argument
+  count — a harsher answer than Excel gives to a formula it accepts, and one that says
+  nothing about whether the answer would have been right.
+
+  There is only one area to choose from here, so asking for a second is `#REF!` rather than
+  the first area's answer: a number of the right shape from the wrong place is the plausible
+  wrong answer.
+
+  Measured: `threw` fell from 7 to **zero**, agreement 99.75% → 99.76%.
+
 - **`TEXT` understands date and time format codes.** `TEXT(41583, "ddd")` returned `"41583"`
   — the serial, formatted as the number it is rather than the weekday it was asked for,
   because no branch recognised the code and the numeric path took it.

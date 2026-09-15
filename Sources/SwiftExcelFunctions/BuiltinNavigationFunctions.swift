@@ -549,13 +549,27 @@ public enum BuiltinNavigationFunctions {
     /// With both: reads the position directly, since the array knows its own width.
     ///
     /// Returns `#REF!` if the index is out of bounds.
-    static let index = ExcelFunction(name: "INDEX", minArgs: 2, maxArgs: 3) { args in
+    static let index = ExcelFunction(name: "INDEX", minArgs: 2, maxArgs: 4) { args in
         catching {
             let array = asMatrix(args[0])
             let rowNum = Int(try toNumber(args[1]))
             guard rowNum >= 1 else { return .error(.value) }
 
-            guard args.count == 3 else {
+            // `INDEX(reference, row, column, area)` — the reference form's fourth argument
+            // chooses among the areas of a multi-area reference. This package has no
+            // multi-area reference to choose from, so the only area is the first, and
+            // asking for another is `#REF!` rather than a silent first-area answer.
+            //
+            // Found by the oracle: seven cells wrote `INDEX(…, 1, 1, 1)` and this refused
+            // the call outright on its argument count, which is a harsher answer than Excel
+            // gives to a formula it accepts.
+            if args.count == 4 {
+                let area = Int(try toNumber(args[3]))
+                guard area == 1 else { return .error(.ref) }
+            }
+
+            // Two arguments is the one-index form; three or four supply a column as well.
+            guard args.count >= 3 else {
                 // One index. Along a vector it counts cells; across a block Excel
                 // means the whole row, which is now a value this can return.
                 if array.isVector {
@@ -568,6 +582,7 @@ public enum BuiltinNavigationFunctions {
 
             let colNum = Int(try toNumber(args[2]))
             guard colNum >= 1 else { return .error(.value) }
+
             guard let value = array.element(row: rowNum - 1, column: colNum - 1) else {
                 return .error(.ref)
             }
