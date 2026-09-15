@@ -27,6 +27,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A scalar function handed a range now applies to every element.** Excel does this without
+  being asked — `RIGHT($BQ$1:$BW$1, 1)` is seven last-characters, not an error — and
+  `SUMPRODUCT(BQ10:BW10, VALUE(RIGHT($BQ$1:$BW$1, 1)))` depends on it: the inner call has to
+  produce a seven-element array for the outer one to multiply against.
+
+  **This was 400 cells, the single largest defect the oracle found** — one formula shape
+  repeated down four hundred rows, answering `#VALUE!` because `RIGHT` called `toString` on a
+  range and `VALUE` did the same to what `RIGHT` returned.
+
+  `ExcelFunction.mappedOverArrays()` is written once and applied to the scalar text
+  functions. A dozen copies of the same loop is a dozen chances to broadcast differently, and
+  the difference would show up as a shape rather than as an error. A single-element array
+  broadcasts against a larger one; two genuinely different shapes are `#VALUE!` rather than a
+  guess about which to clip. Joining functions — `CONCATENATE`, `CONCAT`, `TEXTJOIN` — are
+  deliberately excluded, because handing them a range is a different request rather than the
+  same one repeated.
+
+  **Measured: agreement 99.76% → 99.99%**, with `differed` and `threw` both at zero. The only
+  disagreements left in that corpus are 11 cells where a whole-row reference is clipped to the
+  sheet's populated width.
+
 - **`INDEX` accepts the `area_num` argument its reference form takes.** Seven cells in real
   workbooks write `INDEX(…, 1, 1, 1)`, and this package refused the call on its argument
   count — a harsher answer than Excel gives to a formula it accepts, and one that says

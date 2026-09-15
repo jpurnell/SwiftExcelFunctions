@@ -18,10 +18,14 @@ import SwiftExcelCore
 public enum BuiltinTextPrimitives {
 
     /// All text primitives for registration in a ``FunctionRegistry``.
+    /// Every text primitive, with the scalar ones mapped across arrays.
+    ///
+    /// `CONCAT` and `TEXTJOIN` are left alone: both take ranges by definition and join what
+    /// they find, so mapping them across an array would turn one answer into many.
     public static let all: [ExcelFunction] = [
-        char, code, exact, rept, concat, textJoin,
+        char, code, exact, rept,
         textBefore, textAfter, replace, tFunction, value, fixed
-    ]
+    ].map { $0.mappedOverArrays() } + [concat, textJoin]
 
     // MARK: - Characters
 

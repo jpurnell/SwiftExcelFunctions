@@ -16,10 +16,15 @@ import SwiftExcelCore
 public enum BuiltinTextFunctions {
 
     /// All text functions for registration in a ``FunctionRegistry``.
+    /// Every text function, with the scalar ones mapped across arrays.
+    ///
+    /// `CONCATENATE` is deliberately not mapped: it *joins* its arguments, so handing it a
+    /// range is a different request rather than the same one repeated, and Excel refuses it
+    /// too.
     public static let all: [ExcelFunction] = [
-        len, left, right, mid, trim, upper, lower, concatenate, text,
+        len, left, right, mid, trim, upper, lower, text,
         find, search, substitute, proper, clean, numbervalue, unicode, unichar,
-    ]
+    ].map { $0.mappedOverArrays() } + [concatenate]
 
     // MARK: - Type coercion
 
