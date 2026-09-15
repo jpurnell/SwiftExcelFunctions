@@ -51,7 +51,7 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
     func testAllContainsEveryFunctionInTheGroup() {
         XCTAssertEqual(
             Set(BuiltinAggregationFunctions.all.map(\.name)),
-            ["SUM", "SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF",
+            ["SUM", "SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS",
              "SUMPRODUCT", "SUMSQ"])
     }
 

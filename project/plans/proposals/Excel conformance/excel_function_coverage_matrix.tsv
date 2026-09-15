@@ -67,7 +67,7 @@ EXCEL	SIN	math	have	math	0	0	number
 EXCEL	SINH	math	have	primitives	0	0	number
 EXCEL	SQRT	math	have	math	153	7	number
 EXCEL	SQRTPI	math	have	primitives	0	0	number
-EXCEL	SUBTOTAL	math	unreviewed		0	0	function_num,ref1,[ref2],...
+EXCEL	SUBTOTAL	math	have		0	0	function_num,ref1,[ref2],...
 EXCEL	SUM	math	have	aggregation	69194	338	number1,[number2],...
 EXCEL	SUMIF	math	have	aggregation	38	4	range, criteria, [sum_range]
 EXCEL	SUMIFS	math	have	aggregation	78816	4	sum_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
@@ -83,7 +83,7 @@ EXCEL	AVEDEV	statistical	have	spreadsheet statistics	0	0	number1, [number2], ...
 EXCEL	AVERAGE	statistical	have	stats	67	18	number1, [number2], ...
 EXCEL	AVERAGEA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	AVERAGEIF	statistical	have	aggregation	0	0	range, criteria, [average_range]
-EXCEL	AVERAGEIFS	statistical	bindable	PeriodSequence.aggregate	0	0	average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
+EXCEL	AVERAGEIFS	statistical	have	PeriodSequence.aggregate	0	0	average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...
 EXCEL	BETA.DIST	statistical	have	betaCDF	0	0	x,alpha,beta,cumulative,[A],[B]
 EXCEL	BETA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta,[A],[B]
 EXCEL	BINOM.DIST	statistical	have	statistical distributions	0	0	number_s,trials,probability_s,cumulative
@@ -95,8 +95,8 @@ EXCEL	CHISQ.INV	statistical	have	spreadsheet statistics	0	0	probability,deg_free
 EXCEL	CHISQ.INV.RT	statistical	have	DistributionChiSquared.quantile(1-p) — bound	0	0	probability,deg_freedom
 EXCEL	CHISQ.TEST	statistical	have	statistical tests	0	0	actual_range,expected_range
 EXCEL	CONFIDENCE.NORM	statistical	have	statistical tests	0	0	alpha,standard_dev,size
-EXCEL	CONFIDENCE.T	statistical	bindable	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
-EXCEL	CORREL	statistical	bindable	correlationCoefficient	0	0	array1, array2
+EXCEL	CONFIDENCE.T	statistical	have	MovingAverageModel.predictWithConfidence	0	0	alpha,standard_dev,size
+EXCEL	CORREL	statistical	have	correlationCoefficient	0	0	array1, array2
 EXCEL	COUNT	statistical	have	stats	43316	45	value1, [value2], ...
 EXCEL	COUNTA	statistical	have	stats	35	5	value1, [value2], ...
 EXCEL	COUNTBLANK	statistical	have	array	0	0	range
@@ -104,34 +104,34 @@ EXCEL	COUNTIF	statistical	have	aggregation	60	1	range, criteria
 EXCEL	COUNTIFS	statistical	have	aggregation	0	0	criteria_range1, criteria1, [criteria_range2, criteria2]...
 EXCEL	COVARIANCE.P	statistical	have	bindings	124	4	array1,array2
 EXCEL	COVARIANCE.S	statistical	have	bindings	0	0	array1,array2
-EXCEL	DEVSQ	statistical	bindable	sumOfSquaredAvgDiff	0	0	number1, [number2], ...
+EXCEL	DEVSQ	statistical	have	sumOfSquaredAvgDiff	0	0	number1, [number2], ...
 EXCEL	EXPON.DIST	statistical	have	statistical distributions	0	0	x,lambda,cumulative
 EXCEL	F.DIST	statistical	bindable	fCDF	0	0	x,deg_freedom1,deg_freedom2,cumulative
 EXCEL	F.DIST.RT	statistical	have	statistical distributions	0	0	x,deg_freedom1,deg_freedom2
-EXCEL	F.INV	statistical	bindable	fQuantile	0	0	probability,deg_freedom1,deg_freedom2
+EXCEL	F.INV	statistical	have	fQuantile	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.INV.RT	statistical	have	statistical quantiles	0	0	probability,deg_freedom1,deg_freedom2
 EXCEL	F.TEST	statistical	have	statistical tests	0	0	array1,array2
-EXCEL	FISHER	statistical	bindable	fisher	0	0	x
-EXCEL	FISHERINV	statistical	bindable	rho	0	0	y
-EXCEL	FORECAST	statistical	bindable	linearRegression	0	0	x, known_y's, known_x's
+EXCEL	FISHER	statistical	have	fisher	0	0	x
+EXCEL	FISHERINV	statistical	have	rho	0	0	y
+EXCEL	FORECAST	statistical	have	linearRegression	0	0	x, known_y's, known_x's
 EXCEL	FORECAST.ETS	statistical	have	BuiltinForecastETS + BusinessMath fitETS	0	0	target_date, values, timeline, [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.CONFINT	statistical	have	BuiltinForecastETS + forecastWithConfidence	0	0	target_date, values, timeline, [confidence_level], [seasonality], [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.SEASONALITY	statistical	have	BuiltinForecastETS + dominantSeasonLength	0	0	values, timeline, [data_completion], [aggregation]
 EXCEL	FORECAST.ETS.STAT	statistical	have	BuiltinForecastETS + BusinessMath fitETS	0	0	values, timeline, statistic_type, [seasonality], [data_completion], [aggregation]
-EXCEL	FORECAST.LINEAR	statistical	bindable	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
+EXCEL	FORECAST.LINEAR	statistical	have	LinearTrend.trainedForecast	0	0	x, known_y's, known_x's
 EXCEL	FREQUENCY	statistical	have	spreadsheet statistics	0	0	data_array, bins_array
 EXCEL	GAMMA	statistical	have	gamma and modes	0	0	number
 EXCEL	GAMMA.DIST	statistical	have	statistical distributions	0	0	x,alpha,beta,cumulative
 EXCEL	GAMMA.INV	statistical	have	statistical quantiles	0	0	probability,alpha,beta
-EXCEL	GAMMALN	statistical	bindable	logFactorial	0	0	x
+EXCEL	GAMMALN	statistical	have	logFactorial	0	0	x
 EXCEL	GAMMALN.PRECISE	statistical	have	gamma and modes	0	0	x
 EXCEL	GAUSS	statistical	have	gamma and modes	0	0	z
-EXCEL	GEOMEAN	statistical	bindable	geometricMean	0	0	number1, [number2], ...
+EXCEL	GEOMEAN	statistical	have	geometricMean	0	0	number1, [number2], ...
 EXCEL	GROWTH	statistical	bindable	TimeSeries.exponential	0	0	known_y's, [known_x's], [new_x's], [const]
-EXCEL	HARMEAN	statistical	bindable	harmonicMean	0	0	number1, [number2], ...
+EXCEL	HARMEAN	statistical	have	harmonicMean	0	0	number1, [number2], ...
 EXCEL	HYPGEOM.DIST	statistical	have	statistical tests	0	0	sample_s,number_sample,population_s,number_pop,cumulative
 EXCEL	INTERCEPT	statistical	have	bindings	0	0	known_y's, known_x's
-EXCEL	KURT	statistical	bindable	kurtosis	0	0	number1, [number2], ...
+EXCEL	KURT	statistical	have	kurtosis	0	0	number1, [number2], ...
 EXCEL	LARGE	statistical	have	stats	0	0	array, k
 EXCEL	LINEST	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [const], [stats]
 EXCEL	LOGEST	statistical	bindable	ExponentialTrend	0	0	known_y's, [known_x's], [const], [stats]
@@ -151,12 +151,12 @@ EXCEL	NORM.DIST	statistical	have	bindings	0	0	x,mean,standard_dev,cumulative
 EXCEL	NORM.INV	statistical	have	bindings	0	0	probability,mean,standard_dev
 EXCEL	NORM.S.DIST	statistical	have	bindings	0	0	z,cumulative
 EXCEL	NORM.S.INV	statistical	have	bindings	2	1	probability
-EXCEL	PEARSON	statistical	bindable	correlationCoefficient	0	0	array1, array2
+EXCEL	PEARSON	statistical	have	correlationCoefficient	0	0	array1, array2
 EXCEL	PERCENTILE.EXC	statistical	have	spreadsheet statistics	0	0	array,k
 EXCEL	PERCENTILE.INC	statistical	have	stats	0	0	array,k
 EXCEL	PERCENTRANK.EXC	statistical	have	gamma and modes	0	0	array,x,[significance]
 EXCEL	PERCENTRANK.INC	statistical	have	spreadsheet statistics	0	0	array,x,[significance]
-EXCEL	PERMUT	statistical	bindable	permutation	0	0	number, number_chosen
+EXCEL	PERMUT	statistical	have	permutation	0	0	number, number_chosen
 EXCEL	PERMUTATIONA	statistical	have	gamma and modes	0	0	number, number-chosen
 EXCEL	PHI	statistical	have	gamma and modes	0	0	x
 EXCEL	POISSON.DIST	statistical	have	statistical distributions	0	0	x,mean,cumulative
@@ -165,12 +165,12 @@ EXCEL	QUARTILE.EXC	statistical	have	spreadsheet statistics	0	0	array, quart
 EXCEL	QUARTILE.INC	statistical	have	spreadsheet statistics	0	0	array,quart
 EXCEL	RANK.AVG	statistical	have	bindings	0	0	number,ref,[order]
 EXCEL	RANK.EQ	statistical	have	bindings	0	0	number,ref,[order]
-EXCEL	RSQ	statistical	bindable	rSquared	0	0	known_y's,known_x's
-EXCEL	SKEW	statistical	bindable	skew	0	0	number1, [number2], ...
-EXCEL	SKEW.P	statistical	bindable	skewP	0	0	number 1, [number 2],...
+EXCEL	RSQ	statistical	have	rSquared	0	0	known_y's,known_x's
+EXCEL	SKEW	statistical	have	skew	0	0	number1, [number2], ...
+EXCEL	SKEW.P	statistical	have	skewP	0	0	number 1, [number 2],...
 EXCEL	SLOPE	statistical	have	bindings	0	0	known_y's, known_x's
 EXCEL	SMALL	statistical	have	stats	0	0	array, k
-EXCEL	STANDARDIZE	statistical	bindable	standardize	0	0	x, mean, standard_dev
+EXCEL	STANDARDIZE	statistical	have	standardize	0	0	x, mean, standard_dev
 EXCEL	STDEV.P	statistical	have	stats	0	0	number1,[number2],...
 EXCEL	STDEV.S	statistical	have	stats	86410	42	number1,[number2],...
 EXCEL	STDEVA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
@@ -179,7 +179,7 @@ EXCEL	STEYX	statistical	have	spreadsheet statistics	0	0	known_y's, known_x's
 EXCEL	T.DIST	statistical	bindable	studentTPDF	0	0	x,deg_freedom, cumulative
 EXCEL	T.DIST.2T	statistical	have	statistical distributions	0	0	x,deg_freedom
 EXCEL	T.DIST.RT	statistical	have	spreadsheet statistics	0	0	x,deg_freedom
-EXCEL	T.INV	statistical	bindable	tQuantile	0	0	probability,deg_freedom
+EXCEL	T.INV	statistical	have	tQuantile	0	0	probability,deg_freedom
 EXCEL	T.INV.2T	statistical	have	statistical quantiles	0	0	probability,deg_freedom
 EXCEL	T.TEST	statistical	have	spreadsheet statistics	0	0	array1,array2,tails,type
 EXCEL	TREND	statistical	bindable	linearRegression	0	0	known_y's, [known_x's], [new_x's], [const]
@@ -246,7 +246,7 @@ EXCEL	YIELD	financial	have	bondYield	0	0	settlement, maturity, rate, pr, redempt
 EXCEL	YIELDDISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
 EXCEL	YIELDMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, pr, [basis]
 EXCEL	DATE	datetime	have	datetime	171	6	year,month,day
-EXCEL	DATEDIF	datetime	unreviewed		0	0	start_date,end_date,unit
+EXCEL	DATEDIF	datetime	have		0	0	start_date,end_date,unit
 EXCEL	DATEVALUE	datetime	have	datetime	0	0	date_text
 EXCEL	DAY	datetime	have	datetime	5906	16	serial_number
 EXCEL	DAYS	datetime	have	datetime	0	0	end_date, start_date
@@ -254,20 +254,20 @@ EXCEL	DAYS360	datetime	bindable	DayCountConvention.days	0	0	start_date,end_date,
 EXCEL	EDATE	datetime	have	datetime	0	0	start_date, months
 EXCEL	EOMONTH	datetime	have	datetime	1723	22	start_date, months
 EXCEL	HOUR	datetime	have	datetime	0	0	serial_number
-EXCEL	ISOWEEKNUM	datetime	unreviewed		0	0	date
+EXCEL	ISOWEEKNUM	datetime	have		0	0	date
 EXCEL	MINUTE	datetime	have	datetime	0	0	serial_number
 EXCEL	MONTH	datetime	have	datetime	9686	19	serial_number
-EXCEL	NETWORKDAYS	datetime	unreviewed		0	0	start_date, end_date, [holidays]
-EXCEL	NETWORKDAYS.INTL	datetime	unreviewed		0	0	start_date, end_date, [weekend], [holidays]
+EXCEL	NETWORKDAYS	datetime	have		0	0	start_date, end_date, [holidays]
+EXCEL	NETWORKDAYS.INTL	datetime	have		0	0	start_date, end_date, [weekend], [holidays]
 EXCEL	NOW	datetime	have	datetime	37	13	(no arguments)
 EXCEL	SECOND	datetime	have	datetime	0	0	serial_number
 EXCEL	TIME	datetime	have	datetime	0	0	hour, minute, second
-EXCEL	TIMEVALUE	datetime	unreviewed		0	0	time_text
+EXCEL	TIMEVALUE	datetime	have		0	0	time_text
 EXCEL	TODAY	datetime	have	datetime	37	7	(no arguments)
 EXCEL	WEEKDAY	datetime	have	datetime	5477	6	serial_number,[return_type]
-EXCEL	WEEKNUM	datetime	unreviewed		0	0	serial_number,[return_type]
+EXCEL	WEEKNUM	datetime	have		0	0	serial_number,[return_type]
 EXCEL	WORKDAY	datetime	have	datetime	0	0	start_date, days, [holidays]
-EXCEL	WORKDAY.INTL	datetime	unreviewed		0	0	start_date, days, [weekend], [holidays]
+EXCEL	WORKDAY.INTL	datetime	have		0	0	start_date, days, [weekend], [holidays]
 EXCEL	YEAR	datetime	have	datetime	21589	36	serial_number
 EXCEL	YEARFRAC	datetime	have	bindings	3425	9	start_date, end_date, [basis]
 EXCEL	AND	logical	have	logic	4629	50	logical1, [logical2], ...
@@ -498,7 +498,7 @@ EXCEL	GAMMAINV	compatibility	have	SwiftExcelFunctions	0	0	probability,alpha,beta
 EXCEL	HYPGEOMDIST	compatibility	have	SwiftExcelFunctions	0	0	sample_s,number_sample,population_s,number_pop
 EXCEL	LOGINV	compatibility	have	SwiftExcelFunctions	0	0	probability, mean, standard_dev
 EXCEL	LOGNORMDIST	compatibility	have	always cumulative; LOGNORM.DIST takes the flag as a required argument	0	0	x,mean,standard_dev
-EXCEL	MODE	compatibility	bindable	mode	0	0	number1,[number2],...
+EXCEL	MODE	compatibility	have	mode	0	0	number1,[number2],...
 EXCEL	NEGBINOMDIST	compatibility	have	SwiftExcelFunctions	0	0	number_f,number_s,probability_s
 EXCEL	NORMDIST	compatibility	have	bindings	0	0	x,mean,standard_dev,cumulative
 EXCEL	NORMINV	compatibility	have	bindings	0	0	probability,mean,standard_dev

@@ -17,7 +17,7 @@ public enum BuiltinAggregationFunctions {
 
     /// All aggregation functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
-        sum, sumif, sumifs, countif, countifs, averageif, sumproduct, sumsq,
+        sum, sumif, sumifs, countif, countifs, averageif, averageifs, sumproduct, sumsq,
     ]
 
     // MARK: - Products
@@ -488,6 +488,63 @@ public enum BuiltinAggregationFunctions {
                 }
             }
 
+            return .number(try safeDivide(total, Double(count)))
+        }
+    }
+
+    // MARK: - AVERAGEIFS
+
+    /// `AVERAGEIFS(average_range, criteria_range1, criteria1, …)` — the mean of the rows
+    /// meeting **every** criterion.
+    ///
+    /// The most-called function this package could not answer: **35 calls** in the corpus
+    /// sweep, all in one workbook, all returning `#NAME?` for want of a name.
+    ///
+    /// Two details separate it from ``sumifs``, and both are Excel's doing rather than
+    /// ours:
+    ///
+    /// - **The value range comes first**, as it does in `SUMIFS` and `MAXIFS` and *not* as
+    ///   it does in `AVERAGEIF`, where the criteria range leads and the value range is an
+    ///   optional third argument. Reading the two the same way puts the criteria where the
+    ///   values should be and averages the wrong column without erroring.
+    /// - **No matching row is `#DIV/0!`**, not zero. `MAXIFS` answers zero for an empty
+    ///   selection and this answers an error, so there is no consistent rule across the
+    ///   `*IFS` family to infer from — each is what Excel documents for that function.
+    ///
+    /// Only numbers are averaged. Text in the value range is skipped rather than counted
+    /// as zero, which is what changes a mean rather than merely a total.
+    static let averageifs = ExcelFunction(name: "AVERAGEIFS", minArgs: 3, maxArgs: nil) { args in
+        catching {
+            // The value range, then (range, criterion) pairs — so an odd count is a
+            // criterion with no range or a range with no criterion.
+            guard args.count >= 3, (args.count - 1) % 2 == 0 else { return .error(.value) }
+            if let error = args.first(where: { if case .error = $0 { return true } else { return false } }) {
+                return error
+            }
+
+            let candidates = toArray(args[0])
+            var conditions: [(range: [CellValue], criterion: String)] = []
+            for index in stride(from: 1, to: args.count, by: 2) {
+                guard let criterion = criteriaString(from: args[index + 1]) else {
+                    return .error(.value)
+                }
+                conditions.append((toArray(args[index]), criterion))
+            }
+
+            var total = 0.0
+            var count = 0
+            for row in candidates.indices {
+                let matches = conditions.allSatisfy { condition in
+                    let value = row < condition.range.count ? condition.range[row] : .blank
+                    return matchesCriteria(value, condition.criterion)
+                }
+                guard matches, let number = numericValue(candidates[row]) else { continue }
+                total += number
+                count += 1
+            }
+
+            // Excel's answer to "the average of nothing" is an error, not zero.
+            guard count > 0 else { return .error(.div0) }
             return .number(try safeDivide(total, Double(count)))
         }
     }

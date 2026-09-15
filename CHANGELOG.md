@@ -9,6 +9,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Twenty-nine functions, chosen by what the corpus actually calls.**
+
+  A sweep of **2,236 workbooks** asked one question — which function names does this
+  package fail to answer — and the answer was **eighteen names**, not the 115 the coverage
+  matrix carried as unreviewed. The two lists barely overlap, and the measurement reordered
+  the work:
+
+  | Name | Calls | Books | What it needed |
+  |---|---|---|---|
+  | `RANDOMNORMAL` | 10,801 | 1 | *Crystal Ball's, not Excel's* |
+  | **`WEEKNUM`** | 209 | 1 | a build |
+  | **`AVERAGEIFS`** | 35 | 1 | a build |
+  | **`NETWORKDAYS`** | 12 | 3 | a build |
+  | **`SUBTOTAL`** | 8 | 1 | a build |
+  | **`SKEW`** | 7 | 3 | a binding |
+  | **`CORREL`** | 2 | 1 | a binding |
+  | `YIELDMAT`, `YIELDDISC` | 3 | 2 | financial, still open |
+  | **`MODE`, `FORECAST`, `RSQ`** | 1 each | 1 | a binding, or an alias |
+  | `LINEST` | 1 | 1 | array-shaped, still open |
+  | `BS`, `MYLAMBDA`, `MAXEXP`, `CALLOPTION` | 1 each | 1 | *someone's own macros* |
+
+  **Every statistical name on that list was already implemented upstream**, under a name no
+  search for the Excel spelling would reach — `skewS`, `correlationCoefficient`, `rSquared`.
+  `MODE` and `GAMMALN` were already implemented *here*, under `MODE.SNGL` and
+  `GAMMALN.PRECISE`, and were answering `#NAME?` for the sake of a full stop.
+
+  What landed:
+
+  - **The working-day family.** `NETWORKDAYS`, `NETWORKDAYS.INTL` and `WORKDAY.INTL` join
+    the `WORKDAY` that was already here. The weekend argument has two spellings and they
+    are not interchangeable — a **code** from Excel's own dialog, or a seven-character
+    **mask** reading Monday first, where `1` marks a day that does *not* work. `"0000011"`
+    reads as the number 11 if given the chance, turning "Saturday and Sunday" into "Sunday
+    only" — a plausible answer four days in seven — so the argument's *type* decides which
+    spelling it is, never what it looks like.
+
+    Checked against `numpy.busday_count` and `busday_offset` across all fourteen weekend
+    codes, over a month that starts on a Tuesday so that an off-by-one mapping cannot hide.
+
+  - **`WEEKNUM`, `ISOWEEKNUM`, `DATEDIF`, `TIMEVALUE`.** `WEEKNUM` numbers the week ten
+    ways and `ISOWEEKNUM` the one way that is a standard: 1 January 2016 is week 1 to the
+    first and week 53 *of 2015* to the second, which is a difference of a year rather than
+    of a week. ISO weeks were checked against Python's `date.isocalendar()`.
+
+    **`DATEDIF`'s `"MD"` unit reproduces Excel's own wrong answer**, deliberately.
+    `DATEDIF("2016-01-31", "2016-03-01", "MD")` is −1 in Excel, because the borrow is
+    February's 29 days against a gap of 30, and Microsoft's reference calls the unit "not
+    recommended" for exactly that reason. ADR-001 makes Excel the specification; fixing it
+    here would put us in disagreement with the sheet in the one unit its own vendor warns
+    about.
+
+  - **`AVERAGEIFS`.** The value range comes first — `SUMIFS`'s order, *not* `AVERAGEIF`'s,
+    where the criteria range leads. Reading the two alike averages the wrong column without
+    erroring. No matching row is `#DIV/0!`, where `MAXIFS` on the same shape answers zero:
+    there is no consistent rule across the `*IFS` family to infer, only what Excel
+    documents for each.
+
+  - **`SUBTOTAL`.** Eleven aggregates behind one number, in two blocks. **The 101–111 block
+    answers exactly what 1–11 answers**, and that is stated rather than hidden: the
+    hundreds ignore rows the user hid by hand, row visibility is a property of the *sheet*,
+    and an evaluator handed `[CellValue]` has no way to ask. The nesting rule — a
+    `SUBTOTAL` skips other `SUBTOTAL`s inside its range — needs the cells' *formulas* and
+    is likewise not modelled. A test pins both, so they are decisions rather than
+    oversights.
+
+  - **Eighteen statistical bindings**: `SKEW`, `SKEW.P`, `KURT`, `CORREL`, `PEARSON`,
+    `RSQ`, `FORECAST`, `FORECAST.LINEAR`, `DEVSQ`, `GEOMEAN`, `HARMEAN`, `STANDARDIZE`,
+    `FISHER`, `FISHERINV`, `PERMUT`, `F.INV`, `T.INV`, `CONFIDENCE.T` — every expected
+    value checked against SciPy or NumPy, none against what this package returns.
+
+    The argument order is what these tests are really for. Excel writes
+    `FORECAST(x, known_y, known_x)` with **the y series in the middle** and BusinessMath's
+    regression takes `(x, y)`; a binding that passes them straight through fits x on y and
+    answers 3.05 where the answer is 6.60. In range, from the wrong line, and invisible.
+
+  - **`MODE` and `GAMMALN` as aliases** of `MODE.SNGL` and `GAMMALN.PRECISE`, joining
+    `NORMSINV` and the four beside it.
+
+  **Measured: the coverage matrix moves 350 `have` → 379, `unreviewed` 115 → 107,
+  `bindable` 41 → 20.** Of the eighteen unanswerable names, six were Crystal Ball's or
+  someone's own macros and are not ours to answer; of the twelve that were, nine now
+  answer.
+
+
 - **`workbook-oracle`** — the Excel oracle as a resumable executable, and `WorkbookOracle` in
   `WorkbookAudit` as the library it drives.
 

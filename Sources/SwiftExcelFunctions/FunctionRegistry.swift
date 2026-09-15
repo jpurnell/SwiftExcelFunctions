@@ -106,6 +106,10 @@ public struct FunctionRegistry: Sendable {
             BuiltinPhonetic.all,
             BuiltinNavigationFunctions.all,
             BuiltinDateTimeFunctions.all,
+            BuiltinWeekFunctions.all,
+            BuiltinStatisticalBindings.all,
+            BuiltinSubtotal.all,
+            BuiltinWorkingDayFunctions.all,
             BuiltinAggregationFunctions.all,
             BuiltinArrayFunctions.all,
             BuiltinRiskSolverFunctions.all,
@@ -159,6 +163,10 @@ public struct FunctionRegistry: Sendable {
         ("NORMSDIST", "NORM.S.DIST"),
         ("NORMDIST", "NORM.DIST"),
         ("NORMINV", "NORM.INV"),
+        // Two more of the same kind, both measured in the corpus sweep: the dotted name
+        // is what is implemented and the plain one is what workbooks still write.
+        ("MODE", "MODE.SNGL"),
+        ("GAMMALN", "GAMMALN.PRECISE"),
     ]
 
     // MARK: - Factory
