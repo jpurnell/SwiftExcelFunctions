@@ -290,27 +290,27 @@ EXCEL	SWITCH	logical	unreviewed		0	0	expression, value1, result1, [default or va
 EXCEL	TRUE	logical	have	logic	0	0	(no arguments)
 EXCEL	XOR	logical	unreviewed		0	0	logical1, [logical2],...
 EXCEL	CELL	information	have	navigation	0	0	info_type, [reference]
-EXCEL	ERROR.TYPE	information	unreviewed		0	0	error_val
-EXCEL	INFO	information	unreviewed		0	0	type_text
+EXCEL	ERROR.TYPE	information	have		0	0	error_val
+EXCEL	INFO	information	out of scope	reports the machine it runs on — no workbook answer exists	0	0	type_text
 EXCEL	ISBLANK	information	have	logic	386	11	value
 EXCEL	ISERR	information	have	logic	3	3	value
 EXCEL	ISERROR	information	have	logic	2462	35	value
-EXCEL	ISEVEN	information	unreviewed		0	0	number
-EXCEL	ISFORMULA	information	unreviewed		0	0	reference
-EXCEL	ISLOGICAL	information	unreviewed		0	0	value
+EXCEL	ISEVEN	information	have		0	0	number
+EXCEL	ISFORMULA	information	have	reads the cell, not its value	0	0	reference
+EXCEL	ISLOGICAL	information	have		0	0	value
 EXCEL	ISNA	information	have	logic	272	8	value
-EXCEL	ISNONTEXT	information	unreviewed		0	0	value
+EXCEL	ISNONTEXT	information	have		0	0	value
 EXCEL	ISNUMBER	information	have	logic	493	1	value
-EXCEL	ISODD	information	unreviewed		0	0	number
-EXCEL	ISOMITTED	information	unreviewed		0	0	argument
+EXCEL	ISODD	information	have		0	0	number
+EXCEL	ISOMITTED	information	out of scope	asks whether a LAMBDA argument was supplied; there is no LAMBDA	0	0	argument
 EXCEL	ISREF	information	have	logic	12	12	value
 EXCEL	ISTEXT	information	have	logic	35	5	value
-EXCEL	N	information	unreviewed		0	0	value
+EXCEL	N	information	have		0	0	value
 EXCEL	NA	information	have	logic	124	23	(no arguments)
-EXCEL	SHEET	information	unreviewed		0	0	value
-EXCEL	SHEETS	information	unreviewed		0	0	reference
-EXCEL	STOCKHISTORY	information	unreviewed		0	0	stock, start_date, [end_date], [interval], [headers], [property0], [property1], [property2], [property3], [property4], [property5]
-EXCEL	TYPE	information	unreviewed		0	0	value
+EXCEL	SHEET	information	out of scope	needs the workbook's sheet list; an evaluator has a CellValueProvider	0	0	value
+EXCEL	SHEETS	information	out of scope	needs the workbook's sheet list; an evaluator has a CellValueProvider	0	0	reference
+EXCEL	STOCKHISTORY	information	out of scope	calls a web service	0	0	stock, start_date, [end_date], [interval], [headers], [property0], [property1], [property2], [property3], [property4], [property5]
+EXCEL	TYPE	information	have		0	0	value
 EXCEL	ADDRESS	lookup	have	navigation	21017	32	row_num, column_num, [abs_num], [a1], [sheet_text]
 EXCEL	AREAS	lookup	unreviewed		0	0	reference
 EXCEL	CHOOSE	lookup	have	navigation	40	21	index_num, value1, [value2], ...
@@ -353,7 +353,7 @@ EXCEL	XLOOKUP	lookup	have	navigation	0	0	lookup_value, lookup_array, return_arra
 EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [search_mode]
 EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
 EXCEL	ASC	text	have	BuiltinTextWidthFunctions — inverse of DBCS	0	0	text
-EXCEL	ARRAYTOTEXT	text	unreviewed		0	0	array, [format]
+EXCEL	ARRAYTOTEXT	text	have		0	0	array, [format]
 EXCEL	BAHTTEXT	text	have	BuiltinBahtText	0	0	number
 EXCEL	CHAR	text	have	text	0	0	number
 EXCEL	CLEAN	text	have	text	0	0	text
@@ -362,7 +362,7 @@ EXCEL	CONCAT	text	have	text	0	0	text1, [text2],...
 EXCEL	CONCATENATE	text	have	text	0	0	text1, [text2], ...
 EXCEL	DBCS	text	have	BuiltinTextWidthFunctions	0	0	text
 EXCEL	DETECTLANGUAGE	text	out of scope	network service, as cube/web	0	0	text
-EXCEL	DOLLAR	text	unreviewed		0	0	number, [decimals]
+EXCEL	DOLLAR	text	have		0	0	number, [decimals]
 EXCEL	EXACT	text	have	text	0	0	text1, text2
 EXCEL	FIND	text	have	text	0	0	find_text, within_text, [start_num]
 EXCEL	FINDB	text	have	BuiltinTextFunctions.find — Western locale, ADR-002	0	0	find_text, within_text, [start_num]
@@ -377,9 +377,9 @@ EXCEL	MIDB	text	have	BuiltinTextFunctions.mid — Western locale, ADR-002	0	0	UN
 EXCEL	NUMBERVALUE	text	have	text	0	0	Text, [Decimal_separator], [Group_separator]
 EXCEL	PHONETIC	text	have	BuiltinPhonetic + SwiftXLSX 0.24.0 rPh reading	0	0	reference
 EXCEL	PROPER	text	have	text	0	0	text
-EXCEL	REGEXEXTRACT	text	unreviewed		0	0	text, pattern, [return_mode], [case_sensitivity]
-EXCEL	REGEXREPLACE	text	unreviewed		0	0	text, pattern, replacement, [occurrence], [case_sensitivity]
-EXCEL	REGEXTEST	text	unreviewed		0	0	text, pattern, [case_sensitivity]
+EXCEL	REGEXEXTRACT	text	have	NSRegularExpression	0	0	text, pattern, [return_mode], [case_sensitivity]
+EXCEL	REGEXREPLACE	text	have	NSRegularExpression	0	0	text, pattern, replacement, [occurrence], [case_sensitivity]
+EXCEL	REGEXTEST	text	have	NSRegularExpression	0	0	text, pattern, [case_sensitivity]
 EXCEL	REPLACE	text	have	text	0	0	old_text, start_num, num_chars, new_text
 EXCEL	REPLACEB	text	have	BuiltinTextFunctions.replace — Western locale, ADR-002	0	0	UNCONFIRMED
 EXCEL	REPT	text	have	text	0	0	text, number_times
@@ -393,14 +393,14 @@ EXCEL	TEXT	text	have	text	51	24	value, format_text
 EXCEL	TEXTAFTER	text	have	text	0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
 EXCEL	TEXTBEFORE	text	have	text	0	0	text,delimiter,[instance_num], [match_mode], [match_end], [if_not_found]
 EXCEL	TEXTJOIN	text	have	text	0	0	delimiter, ignore_empty, text1, [text2], ...
-EXCEL	TEXTSPLIT	text	unreviewed		0	0	text,col_delimiter,[row_delimiter],[ignore_empty], [match_mode], [pad_with]
+EXCEL	TEXTSPLIT	text	have		0	0	text,col_delimiter,[row_delimiter],[ignore_empty], [match_mode], [pad_with]
 EXCEL	TRANSLATE	text	out of scope	network service, as cube/web	0	0	text, [source_language], [target_language]
 EXCEL	TRIM	text	have	text	0	0	text
 EXCEL	UNICHAR	text	have	text	0	0	number
 EXCEL	UNICODE	text	have	text	0	0	text
 EXCEL	UPPER	text	have	text	0	0	text
 EXCEL	VALUE	text	have	text	0	0	text
-EXCEL	VALUETOTEXT	text	unreviewed		0	0	value, [format]
+EXCEL	VALUETOTEXT	text	have		0	0	value, [format]
 EXCEL	JIS	text	have	BuiltinTextWidthFunctions — same function as DBCS	0	0	text
 EXCEL	DAVERAGE	database	unreviewed		0	0	database, field, criteria
 EXCEL	DCOUNT	database	unreviewed		0	0	database, field, criteria

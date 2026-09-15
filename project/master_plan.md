@@ -457,20 +457,20 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket.** **107 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
+- **The unreviewed bucket.** **87 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
   is `unreviewed` reaching **0** — every row *classified*, not every row implemented. Two of
-  the ten EXCEL categories are now closed: `compatibility` and `engineering`. `datetime`
-  closed with the 0.11 tranche.
+  five of the ten EXCEL categories are now closed: `compatibility`, `engineering`,
+  `datetime`, `information` and `text`.
 
   | Category | Rows | What the work is |
   |---|---|---|
   | lookup | 24 | **Ungated.** The array shape is decided — matrix only, no `#SPILL!` |
   | financial | 21 | Judgment per function; where the honest `out of scope` marks will come from |
   | math | 19 | Mostly primitives, in the way the first math tranche was |
-  | information | 13 | `IS*` predicates — this package's own semantics, not arithmetic |
   | database | 12 | `DSUM` and relatives; one criteria-range design serves all twelve |
   | logical | 11 | This package's semantics again, plus the `LAMBDA` family, which is not |
-  | text | 7 | Near-free, like the text rows already done |
+  | ~~information~~ | ~~13~~ | **Closed.** Eight implemented, five out of scope with reasons |
+  | ~~text~~ | ~~7~~ | **Closed.** All seven, the `REGEX*` trio included |
 
   The original framing — *"engineering and text are the near-free ones, statistical belongs to
   BusinessMath, lookup and financial and database need judgment"* — held everywhere it has

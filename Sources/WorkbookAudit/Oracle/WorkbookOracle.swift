@@ -118,6 +118,47 @@ public enum WorkbookOracle {
         return nil
     }
 
+    /// A whole-column or whole-row reference that a shared formula has shifted.
+    ///
+    /// **`C:C` has no row to offset.** Excel stores a column of identical formulas once and
+    /// derives the rest by offset, and a whole-column reference is derived unchanged — every
+    /// row of the shared range sees `C:C`. SwiftXLSX's expansion materialises it as
+    /// `C1:C1048576` first and *then* offsets, so the formula in row 26 comes out as
+    /// `C26:C1048601`: a window starting 25 rows too low, and reaching past the end of the
+    /// sheet.
+    ///
+    /// Every position downstream is then wrong by the offset. `INDEX(MATCH(F165,C:C,0),,1)`
+    /// answered `C206` where Excel answered `C231` — 112 cells in one corpus workbook, and
+    /// a false accusation each.
+    ///
+    /// **Recognised by its shape, which is unambiguous.** A range spanning exactly
+    /// 1,048,576 rows but not starting at row 1 cannot have been written by a person: it is
+    /// a whole column that has been moved. The same for 16,384 columns not starting at
+    /// column A.
+    ///
+    /// The expansion is upstream and is recorded rather than worked around. What belongs
+    /// here is declining to judge a formula we know has been read wrongly.
+    ///
+    /// - Parameter ast: The formula.
+    /// - Returns: The first such reference, written out, or `nil`.
+    static func shiftedWholeReference(in ast: FormulaAST) -> String? {
+        for node in OracleFinding.nodes(in: ast) {
+            let range: CellRange
+            switch node {
+            case .cellRange(let found): range = found
+            case .sheetRef(let found): range = found.range
+            default: continue
+            }
+            if range.rowCount == CellRef.lastOnSheet.row, range.start.row > 1 {
+                return "\(range.start.reference):\(range.end.reference)"
+            }
+            if range.columnCount == CellRef.lastOnSheet.column, range.start.column > 1 {
+                return "\(range.start.reference):\(range.end.reference)"
+            }
+        }
+        return nil
+    }
+
     // MARK: - Reading Excel's answers
 
     /// A provider whose references resolve to the value Excel recorded.
@@ -234,6 +275,9 @@ public enum WorkbookOracle {
         }
         if let name = unresolvableName(in: ast, names: names, sheet: sheet) {
             return .notComparable("unresolved name: \(name)")
+        }
+        if let shifted = shiftedWholeReference(in: ast) {
+            return .notComparable("shifted whole reference: \(shifted)")
         }
         guard let excel = cached else { return .notComparable("no cached value") }
 

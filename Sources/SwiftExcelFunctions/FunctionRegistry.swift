@@ -108,6 +108,8 @@ public struct FunctionRegistry: Sendable {
             BuiltinDateTimeFunctions.all,
             BuiltinWeekFunctions.all,
             BuiltinStatisticalBindings.all,
+            BuiltinInformationFunctions.all,
+            BuiltinTextConversionFunctions.all,
             BuiltinSubtotal.all,
             BuiltinWorkingDayFunctions.all,
             BuiltinAggregationFunctions.all,

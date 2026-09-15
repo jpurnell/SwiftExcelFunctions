@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The `text` and `information` categories, closed.** Twenty rows out of the unreviewed
+  bucket: fifteen implemented and five marked out of scope with the reason written down.
+
+  | | |
+  |---|---|
+  | `ISEVEN`, `ISODD` | parity, **truncated** toward zero — `ISEVEN(2.9)` is TRUE |
+  | `ISLOGICAL`, `ISNONTEXT` | the remaining kind predicates |
+  | `N` | Excel's coercion table, where `N("7")` is **0** and not 7 |
+  | `TYPE`, `ERROR.TYPE` | the kind and the error, as numbers to branch on |
+  | `ISFORMULA` | the only one that reads the *cell*: a formula returning 7 and a typed 7 are the same value and different cells |
+  | `DOLLAR` | currency text, negatives in parentheses, negative places rounding left |
+  | `VALUETOTEXT`, `ARRAYTOTEXT` | concise for a person, strict for a formula to read back |
+  | `TEXTSPLIT` | text into a rectangle, rows the outer cut, ragged rows padded with `#N/A` |
+  | `REGEXTEST`, `REGEXEXTRACT`, `REGEXREPLACE` | the 2024 trio, over `NSRegularExpression` |
+
+  **Out of scope, each for its own reason:** `INFO` reports the machine it runs on;
+  `STOCKHISTORY` calls a web service; `SHEET` and `SHEETS` need the workbook's sheet list,
+  which an evaluator handed a `CellValueProvider` does not have; `ISOMITTED` asks whether a
+  `LAMBDA` argument was supplied, and there is no `LAMBDA` yet. Recorded in the matrix
+  rather than left unreviewed, because "we decided not to" and "nobody looked" are different
+  states and only one of them is finished.
+
+  **Measured: `have` 379 → 394, `unreviewed` 107 → 87, `out of scope` 12 → 17.** The
+  remaining 87 are lookup 24, financial 21, math 19, database 12 and logical 11.
+
 - **`xlsx-audit` — the checks, runnable by someone who is not us.**
 
   ```
