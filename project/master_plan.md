@@ -477,8 +477,9 @@ the motivating application rather than an end in itself.
   been tested. Engineering turned out to need **no mathematics written at all**.
 
   **And the bucket is not where the demand is.** A sweep of 2,236 workbooks found **eighteen**
-  function names this package could not answer, of which six were Crystal Ball's or somebody's
-  own macros. The other twelve barely intersect the 107: `WEEKNUM` (209 calls), `AVERAGEIFS`
+  function names this package could not answer, of which three are `LAMBDA`s defined in the
+  workbooks themselves — including `RANDOMNORMAL`, the most-called of the eighteen at 10,801
+  calls — and three are somebody's macros. The other twelve barely intersect the 107: `WEEKNUM` (209 calls), `AVERAGEIFS`
   (35), `NETWORKDAYS` (12), `SUBTOTAL` (8), `SKEW` (7), `CORREL` (2) — nine of the twelve now
   answer. **The rest of the bucket measures zero calls across the whole corpus**, which makes
   it completeness work rather than demand work, and that is worth knowing before spending a

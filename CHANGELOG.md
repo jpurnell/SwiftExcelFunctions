@@ -232,7 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   | Name | Calls | Books | What it needed |
   |---|---|---|---|
-  | `RANDOMNORMAL` | 10,801 | 1 | *Crystal Ball's, not Excel's* |
+  | `RANDOMNORMAL` | 10,801 | 1 | **a user-defined `LAMBDA`** — see the correction below |
   | **`WEEKNUM`** | 209 | 1 | a build |
   | **`AVERAGEIFS`** | 35 | 1 | a build |
   | **`NETWORKDAYS`** | 12 | 3 | a build |
@@ -242,7 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | `YIELDMAT`, `YIELDDISC` | 3 | 2 | financial, still open |
   | **`MODE`, `FORECAST`, `RSQ`** | 1 each | 1 | a binding, or an alias |
   | `LINEST` | 1 | 1 | array-shaped, still open |
-  | `BS`, `MYLAMBDA`, `MAXEXP`, `CALLOPTION` | 1 each | 1 | *someone's own macros* |
+  | `BS`, `MYLAMBDA`, `MAXEXP`, `CALLOPTION` | 1 each | 1 | two are `LAMBDA`s, two are macros |
 
   **Every statistical name on that list was already implemented upstream**, under a name no
   search for the Excel spelling would reach — `skewS`, `correlationCoefficient`, `rSquared`.
@@ -302,9 +302,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `NORMSINV` and the four beside it.
 
   **Measured: the coverage matrix moves 350 `have` → 379, `unreviewed` 115 → 107,
-  `bindable` 41 → 20.** Of the eighteen unanswerable names, six were Crystal Ball's or
-  someone's own macros and are not ours to answer; of the twelve that were, nine now
-  answer.
+  `bindable` 41 → 20.** Of the eighteen unanswerable names, twelve were ours to answer and
+  nine now do.
+
+  **Correction.** `RANDOMNORMAL`, `MYLAMBDA` and `MAXEXP` were written up here as add-in
+  functions or someone's macros. They are **`LAMBDA`s defined in the workbook**, found by
+  reading the two files that actually define one:
+
+  ```
+  randomNormal = _xlfn.LAMBDA(_xlpm.x, _xlpm.y, _xlpm.x + _xlpm.y * SQRT(-2*LOG(RAND())) * COS(2*PI()*RAND()))
+  ```
+
+  So the most-called name this package cannot answer is not an add-in's — it is Excel's own
+  `LAMBDA`, and the "no demand for `LAMBDA`" reading that followed from the first census was
+  wrong. Two workbooks in 2,240 define one; one of them calls it 10,801 times. See
+  `PROPOSAL_lambda.md`.
 
 
 - **`workbook-oracle`** — the Excel oracle as a resumable executable, and `WorkbookOracle` in
