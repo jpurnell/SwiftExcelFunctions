@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -243,6 +243,97 @@ enum ConformanceCases {
               note: "one more point to size Excel's Bessel error"),
         .init(family: "round3", formula: "BESSELY(0.5, 0)",
               note: "Y near the origin, where it diverges fastest"),
+    ]
+
+    // MARK: - Round four: the size of the grid
+
+    /// How big Excel's sheet actually is.
+    ///
+    /// 16,384 columns by 1,048,576 rows has been the answer since Excel 2007 introduced the
+    /// XML format, and both this package and SwiftExcelCore encode it. It is being asked
+    /// anyway, because a bound about to be written into a shared library on the strength of
+    /// "everyone knows this" is exactly the sort of thing this project has been wrong about
+    /// five times — and `COLUMNS(1:1)` settles it in one cell.
+    static let roundFour: [ConformanceCase] = [
+        .init(family: "grid", formula: "COLUMNS(1:1)",
+              note: "a whole row — 16384, if the grid is what it has been since 2007"),
+        .init(family: "grid", formula: "ROWS(A:A)",
+              note: "a whole column — 1048576"),
+        .init(family: "grid", formula: "COLUMNS($A$1:$XFD$1)",
+              note: "the same row written out, in case the shorthand parses differently"),
+        .init(family: "grid", formula: "COLUMN($XFD$1)",
+              note: "XFD's index, which is the column count if XFD is the last"),
+        .init(family: "grid", formula: "ROWS($A$1:$A$1048576)",
+              note: "the same column written out"),
+    ]
+
+    // MARK: - Round five: when Excel decides a number is zero
+
+    /// Excel snaps a result to exactly zero when subtraction has cancelled nearly all of it,
+    /// and this package does not.
+    ///
+    /// Fifteen cells in one corpus disagree for this reason alone — `D50-B50` computing
+    /// `-1.4551915228366852e-11` where Excel writes `0`. The values are not in dispute: both
+    /// sides do the same IEEE arithmetic and get the same bits. What differs is that Excel
+    /// then decides the answer was meant to be nothing.
+    ///
+    /// **Knowing the rule is worth more than fixing the fifteen.** These cases are built to
+    /// find its shape rather than to confirm it exists:
+    ///
+    /// - whether the snap depends on *cancellation* or merely on being small
+    /// - whether it survives another operation afterwards
+    /// - whether it scales with the operands' magnitude, as a relative epsilon would
+    /// - whether comparison sees the snapped value or the real one
+    static let roundFive: [ConformanceCase] = [
+        // The classics: exact zero is intended, IEEE leaves a residue.
+        .init(family: "snap", formula: "0.1+0.2-0.3",
+              note: "the canonical case — IEEE leaves 5.55e-17"),
+        .init(family: "snap", formula: "1.1-1-0.1", note: "residue about 2.8e-17"),
+        .init(family: "snap", formula: "0.5-0.4-0.1", note: "residue about -2.8e-17"),
+
+        // Magnitude: a relative rule should snap all of these, an absolute one only some.
+        .init(family: "snap", formula: "100000.1-100000-0.1",
+              note: "residue near 1e-11 — the scale the corpus cells sit at"),
+        .init(family: "snap", formula: "10000000.1-10000000-0.1",
+              note: "residue near 1e-9, two orders larger"),
+        .init(family: "snap", formula: "1000000000.1-1000000000-0.1",
+              note: "residue near 1e-7 — still relatively tiny, absolutely not"),
+
+        // Small but honest: no cancellation, so nothing should be snapped away.
+        .init(family: "snap", formula: "0.00000000001",
+              note: "1e-11 written down — if this became 0, the rule is about size alone"),
+        .init(family: "snap", formula: "0.00000000001*1",
+              note: "the same, arrived at by multiplication"),
+        .init(family: "snap", formula: "0.00000000001/10",
+              note: "1e-12 by division"),
+
+        // Does the snap survive a later operation?
+        .init(family: "snap", formula: "(0.1+0.2-0.3)*1",
+              note: "multiplied after cancelling — snapped before, or after?"),
+        .init(family: "snap", formula: "(0.1+0.2-0.3)+0",
+              note: "added to nothing afterwards"),
+        .init(family: "snap", formula: "(0.1+0.2-0.3)*1000000",
+              note: "scaled up — 5.55e-11 if the residue survived"),
+        .init(family: "snap", formula: "SUM(0.1,0.2,-0.3)",
+              note: "the same cancellation inside SUM rather than between operators"),
+
+        // What sees the snapped value?
+        .init(family: "snap", formula: "IF(0.1+0.2-0.3=0,\"zero\",\"not zero\")",
+              note: "does a comparison see the snap?"),
+        .init(family: "snap", formula: "IF(0.1+0.2=0.3,\"equal\",\"not equal\")",
+              note: "and the classic form of the same question"),
+        .init(family: "snap", formula: "(0.1+0.2-0.3)=0",
+              note: "the comparison on its own"),
+        .init(family: "snap", formula: "SIGN(0.1+0.2-0.3)",
+              note: "sign of the residue — 0 if snapped, 1 if not"),
+
+        // Where the boundary sits.
+        .init(family: "snap", formula: "1-0.9999999999999",
+              note: "1e-13 — a real difference, well above any residue"),
+        .init(family: "snap", formula: "1-0.999999999999999",
+              note: "1e-15, approaching the last bits of a double"),
+        .init(family: "snap", formula: "1-0.9999999999999999",
+              note: "1e-16 — below a double's resolution at 1, so exactly 0 anyway"),
     ]
 
     // MARK: - Bessel

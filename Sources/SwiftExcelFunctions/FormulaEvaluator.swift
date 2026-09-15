@@ -230,7 +230,17 @@ public enum FormulaEvaluator {
             }
 
         case .namedRange(let name):
-            guard let target = names.resolve(name, inSheet: nil) else {
+            // **The sheet is passed, because a name means different things on different
+            // sheets.** Excel scopes a defined name either to the workbook or to one sheet,
+            // and a workbook may hold all three: `MarketGrapeCost` scoped to two sheets and
+            // again to the workbook, each pointing somewhere else.
+            //
+            // Resolving with `nil` here asked for the workbook-scoped one every time, so a
+            // formula on a sheet with its own definition silently read another sheet's
+            // number — 31 cells in one workbook, answering 0.3 where Excel answers 0.812.
+            // The resolver was always right; it was never told where the question came from.
+            guard let target = names.resolve(name, inSheet: currentSheet.isEmpty ? nil : currentSheet)
+            else {
                 return .error(.name)
             }
             return try evaluateNamedTarget(

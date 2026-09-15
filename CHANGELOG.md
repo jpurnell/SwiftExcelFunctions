@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A defined name resolves against the sheet the formula is on.** Excel scopes a name either
+  to the workbook or to a single sheet, and a workbook may hold both at once — a teaching
+  model in the corpus defines `MarketGrapeCost` three times, once for each of two sheets and
+  once for the workbook, each pointing at a different cell.
+
+  The evaluator resolved with no sheet at all, so it always found the workbook-scoped
+  definition. **31 cells in that one workbook read another sheet's number**, answering `0.3`
+  where Excel answers `0.812`. Nothing errored; the answers came from the wrong place.
+
+  `NamedRangeCollection.resolve(_:inSheet:)` was always right — it takes a sheet and prefers
+  a scoped match. It was simply never told where the question came from, while the evaluator
+  held `currentSheet` in the same scope.
+
+  **Measured on 150 workbooks none of this work had touched: 99.89% → 99.92%**, `differed`
+  73 → 40.
+
 - **A whole-row reference keeps its full width** — SwiftExcelCore moved to `0.9.0`, where
   `clipped(to:)` no longer pulls `$3:$3` back to the last populated column.
 
