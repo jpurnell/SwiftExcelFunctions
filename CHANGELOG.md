@@ -89,6 +89,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Measured: 583 cells in one workbook**, all answering zero.
 
+- **The oracle reads a workbook once.** `WorkbookValueProvider.value(at:)` finds its sheet by
+  scanning `workbook.sheets` and comparing names, on *every cell read*. One
+  `SUMIFS($F$2:$F$20001, $E$2:$E$20001, …)` reads 80,000 cells, and a sheet of them reads
+  tens of millions — each paying a linear scan over thirteen sheet names and a retain of the
+  cell's style.
+
+  The oracle now snapshots every cell into a dictionary keyed by position, and caches the
+  rectangles it materialises: a column of 20,000 formulas naming the same four ranges reads
+  those ranges once rather than 20,000 times. Measured on the workbook that made this
+  visible: **over 7 minutes to 3.9 minutes**, and it is the criteria matching that is left.
+
+  The key is a position rather than a reference string. Keying by `"$B$1"` meant building
+  that string on every read, and the profile was almost entirely integer-to-ASCII.
+
 - **A cell holding a formula is never blank**, whatever the formula produced.
 
   `IF(…, A3, "")` leaves `<c t="str"><f>…</f><v/></c>` — a formula whose result is the empty

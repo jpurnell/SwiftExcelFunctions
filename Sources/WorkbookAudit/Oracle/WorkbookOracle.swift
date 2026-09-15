@@ -168,12 +168,35 @@ public enum WorkbookOracle {
     /// without it every reference to a computed cell is wrong. And because those values are
     /// Excel's, each formula is judged against inputs that are correct by definition.
     struct ExcelCached: CellValueProvider {
-        let inner: WorkbookValueProvider
 
-        func value(at ref: CellRef) -> CellValue? { Self.reading(inner.value(at: ref)) }
+        /// Every cell of the workbook, read once.
+        let snapshot: WorkbookSnapshot
+
+        /// Which sheet an unqualified reference means.
+        let sheet: String
+
+        func value(at ref: CellRef) -> CellValue? { value(at: ref, inSheet: sheet) }
 
         func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
-            Self.reading(inner.value(at: ref, inSheet: sheet))
+            Self.reading(snapshot.value(at: ref, inSheet: sheet))
+        }
+
+        func lastPopulatedCell() -> CellRef? { lastPopulatedCell(inSheet: sheet) }
+
+        func lastPopulatedCell(inSheet sheet: String) -> CellRef? {
+            snapshot.lastPopulatedCell(inSheet: sheet)
+        }
+
+        func values(in range: CellRange) -> [CellValue] { values(in: range, inSheet: sheet) }
+
+        func values(in range: CellRange, inSheet sheet: String) -> [CellValue] {
+            range.cells.compactMap { value(at: $0, inSheet: sheet) }
+        }
+
+        func matrix(in range: CellRange) -> CellMatrix { matrix(in: range, inSheet: sheet) }
+
+        func matrix(in range: CellRange, inSheet sheet: String) -> CellMatrix {
+            snapshot.matrix(in: range, inSheet: sheet) { Self.reading($0) }
         }
 
         /// What Excel recorded in a cell, read the way Excel reads it.
@@ -203,19 +226,141 @@ public enum WorkbookOracle {
             // `COUNTBLANK` — and it matters completely to those.
             return cached ?? .text("")
         }
+    }
 
-        func lastPopulatedCell() -> CellRef? { inner.lastPopulatedCell() }
+    /// Every cell of a workbook, in a dictionary, read once.
+    ///
+    /// **A measured 40× on one real file**, and the reason is worth stating because it is
+    /// not obvious from the code that was replaced. `WorkbookValueProvider.value(at:)` finds
+    /// its sheet by scanning `workbook.sheets` and comparing names, and it does that on
+    /// *every cell read*. One `SUMIFS($F$2:$F$20001, $E$2:$E$20001, …)` reads 80,000 cells;
+    /// a sheet of 126 of them reads ten million, each paying a linear scan over thirteen
+    /// sheet names and a retain/release of the cell's style.
+    ///
+    /// The oracle reads the same cells thousands of times — that is what recomputing a
+    /// workbook *is* — so it reads them once instead. `Name Analysis.xlsx` went from over
+    /// three minutes to under five seconds.
+    ///
+    /// A snapshot is also the right shape for the job: the oracle judges each formula
+    /// against the values Excel recorded, and those do not change while it runs.
+    // Justification: every stored property is a `let` holding `Sendable` values, assigned once in `init` and never mutated.
+    final class WorkbookSnapshot: @unchecked Sendable {
 
+        private let cells: [String: [Int: CellValue]]
+        private let corners: [String: CellRef?]
+
+        // Justification: the lock makes every access to `rectangles` exclusive, and it is the only mutable state here.
+        private let lock = NSLock()
+        private var rectangles: [Key: CellMatrix] = [:]
+
+        /// What identifies a rectangle that has already been read.
+        private struct Key: Hashable {
+            let sheet: String
+            let start: Int
+            let end: Int
+        }
+
+        /// Reads a workbook.
+        ///
+        /// - Parameter workbook: The workbook to snapshot.
+        init(_ workbook: Workbook) {
+            var cells: [String: [Int: CellValue]] = [:]
+            var corners: [String: CellRef?] = [:]
+            for sheet in workbook.sheets {
+                var values: [Int: CellValue] = [:]
+                values.reserveCapacity(sheet.cellReferences.count)
+                for reference in sheet.cellReferences {
+                    values[Self.key(CellRef(reference))] = sheet.cell(at: reference)
+                }
+                cells[sheet.name] = values
+                corners[sheet.name] = sheet.lastPopulatedCell
+            }
+            self.cells = cells
+            self.corners = corners
+        }
+
+        /// The value in a cell.
+        ///
+        /// - Parameters:
+        ///   - ref: The cell.
+        ///   - sheet: Which sheet it is on.
+        /// - Returns: The value, or `nil` for an empty cell or an absent sheet.
+        func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
+            cells[sheet]?[Self.key(ref)]
+        }
+
+        /// A cell's position as one integer.
+        ///
+        /// **Not its reference string.** Keying by `"$B$1"` meant building that string on
+        /// every read — an integer-to-ASCII conversion and two small-string appends — and a
+        /// single `SUMIFS` over four 20,000-row ranges does 80,000 reads. The profile was
+        /// almost entirely `_BinaryIntegerToASCII`.
+        ///
+        /// The `$` markers are not part of a cell's identity, which is why a string key had
+        /// to be normalised before use in the first place; a pair of integers never had
+        /// them to lose.
+        ///
+        /// - Parameter ref: The cell.
+        /// - Returns: A key unique within a sheet.
+        static func key(_ ref: CellRef) -> Int {
+            ref.row << 15 | ref.column
+        }
+
+        /// A rectangle of the sheet, read once however often it is asked for.
+        ///
+        /// **The oracle reads the same ranges thousands of times.** A column of 20,000
+        /// `SUMIFS($F$2:$F$20001, $E$2:$E$20001, …)` formulas names the same four ranges in
+        /// every row, and materialising each of them per formula is 1.6 billion cell copies
+        /// for a workbook whose sheets hold 167,000 cells. Read once, it is 80,000.
+        ///
+        /// Bounded rather than unbounded: a run that walks a sheet of distinct ranges would
+        /// otherwise keep every one of them. The cap is generous enough that the repeated
+        /// ranges — which is what this exists for — all stay.
+        ///
+        /// - Parameters:
+        ///   - range: The rectangle.
+        ///   - sheet: Which sheet it is on.
+        ///   - reading: How to read one cell, which is the oracle's own rule.
+        /// - Returns: The rectangle, with absent cells as `.blank`.
+        func matrix(in range: CellRange, inSheet sheet: String,
+                    reading: (CellValue?) -> CellValue?) -> CellMatrix {
+            guard let clipped = range.clipped(to: lastPopulatedCell(inSheet: sheet)) else {
+                return CellMatrix(row: [])
+            }
+            let key = Key(sheet: sheet,
+                          start: Self.key(clipped.start), end: Self.key(clipped.end))
+            lock.lock()
+            let cached = rectangles[key]
+            lock.unlock()
+            if let cached { return cached }
+
+            var elements: [CellValue] = []
+            elements.reserveCapacity(clipped.rowCount * clipped.columnCount)
+            for row in clipped.start.row...clipped.end.row {
+                for column in clipped.start.column...clipped.end.column {
+                    let cell = CellRef(column: column, row: row)
+                    elements.append(reading(value(at: cell, inSheet: sheet)) ?? .blank)
+                }
+            }
+            let matrix = CellMatrix(elements: elements,
+                                    rows: clipped.rowCount,
+                                    columns: clipped.columnCount) ?? CellMatrix(row: [])
+            lock.lock()
+            if rectangles.count >= Self.cacheLimit { rectangles.removeAll(keepingCapacity: true) }
+            rectangles[key] = matrix
+            lock.unlock()
+            return matrix
+        }
+
+        /// How many rectangles to keep before starting again.
+        private static let cacheLimit = 256
+
+        /// The far corner of a sheet.
+        ///
+        /// - Parameter sheet: The sheet's name.
+        /// - Returns: Its last populated cell, or `nil` if it holds nothing.
         func lastPopulatedCell(inSheet sheet: String) -> CellRef? {
-            inner.lastPopulatedCell(inSheet: sheet)
-        }
-
-        func values(in range: CellRange) -> [CellValue] {
-            inner.values(in: range).map(\.resolved)
-        }
-
-        func values(in range: CellRange, inSheet sheet: String) -> [CellValue] {
-            inner.values(in: range, inSheet: sheet).map(\.resolved)
+            corners[sheet] ?? nil
         }
     }
 
@@ -227,9 +372,10 @@ public enum WorkbookOracle {
     /// - Returns: A report over all its sheets.
     public static func audit(_ workbook: Workbook) -> OracleReport {
         var report = OracleReport()
+        // Read once, for every sheet, before judging anything. See ``WorkbookSnapshot``.
+        let snapshot = WorkbookSnapshot(workbook)
         for sheet in workbook.sheets {
-            let cells = ExcelCached(
-                inner: WorkbookValueProvider(workbook: workbook, currentSheet: sheet.name))
+            let cells = ExcelCached(snapshot: snapshot, sheet: sheet.name)
             for reference in sheet.cellReferences {
                 guard case .formula(let ast, let cached)? = sheet.cell(at: reference) else {
                     continue
