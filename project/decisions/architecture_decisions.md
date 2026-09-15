@@ -166,3 +166,57 @@ until it exists the locale seam is speculative work.
 - **`DBCS` and `JIS`** convert between half-width and full-width forms. That is a
   Unicode mapping table rather than a locale question, and it is unaffected by this
   decision.
+
+---
+
+## ADR-003 — Excel's zero-snap is reproduced; Excel's 15-digit storage is not
+
+**Date:** 2026-09-14
+**Category:** numerics
+**Status:** Accepted, in force
+
+### Decision
+
+Two Excel behaviours were measured in the same round. One is implemented and one is not.
+
+**Implemented — the final-operation snap.** A result that is negligible against its own
+operands becomes exactly zero: on the last addition or subtraction of a formula, and on
+every comparison wherever it sits. `0.1+0.2-0.3` is `0`; `IF(0.1+0.2=0.3,…)` says equal.
+See ``ExcelFinalRounding``, whose threshold and scope were read out of Excel rather than
+out of documentation.
+
+**Not implemented — the 15-significant-digit store.** Excel keeps 15 significant decimal
+digits, so `0.9999999999999985` is `0.999999999999998` before any arithmetic runs. We keep
+the full `Double`.
+
+### Why the line falls there
+
+The snap is Excel **computing differently**. No amount of correct arithmetic produces
+`0.1+0.2-0.3 = 0`; Excel applies a rule, and a package that claims agreement with Excel has
+to apply the same rule or disagree with every cancelling subtraction in every workbook.
+
+The digit limit is Excel **computing worse**. It discards information that was correctly
+computed. ADR-001 obliges us to match Excel's *values*, and this is the case already
+settled twice against reproduction — the Bessel family, where Excel is wrong by up to
+1.6e-7 and we match scipy to 1e-15, and `IMSQRT`, where Excel's own `i²` is not `-1`.
+Implementing the digit limit would move us *away* from those decisions, not toward
+consistency with them.
+
+### What this costs, stated plainly
+
+Cells whose cached value was shaped by the 15-digit store will disagree with us in the
+16th digit. That disagreement is real and will show up in the oracle. It is accepted.
+
+### The revisit condition
+
+A corpus cell where the 15-digit store changes an answer **visibly** — a different integer,
+a different branch of an `IF`, a different rank — rather than a trailing digit. That is a
+different problem from precision loss and would deserve its own decision.
+
+### What it rules out
+
+- **A global "Excel precision" mode.** Rounding every intermediate to 15 digits would make
+  the package's answers worse everywhere to fix the 16th digit somewhere.
+- **Reading the snap as a tolerance.** It is not an epsilon comparison bolted onto `==`;
+  it is scoped — last operation only for arithmetic, always for comparisons — and that
+  scope is what the measurements established. `(0.1+0.2-0.3)*1` keeps its residue.

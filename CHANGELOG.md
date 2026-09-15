@@ -27,6 +27,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`0.1+0.2-0.3` is zero, as it is in Excel.** A subtraction that cancels almost everything
+  now returns exactly zero rather than the residue IEEE arithmetic leaves, and a comparison
+  applies the same rule wherever it sits — which is why `IF(0.1+0.2=0.3,…)` says equal while
+  `(0.1+0.2-0.3)=0` says FALSE. Those two look inconsistent and are not: the first pair
+  differ by 1.85e-16 *of themselves*, the second by the whole of the residue.
+
+  **The rule was measured, not read.** Twenty formulas were put to Excel and its answers
+  recorded, and the rule that accounts for all of them is about the *ratio* of a result to
+  its operands, not about the result being small: `100000.1-100000-0.1` keeps its `5.8e-12`,
+  a hundred thousand times larger than a residue that gets snapped away, because against
+  operands of about `0.1` that is a real difference.
+
+  It applies to **the last operation only**. `(0.1+0.2-0.3)*1` returns the residue in Excel
+  and the same subtraction alone in a cell returns zero — one measured case that rules out
+  correcting every addition as it happens, which is the shape anyone would write first.
+
+  ``ExcelFinalRounding`` carries the threshold and the reasoning, and `FinalRoundingTests`
+  holds Excel's twenty answers.
+
+  **Deliberately not implemented: Excel's 15-significant-digit store**, measured in the same
+  round. That one makes Excel's answers less accurate rather than differently computed, and
+  this package has twice decided it does not reproduce Excel's arithmetic errors — over the
+  Bessel family and over `IMSQRT`. Recorded as ADR-003 with the revisit condition stated.
+
 - **A defined name resolves against the sheet the formula is on.** Excel scopes a name either
   to the workbook or to a single sheet, and a workbook may hold both at once — a teaching
   model in the corpus defines `MarketGrapeCost` three times, once for each of two sheets and

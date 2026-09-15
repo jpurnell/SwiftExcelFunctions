@@ -253,14 +253,16 @@ public enum FormulaEvaluator {
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return try addValues(left, right)
+            return correctedIfFinal(try addValues(left, right),
+                                    left: left, right: right, depth: depth)
 
         case .subtract(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = left { return left }
             let right = try evaluateNode(rhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
             if case .error = right { return right }
-            return try subtractValues(left, right)
+            return correctedIfFinal(try subtractValues(left, right),
+                                    left: left, right: right, depth: depth)
 
         case .multiply(let lhs, let rhs):
             let left = try evaluateNode(lhs, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth)
@@ -550,14 +552,43 @@ public enum FormulaEvaluator {
     /// - Booleans: FALSE < TRUE
     /// - Different types: numbers < text < booleans (Excel ordering)
     /// - Blank is treated as 0 for numeric comparison, "" for string
+    /// Applies Excel's final-operation correction, but only at the root of the formula.
+    ///
+    /// **Depth is the whole of it.** Excel corrects the last operation and no earlier one:
+    /// `(0.1+0.2-0.3)*1` keeps the residue that `0.1+0.2-0.3` discards, so correcting every
+    /// addition as it happens would be measurably wrong. Depth zero is the node whose value
+    /// becomes the cell's, which is the one Excel corrects.
+    ///
+    /// - Parameters:
+    ///   - result: What the operation produced.
+    ///   - left: Its left operand, for the scale to judge against.
+    ///   - right: Its right operand.
+    ///   - depth: How deep the operation sits; zero is the root.
+    /// - Returns: The corrected value at the root, the original anywhere else.
+    private static func correctedIfFinal(_ result: CellValue, left: CellValue,
+                                         right: CellValue, depth: Int) -> CellValue {
+        guard depth == 0,
+              case .number(let value) = result,
+              case .number(let lhs) = normalizeForComparison(left),
+              case .number(let rhs) = normalizeForComparison(right) else {
+            return result
+        }
+        return .number(ExcelFinalRounding.corrected(value, lhs: lhs, rhs: rhs))
+    }
+
     private static func compareValues(_ left: CellValue, _ right: CellValue) -> ComparisonResult {
         let lNorm = normalizeForComparison(left)
         let rNorm = normalizeForComparison(right)
 
         switch (lNorm, rNorm) {
         case (.number(let a), .number(let b)):
-            if a < b { return .orderedAscending }
-            if a > b { return .orderedDescending }
+            // Excel compares by subtracting, and corrects that subtraction the way it
+            // corrects any other — so two numbers whose difference is negligible against
+            // them are equal. This is the whole of why `0.1+0.2=0.3` is TRUE in Excel while
+            // `(0.1+0.2-0.3)=0` is FALSE: in the second, the difference *is* the operand.
+            let difference = ExcelFinalRounding.corrected(a - b, lhs: a, rhs: b)
+            if difference < 0 { return .orderedAscending }
+            if difference > 0 { return .orderedDescending }
             return .orderedSame
 
         case (.text(let a), .text(let b)):

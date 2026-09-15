@@ -90,7 +90,7 @@ enum ExcelDateFormat {
     /// everything else a character at a time.
     private static func tokenize(_ format: String) -> [String] {
         var tokens: [String] = []
-        var characters = Array(format)
+        let characters = Array(format)
         var index = 0
         // Bounded: `index` strictly increases on every branch.
         while index < characters.count {

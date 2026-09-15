@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -334,6 +334,36 @@ enum ConformanceCases {
               note: "1e-15, approaching the last bits of a double"),
         .init(family: "snap", formula: "1-0.9999999999999999",
               note: "1e-16 — below a double's resolution at 1, so exactly 0 anyway"),
+    ]
+
+    // MARK: - Round six: where the snapping threshold sits
+
+    /// Round five found the rule; this finds its edge.
+    ///
+    /// The rule: on a final addition or subtraction, Excel returns exactly zero when the
+    /// result is negligible against the operands. Round five bracketed the threshold only
+    /// loosely — a relative size of 1.0 × 10⁻¹⁵ snapped and 1.0 × 10⁻¹³ did not, which leaves
+    /// two orders of magnitude unexplored.
+    ///
+    /// Each case is `1 − (1 − r)`, so the operands are both about 1 and the result is `r`.
+    /// That makes the relative size the only thing varying.
+    static let roundSix: [ConformanceCase] = [
+        .init(family: "threshold", formula: "1-0.99999999999999",
+              note: "r = 1e-14"),
+        .init(family: "threshold", formula: "1-0.999999999999995",
+              note: "r = 5e-15"),
+        .init(family: "threshold", formula: "1-0.999999999999997",
+              note: "r = 3e-15"),
+        .init(family: "threshold", formula: "1-0.999999999999998",
+              note: "r = 2e-15"),
+        .init(family: "threshold", formula: "1-0.9999999999999985",
+              note: "r = 1.5e-15"),
+        .init(family: "threshold", formula: "1-0.9999999999999995",
+              note: "r = 5e-16 — below the last snapping case from round five"),
+        // 2^-48 is 3.55e-15 and sits inside the bracket; worth naming in case the
+        // threshold is a power of two rather than a decimal.
+        .init(family: "threshold", formula: "1-0.9999999999999964",
+              note: "r near 2^-48 = 3.55e-15, in case the bound is binary"),
     ]
 
     // MARK: - Bessel
