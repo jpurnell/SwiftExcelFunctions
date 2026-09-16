@@ -378,13 +378,16 @@ enum ConformanceWorkbook {
     enum Failure: Error, CustomStringConvertible {
         case usage
         case noConformanceSheet
+        case noSheet
         case disagreed(differed: Int, uncalculated: Int)
 
         var description: String {
             switch self {
             case .usage:
-                return "usage: conformance-workbook <emit|check|divergences> <path.xlsx>"
+                return "usage: conformance-workbook "
+                    + "<emit|check|divergences|depth|depth-read> <path.xlsx>"
             case .noConformanceSheet: return "no sheet named Conformance in that file"
+            case .noSheet: return "no sheet named Limits in that file"
             case .disagreed(let differed, let uncalculated):
                 var reasons: [String] = []
                 if differed > 0 { reasons.append("\(differed) unexplained disagreement(s)") }
@@ -423,6 +426,8 @@ do {
     case "emit": try ConformanceWorkbook.emit(to: arguments[1])
     case "check": try ConformanceWorkbook.check(arguments[1])
     case "divergences": try ConformanceWorkbook.divergences(to: arguments[1])
+    case "depth": try RecursionDepthSheet.emit(to: arguments[1])
+    case "depth-read": try RecursionDepthSheet.read(arguments[1])
     default: throw ConformanceWorkbook.Failure.usage
     }
 } catch let failure {
