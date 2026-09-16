@@ -428,10 +428,28 @@ say out loud.
 | fat | the same with three more calls per level | yes |
 | iteration | whether `REDUCE` over a long sequence is bounded separately | no |
 
-**Thin against fat is the question that decides the instrument.** Both failing at the same
-depth means the budget is counted in *calls*, and a call counter suffices. The fat one
-failing earlier means the budget is *stack*, and a call counter is the wrong instrument
-altogether.
+**Thin against fat is the question that decides the instrument — and it is answered.**
+
+| Question | Answer |
+|---|---|
+| recursion depth | **3,072 works; 4,096 is `#NUM!`** |
+| calls or stack? | **calls.** The fat body — three more function calls per level — refuses at *exactly* the same depth |
+| is the refusal catchable? | **no.** `IFERROR` does not trap it; the cell caches `#NUM!` |
+| `REDUCE` iteration | no limit found to 8,192 |
+
+So **a call counter is the right instrument**, and measuring work per level would be
+measuring something Excel does not. `maxDepth = 256` is an order of magnitude too small, and
+it counts AST nodes rather than calls — two separate corrections, both now grounded.
+
+That `IFERROR` cannot trap the refusal is a smaller finding with a sharp edge: `IFERROR`
+sits on the same stack that ran out, so it never gets the chance. An evaluator that returns
+`#NUM!` through its own error-handling path would be *more* forgiving than Excel, and a
+formula that recovers here would recover where Excel does not.
+
+Round 4 closes the bracket between 3,072 and 4,096, and asks the one question left: whether
+recursion and nesting draw on **one budget or two**. If a 3,000-deep recursion still works
+from inside sixty nested `IF`s they are separate counters, and this package should keep them
+separate too.
 
 The canary answered **6** in that first round, so the `_xlfn.`/`_xlpm.` spelling is right
 and the three remaining sections are asking what they mean to ask. A canary row — `REDUCE`

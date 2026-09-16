@@ -9,35 +9,44 @@ import SwiftXLSX
 /// `LAMBDA` can call itself, which is how a spreadsheet author writes a loop, and an
 /// evaluator has to stop somewhere. Picking a number would be guessing at Excel's: too low
 /// refuses formulas Excel computes, too high burns a stack on one somebody's Excel refuses.
-/// Microsoft documents 64 levels of *function nesting* and says nothing about `LAMBDA`
-/// recursion, so the only authority is Excel itself.
+/// Microsoft documents 64 levels of *function nesting* and says nothing whatever about
+/// `LAMBDA` recursion, so the only authority is Excel itself.
 ///
 /// ```
 /// swift run conformance-workbook depth ~/Desktop/limits.xlsx
-/// # add the two names, let it calculate, save
+/// # open it, let it calculate, save it
 /// swift run conformance-workbook depth-read ~/Desktop/limits.xlsx
 /// ```
 ///
-/// ## Four questions, and why each is separate
+/// ## What is settled
 ///
-/// | Section | Asks |
-/// |---|---|
-/// | nesting | how deep an *expression* may be, with no recursion at all |
-/// | thin | how deep a recursive `LAMBDA` may go |
-/// | fat | the same, with three more function calls per level |
-/// | iteration | whether `REDUCE` over a long sequence is bounded separately |
+/// | Question | Answer | Round |
+/// |---|---|---|
+/// | expression nesting | **65 calls load, 66 do not** | 1 |
+/// | how nesting is enforced | **when the file loads** — Excel deletes the cell and calls the file damaged | 1 |
+/// | `REDUCE` over `SEQUENCE(n)` | no limit found to **8,192** | 2 |
+/// | recursion depth | **3,072 works, 4,096 is `#NUM!`** | 3 |
+/// | calls or stack? | **calls** — a body with three more function calls per level refuses at exactly the same depth | 3 |
+/// | is the refusal catchable? | **no** — `IFERROR` does not trap it; the cell caches `#NUM!` | 3 |
 ///
-/// **`thin` against `fat` is the question that decides the implementation.** If both fail at
-/// the same depth the budget is counted in *calls*, and a counter suffices. If the fat one
-/// fails earlier the budget is *stack*, and a call counter would be the wrong instrument —
-/// this package would need to measure something closer to the work per level.
+/// **Thin against fat was the question the sheet was built for**, and the two agreeing
+/// exactly settles the instrument: a call counter is the right thing to build, and measuring
+/// the work per level would be measuring something Excel does not.
 ///
-/// ## The canary
+/// ## What round 4 asks
 ///
-/// Row 8 is `REDUCE` over three cells, whose answer is 6. Everything in this sheet depends
-/// on the `_xlfn.` and `_xlpm.` prefixes being written the way the format wants, and a file
-/// that gets them wrong shows `#NAME?` in every row — which looks exactly like Excel
-/// refusing the depth. If the canary is not 6, nothing else here means anything.
+/// - **Where exactly** between 3,072 and 4,096 the limit falls.
+/// - **Whether the recursion budget and the nesting budget are one budget**, by calling a
+///   recursion that is known to work from inside sixty nested `IF`s. If it still works they
+///   are separate counters and this package should keep them separate too — the current
+///   `maxDepth` conflates them, and at 256 it is an order of magnitude too small for either.
+///
+/// ## The two canaries
+///
+/// `REDUCE` over three cells, answer 6, proves the `_xlfn.`/`_xlpm.` prefixes are written the
+/// way the format wants. A self-applying `LAMBDA` at depth 3, answer 3, proves Excel accepts
+/// the nameless recursion the ladders are built from. A sheet whose canaries are wrong is
+/// measuring its own defects, so ``read(_:)`` reports them first and stops if either fails.
 enum RecursionDepthSheet {
 
     /// Which layout this version of the tool writes and expects.
@@ -45,54 +54,43 @@ enum RecursionDepthSheet {
     /// **Stamped into the file, because a round read with the wrong map is worse than no
     /// reading at all.** Round three was emitted over a path whose round-two copy was open
     /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
-    /// rows — reported an empty self-application canary, a nesting ladder one row short and
-    /// twenty-one missing iteration rows. Every one of those was a layout mismatch wearing
-    /// the costume of a measurement.
-    ///
-    /// The same doctrine as the canary: a reading that cannot be told apart from a failure
-    /// is not a reading, so the file says which round it is and `read` refuses to guess.
-    static let round = 3
+    /// rows — reported an empty canary, a ladder one row short and twenty-one missing rows.
+    /// Every one of those was a layout mismatch wearing the costume of a measurement.
+    static let round = 4
 
-    /// Where each section starts, so `emit` and `read` cannot disagree.
-    private enum Layout {
-        static let canaryRow = 8
-        static let selfCanaryRow = 9
-        static let nestingHeader = 11
-        static let selfThinHeader = 21
-        static let selfFatHeader = 44
-        static let namedThinHeader = 67
-        static let namedFatHeader = 90
-        static let iterationHeader = 113
-        /// The column holding the depth asked for, and the one holding Excel's answer.
+    /// The column holding what was asked, the question in words, and Excel's answer.
+    private enum Column {
         static let depth = "A", question = "B", answer = "C"
         /// Where the round number sits.
         static let round = "E1"
+        /// The two canary rows.
+        static let prefixCanary = "C9", selfCanary = "C10"
     }
 
-    /// A recursive `LAMBDA` that needs no name, by passing itself to itself.
-    ///
-    /// **This is what removes the manual step**, and the manual step had already cost two
-    /// rounds. A `LAMBDA` cannot call itself anonymously — there is nothing to call — but it
-    /// can take *itself* as a parameter and invoke that:
-    ///
-    /// ```
-    /// LAMBDA(f, n, IF(n<=0, 0, 1 + f(f, n-1)))(LAMBDA(f, n, IF(n<=0, 0, 1 + f(f, n-1))), 100)
-    /// ```
-    ///
-    /// The immediately-invoked form is not a trick this sheet invented: `Wy Now.xlsx` in the
-    /// corpus writes one, so Excel demonstrably accepts it.
-    ///
-    /// **Whether it is bounded the same way a named recursion is, is a separate question** —
-    /// invoking a parameter and resolving a name are different mechanisms and may well have
-    /// different budgets. So the named sections stay, for whoever adds the names; the
-    /// self-applying ones answer even when nobody does.
-    ///
-    /// - Parameter step: What each level contributes, which is `1` in both bodies and
-    ///   written two ways to vary the work per level rather than the answer.
-    /// - Returns: The stored form of the lambda, prefixes and all.
-    static func selfApplying(step: String) -> String {
-        "_xlfn.LAMBDA(_xlpm.f,_xlpm.n,IF(_xlpm.n<=0,0,"
-            + "\(step)+_xlpm.f(_xlpm.f,_xlpm.n-1)))"
+    // MARK: - The plan
+    //
+    // Emit and read walk the *same* list, so they cannot disagree about where a section
+    // begins — which is the bug the round stamp exists to catch, removed outright.
+
+    /// What a section asks Excel.
+    enum Kind {
+        /// `IF(TRUE, … , d)` nested `d` deep. No `LAMBDA` involved.
+        case nesting
+        /// A self-applying recursive `LAMBDA`, counting down from `d`.
+        case recursion(step: String)
+        /// The same, reached from inside `nested` layers of `IF`.
+        case recursionUnderNesting(step: String, nested: Int)
+        /// `REDUCE` over `SEQUENCE(d)`, which iterates rather than recursing.
+        case iteration
+    }
+
+    /// One block of rows.
+    struct Section {
+        let title: String
+        let kind: Kind
+        let depths: [Int]
+        /// The row its header sits on; the questions follow it.
+        var headerRow = 0
     }
 
     /// The thin body contributes a literal 1 per level.
@@ -101,31 +99,44 @@ enum RecursionDepthSheet {
     /// The fat body contributes the same 1 through three more function calls.
     static let fatStep = "SUM(1,ABS(SIGN(_xlpm.n)))-1"
 
-    /// The depths put to the recursive sections.
+    /// Every section, in order, with its rows assigned.
     ///
-    /// Geometric, because the limit could be anywhere between a hundred and a hundred
-    /// thousand and a linear ladder would either miss it or take all afternoon. `read`
-    /// reports the bracket — the largest that worked and the smallest that did not — and a
-    /// second round can close it if the gap matters.
-    static let ladder = [1, 2, 4, 8, 16, 32, 64, 128, 192, 256, 384, 512, 768,
-                         1024, 1280, 1536, 2048, 3072, 4096, 6144, 8192]
-
-    /// The depths put to the nesting section.
-    ///
-    /// **Answered: 65 nested `IF`s load and 66 do not.** The first round asked up to 128 and
-    /// Excel replied by refusing to open the file — *"Removed Records: Formula from
-    /// /xl/worksheets/sheet1.xml"* — and stripping exactly the four cells above 65. So the
-    /// limit is real, it is 65 calls deep, and **Excel enforces it when the file loads
-    /// rather than when the formula runs**: an over-nested formula is not `#VALUE!`, it is a
-    /// workbook Excel considers damaged.
-    ///
-    /// Microsoft documents "nested levels of functions: 64", which is consistent if the
-    /// outermost call is not counted as nesting. Either way the measured fact is the one to
-    /// key off.
-    ///
-    /// The ladder now stops at 65 so the sheet no longer forces a repair on open — a round
-    /// that damages the file takes the other three sections down with it.
-    static let nestingLadder = [2, 8, 32, 60, 62, 63, 64, 65]
+    /// - Returns: The sections, each knowing where it begins.
+    static func plan() -> [Section] {
+        var sections = [
+            // Round 3 bracketed the limit at 3,072 < n ≤ 4,096. This closes it.
+            Section(title: "recursion — where exactly the limit falls",
+                    kind: .recursion(step: thinStep),
+                    depths: [3100, 3200, 3400, 3600, 3800, 3900, 4000, 4032,
+                             4064, 4080, 4088, 4092, 4094, 4095, 4096]),
+            // If nesting and recursion share one budget, the deeper call sites fail first.
+            Section(title: "nesting budget vs recursion budget — 3000 deep, no nesting",
+                    kind: .recursionUnderNesting(step: thinStep, nested: 0),
+                    depths: [3000]),
+            Section(title: "   the same, from inside 8 nested IFs",
+                    kind: .recursionUnderNesting(step: thinStep, nested: 8),
+                    depths: [3000]),
+            Section(title: "   from inside 32",
+                    kind: .recursionUnderNesting(step: thinStep, nested: 32),
+                    depths: [3000]),
+            Section(title: "   from inside 60",
+                    kind: .recursionUnderNesting(step: thinStep, nested: 60),
+                    depths: [3000]),
+            // Controls, so a round that goes wrong says so rather than looking like news.
+            Section(title: "control — expression nesting, known to be 65",
+                    kind: .nesting, depths: [64, 65]),
+            Section(title: "control — REDUCE, known to reach 8192",
+                    kind: .iteration, depths: [8192]),
+            Section(title: "control — the fat body, known to match the thin one",
+                    kind: .recursion(step: fatStep), depths: [3072, 4096]),
+        ]
+        var row = 12
+        for index in sections.indices {
+            sections[index].headerRow = row
+            row += sections[index].depths.count + 2
+        }
+        return sections
+    }
 
     // MARK: - Emit
 
@@ -137,22 +148,13 @@ enum RecursionDepthSheet {
         let sheet = workbook.addSheet(name: "Limits")
 
         instructions(in: sheet)
-        canary(in: sheet)
-        nesting(in: sheet)
-        selfRecursion(in: sheet, header: Layout.selfThinHeader, step: thinStep,
-                      title: "recursion without a name — thin body")
-        selfRecursion(in: sheet, header: Layout.selfFatHeader, step: fatStep,
-                      title: "recursion without a name — fat body (three more calls per level)")
-        recursion(in: sheet, header: Layout.namedThinHeader, name: "depthProbe",
-                  title: "recursion by name — thin body (needs depthProbe)")
-        recursion(in: sheet, header: Layout.namedFatHeader, name: "depthProbeFat",
-                  title: "recursion by name — fat body (needs depthProbeFat)")
-        iteration(in: sheet)
+        canaries(in: sheet)
+        for section in plan() { write(section, in: sheet) }
 
         // Asked before the save, or the answer is always yes. Asked of the resolved URL
-        // rather than of the path string, which is what the safety checker wants and is
-        // also the more precise question — a path with a `..` in it names a file somewhere
-        // other than where it reads.
+        // rather than of the path string, which is what the safety checker wants and is the
+        // more precise question — a path with a `..` in it names a file somewhere other
+        // than where it reads.
         let url = URL(fileURLWithPath: path).standardized
         let replacing = (try? url.resourceValues(forKeys: [.isRegularFileKey]))?
             .isRegularFile ?? false
@@ -162,133 +164,124 @@ enum RecursionDepthSheet {
                 + "close any copy open in Excel, or it will save itself back over this one")
         }
         ConformanceWorkbook.report("wrote round \(round) of the limits workbook to \(path)")
-        ConformanceWorkbook.report("add the two names in B4 and B5 (Name Manager → New), "
-            + "let it calculate, save — then run `depth-read`")
+        ConformanceWorkbook.report("open it, let it calculate, save — then run `depth-read`")
     }
 
-    /// The header block, including the two names the reader has to add by hand.
-    ///
-    /// **They are added by hand because this package cannot write them.** SwiftXLSX's
-    /// writer emits no `<definedName>` elements at all — it reads them and drops them — so a
-    /// workbook generated here carries no names. That is a fifth defect found in the same
-    /// reader this month, and it is recorded rather than worked around: injecting XML into a
-    /// saved archive to dodge it would be a second writer, which is the thing the package
-    /// split exists to prevent.
     private static func instructions(in sheet: Worksheet) {
-        sheet.write("Excel's own limits — nesting, recursion, iteration", to: "A1")
+        sheet.write("Excel's own limits — round \(round)", to: "A1")
         sheet.write("round", to: "D1")
-        sheet.write(Double(round), to: Layout.round)
+        sheet.write(Double(round), to: Column.round)
         sheet.write("Nothing here tests SwiftExcelFunctions. Every cell is a question for Excel.",
                     to: "A2")
-        sheet.write("1. Name Manager (⌃⌘F3) → New, twice, pasting each name and formula:",
+        sheet.write("Open, let it calculate, save where it is. Nothing to add by hand.",
                     to: "A3")
-        sheet.write("depthProbe", to: "A4")
-        sheet.write("=LAMBDA(n, IF(n<=0, 0, 1 + depthProbe(n-1)))", to: "B4")
-        sheet.write("depthProbeFat", to: "A5")
-        sheet.write("=LAMBDA(n, IF(n<=0, 0, SUM(1, ABS(SIGN(n))) - 1 + depthProbeFat(n-1)))",
-                    to: "B5")
-        sheet.write("   Scope: Workbook — the default, and what makes a name usable on "
-            + "every sheet of the file.", to: "A6")
-        sheet.write("2. Let the sheet calculate, then save it where it is. If Excel stalls "
-            + "on the largest rows, delete them.", to: "A7")
-        sheet.write("Known already: 65 nested IFs load and 66 do not — Excel strips the "
-            + "cell on open rather than erroring.", to: "A9")
+        sheet.write("Settled: 65 nested calls load and 66 do not; recursion reaches 3072 and "
+            + "refuses at 4096 with #NUM!;", to: "A4")
+        sheet.write("a body with three more calls per level refuses at exactly the same "
+            + "depth, so the budget is counted in calls.", to: "A5")
+        sheet.write("This round closes the bracket, and asks whether nesting and recursion "
+            + "share one budget.", to: "A6")
+        sheet.write("If a row stalls, delete it — a deleted row reads as deleted rather than "
+            + "as a refusal.", to: "A7")
     }
 
-    /// One row whose answer is known, so a broken file is obvious.
-    private static func canary(in sheet: Worksheet) {
-        sheet.write("canary — this must be 6", to: "A\(Layout.canaryRow)")
+    /// The two rows whose answers are known, so a broken sheet is obvious.
+    private static func canaries(in sheet: Worksheet) {
+        sheet.write("canary — prefixes; this must be 6", to: "A9")
         sheet.write(1, to: "Z1")
         sheet.write(2, to: "Z2")
         sheet.write(3, to: "Z3")
         raw("_xlfn.REDUCE(0,Z1:Z3,_xlfn.LAMBDA(_xlpm.a,_xlpm.b,_xlpm.a+_xlpm.b))",
-            to: "\(Layout.answer)\(Layout.canaryRow)", in: sheet)
+            to: Column.prefixCanary, in: sheet)
 
-        // The second canary: self-application, which the sections below depend on as much
-        // as every row depends on the prefixes.
-        sheet.write("canary — self-applying LAMBDA, this must be 3",
-                    to: "A\(Layout.selfCanaryRow)")
+        sheet.write("canary — self-applying LAMBDA; this must be 3", to: "A10")
         let body = selfApplying(step: thinStep)
-        raw("\(body)(\(body),3)", to: "\(Layout.answer)\(Layout.selfCanaryRow)", in: sheet)
+        raw("\(body)(\(body),3)", to: Column.selfCanary, in: sheet)
     }
 
-    /// A ladder of self-applying recursions, which need nothing added to the file.
-    private static func selfRecursion(in sheet: Worksheet, header headerRow: Int,
-                                      step: String, title: String) {
-        header(title, at: headerRow, in: sheet)
-        let body = selfApplying(step: step)
-        for (offset, depth) in ladder.enumerated() {
-            let row = headerRow + 1 + offset
-            sheet.write(Double(depth), to: "\(Layout.depth)\(row)")
-            sheet.write("LAMBDA(f,n,…)(itself, \(depth))", to: "\(Layout.question)\(row)")
-            raw("IFERROR(\(body)(\(body),\(depth)),\"refused\")",
-                to: "\(Layout.answer)\(row)", in: sheet)
+    /// Writes one section's header and questions.
+    private static func write(_ section: Section, in sheet: Worksheet) {
+        sheet.write(section.title, to: "\(Column.depth)\(section.headerRow)")
+        sheet.write("asked", to: "\(Column.question)\(section.headerRow)")
+        sheet.write("Excel", to: "\(Column.answer)\(section.headerRow)")
+
+        for (offset, depth) in section.depths.enumerated() {
+            let row = section.headerRow + 1 + offset
+            sheet.write(Double(depth), to: "\(Column.depth)\(row)")
+            sheet.write(description(of: section.kind, depth: depth),
+                        to: "\(Column.question)\(row)")
+            raw(formula(for: section.kind, depth: depth),
+                to: "\(Column.answer)\(row)", in: sheet)
         }
     }
 
-    /// How deep an expression may nest, with no recursion involved.
+    /// The formula a row puts to Excel.
     ///
-    /// Microsoft documents 64 and the cases cluster around it. The innermost value is the
-    /// depth itself, so a row that works says so in its own answer.
-    private static func nesting(in sheet: Worksheet) {
-        header("expression nesting (no LAMBDA) — the limit is known; this is the regression",
-               at: Layout.nestingHeader, in: sheet)
-        for (offset, depth) in nestingLadder.enumerated() {
-            let row = Layout.nestingHeader + 1 + offset
-            sheet.write(Double(depth), to: "\(Layout.depth)\(row)")
-            sheet.write("IF(TRUE, … , \(depth)) nested \(depth) deep",
-                        to: "\(Layout.question)\(row)")
-            raw(nested(depth), to: "\(Layout.answer)\(row)", in: sheet)
+    /// **Not wrapped in `IFERROR` any more.** Round three wrapped them and Excel cached
+    /// `#NUM!` regardless: the recursion-limit error is *not* trappable — `IFERROR` sits on
+    /// the same stack that ran out, so it never gets the chance. Leaving the error bare is
+    /// therefore both simpler and more informative, since the error code is itself a
+    /// measurement.
+    static func formula(for kind: Kind, depth: Int) -> String {
+        switch kind {
+        case .nesting:
+            return nested(depth, around: "\(depth)")
+        case .recursion(let step):
+            let body = selfApplying(step: step)
+            return "\(body)(\(body),\(depth))"
+        case .recursionUnderNesting(let step, let layers):
+            let body = selfApplying(step: step)
+            return nested(layers, around: "\(body)(\(body),\(depth))")
+        case .iteration:
+            return "_xlfn.REDUCE(0,_xlfn.SEQUENCE(\(depth)),"
+                + "_xlfn.LAMBDA(_xlpm.a,_xlpm.v,_xlpm.a+_xlpm.v))"
         }
     }
 
-    /// `IF(TRUE, …, d)` nested to a depth, with `d` at the centre.
+    private static func description(of kind: Kind, depth: Int) -> String {
+        switch kind {
+        case .nesting: return "IF(TRUE, … , \(depth)) nested \(depth) deep"
+        case .recursion: return "LAMBDA(f,n,…)(itself, \(depth))"
+        case .recursionUnderNesting(_, let layers):
+            return "\(layers) nested IFs around a \(depth)-deep recursion"
+        case .iteration: return "REDUCE(0, SEQUENCE(\(depth)), LAMBDA(a,v,a+v))"
+        }
+    }
+
+    /// A recursive `LAMBDA` that needs no name, by passing itself to itself.
     ///
-    /// - Parameter depth: How many `IF`s to wrap.
+    /// **This is what removed the manual step**, which had already cost two rounds. A
+    /// `LAMBDA` cannot call itself anonymously — there is nothing to call — but it can take
+    /// *itself* as a parameter and invoke that:
+    ///
+    /// ```
+    /// LAMBDA(f, n, IF(n<=0, 0, 1 + f(f, n-1)))(LAMBDA(f, n, IF(n<=0, 0, 1 + f(f, n-1))), 100)
+    /// ```
+    ///
+    /// Not a trick this sheet invented: `Wy Now.xlsx` in the corpus writes an
+    /// immediately-invoked `LAMBDA`, so Excel demonstrably accepts the form — and the canary
+    /// proves it each round rather than trusting that.
+    ///
+    /// - Parameter step: What each level contributes — `1`, written two ways, so the *work*
+    ///   per level varies and the answer does not.
+    /// - Returns: The stored form, prefixes and all.
+    static func selfApplying(step: String) -> String {
+        "_xlfn.LAMBDA(_xlpm.f,_xlpm.n,IF(_xlpm.n<=0,0,\(step)+_xlpm.f(_xlpm.f,_xlpm.n-1)))"
+    }
+
+    /// Wraps an expression in `IF(TRUE, …, 0)` to a depth.
+    ///
+    /// - Parameters:
+    ///   - depth: How many `IF`s to wrap.
+    ///   - inner: What sits at the centre.
     /// - Returns: The formula text.
-    static func nested(_ depth: Int) -> String {
-        var formula = "\(depth)"
-        // Bounded by `depth`, which the caller takes from a fixed ladder.
+    static func nested(_ depth: Int, around inner: String) -> String {
+        var formula = inner
+        // Bounded by `depth`, which comes from a fixed plan.
         for _ in 0..<depth {
             formula = "IF(TRUE,\(formula),0)"
         }
         return formula
-    }
-
-    /// A ladder of calls to a recursive name.
-    private static func recursion(in sheet: Worksheet, header headerRow: Int,
-                                  name: String, title: String) {
-        header(title, at: headerRow, in: sheet)
-        for (offset, depth) in ladder.enumerated() {
-            let row = headerRow + 1 + offset
-            sheet.write(Double(depth), to: "\(Layout.depth)\(row)")
-            sheet.write("\(name)(\(depth))", to: "\(Layout.question)\(row)")
-            // Wrapped, so a refusal is a value this can read rather than an error that
-            // stops the sheet. Excel's own answer to too much recursion is #NUM!.
-            raw("IFERROR(\(name)(\(depth)),\"refused\")",
-                to: "\(Layout.answer)\(row)", in: sheet)
-        }
-    }
-
-    /// The same ladder through `REDUCE`, which iterates without recursing.
-    private static func iteration(in sheet: Worksheet) {
-        header("iteration — REDUCE over SEQUENCE(n), answer is n(n+1)/2",
-               at: Layout.iterationHeader, in: sheet)
-        for (offset, depth) in ladder.enumerated() {
-            let row = Layout.iterationHeader + 1 + offset
-            sheet.write(Double(depth), to: "\(Layout.depth)\(row)")
-            sheet.write("REDUCE(0, SEQUENCE(\(depth)), LAMBDA(a,v,a+v))",
-                        to: "\(Layout.question)\(row)")
-            raw("IFERROR(_xlfn.REDUCE(0,_xlfn.SEQUENCE(\(depth)),"
-                + "_xlfn.LAMBDA(_xlpm.a,_xlpm.v,_xlpm.a+_xlpm.v)),\"refused\")",
-                to: "\(Layout.answer)\(row)", in: sheet)
-        }
-    }
-
-    private static func header(_ title: String, at row: Int, in sheet: Worksheet) {
-        sheet.write(title, to: "\(Layout.depth)\(row)")
-        sheet.write("asked", to: "\(Layout.question)\(row)")
-        sheet.write("Excel", to: "\(Layout.answer)\(row)")
     }
 
     /// Writes a formula **verbatim**, without parsing it.
@@ -309,10 +302,11 @@ enum RecursionDepthSheet {
     /// - Parameter path: The saved workbook.
     static func read(_ path: String) throws {
         let workbook = try Workbook(contentsOf: URL(fileURLWithPath: path))
-        guard let sheetForRound = workbook.sheets.first(where: { $0.name == "Limits" }) else {
+        guard let sheet = workbook.sheets.first(where: { $0.name == "Limits" }) else {
             throw ConformanceWorkbook.Failure.noSheet
         }
-        let stamped = value(at: Layout.round, in: sheetForRound)
+
+        let stamped = value(at: Column.round, in: sheet)
         guard case .number(let found)? = stamped, Int(found) == round else {
             say("This file is round \(describe(stamped)) and the tool writes round \(round).")
             say("Reading it with this layout would report layout mismatches as measurements.")
@@ -320,91 +314,46 @@ enum RecursionDepthSheet {
             return
         }
 
-        // Said up front, because it decides how to read two of the six sections.
-        let defined = ["depthProbe", "depthProbeFat"]
-            .filter { workbook.namedRanges.resolve($0) != nil }
-        say("names in the file: \(defined.isEmpty ? "none" : defined.joined(separator: ", "))")
-        guard let sheet = workbook.sheets.first(where: { $0.name == "Limits" }) else {
-            throw ConformanceWorkbook.Failure.noSheet
-        }
-
-        let canaryValue = value(at: "\(Layout.answer)\(Layout.canaryRow)", in: sheet)
-        say("canary: \(describe(canaryValue))   (must be 6)")
-        guard case .number(let six)? = canaryValue, six == 6 else {
+        let prefixes = value(at: Column.prefixCanary, in: sheet)
+        let selfApplication = value(at: Column.selfCanary, in: sheet)
+        say("canary, prefixes:         \(describe(prefixes))   (must be 6)")
+        say("canary, self-application: \(describe(selfApplication))   (must be 3)")
+        guard case .number(let six)? = prefixes, six == 6,
+              case .number(let three)? = selfApplication, three == 3 else {
             say("")
-            say("The canary did not answer 6, so the prefixes are wrong and every other")
-            say("row below is measuring the wrong thing. Fix the emit before reading on.")
+            say("A canary is wrong, so every row below is measuring this sheet's own defect")
+            say("rather than Excel's limits. Fix the emit before reading on.")
             return
         }
         say("")
 
-        let selfCanary = value(at: "\(Layout.answer)\(Layout.selfCanaryRow)", in: sheet)
-        say("self-application canary: \(describe(selfCanary))   (must be 3)")
-        let selfWorks: Bool
-        if case .number(let three)? = selfCanary, three == 3 { selfWorks = true } else {
-            selfWorks = false
-            say("   → Excel refused a self-applying LAMBDA, so the two nameless sections")
-            say("     below measure that refusal and not a depth.")
-        }
-        say("")
-
-        report(section: "expression nesting", header: Layout.nestingHeader,
-               depths: nestingLadder, in: sheet)
-        if selfWorks {
-            report(section: "recursion without a name, thin", header: Layout.selfThinHeader,
-                   depths: ladder, in: sheet)
-            report(section: "recursion without a name, fat", header: Layout.selfFatHeader,
-                   depths: ladder, in: sheet)
-        }
-        reportNamed(section: "recursion by name, thin", header: Layout.namedThinHeader,
-                    name: "depthProbe", workbook: workbook, in: sheet)
-        reportNamed(section: "recursion by name, fat", header: Layout.namedFatHeader,
-                    name: "depthProbeFat", workbook: workbook, in: sheet)
-        report(section: "iteration via REDUCE", header: Layout.iterationHeader,
-               depths: ladder, in: sheet)
+        for section in plan() { report(section, in: sheet) }
     }
 
-    /// A named section, which says whether the name is there before saying anything else.
-    ///
-    /// **A section where even depth 1 refuses has not measured a limit**, it has measured a
-    /// missing name: `depthProbe(1)` is `#NAME?`, `IFERROR` turns that into "refused", and
-    /// the row reads exactly like a refusal at depth 1. That cost a round, and the guard is
-    /// the same doctrine as the canary — a reading that cannot be told apart from a setup
-    /// failure is not a reading.
-    private static func reportNamed(section: String, header headerRow: Int, name: String,
-                                    workbook: Workbook, in sheet: Worksheet) {
-        guard workbook.namedRanges.resolve(name) != nil else {
-            say("\(section):")
-            say("   not measured — no name `\(name)` in this file.")
-            say("   Name Manager (⌃⌘F3) → New → Scope: Workbook, and paste what B4/B5 say.")
-            return
-        }
-        report(section: section, header: headerRow, depths: ladder, in: sheet)
-    }
-
-    /// Prints one section's bracket.
-    private static func report(section: String, header headerRow: Int,
-                               depths: [Int], in sheet: Worksheet) {
+    /// Prints one section's answers.
+    private static func report(_ section: Section, in sheet: Worksheet) {
+        say("\(section.title):")
         var worked: [Int] = []
         var refused: [Int] = []
-        var blank = 0
-        for (offset, depth) in depths.enumerated() {
-            let row = headerRow + 1 + offset
-            switch value(at: "\(Layout.answer)\(row)", in: sheet) {
+        var empty = 0
+        for (offset, depth) in section.depths.enumerated() {
+            let row = section.headerRow + 1 + offset
+            let answer = value(at: "\(Column.answer)\(row)", in: sheet)
+            switch answer {
             case .number: worked.append(depth)
-            case .text(let text) where text == "refused": refused.append(depth)
-            case .error: refused.append(depth)
-            case .none, .some(.blank): blank += 1
-            case .some: blank += 1
+            case .none, .some(.blank): empty += 1
+            default: refused.append(depth)
+            }
+            // A one-row section is a question rather than a ladder, so it shows its answer.
+            if section.depths.count == 1 {
+                say("   \(depth) → \(describe(answer))")
             }
         }
-        say("\(section):")
+        guard section.depths.count > 1 else { return }
         say("   worked up to   \(worked.max().map(String.init) ?? "nothing")")
         say("   first refused  \(refused.min().map(String.init) ?? "never")")
-        if blank > 0 {
-            // Deleted or never calculated. Said rather than counted as a refusal, because
-            // the two mean opposite things and the sheet invites deleting the slow rows.
-            say("   \(blank) row(s) empty — deleted, or the sheet did not calculate them")
+        if empty > 0 {
+            say("   \(empty) row(s) empty — deleted, or never calculated")
         }
     }
 
