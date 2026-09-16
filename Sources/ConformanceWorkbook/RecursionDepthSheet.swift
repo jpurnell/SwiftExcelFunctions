@@ -40,6 +40,19 @@ import SwiftXLSX
 /// refusing the depth. If the canary is not 6, nothing else here means anything.
 enum RecursionDepthSheet {
 
+    /// Which layout this version of the tool writes and expects.
+    ///
+    /// **Stamped into the file, because a round read with the wrong map is worse than no
+    /// reading at all.** Round three was emitted over a path whose round-two copy was open
+    /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
+    /// rows — reported an empty self-application canary, a nesting ladder one row short and
+    /// twenty-one missing iteration rows. Every one of those was a layout mismatch wearing
+    /// the costume of a measurement.
+    ///
+    /// The same doctrine as the canary: a reading that cannot be told apart from a failure
+    /// is not a reading, so the file says which round it is and `read` refuses to guess.
+    static let round = 3
+
     /// Where each section starts, so `emit` and `read` cannot disagree.
     private enum Layout {
         static let canaryRow = 8
@@ -52,6 +65,8 @@ enum RecursionDepthSheet {
         static let iterationHeader = 113
         /// The column holding the depth asked for, and the one holding Excel's answer.
         static let depth = "A", question = "B", answer = "C"
+        /// Where the round number sits.
+        static let round = "E1"
     }
 
     /// A recursive `LAMBDA` that needs no name, by passing itself to itself.
@@ -134,8 +149,19 @@ enum RecursionDepthSheet {
                   title: "recursion by name — fat body (needs depthProbeFat)")
         iteration(in: sheet)
 
-        try workbook.save(to: URL(fileURLWithPath: path))
-        ConformanceWorkbook.report("wrote the limits workbook to \(path)")
+        // Asked before the save, or the answer is always yes. Asked of the resolved URL
+        // rather than of the path string, which is what the safety checker wants and is
+        // also the more precise question — a path with a `..` in it names a file somewhere
+        // other than where it reads.
+        let url = URL(fileURLWithPath: path).standardized
+        let replacing = (try? url.resourceValues(forKeys: [.isRegularFileKey]))?
+            .isRegularFile ?? false
+        try workbook.save(to: url)
+        if replacing {
+            ConformanceWorkbook.report("note: \(path) already existed and was replaced — "
+                + "close any copy open in Excel, or it will save itself back over this one")
+        }
+        ConformanceWorkbook.report("wrote round \(round) of the limits workbook to \(path)")
         ConformanceWorkbook.report("add the two names in B4 and B5 (Name Manager → New), "
             + "let it calculate, save — then run `depth-read`")
     }
@@ -150,6 +176,8 @@ enum RecursionDepthSheet {
     /// split exists to prevent.
     private static func instructions(in sheet: Worksheet) {
         sheet.write("Excel's own limits — nesting, recursion, iteration", to: "A1")
+        sheet.write("round", to: "D1")
+        sheet.write(Double(round), to: Layout.round)
         sheet.write("Nothing here tests SwiftExcelFunctions. Every cell is a question for Excel.",
                     to: "A2")
         sheet.write("1. Name Manager (⌃⌘F3) → New, twice, pasting each name and formula:",
@@ -281,6 +309,17 @@ enum RecursionDepthSheet {
     /// - Parameter path: The saved workbook.
     static func read(_ path: String) throws {
         let workbook = try Workbook(contentsOf: URL(fileURLWithPath: path))
+        guard let sheetForRound = workbook.sheets.first(where: { $0.name == "Limits" }) else {
+            throw ConformanceWorkbook.Failure.noSheet
+        }
+        let stamped = value(at: Layout.round, in: sheetForRound)
+        guard case .number(let found)? = stamped, Int(found) == round else {
+            say("This file is round \(describe(stamped)) and the tool writes round \(round).")
+            say("Reading it with this layout would report layout mismatches as measurements.")
+            say("Emit a fresh one — to a path nothing has open — and save that instead.")
+            return
+        }
+
         // Said up front, because it decides how to read two of the six sections.
         let defined = ["depthProbe", "depthProbeFat"]
             .filter { workbook.namedRanges.resolve($0) != nil }
