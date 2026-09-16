@@ -25,7 +25,7 @@ import SwiftXLSX
 /// | expression nesting | **65 calls load, 66 do not** | 1 |
 /// | how nesting is enforced | **when the file loads** — Excel deletes the cell and calls the file damaged | 1 |
 /// | `REDUCE` over `SEQUENCE(n)` | no limit found to **8,192** | 2 |
-/// | recursion depth | **3,072 works, 4,096 is `#NUM!`** | 3 |
+/// | recursion depth | **4,095 invocations succeed; the 4,096th is `#NUM!`** | 4 |
 /// | calls or stack? | **calls** — a body with three more function calls per level refuses at exactly the same depth | 3 |
 /// | is the refusal catchable? | **no** — `IFERROR` does not trap it; the cell caches `#NUM!` | 3 |
 ///
@@ -33,13 +33,18 @@ import SwiftXLSX
 /// exactly settles the instrument: a call counter is the right thing to build, and measuring
 /// the work per level would be measuring something Excel does not.
 ///
-/// ## What round 4 asks
+/// ## What round 5 asks
 ///
-/// - **Where exactly** between 3,072 and 4,096 the limit falls.
-/// - **Whether the recursion budget and the nesting budget are one budget**, by calling a
-///   recursion that is known to work from inside sixty nested `IF`s. If it still works they
-///   are separate counters and this package should keep them separate too — the current
-///   `maxDepth` conflates them, and at 256 it is an order of magnitude too small for either.
+/// **One budget or two** — and round 4 failed to answer it, through a fault in the question
+/// rather than in Excel. It put a 3,000-deep recursion inside 60 nested `IF`s, and
+/// `3000 + 60` is 3,060: comfortably under the 4,095 limit, so it would have succeeded
+/// whether the counters were shared or separate. A probe that passes under either hypothesis
+/// measures nothing.
+///
+/// Round 5 puts the recursion at **4,090**, five short of the limit. Then `4090 + 8` is
+/// 4,098 — over — so a shared counter must refuse and a separate one cannot. The nesting
+/// ladder runs 0, 2, 4, 8, 32, 60, which also locates the shared budget exactly if it is
+/// shared.
 ///
 /// ## The two canaries
 ///
@@ -56,7 +61,7 @@ enum RecursionDepthSheet {
     /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
     /// rows — reported an empty canary, a ladder one row short and twenty-one missing rows.
     /// Every one of those was a layout mismatch wearing the costume of a measurement.
-    static let round = 4
+    static let round = 5
 
     /// The column holding what was asked, the question in words, and Excel's answer.
     private enum Column {
@@ -80,6 +85,9 @@ enum RecursionDepthSheet {
         case recursion(step: String)
         /// The same, reached from inside `nested` layers of `IF`.
         case recursionUnderNesting(step: String, nested: Int)
+        /// A recursion of fixed depth, wrapped in a *varying* number of `IF` layers —
+        /// so the ladder counts the nesting rather than the recursion.
+        case nestingLadderAroundRecursion(step: String, depth: Int)
         /// `REDUCE` over `SEQUENCE(d)`, which iterates rather than recursing.
         case iteration
     }
@@ -104,31 +112,23 @@ enum RecursionDepthSheet {
     /// - Returns: The sections, each knowing where it begins.
     static func plan() -> [Section] {
         var sections = [
-            // Round 3 bracketed the limit at 3,072 < n ≤ 4,096. This closes it.
-            Section(title: "recursion — where exactly the limit falls",
-                    kind: .recursion(step: thinStep),
-                    depths: [3100, 3200, 3400, 3600, 3800, 3900, 4000, 4032,
-                             4064, 4080, 4088, 4092, 4094, 4095, 4096]),
-            // If nesting and recursion share one budget, the deeper call sites fail first.
-            Section(title: "nesting budget vs recursion budget — 3000 deep, no nesting",
-                    kind: .recursionUnderNesting(step: thinStep, nested: 0),
-                    depths: [3000]),
-            Section(title: "   the same, from inside 8 nested IFs",
-                    kind: .recursionUnderNesting(step: thinStep, nested: 8),
-                    depths: [3000]),
-            Section(title: "   from inside 32",
-                    kind: .recursionUnderNesting(step: thinStep, nested: 32),
-                    depths: [3000]),
-            Section(title: "   from inside 60",
-                    kind: .recursionUnderNesting(step: thinStep, nested: 60),
-                    depths: [3000]),
+            // 4090 is five short of the limit, so 4090 + 8 is over it. A shared counter
+            // must refuse from 8 layers up; a separate one cannot refuse at any of these.
+            Section(title: "one budget or two — a 4090-deep recursion, from inside N IFs",
+                    kind: .nestingLadderAroundRecursion(step: thinStep, depth: 4090),
+                    depths: [0, 2, 4, 8, 32, 60]),
             // Controls, so a round that goes wrong says so rather than looking like news.
+            Section(title: "control — the limit itself, known to be 4094 / 4095",
+                    kind: .recursion(step: thinStep), depths: [4093, 4094, 4095]),
             Section(title: "control — expression nesting, known to be 65",
                     kind: .nesting, depths: [64, 65]),
             Section(title: "control — REDUCE, known to reach 8192",
                     kind: .iteration, depths: [8192]),
-            Section(title: "control — the fat body, known to match the thin one",
-                    kind: .recursion(step: fatStep), depths: [3072, 4096]),
+            // Sharper than round 3's control, which checked the fat body at 3072 and 4096.
+            // At the exact boundary, an identical answer confirms "calls, not stack" where
+            // it matters rather than a thousand levels short of it.
+            Section(title: "control — the fat body at the boundary",
+                    kind: .recursion(step: fatStep), depths: [4094, 4095]),
         ]
         var row = 12
         for index in sections.indices {
@@ -175,12 +175,12 @@ enum RecursionDepthSheet {
                     to: "A2")
         sheet.write("Open, let it calculate, save where it is. Nothing to add by hand.",
                     to: "A3")
-        sheet.write("Settled: 65 nested calls load and 66 do not; recursion reaches 3072 and "
-            + "refuses at 4096 with #NUM!;", to: "A4")
+        sheet.write("Settled: 65 nested calls load and 66 do not; 4095 LAMBDA invocations "
+            + "succeed and the 4096th is #NUM!;", to: "A4")
         sheet.write("a body with three more calls per level refuses at exactly the same "
             + "depth, so the budget is counted in calls.", to: "A5")
-        sheet.write("This round closes the bracket, and asks whether nesting and recursion "
-            + "share one budget.", to: "A6")
+        sheet.write("This round asks one question: do nesting and recursion draw on one "
+            + "budget or two?", to: "A6")
         sheet.write("If a row stalls, delete it — a deleted row reads as deleted rather than "
             + "as a refusal.", to: "A7")
     }
@@ -232,6 +232,10 @@ enum RecursionDepthSheet {
         case .recursionUnderNesting(let step, let layers):
             let body = selfApplying(step: step)
             return nested(layers, around: "\(body)(\(body),\(depth))")
+        case .nestingLadderAroundRecursion(let step, let fixed):
+            // Here the ladder's value is the *nesting*, and the recursion is fixed.
+            let body = selfApplying(step: step)
+            return nested(depth, around: "\(body)(\(body),\(fixed))")
         case .iteration:
             return "_xlfn.REDUCE(0,_xlfn.SEQUENCE(\(depth)),"
                 + "_xlfn.LAMBDA(_xlpm.a,_xlpm.v,_xlpm.a+_xlpm.v))"
@@ -244,6 +248,8 @@ enum RecursionDepthSheet {
         case .recursion: return "LAMBDA(f,n,…)(itself, \(depth))"
         case .recursionUnderNesting(_, let layers):
             return "\(layers) nested IFs around a \(depth)-deep recursion"
+        case .nestingLadderAroundRecursion(_, let fixed):
+            return "\(depth) nested IFs around a \(fixed)-deep recursion"
         case .iteration: return "REDUCE(0, SEQUENCE(\(depth)), LAMBDA(a,v,a+v))"
         }
     }

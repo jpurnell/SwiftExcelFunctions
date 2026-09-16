@@ -432,7 +432,7 @@ say out loud.
 
 | Question | Answer |
 |---|---|
-| recursion depth | **3,072 works; 4,096 is `#NUM!`** |
+| recursion depth | **4,095 invocations succeed; the 4,096th is `#NUM!`** |
 | calls or stack? | **calls.** The fat body — three more function calls per level — refuses at *exactly* the same depth |
 | is the refusal catchable? | **no.** `IFERROR` does not trap it; the cell caches `#NUM!` |
 | `REDUCE` iteration | no limit found to 8,192 |
@@ -446,10 +446,19 @@ sits on the same stack that ran out, so it never gets the chance. An evaluator t
 `#NUM!` through its own error-handling path would be *more* forgiving than Excel, and a
 formula that recovers here would recover where Excel does not.
 
-Round 4 closes the bracket between 3,072 and 4,096, and asks the one question left: whether
-recursion and nesting draw on **one budget or two**. If a 3,000-deep recursion still works
-from inside sixty nested `IF`s they are separate counters, and this package should keep them
-separate too.
+**The limit is 4,096 exactly**, and that it is a power of two is worth noticing: it reads
+like a fixed frame table rather than a heuristic, which makes it the sort of number that
+stays put across versions. `f(f, 4094)` is 4,095 invocations — 4094 down to the base case at
+0 — and succeeds; `f(f, 4095)` is 4,096 and does not.
+
+**One question is left, and round 4 failed to answer it** — through a fault in the question
+rather than in Excel. It put a 3,000-deep recursion inside 60 nested `IF`s, and `3000 + 60`
+is 3,060: comfortably under the limit, so it would have succeeded whether the counters were
+shared or separate. A probe that passes under either hypothesis measures nothing, and this
+one read as an answer.
+
+Round 5 puts the recursion at **4,090**, five short of the limit, so `4090 + 8` is over it:
+a shared counter must refuse and a separate one cannot.
 
 The canary answered **6** in that first round, so the `_xlfn.`/`_xlpm.` spelling is right
 and the three remaining sections are asking what they mean to ask. A canary row — `REDUCE`
