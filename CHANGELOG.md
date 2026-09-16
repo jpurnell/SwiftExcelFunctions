@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`conformance-workbook depth` — asking Excel where its own limits are.** Microsoft
+  documents 64 levels of function nesting and says nothing whatever about `LAMBDA`
+  recursion, so the only authority is Excel. Four sections: expression nesting, recursive
+  `LAMBDA` with a thin body, the same with a fat one, and `REDUCE` iteration. Thin against
+  fat is the one that decides the implementation — both failing at the same depth means the
+  budget is counted in calls, the fat one failing earlier means it is stack.
+
+  **First answer: 65 nested calls load and 66 do not.** Excel replied by refusing to open
+  the file — `Removed Records: Formula from /xl/worksheets/sheet1.xml` — and stripping
+  exactly the four cells above 65, leaving the rest of the sheet untouched. So the limit is
+  enforced **when the file loads, not when the formula runs**: an over-nested formula is not
+  an error value, it is a workbook Excel repairs by deleting the cell.
+
 - **The `text` and `information` categories, closed.** Twenty rows out of the unreviewed
   bucket: fifteen implemented and five marked out of scope with the reason written down.
 

@@ -57,11 +57,25 @@ enum RecursionDepthSheet {
     /// thousand and a linear ladder would either miss it or take all afternoon. `read`
     /// reports the bracket — the largest that worked and the smallest that did not — and a
     /// second round can close it if the gap matters.
-    static let ladder = [1, 2, 4, 8, 16, 32, 64, 96, 128, 192, 256, 384, 512, 768,
-                         1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384]
+    static let ladder = [1, 2, 4, 8, 16, 32, 64, 128, 192, 256, 384, 512, 768,
+                         1024, 1280, 1536, 2048, 3072, 4096, 6144, 8192]
 
-    /// The depths put to the nesting section, clustered around the documented 64.
-    static let nestingLadder = [2, 8, 32, 60, 62, 63, 64, 65, 66, 70, 100, 128]
+    /// The depths put to the nesting section.
+    ///
+    /// **Answered: 65 nested `IF`s load and 66 do not.** The first round asked up to 128 and
+    /// Excel replied by refusing to open the file — *"Removed Records: Formula from
+    /// /xl/worksheets/sheet1.xml"* — and stripping exactly the four cells above 65. So the
+    /// limit is real, it is 65 calls deep, and **Excel enforces it when the file loads
+    /// rather than when the formula runs**: an over-nested formula is not `#VALUE!`, it is a
+    /// workbook Excel considers damaged.
+    ///
+    /// Microsoft documents "nested levels of functions: 64", which is consistent if the
+    /// outermost call is not counted as nesting. Either way the measured fact is the one to
+    /// key off.
+    ///
+    /// The ladder now stops at 65 so the sheet no longer forces a repair on open — a round
+    /// that damages the file takes the other three sections down with it.
+    static let nestingLadder = [2, 8, 32, 60, 62, 63, 64, 65]
 
     // MARK: - Emit
 
@@ -109,6 +123,8 @@ enum RecursionDepthSheet {
         sheet.write("2. Let the sheet calculate, then save it where it is.", to: "A6")
         sheet.write("If Excel stalls on the largest rows, delete them — the measurement "
             + "works from whatever finished.", to: "A7")
+        sheet.write("Known already: 65 nested IFs load and 66 do not — Excel strips the "
+            + "cell on open rather than erroring.", to: "A9")
     }
 
     /// One row whose answer is known, so a broken file is obvious.
@@ -126,7 +142,8 @@ enum RecursionDepthSheet {
     /// Microsoft documents 64 and the cases cluster around it. The innermost value is the
     /// depth itself, so a row that works says so in its own answer.
     private static func nesting(in sheet: Worksheet) {
-        header("expression nesting (no LAMBDA)", at: Layout.nestingHeader, in: sheet)
+        header("expression nesting (no LAMBDA) — the limit is known; this is the regression",
+               at: Layout.nestingHeader, in: sheet)
         for (offset, depth) in nestingLadder.enumerated() {
             let row = Layout.nestingHeader + 1 + offset
             sheet.write(Double(depth), to: "\(Layout.depth)\(row)")

@@ -399,8 +399,27 @@ for a lambda alone in a cell, and `ERROR.TYPE` — which switches over every cas
 row Excel gives it (`#CALC!` has no `ERROR.TYPE` number in Excel's table; it returns `#N/A`,
 and that is what to reproduce).
 
-**2. What call depth is right? → Measured, not chosen.** `conformance-workbook depth` emits
-a workbook that asks Excel where its own limits are, in four separate sections:
+**2. What call depth is right? → Being measured, and one answer is already in.**
+
+**Expression nesting: 65 calls deep loads, 66 does not.** Excel answered the first round by
+**refusing to open the file** —
+
+```xml
+<removedRecord>Removed Records: Formula from /xl/worksheets/sheet1.xml part</removedRecord>
+```
+
+— and stripping exactly the four cells that asked for 66, 70, 100 and 128, leaving every
+other formula in the sheet intact. So the limit is real, it is 65, and **Excel enforces it
+when the file loads rather than when the formula runs**: an over-nested formula is not
+`#VALUE!`, it is a workbook Excel considers damaged and repairs by deleting the cell.
+
+Microsoft documents "nested levels of functions: 64", which is consistent if the outermost
+call is not counted as nesting. The measured number is the one to key off, and the *manner*
+of the refusal is the more useful half: a workbook that arrives with a formula missing may
+have been repaired rather than authored that way, which is a thing the checker could one day
+say out loud.
+
+`conformance-workbook depth` asks the rest, in four separate sections:
 
 | Section | Asks | Needs a name |
 |---|---|---|
@@ -414,7 +433,9 @@ depth means the budget is counted in *calls*, and a call counter suffices. The f
 failing earlier means the budget is *stack*, and a call counter is the wrong instrument
 altogether.
 
-A canary row — `REDUCE` over three cells, answer 6 — guards the whole sheet: every row
+The canary answered **6** in that first round, so the `_xlfn.`/`_xlpm.` spelling is right
+and the three remaining sections are asking what they mean to ask. A canary row — `REDUCE`
+over three cells, answer 6 — guards the whole sheet: every row
 depends on `_xlfn.` and `_xlpm.` being written the way the format wants, and a file that gets
 them wrong shows `#NAME?` everywhere, which looks exactly like Excel refusing the depth.
 
