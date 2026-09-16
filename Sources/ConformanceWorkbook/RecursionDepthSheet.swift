@@ -18,7 +18,7 @@ import SwiftXLSX
 /// swift run conformance-workbook depth-read ~/Desktop/limits.xlsx
 /// ```
 ///
-/// ## What is settled
+/// ## What it found — the programme is complete
 ///
 /// | Question | Answer | Round |
 /// |---|---|---|
@@ -26,25 +26,25 @@ import SwiftXLSX
 /// | how nesting is enforced | **when the file loads** — Excel deletes the cell and calls the file damaged | 1 |
 /// | `REDUCE` over `SEQUENCE(n)` | no limit found to **8,192** | 2 |
 /// | recursion depth | **4,095 invocations succeed; the 4,096th is `#NUM!`** | 4 |
-/// | calls or stack? | **calls** — a body with three more function calls per level refuses at exactly the same depth | 3 |
+/// | calls or stack? | **calls** — three more function calls per level refuses at the *same* depth, confirmed at the boundary | 3, 5 |
 /// | is the refusal catchable? | **no** — `IFERROR` does not trap it; the cell caches `#NUM!` | 3 |
+/// | one budget or two? | **two** — a 4,090-deep recursion works from inside 60 nested `IF`s, and 4,150 is well past the limit | 5 |
 ///
-/// **Thin against fat was the question the sheet was built for**, and the two agreeing
-/// exactly settles the instrument: a call counter is the right thing to build, and measuring
-/// the work per level would be measuring something Excel does not.
+/// **What this package should build, then:** two counters, not one. An expression-nesting
+/// bound of 65 and a call bound of 4,096, kept apart because Excel keeps them apart.
+/// `FormulaEvaluator.maxDepth` is a single counter at 256 incremented once per *AST node*,
+/// which is wrong three ways over — too small, counting the wrong thing, and conflating two
+/// budgets Excel measures separately.
 ///
-/// ## What round 5 asks
+/// The uncatchable refusal is the subtle one. `IFERROR` sits on the same stack that ran out,
+/// so an evaluator returning `#NUM!` through its own error-handling path would be *more
+/// forgiving than Excel*, and a formula would recover here where the real thing does not.
 ///
-/// **One budget or two** — and round 4 failed to answer it, through a fault in the question
-/// rather than in Excel. It put a 3,000-deep recursion inside 60 nested `IF`s, and
-/// `3000 + 60` is 3,060: comfortably under the 4,095 limit, so it would have succeeded
-/// whether the counters were shared or separate. A probe that passes under either hypothesis
-/// measures nothing.
+/// ## The sheet from here
 ///
-/// Round 5 puts the recursion at **4,090**, five short of the limit. Then `4090 + 8` is
-/// 4,098 — over — so a shared counter must refuse and a separate one cannot. The nesting
-/// ladder runs 0, 2, 4, 8, 32, 60, which also locates the shared budget exactly if it is
-/// shared.
+/// Every section is now a control with a known answer, so the file is a **regression check**:
+/// emit it against a new Excel, read it, and anything that moved is news. The programme it
+/// was built to run is finished.
 ///
 /// ## The two canaries
 ///

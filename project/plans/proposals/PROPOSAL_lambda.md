@@ -399,72 +399,48 @@ for a lambda alone in a cell, and `ERROR.TYPE` — which switches over every cas
 row Excel gives it (`#CALC!` has no `ERROR.TYPE` number in Excel's table; it returns `#N/A`,
 and that is what to reproduce).
 
-**2. What call depth is right? → Being measured, and one answer is already in.**
+**2. What call depth is right? → Measured, and the programme is finished.**
 
-**Expression nesting: 65 calls deep loads, 66 does not.** Excel answered the first round by
-**refusing to open the file** —
-
-```xml
-<removedRecord>Removed Records: Formula from /xl/worksheets/sheet1.xml part</removedRecord>
-```
-
-— and stripping exactly the four cells that asked for 66, 70, 100 and 128, leaving every
-other formula in the sheet intact. So the limit is real, it is 65, and **Excel enforces it
-when the file loads rather than when the formula runs**: an over-nested formula is not
-`#VALUE!`, it is a workbook Excel considers damaged and repairs by deleting the cell.
-
-Microsoft documents "nested levels of functions: 64", which is consistent if the outermost
-call is not counted as nesting. The measured number is the one to key off, and the *manner*
-of the refusal is the more useful half: a workbook that arrives with a formula missing may
-have been repaired rather than authored that way, which is a thing the checker could one day
-say out loud.
-
-`conformance-workbook depth` asks the rest, in four separate sections:
-
-| Section | Asks | Needs a name |
+| Question | Answer | Round |
 |---|---|---|
-| nesting | how deep an expression may be, with no recursion | no |
-| thin | how deep a recursive `LAMBDA` goes | yes |
-| fat | the same with three more calls per level | yes |
-| iteration | whether `REDUCE` over a long sequence is bounded separately | no |
+| expression nesting | **65 calls load, 66 do not** | 1 |
+| how nesting is enforced | **when the file loads** — Excel deletes the cell and calls the file damaged | 1 |
+| recursion depth | **4,095 invocations succeed; the 4,096th is `#NUM!`** | 4 |
+| calls or stack? | **calls** — a body with three more function calls per level refuses at the same depth, confirmed *at* the boundary | 3, 5 |
+| is the refusal catchable? | **no** — `IFERROR` does not trap it | 3 |
+| one budget or two? | **two** — a 4,090-deep recursion works from inside 60 nested `IF`s | 5 |
+| `REDUCE` iteration | no limit found to 8,192 | 2 |
 
-**Thin against fat is the question that decides the instrument — and it is answered.**
+**So: two counters, not one.** An expression-nesting bound of **65** and a call bound of
+**4,096**, kept apart because Excel keeps them apart — 4,090 + 60 is 4,150, well past the
+recursion limit, and Excel answered it without complaint.
 
-| Question | Answer |
-|---|---|
-| recursion depth | **4,095 invocations succeed; the 4,096th is `#NUM!`** |
-| calls or stack? | **calls.** The fat body — three more function calls per level — refuses at *exactly* the same depth |
-| is the refusal catchable? | **no.** `IFERROR` does not trap it; the cell caches `#NUM!` |
-| `REDUCE` iteration | no limit found to 8,192 |
+`FormulaEvaluator.maxDepth` is a single counter at 256, incremented once per *AST node*. That
+is wrong three ways at once: an order of magnitude too small, counting the wrong thing, and
+conflating two budgets that Excel measures separately. Replacing it is part of step 1.
 
-So **a call counter is the right instrument**, and measuring work per level would be
-measuring something Excel does not. `maxDepth = 256` is an order of magnitude too small, and
-it counts AST nodes rather than calls — two separate corrections, both now grounded.
+That 4,096 is a power of two is worth noticing: it reads like a fixed frame table rather than
+a heuristic, which makes it the sort of number that stays put across versions.
 
-That `IFERROR` cannot trap the refusal is a smaller finding with a sharp edge: `IFERROR`
-sits on the same stack that ran out, so it never gets the chance. An evaluator that returns
-`#NUM!` through its own error-handling path would be *more* forgiving than Excel, and a
-formula that recovers here would recover where Excel does not.
+**Two findings with edges**, neither of which was the question being asked:
 
-**The limit is 4,096 exactly**, and that it is a power of two is worth noticing: it reads
-like a fixed frame table rather than a heuristic, which makes it the sort of number that
-stays put across versions. `f(f, 4094)` is 4,095 invocations — 4094 down to the base case at
-0 — and succeeds; `f(f, 4095)` is 4,096 and does not.
+- **The refusal is not catchable.** `IFERROR(<too deep>, "x")` caches `#NUM!`, because
+  `IFERROR` sits on the same stack that ran out. An evaluator that produced `#NUM!` through
+  its own error-handling path would be *more forgiving than Excel* — a formula would recover
+  here where the real thing does not.
+- **Nesting is enforced at load, not at evaluation.** Excel does not return an error for a
+  66-deep formula; it deletes the cell and reports the file as damaged. This package cannot
+  delete anything, and a file that reaches it with 66-deep nesting was written by something
+  other than Excel — so the faithful analogue is for the *reader* to say so, not for the
+  evaluator to refuse. Recorded; not settled.
 
-**One question is left, and round 4 failed to answer it** — through a fault in the question
-rather than in Excel. It put a 3,000-deep recursion inside 60 nested `IF`s, and `3000 + 60`
-is 3,060: comfortably under the limit, so it would have succeeded whether the counters were
-shared or separate. A probe that passes under either hypothesis measures nothing, and this
-one read as an answer.
-
-Round 5 puts the recursion at **4,090**, five short of the limit, so `4090 + 8` is over it:
-a shared counter must refuse and a separate one cannot.
-
-The canary answered **6** in that first round, so the `_xlfn.`/`_xlpm.` spelling is right
-and the three remaining sections are asking what they mean to ask. A canary row — `REDUCE`
-over three cells, answer 6 — guards the whole sheet: every row
-depends on `_xlfn.` and `_xlpm.` being written the way the format wants, and a file that gets
-them wrong shows `#NAME?` everywhere, which looks exactly like Excel refusing the depth.
+**And a note on how one round went wrong**, because the failure mode generalises. Round 4
+asked the budget question with a 3,000-deep recursion inside 60 nested `IF`s — and `3000+60`
+is comfortably under the limit, so it passes whether the counters are shared or separate. All
+four rows answered, and the result read exactly like evidence for two budgets. **A probe that
+passes under either hypothesis measures nothing**, and this one would have been believed. The
+fix was arithmetic: put the recursion five short of the limit so a shared counter *must*
+refuse.
 
 **3. Sheet-scoped lambdas. → Approved, with a test.** The resolver already takes a sheet, so
 this should cost nothing; "should" is what the test is for.
