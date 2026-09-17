@@ -49,13 +49,114 @@ import SwiftExcelCore
 /// - `.blank` coerces to `0.0` for numbers, `""` for strings
 /// - `.error` values propagate immediately
 ///
-/// ## Depth Limit
+/// ## Depth limits
 ///
-/// Evaluation depth is capped at 256 to prevent stack overflow on deeply nested formulas.
+/// Three bounds, because Excel keeps two and the stack needs a third. See
+/// ``maxCallDepth``, ``maxRecursionDepth`` and ``maxNodeDepth``, and
+/// `project/docs/technical/ExcelEvaluationLimits.md` for how the first two were measured.
 public enum FormulaEvaluator {
 
-    /// The maximum evaluation depth before raising ``EvaluationError/evaluationDepthExceeded``.
-    public static let maxDepth = 256
+    /// How deep an expression may nest: **65 function calls**.
+    ///
+    /// Measured against Excel 16.114, and the bracket has no slack in it — Excel kept the
+    /// cells asking for 2, 8, 32, 60, 62, 63, 64 and 65, and deleted exactly those asking for
+    /// 66, 70, 100 and 128. Microsoft documents "nested levels of functions: 64", which is
+    /// consistent with 65 if the outermost call is not counted as nesting; both are right
+    /// under their own reading and an implementation should key off the measured one.
+    ///
+    /// **A violation is a fact about the file, not about the formula.** Excel does not
+    /// evaluate an over-nested formula and return an error — it refuses the *file*, deleting
+    /// the cell and reporting the workbook as damaged. An evaluator has nothing to delete, so
+    /// the honest analogue is to refuse and let the caller decide. A file arriving with
+    /// 66-deep nesting was written by something that is not Excel.
+    ///
+    /// Counted in **function calls**. Operators are not calls and Excel does not count them:
+    /// `A1+A2+…` a few hundred terms long is one expression, bounded by the 8,192-character
+    /// formula length rather than by this.
+    public static let maxCallDepth = 65
+
+    /// How deep a `LAMBDA` may recurse: **4,096 invocations**.
+    ///
+    /// `f(f, 4094)` answers 4094 and `f(f, 4095)` is `#NUM!`, so the limit is 4,096 counting
+    /// the base case. That it is a power of two reads like a fixed frame table rather than a
+    /// heuristic, which makes it the kind of number that stays put across versions.
+    ///
+    /// **A separate budget from ``maxCallDepth``**, established by running a 4,090-deep
+    /// recursion inside 0, 2, 4, 8, 32 and 60 nested `IF`s: every one answered 4090, and
+    /// 4,090 + 60 is well past 4,095, so a shared counter had to refuse and did not.
+    ///
+    /// The refusal is **not catchable**. `IFERROR` sits on the same stack that ran out, so it
+    /// never gets the chance to handle anything — and an evaluator that produced `#NUM!`
+    /// through its own error-handling path would be *more forgiving than Excel*.
+    public static let maxRecursionDepth = 4096
+
+    /// How deep the tree itself may go before this evaluator stops descending.
+    ///
+    /// **This one is ours, not Excel's**, and it is here for the stack rather than for
+    /// fidelity. Excel caps formula *text* at 8,192 characters and every nesting level costs
+    /// at least one character, so no formula Excel can hold reaches this depth; what it rules
+    /// out is a hand-built AST exhausting the stack.
+    ///
+    /// It replaces a `maxDepth = 256` that was incremented once per AST node and presented as
+    /// though it were a rule about spreadsheets. It was not, and at 256 it refused ordinary
+    /// things — a 300-term sum is nothing unusual in a real sheet and Excel computes it
+    /// without complaint.
+    ///
+    /// **The number is measured, not reasoned to.** The first attempt was 8,192, on the
+    /// argument that Excel caps formula text at 8,192 characters so nothing legal can be
+    /// deeper. That is true about Excel and irrelevant here: the binding constraint is this
+    /// evaluator's own recursion, not the format. `evaluateNode` takes nine arguments and
+    /// 8,192 frames of it is `SIGSEGV` — reached before the guard that was supposed to
+    /// prevent it. **A bound whose enforcement crashes is not a bound.**
+    ///
+    /// So it was measured by bisection, evaluating a stack of `negate` nodes at increasing
+    /// depths until the process died: a debug build under XCTest survives ~1,100 frames and
+    /// dies by 1,200. Release frames are smaller and would go further; the bound has to hold
+    /// in the worse case. 512 leaves better than 2× margin under the measured ceiling, and is
+    /// still 8× Excel's own call limit — a 300-term sum, which is an ordinary thing to find,
+    /// sits comfortably inside it.
+    ///
+    /// Raising it is not a matter of choosing a larger number. It needs an explicit stack or
+    /// a trampoline in `evaluateNode`, and until then this is the honest ceiling.
+    public static let maxNodeDepth = 512
+
+    /// The three budgets, threaded as one value.
+    ///
+    /// One parameter rather than three, because `evaluateNode` already passes nine and the
+    /// count is the problem the `LAMBDA` work will fix properly with an evaluation
+    /// environment. Until then this at least keeps the counters from being conflated, which
+    /// is the mistake that made a single `depth` wrong.
+    struct Depth {
+        /// Tree levels descended, against ``FormulaEvaluator/maxNodeDepth``.
+        var nodes = 0
+        /// Function calls entered, against ``FormulaEvaluator/maxCallDepth``.
+        var calls = 0
+
+        // The third counter, for `LAMBDA` recursion against
+        // ``FormulaEvaluator/maxRecursionDepth``, belongs here and is not here yet: nothing
+        // would increment it, and a field no code touches is a claim the compiler cannot
+        // check. It arrives with `LAMBDA`. The bound itself is stated now because it is
+        // measured now.
+
+        /// One level further into the tree, which is not a call.
+        var descended: Depth {
+            var next = self
+            next.nodes += 1
+            return next
+        }
+
+        /// One level further into the tree *and* one call deeper.
+        ///
+        /// - Throws: ``EvaluationError/callDepthExceeded`` past Excel's measured 65.
+        func calling() throws -> Depth {
+            var next = descended
+            next.calls += 1
+            guard next.calls <= FormulaEvaluator.maxCallDepth else {
+                throw EvaluationError.callDepthExceeded
+            }
+            return next
+        }
+    }
 
     /// Errors that can occur during formula evaluation.
     public enum EvaluationError: Error, Equatable, Sendable {
@@ -67,8 +168,13 @@ public enum FormulaEvaluator {
         case circularReference // LIVE: public API for consumers
         /// A type mismatch occurred during coercion.
         case typeMismatch(expected: String, got: String)
-        /// The evaluation recursion depth exceeded ``FormulaEvaluator/maxDepth``.
-        case evaluationDepthExceeded
+        /// The expression nested past ``FormulaEvaluator/maxCallDepth``, which Excel refuses
+        /// at file load by deleting the cell. Reaching this means the file was not written
+        /// by Excel.
+        case callDepthExceeded
+        /// The tree went deeper than ``FormulaEvaluator/maxNodeDepth``. A stack guard rather
+        /// than a rule about spreadsheets — no formula Excel can hold reaches it.
+        case nodeDepthExceeded
     }
 
     /// Evaluates one formula and distributes its result across a span.
@@ -172,7 +278,7 @@ public enum FormulaEvaluator {
         try evaluateNode(
             ast, cells: cells, names: names, functions: functions,
             callingCell: callingCell, currentSheet: currentSheet,
-            random: random, simulation: simulation, depth: 0)
+            random: random, simulation: simulation, depth: Depth())
     }
 
     // MARK: - Private Recursive Evaluator
@@ -186,13 +292,13 @@ public enum FormulaEvaluator {
         currentSheet: String,
         random: (any RandomSource)?,
         simulation: (any SimulationResultProvider)?,
-        depth: Int
+        depth: Depth
     ) throws -> CellValue {
-        guard depth < maxDepth else {
-            throw EvaluationError.evaluationDepthExceeded
+        guard depth.nodes < maxNodeDepth else {
+            throw EvaluationError.nodeDepthExceeded
         }
 
-        let nextDepth = depth + 1
+        let nextDepth = depth.descended
 
         switch ast {
         // MARK: Literals
@@ -373,11 +479,15 @@ public enum FormulaEvaluator {
                     function: name, expected: fn.minArgs...(fn.maxArgs ?? fn.minArgs), got: args.count
                 )
             }
+            // This is a call, and Excel counts calls. The arguments descend one level of
+            // tree *and* one level of nesting; a sibling argument is not deeper than its
+            // neighbour, so `SUM(1, 2, …, 200)` is one level however wide it gets.
+            let inCall = try depth.calling()
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {
                 let val = try evaluateNode(
-                    arg, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: nextDepth
+                    arg, cells: cells, names: names, functions: functions, callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: inCall
                 )
                 evaluatedArgs.append(val)
             }
@@ -407,7 +517,7 @@ public enum FormulaEvaluator {
         currentSheet: String,
         random: (any RandomSource)?,
         simulation: (any SimulationResultProvider)?,
-        depth: Int
+        depth: Depth
     ) throws -> CellValue {
         switch target {
         case .cell(let ref):
@@ -638,8 +748,10 @@ public enum FormulaEvaluator {
     ///   - depth: How deep the operation sits; zero is the root.
     /// - Returns: The corrected value at the root, the original anywhere else.
     private static func correctedIfFinal(_ result: CellValue, left: CellValue,
-                                         right: CellValue, depth: Int) -> CellValue {
-        guard depth == 0,
+                                         right: CellValue, depth: Depth) -> CellValue {
+        // `nodes == 0` is what "this is the outermost operation" means: the final operation
+        // is the one nothing encloses, and Excel's display rounding applies to it alone.
+        guard depth.nodes == 0,
               case .number(let value) = result,
               case .number(let lhs) = normalizeForComparison(left, against: right),
               case .number(let rhs) = normalizeForComparison(right, against: left) else {

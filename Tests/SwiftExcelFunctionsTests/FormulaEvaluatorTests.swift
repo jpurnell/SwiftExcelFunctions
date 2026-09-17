@@ -631,20 +631,23 @@ final class FormulaEvaluatorTests: XCTestCase {
 
     // MARK: - Depth Limit
 
-    func testDepthLimitExceeded() throws {
-        // Build a deeply nested AST exceeding 256 levels
+    /// 257 negations are **not** too deep, and asserting that they were is what this test
+    /// used to do.
+    ///
+    /// It was pinning `maxDepth = 256`, a single counter incremented once per AST node. The
+    /// conformance rounds in `ExcelEvaluationLimits.md` established that Excel counts
+    /// function calls and stops at 65, keeps a second counter for `LAMBDA` recursion at
+    /// 4,096, and does not count operators at all — so this formula is one Excel computes
+    /// without complaint and the old expectation was a defect written down as a test.
+    ///
+    /// The bounds now live in `EvaluationDepthTests`. What remains here is the reversal, kept
+    /// rather than deleted so the change is visible where the old claim was made.
+    func testAStackOfNegationsIsNotTooDeep() throws {
         var ast: FormulaAST = .number(1)
         for _ in 0..<257 {
             ast = .negate(ast)
         }
-
-        XCTAssertThrowsError(try eval(ast)) { error in
-            guard let evalError = error as? FormulaEvaluator.EvaluationError else {
-                XCTFail("Expected EvaluationError, got \(error)")
-                return
-            }
-            XCTAssertEqual(evalError, .evaluationDepthExceeded)
-        }
+        assertNumber(try eval(ast), -1, accuracy: 1e-12)
     }
 
     func testDeepNestingBelowLimitSucceeds() throws {

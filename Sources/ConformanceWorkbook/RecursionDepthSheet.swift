@@ -30,11 +30,15 @@ import SwiftXLSX
 /// | is the refusal catchable? | **no** — `IFERROR` does not trap it; the cell caches `#NUM!` | 3 |
 /// | one budget or two? | **two** — a 4,090-deep recursion works from inside 60 nested `IF`s, and 4,150 is well past the limit | 5 |
 ///
-/// **What this package should build, then:** two counters, not one. An expression-nesting
-/// bound of 65 and a call bound of 4,096, kept apart because Excel keeps them apart.
-/// `FormulaEvaluator.maxDepth` is a single counter at 256 incremented once per *AST node*,
-/// which is wrong three ways over — too small, counting the wrong thing, and conflating two
-/// budgets Excel measures separately.
+/// **What this package built, then:** two counters, not one — `FormulaEvaluator.maxCallDepth`
+/// at 65 and `maxRecursionDepth` at 4,096, kept apart because Excel keeps them apart. They
+/// replaced a single `maxDepth = 256` incremented once per *AST node*, which was wrong three
+/// ways over: too small, counting the wrong thing, and conflating two budgets Excel measures
+/// separately.
+///
+/// A third bound, `maxNodeDepth`, is this evaluator's own and is not a claim about Excel. It
+/// exists because `evaluateNode` recurses, and it was measured against the stack rather than
+/// chosen — see its documentation.
 ///
 /// The uncatchable refusal is the subtle one. `IFERROR` sits on the same stack that ran out,
 /// so an evaluator returning `#NUM!` through its own error-handling path would be *more

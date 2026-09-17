@@ -82,15 +82,19 @@ public extension FormulaAST {
 
     /// Visits this node and every node beneath it, parents first.
     ///
-    /// Bounded by ``FormulaEvaluator/maxDepth``, and by it rather than by a second number:
-    /// a formula the evaluator would refuse as too deep is one nothing here should recurse
-    /// into either, and two limits that could disagree would mean a tree one walker
+    /// Bounded by ``FormulaEvaluator/maxNodeDepth``, and by it rather than by a second
+    /// number: a tree the evaluator would refuse to descend is one nothing here should
+    /// recurse into either, and two limits that could disagree would mean a tree one walker
     /// entered and another rejected.
+    ///
+    /// The node bound is the right one of the three. This walks the tree, so it counts what
+    /// the tree costs; ``FormulaEvaluator/maxCallDepth`` is about function calls and would
+    /// stop this walker halfway down an ordinary long sum.
     ///
     /// - Parameters:
     ///   - maxDepth: how deep to descend. Defaults to the evaluator's own bound.
     ///   - visit: called for each node, the receiver first.
-    func walk(maxDepth: Int = FormulaEvaluator.maxDepth, _ visit: (FormulaAST) -> Void) {
+    func walk(maxDepth: Int = FormulaEvaluator.maxNodeDepth, _ visit: (FormulaAST) -> Void) {
         guard maxDepth > 0 else { return }
         visit(self)
         for child in children { child.walk(maxDepth: maxDepth - 1, visit) }

@@ -330,7 +330,7 @@ extension Lowerer {
         cells: any CellValueProvider, builder: ExpressionBuilder,
         failure: inout LoweringFailure?, depth: Int
     ) -> Node? {
-        guard depth < FormulaEvaluator.maxDepth else {
+        guard depth < FormulaEvaluator.maxNodeDepth else {
             failure = .unsupportedNode("nesting past the evaluator's depth", at: cell)
             return nil
         }
