@@ -512,13 +512,10 @@ public enum FormulaEvaluator {
         _ target: NamedRangeTarget,
         in env: EvaluationEnvironment
     ) throws -> CellValue {
-        // Unpacked once, here, rather than threaded through thirty recursive calls. The
-        // environment exists to stop the *threading*; naming its parts locally is what makes
-        // the body below read the same as it always has.
-        let cells = env.cells, names = env.names, functions = env.functions
-        let callingCell = env.callingCell, currentSheet = env.currentSheet
-        let random = env.random, simulation = env.simulation
-        let depth = env.depth
+        // Only `cells` — a name resolves to a place, and reading the place is all this does.
+        // The rest of the environment travels on to `evaluateNode` for the one case that
+        // needs it, which is the point of passing an environment rather than a parameter list.
+        let cells = env.cells
 
         switch target {
         case .cell(let ref):
