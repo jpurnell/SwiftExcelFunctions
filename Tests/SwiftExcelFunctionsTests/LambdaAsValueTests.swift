@@ -162,3 +162,75 @@ final class LambdaAsValueTests: XCTestCase {
             try eval(.function("LAMBDA", [.number(1), .number(2)])), .error(.calc))
     }
 }
+
+/// A `LAMBDA` applied where it is written.
+///
+/// The third of the three corpus shapes, and the last to work. The parser learned it in
+/// SwiftXLSX 0.28.0; this is the other half — evaluating what it produces.
+final class ImmediatelyInvokedLambdaTests: XCTestCase {
+
+    private struct Cells: CellValueProvider {
+        var data: [String: CellValue] = [:]
+        func value(at ref: CellRef) -> CellValue? { data[ref.reference] }
+        func value(at ref: CellRef, inSheet sheet: String) -> CellValue? { nil }
+        func lastPopulatedCell() -> CellRef? { nil }
+        func lastPopulatedCell(inSheet sheet: String) -> CellRef? { nil }
+        func values(in range: CellRange) -> [CellValue] { range.cells.compactMap { value(at: $0) } }
+        func values(in range: CellRange, inSheet sheet: String) -> [CellValue] { [] }
+    }
+    private struct Names: NameResolver {
+        func resolve(_ name: String, inSheet: String?) -> NamedRangeTarget? { nil }
+    }
+
+    private func eval(_ ast: FormulaAST, cells: Cells = Cells()) throws -> CellValue {
+        try FormulaEvaluator.evaluate(ast, cells: cells, names: Names(), functions: .builtin)
+    }
+
+    private func lambda(_ parameters: [String], _ body: FormulaAST) -> FormulaAST {
+        .function("LAMBDA", parameters.map { .namedRange($0) } + [body])
+    }
+
+    func testALambdaAppliedWhereItIsWritten() throws {
+        let ast = FormulaAST.call(
+            lambda(["x"], .multiply(.namedRange("x"), .number(3))), [.number(7)])
+        XCTAssertEqual(try eval(ast), .number(21))
+    }
+
+    /// Currying, with no name between the two calls.
+    func testCallsChain() throws {
+        let adder = lambda(["x"], lambda(["y"], .add(.namedRange("x"), .namedRange("y"))))
+        XCTAssertEqual(try eval(.call(.call(adder, [.number(3)]), [.number(4)])), .number(7))
+    }
+
+    /// **The self-application trick**, which is how a recursive lambda is written with nothing
+    /// added to the file — and what measured Excel's recursion limit.
+    ///
+    /// ```
+    /// LAMBDA(f, n, IF(n<=0, 0, 1 + f(f, n-1)))(LAMBDA(f, n, …), 100)
+    /// ```
+    ///
+    /// The body takes *itself* as a parameter and invokes that, so no defined name is needed.
+    /// Two conformance rounds were lost to a `depthProbe` nobody had added by hand before this
+    /// form removed the precondition altogether.
+    func testSelfApplicationRecurses() throws {
+        let body = lambda(["f", "n"], .function("IF", [
+            .lessOrEqual(.namedRange("n"), .number(0)),
+            .number(0),
+            .add(.number(1), .call(.namedRange("f"),
+                                   [.namedRange("f"),
+                                    .subtract(.namedRange("n"), .number(1))])),
+        ]))
+        XCTAssertEqual(try eval(.call(body, [body, .number(100)])), .number(100))
+    }
+
+    /// Calling something that is not a function is `#VALUE!`.
+    func testCallingANonFunctionIsRefused() throws {
+        XCTAssertEqual(try eval(.call(.number(5), [.number(1)])), .error(.value))
+    }
+
+    /// An error in the callee is the answer, and the arguments are not reached.
+    func testAnErrorInTheCalleePropagates() throws {
+        XCTAssertEqual(try eval(.call(.divide(.number(1), .number(0)), [.number(1)])),
+                       .error(.div0))
+    }
+}

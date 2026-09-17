@@ -357,6 +357,17 @@ public enum FormulaEvaluator {
         case .error(let e):
             return .error(e)
 
+        case .call(let callee, let args):
+            // A call written in place — `LAMBDA(x,x+1)(5)`, and `add(3)(4)` where the callee
+            // is itself a call. Syntactically a call, so it costs a nesting level like any
+            // other; what it calls is an expression rather than a name, which is the whole
+            // difference from `.function`.
+            let inCall = try env.calling()
+            let called = try evaluateNode(callee, in: inCall)
+            if case .error = called { return called }
+            let evaluated = try args.map { try evaluateNode($0, in: inCall) }
+            return try invoke(called, with: evaluated, in: inCall)
+
         case .missing:
             // An argument that is not there evaluates to blank, and the function
             // decides what that means for it. `ADDRESS` reads an omitted fourth

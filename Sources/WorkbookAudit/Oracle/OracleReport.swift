@@ -103,6 +103,10 @@ public struct OracleFinding {
         case .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error, .missing:
             return []
+        case .call(let callee, let arguments):
+            // The callee counts: a lambda written in place is an expression with children of
+            // its own, and a census that walked only the arguments would undercount them.
+            return [callee] + arguments
         }
     }
 

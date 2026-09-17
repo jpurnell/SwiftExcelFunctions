@@ -55,6 +55,10 @@ public extension FormulaAST {
         case .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error, .missing:
             return []
+        case .call(let callee, let arguments):
+            // The callee is a child too. A lambda written in place holds a whole expression,
+            // and a traversal that walked only the arguments would miss every reference in it.
+            return [callee] + arguments
         }
     }
 

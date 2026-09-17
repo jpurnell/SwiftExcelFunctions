@@ -180,6 +180,11 @@ public struct Lowerer: Sendable {
             failures.append(.unsupportedNode("sheet reference", at: cell)); return
         case .namedRange(let name):
             failures.append(.unsupportedNode("named range \(name)", at: cell)); return
+        case .call:
+            // A lambda applied in place. The solver's model is arithmetic over cells, and a
+            // function value has no place in it — the honest answer is to refuse the model
+            // rather than to lower something that is not what the formula says.
+            failures.append(.unsupportedNode("a lambda called in place", at: cell)); return
 
         case .cellRef(let ref):
             // An uncertain cell is an input and stops the walk; anything else is inlined,
@@ -388,6 +393,8 @@ extension Lowerer {
             failure = .unsupportedNode("sheet reference", at: cell); return nil
         case .namedRange(let name):
             failure = .unsupportedNode("named range \(name)", at: cell); return nil
+        case .call:
+            failure = .unsupportedNode("a lambda called in place", at: cell); return nil
 
         case .add, .subtract, .multiply, .divide, .power,
              .equal, .notEqual, .greaterThan, .lessThan, .greaterOrEqual, .lessOrEqual:
