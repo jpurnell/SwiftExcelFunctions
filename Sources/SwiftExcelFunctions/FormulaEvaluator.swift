@@ -572,6 +572,25 @@ public enum FormulaEvaluator {
                 return BuiltinLambdaFunctions.isOmitted(args, in: inCall)
             }
 
+            // The higher-order six. Their *arguments* are evaluated normally — `MAP(A1:A4, f)`
+            // needs both — but calling the lambda needs the evaluator, and an `ExcelFunction`
+            // closure is handed values and no way to evaluate anything. So they are reached
+            // here and given the means to call back in.
+            if BuiltinHigherOrderFunctions.governs(fn.name) {
+                let evaluated = try args.map { try evaluateNode($0, in: inCall) }
+                if let error = evaluated.first(where: { if case .error = $0 { return true }
+                                                        return false }) {
+                    return error
+                }
+                if let result = try BuiltinHigherOrderFunctions.evaluate(
+                    fn.name, arguments: evaluated,
+                    invoke: { lambda, arguments in
+                        try invoke(lambda, with: arguments, in: inCall)
+                    }) {
+                    return result
+                }
+            }
+
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {
@@ -593,6 +612,34 @@ public enum FormulaEvaluator {
             }
             return try fn.evaluate(evaluatedArgs)
         }
+    }
+
+    /// Calls a lambda **value** with arguments already in hand.
+    ///
+    /// The bridge the higher-order functions need: they hold a lambda and some values, and
+    /// have no way to evaluate anything. Anything that is not a lambda is `#VALUE!` — `MAP`'s
+    /// second argument has one job.
+    ///
+    /// - Parameters:
+    ///   - lambda: what the caller was handed in the lambda position.
+    ///   - arguments: the values to bind to its parameters.
+    ///   - env: the environment at the call site.
+    private static func invoke(
+        _ lambda: CellValue, with arguments: [CellValue], in env: EvaluationEnvironment
+    ) throws -> CellValue {
+        guard case .lambda(let parameters, let body, let captured) = lambda else {
+            return .error(.value)
+        }
+        // **Exact arity, unlike a call an author writes.** Omission is something a formula
+        // says — `f(5)` where `f` takes two and asks `ISOMITTED`. `MAP` passing one value to a
+        // two-parameter lambda is not an author omitting anything; it is a mismatch, and
+        // letting omission absorb it would answer plausibly instead of refusing.
+        guard parameters.count == arguments.count else { return .error(.value) }
+
+        return try BuiltinLambdaFunctions.callValue(
+            parameters: parameters, body: body, captured: captured,
+            arguments: arguments, omittedAt: [], in: env,
+            evaluating: { try evaluateNode($0, in: $1) })
     }
 
     /// The argument positions the caller wrote as skipped — `f(1,,3)`.
