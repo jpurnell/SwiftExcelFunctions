@@ -117,8 +117,23 @@ enum BuiltinLambdaFunctions {
         parameters: [String], arguments: [CellValue], omittedAt: Set<Int>,
         closing: [String: CellValue], in env: EvaluationEnvironment
     ) throws -> EvaluationEnvironment? {
-        // Too *many* is still refused: omission is a shortfall, not a free-for-all.
-        guard arguments.count <= parameters.count else { return nil }
+        // **Exact, and the count is of argument *positions*.**
+        //
+        // Round 6 asked Excel and the answer reversed an assumption made here. A two-parameter
+        // lambda called with one argument is `#VALUE!` — not an omission — and one called with
+        // three is `#VALUE!` too. The control in between answered 2, so those readings mean
+        // what they say.
+        //
+        // The assumption had been that a trailing argument may be left out, reasoned from
+        // Microsoft's own `ISOMITTED` pattern being unusable otherwise. That is documentation,
+        // and it was wrong, which is the sixth time in this project's life.
+        //
+        // Counting positions rather than values is what keeps `ISOMITTED` meaningful: `f(7,)`
+        // supplies two positions and leaves the second empty, which is a different thing from
+        // `f(7)`. Whether Excel reads that as omitted is **not yet measured** — round 6's row
+        // for it was malformed, asking `f(7,,)`, which is three positions and re-tested the
+        // rule above.
+        guard arguments.count == parameters.count else { return nil }
 
         var values: [String: CellValue] = [:]
         var absent: Set<String> = []

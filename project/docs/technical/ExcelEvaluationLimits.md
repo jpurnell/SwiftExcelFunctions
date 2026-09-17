@@ -4,7 +4,7 @@
 because Microsoft documents one of them and not the others.
 
 **Measured against:** Microsoft Excel for Mac **16.114** (`AppVersion 16.0300`,
-`calcId 191029`), September 2026, on macOS 27.
+`calcId 191029`), September 2026, on macOS 27. Seven rounds.
 
 **Reproduce it:**
 
@@ -27,6 +27,7 @@ swift run conformance-workbook depth-read ~/Desktop/limits.xlsx
 | Can `IFERROR` trap the refusal? | **No** |
 | Do nesting and recursion share a budget? | **No — two separate counters** |
 | Is `REDUCE` bounded like recursion? | **No limit found to 8,192** |
+| May a `LAMBDA` be called with fewer arguments than it declares? | **No.** `#VALUE!` |
 
 Microsoft documents exactly one line of that: *"Nested levels of functions: 64."* Everything
 else here is unpublished, and the published number needs a footnote — see §1.
@@ -70,7 +71,7 @@ reader reports the canaries first and stops if either is wrong.
 A round that goes wrong then says so, instead of looking like news.
 
 **A round stamp.** The layout is written into the file, and the reader refuses a file whose
-round is not the one it expects. §5 is the story of why.
+round is not the one it expects. §6 is the story of why.
 
 ---
 
@@ -216,7 +217,44 @@ not.
 
 ---
 
-## 5. Three ways the instrument lied, and what fixed each
+## 5. Arity is exact, and the documentation is not
+
+Round six asked whether a `LAMBDA` may be called with fewer arguments than it declares. The
+question matters because `ISOMITTED` exists, and Microsoft's documented pattern for an optional
+parameter —
+
+```
+LAMBDA(x, [y], IF(ISOMITTED(y), x, x+y))
+```
+
+— is unusable unless the answer is yes. The `[y]` is a convention for readers; Excel's formula
+language has no syntax for an optional parameter.
+
+```
+LAMBDA(x,y,IF(ISOMITTED(y),1,2))(7)      →  #VALUE!
+LAMBDA(x,y,IF(ISOMITTED(y),1,2))(7,8)    →  2
+LAMBDA(x,y,x)(7,8,9)                     →  #VALUE!
+```
+
+**Arity is exact.** The middle row is the control and it answers, so the other two mean what
+they say. This evaluator had been built on the opposite assumption, reasoned from the
+documentation, and the assumption was wrong — the sixth time documentation has been wrong in
+this project's life and the first time it was *this project's own reasoning about* the
+documentation rather than the documentation itself.
+
+Which leaves `ISOMITTED` with nothing to report, unless an empty argument *position* —
+`f(7,)`, two positions with the second left blank — is a different thing from a missing one.
+Round six asked that with `f(7,,)`, which is three positions against two parameters and
+therefore measured the arity rule again. **Unresolved, and asked properly in round seven.**
+
+A second reading worth keeping: `ERROR.TYPE(LAMBDA(x,x))` is `#N/A`, not a number. An uncalled
+lambda handed to a function is a **value**, not an error — `#CALC!` is what a *cell* shows, not
+what a lambda *is*. So the published `ERROR.TYPE` code for `#CALC!` is still unmeasured, and
+round seven asks it of a cell that actually holds one.
+
+---
+
+## 6. Three ways the instrument lied, and what fixed each
 
 The findings above took five rounds. Two of the extra rounds were the instrument's fault, and
 the failures are more transferable than the numbers.
@@ -267,6 +305,7 @@ there is nothing left for the two halves to disagree about.
 | The two | **separate counters** |
 | The refusal | `#NUM!`, and **not** routed through anything a formula can catch |
 | Iteration (`REDUCE` and kin) | not bounded with recursion; no limit to 8,192 |
+| `LAMBDA` arity | **exact** — fewer arguments than parameters is `#VALUE!`, not an omission |
 
 A single depth counter — particularly one incremented per AST node, which is neither of the
 things Excel counts — cannot express any of this.

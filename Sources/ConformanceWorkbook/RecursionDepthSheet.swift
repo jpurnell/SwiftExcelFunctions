@@ -65,7 +65,7 @@ enum RecursionDepthSheet {
     /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
     /// rows — reported an empty canary, a ladder one row short and twenty-one missing rows.
     /// Every one of those was a layout mismatch wearing the costume of a measurement.
-    static let round = 6
+    static let round = 7
 
     /// The column holding what was asked, the question in words, and Excel's answer.
     private enum Column {
@@ -124,25 +124,43 @@ enum RecursionDepthSheet {
     /// The last row is the other unmeasured number: `ERROR.TYPE` is published as returning 14
     /// for `#CALC!`, and that is the only value in this package's `ERROR.TYPE` never checked
     /// against Excel.
+    /// Round seven's questions. Round six asked four of these and got two of them wrong.
+    ///
+    /// **What round six established.** A two-parameter `LAMBDA` called with one argument is
+    /// `#VALUE!`; called with three, `#VALUE!`; called with two, it answers. So arity is exact
+    /// and a trailing argument may *not* be left out — which reversed an assumption the
+    /// evaluator had been built on, taken from Microsoft's documented `ISOMITTED` pattern
+    /// being unusable otherwise.
+    ///
+    /// **What round six asked badly.** `f(7,,)` is three argument positions, not a skipped
+    /// second, so it re-measured the arity rule. The empty-position question is asked here
+    /// properly, with `f(7,)`. And `ERROR.TYPE(LAMBDA(…))` answered `#N/A` — correctly, since
+    /// an uncalled lambda handed to a function is a *value* and not an error — so the number
+    /// for `#CALC!` needs a cell that actually holds one.
+    ///
+    /// **What the defined names make possible.** Rows here call a *named* lambda, which needed
+    /// a manual step until this package learned to write `<definedName>`. Two rounds were lost
+    /// to a `depthProbe` nobody had added by hand; the name is now written into the file.
     static let arityQuestions: [(formula: String, asked: String, expected: String)] = [
-        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7)",
-         "two parameters, one argument",
-         "1 if a trailing argument may be left out; #VALUE! if it may not"),
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,)",
+         "two parameters, second position present but empty",
+         "1 if an empty position counts as omitted; #VALUE! if it is just a missing argument"),
         ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,8)",
          "two parameters, two arguments",
          "2 — the control, and it must hold or the row above means nothing"),
-        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,,)",
-         "two parameters, the second skipped",
-         "1 if a skipped argument counts as omitted"),
-        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,_xlpm.x)(7,8,9)",
-         "two parameters, three arguments",
-         "#VALUE! — too many should still be refused"),
-        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.x+0)(7)+0",
-         "an omitted parameter used as a number",
-         "7 — an omitted argument reads as blank, which is 0"),
-        ("ERROR.TYPE(_xlfn.LAMBDA(_xlpm.x,_xlpm.x))",
-         "ERROR.TYPE of an uncalled LAMBDA",
-         "14 if the published table is right"),
+        ("probeOptional(7)",
+         "a NAMED two-parameter lambda, one argument",
+         "1 if a named lambda may omit where an in-place one may not; #VALUE! if arity is "
+         + "arity however the lambda is reached"),
+        ("probeOptional(7,)",
+         "a NAMED two-parameter lambda, second position empty",
+         "1 if an empty position counts as omitted"),
+        ("probeOptional(7,8)",
+         "a NAMED two-parameter lambda, two arguments",
+         "2 — the control for the two rows above"),
+        ("ERROR.TYPE($C$8)",
+         "ERROR.TYPE of a cell that holds an uncalled LAMBDA",
+         "14 if the published table is right — C8 is the #CALC! cell"),
     ]
 
     /// The thin body contributes a literal 1 per level.
@@ -196,6 +214,19 @@ enum RecursionDepthSheet {
 
         instructions(in: sheet)
         canaries(in: sheet)
+
+        // A named lambda, written into the file rather than added by hand. Two rounds were
+        // lost to a `depthProbe` that was never added — each reporting `first refused: 1` for
+        // a limit that cannot refuse at depth 1 — and the defined-name writer this package
+        // gained since removes the precondition outright.
+        workbook.define("probeOptional", as: .unparsed(
+            "_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))"))
+
+        // A cell that *is* `#CALC!`, so `ERROR.TYPE` has an error to report on. Handed the
+        // lambda directly it answered `#N/A` in round 6, which is right — an uncalled lambda
+        // passed to a function is a value — and measured nothing about `#CALC!`.
+        sheet.write("a cell that is #CALC! — ERROR.TYPE reports on it below", to: "A8")
+        sheet.writeFormula("_xlfn.LAMBDA(_xlpm.x,_xlpm.x)", to: "C8")
         for section in plan() { write(section, in: sheet) }
 
         // Asked before the save, or the answer is always yes. Asked of the resolved URL
@@ -395,6 +426,20 @@ enum RecursionDepthSheet {
         var worked: [Int] = []
         var refused: [Int] = []
         var empty = 0
+        // A written section is a list of questions, not a ladder. Summarising it as one
+        // printed "worked up to 4 / first refused 0" — the ladder vocabulary applied to
+        // indices, which is a sentence with no meaning in it.
+        if case .written(let questions) = section.kind {
+            for (offset, index) in section.depths.enumerated() {
+                let row = section.headerRow + 1 + offset
+                guard index >= 0, index < questions.count else { continue }
+                let answer = value(at: "\(Column.answer)\(row)", in: sheet)
+                say("   \(questions[index].asked)")
+                say("      → \(describe(answer))   (expected \(questions[index].expected))")
+            }
+            return
+        }
+
         for (offset, depth) in section.depths.enumerated() {
             let row = section.headerRow + 1 + offset
             let answer = value(at: "\(Column.answer)\(row)", in: sheet)

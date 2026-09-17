@@ -224,25 +224,25 @@ final class NamedLambdaTests: XCTestCase {
 
     // MARK: - Malformed
 
-    /// Too *many* arguments is refused; too few is an omission.
+    /// Arity is exact, measured against Excel in conformance round 6.
     ///
-    /// This test asserted that both were refused, which is what this package did before
-    /// `ISOMITTED` existed. It is reversed rather than deleted, because the change is a
-    /// decision and not a bug fix: Excel has no syntax for an optional parameter, so
-    /// `LAMBDA(x, y, IF(ISOMITTED(y), …))` — Microsoft's own documented pattern — is
-    /// unusable unless a call may supply fewer arguments than the declaration.
+    /// This test has now been written three ways, which is worth leaving visible. It first
+    /// asserted that too few arguments was `#VALUE!` — correct, by luck, since nothing had
+    /// been measured. `ISOMITTED` then reversed it on the strength of Microsoft's documented
+    /// pattern being unusable otherwise. Round 6 asked Excel: a two-parameter lambda called
+    /// with one argument is `#VALUE!`, with the two-argument control beside it answering 2.
     ///
-    /// **That reasoning is documentation, not a conformance round**, and this project's
-    /// record has documentation wrong five times. The conformance workbook carries a row for
-    /// it; until that round is read, this is the assumption and it is written down as one.
-    func testTooFewIsAnOmissionAndTooManyIsRefused() throws {
+    /// The original assertion was right and the reasoning that overturned it was documentation.
+    /// Sixth time that has happened here.
+    func testArityIsExact() throws {
         let names = Names(targets: [
             "hyp": lambda(["a", "b"], .add(.namedRange("a"), .namedRange("b"))),
         ])
-        XCTAssertEqual(try eval(.function("HYP", [.number(3)]), names: names), .number(3),
-                       "the missing argument reads as blank")
+        XCTAssertEqual(try eval(.function("HYP", [.number(3)]), names: names), .error(.value))
         XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4), .number(5)]),
                                 names: names), .error(.value))
+        XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4)]), names: names),
+                       .number(7))
     }
 
     /// A name that is not a lambda is still not a function.

@@ -15,13 +15,19 @@ import SwiftExcelCore
 /// LAMBDA(x, y, IF(ISOMITTED(y), x, x + y))
 /// ```
 ///
-/// ## What is measured and what is assumed
+/// ## What round 6 measured, and what it reversed
 ///
-/// A skipped argument — `f(1,,3)` — is unambiguous: the parser produces `.missing` and there
-/// is nothing to interpret. **A trailing omission — `f(1)` where `f` takes two — is assumed**,
-/// on the strength of Microsoft's documented `ISOMITTED` pattern being unusable without it.
-/// That is documentation rather than a conformance round, and this project's own record has
-/// documentation wrong five times. A row belongs in the conformance workbook.
+/// This file first assumed a trailing argument could be left out — `f(5)` where `f` declares
+/// two — because Microsoft's documented `ISOMITTED` pattern is unusable otherwise. **Excel
+/// refuses it.** A two-parameter lambda called with one argument is `#VALUE!`, and the control
+/// beside it answered 2, so the reading means what it says. Sixth time documentation has been
+/// wrong here.
+///
+/// So arity is exact, and the count is of **argument positions**. That is what keeps
+/// `ISOMITTED` meaningful: `f(7,)` supplies two positions and leaves the second empty, which
+/// is a different thing from `f(7)`. Whether Excel reads *that* as omitted is not yet
+/// measured — round 6's row for it asked `f(7,,)`, which is three positions and re-tested the
+/// rule above. Round 7 asks it properly.
 final class IsOmittedTests: XCTestCase {
 
     private struct Cells: CellValueProvider {
@@ -59,10 +65,13 @@ final class IsOmittedTests: XCTestCase {
         ])
     }
 
-    // MARK: - Trailing omission
+    // MARK: - Arity is exact
 
-    func testATrailingArgumentMayBeLeftOut() throws {
-        XCTAssertEqual(try eval(.function("PLUS", [.number(5)]), names: plus), .number(5))
+    /// Measured, round 6: a two-parameter lambda called with one argument is `#VALUE!`.
+    ///
+    /// This asserted the opposite until Excel was asked.
+    func testATrailingArgumentMayNotBeLeftOut() throws {
+        XCTAssertEqual(try eval(.function("PLUS", [.number(5)]), names: plus), .error(.value))
     }
 
     func testSupplyingItUsesIt() throws {
@@ -72,7 +81,12 @@ final class IsOmittedTests: XCTestCase {
 
     // MARK: - A skipped argument
 
-    /// `f(1,,3)` — the parser produces `.missing`, and that is an omission too.
+    /// `f(1,,3)` — three positions, the middle one empty. The parser produces `.missing`,
+    /// and an empty position is supplied-but-omitted rather than absent.
+    ///
+    /// **Not yet confirmed against Excel.** Round 6 asked this with `f(7,,)`, which is three
+    /// positions against two parameters and therefore measured the arity rule instead. Round 7
+    /// asks it with the right number of positions.
     func testASkippedArgumentIsOmitted() throws {
         let names = Names(targets: [
             "pick": .formula(.function("LAMBDA", [
@@ -109,7 +123,8 @@ final class IsOmittedTests: XCTestCase {
         XCTAssertEqual(try eval(.function("ISIT", [.cellRef(CellRef("A1"))]),
                                 cells: cells, names: names), .bool(false),
                        "an empty cell was still passed")
-        XCTAssertEqual(try eval(.function("ISIT", []), names: names), .bool(true))
+        XCTAssertEqual(try eval(.function("ISIT", [.missing]), names: names), .bool(true),
+                       "an empty *position* is the omission")
     }
 
     /// An omitted parameter reads as blank where it is used as a value.
@@ -120,7 +135,8 @@ final class IsOmittedTests: XCTestCase {
                 .add(.namedRange("a"), .namedRange("b")),
             ])),
         ])
-        XCTAssertEqual(try eval(.function("TOTAL", [.number(7)]), names: names), .number(7))
+        XCTAssertEqual(try eval(.function("TOTAL", [.number(7), .missing]), names: names),
+                       .number(7))
     }
 
     /// Asking about something that is not a parameter is `FALSE`, not an error.
@@ -137,7 +153,7 @@ final class IsOmittedTests: XCTestCase {
 
     // MARK: - Arity
 
-    /// Too *many* arguments is still refused. Omission is a shortfall, not a free-for-all.
+    /// Measured, round 6: too many arguments is `#VALUE!`.
     func testMoreArgumentsThanParametersIsRefused() throws {
         XCTAssertEqual(
             try eval(.function("PLUS", [.number(1), .number(2), .number(3)]), names: plus),
@@ -159,7 +175,7 @@ final class IsOmittedTests: XCTestCase {
                 .namedRange("p"), .function("ISOMITTED", [.namedRange("p")]),
             ])),
         ])
-        XCTAssertEqual(try eval(.function("OUTER", []), names: names), .bool(false),
+        XCTAssertEqual(try eval(.function("OUTER", [.missing]), names: names), .bool(false),
                        "inner's p was supplied, whatever outer's p was")
     }
 }
