@@ -224,12 +224,23 @@ final class NamedLambdaTests: XCTestCase {
 
     // MARK: - Malformed
 
-    /// Too few arguments for the parameters declared.
-    func testArityIsChecked() throws {
+    /// Too *many* arguments is refused; too few is an omission.
+    ///
+    /// This test asserted that both were refused, which is what this package did before
+    /// `ISOMITTED` existed. It is reversed rather than deleted, because the change is a
+    /// decision and not a bug fix: Excel has no syntax for an optional parameter, so
+    /// `LAMBDA(x, y, IF(ISOMITTED(y), …))` — Microsoft's own documented pattern — is
+    /// unusable unless a call may supply fewer arguments than the declaration.
+    ///
+    /// **That reasoning is documentation, not a conformance round**, and this project's
+    /// record has documentation wrong five times. The conformance workbook carries a row for
+    /// it; until that round is read, this is the assumption and it is written down as one.
+    func testTooFewIsAnOmissionAndTooManyIsRefused() throws {
         let names = Names(targets: [
             "hyp": lambda(["a", "b"], .add(.namedRange("a"), .namedRange("b"))),
         ])
-        XCTAssertEqual(try eval(.function("HYP", [.number(3)]), names: names), .error(.value))
+        XCTAssertEqual(try eval(.function("HYP", [.number(3)]), names: names), .number(3),
+                       "the missing argument reads as blank")
         XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4), .number(5)]),
                                 names: names), .error(.value))
     }

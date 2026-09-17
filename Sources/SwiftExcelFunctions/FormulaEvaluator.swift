@@ -566,6 +566,12 @@ public enum FormulaEvaluator {
                 return BuiltinLambdaFunctions.lambdaValue(args, in: inCall)
             }
 
+            // `ISOMITTED` asks about the *name*, not about what it stands for. Evaluated
+            // first, an omitted parameter is a blank and indistinguishable from one supplied.
+            if fn.name == "ISOMITTED" {
+                return BuiltinLambdaFunctions.isOmitted(args, in: inCall)
+            }
+
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {
@@ -587,6 +593,18 @@ public enum FormulaEvaluator {
             }
             return try fn.evaluate(evaluatedArgs)
         }
+    }
+
+    /// The argument positions the caller wrote as skipped — `f(1,,3)`.
+    ///
+    /// Read from the trees rather than from the values, because by the time an argument is a
+    /// value a skipped one is a blank and a blank is an ordinary thing to pass.
+    private static func skippedPositions(in arguments: [FormulaAST]) -> Set<Int> {
+        var skipped: Set<Int> = []
+        for (position, argument) in arguments.enumerated() {
+            if case .missing = argument { skipped.insert(position) }
+        }
+        return skipped
     }
 
     /// Calls a defined name that holds a `LAMBDA`, if it does.
@@ -613,7 +631,7 @@ public enum FormulaEvaluator {
             let evaluated = try args.map { try evaluateNode($0, in: inCall) }
             return try BuiltinLambdaFunctions.callValue(
                 parameters: parameters, body: body, captured: captured,
-                arguments: evaluated, in: inCall,
+                arguments: evaluated, omittedAt: skippedPositions(in: args), in: inCall,
                 evaluating: { try evaluateNode($0, in: $1) })
         }
 
@@ -624,7 +642,7 @@ public enum FormulaEvaluator {
 
         let evaluated = try args.map { try evaluateNode($0, in: inCall) }
         return try BuiltinLambdaFunctions.call(
-            lambda, arguments: evaluated, in: inCall,
+            lambda, arguments: evaluated, omittedAt: skippedPositions(in: args), in: inCall,
             evaluating: { try evaluateNode($0, in: $1) })
     }
 

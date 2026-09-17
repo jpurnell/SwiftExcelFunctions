@@ -45,6 +45,15 @@ struct EvaluationEnvironment {
     /// a copy with one more entry, and nothing it does can reach what encloses it.
     let bindings: [String: CellValue]
 
+    /// Parameters the current call left out, which `ISOMITTED` reports on.
+    ///
+    /// Separate from ``bindings`` rather than marked inside them, because an omitted parameter
+    /// reads as blank where it is *used* — Excel's omitted argument behaves as empty — and a
+    /// blank is also a perfectly ordinary thing to pass. `f(A1)` with `A1` empty supplies a
+    /// value; `f()` does not. Encoding omission as a bound blank would make those two
+    /// indistinguishable, and `ISOMITTED` would call an argument the author wrote absent.
+    let omitted: Set<String>
+
     init(
         cells: any CellValueProvider,
         names: any NameResolver,
@@ -54,7 +63,8 @@ struct EvaluationEnvironment {
         random: (any RandomSource)? = nil,
         simulation: (any SimulationResultProvider)? = nil,
         depth: FormulaEvaluator.Depth = FormulaEvaluator.Depth(),
-        bindings: [String: CellValue] = [:]
+        bindings: [String: CellValue] = [:],
+        omitted: Set<String> = []
     ) {
         self.cells = cells
         self.names = names
@@ -65,7 +75,13 @@ struct EvaluationEnvironment {
         self.simulation = simulation
         self.depth = depth
         self.bindings = bindings
+        self.omitted = omitted
     }
+
+    /// Whether a name is a parameter the current call left out.
+    ///
+    /// - Parameter name: the name as the formula spells it.
+    func wasOmitted(_ name: String) -> Bool { omitted.contains(Self.key(for: name)) }
 
     /// The value a local binding gives this name, if one does.
     ///
@@ -79,7 +95,7 @@ struct EvaluationEnvironment {
     func binding(_ newBindings: [String: CellValue]) -> EvaluationEnvironment {
         var merged = bindings
         for (name, value) in newBindings { merged[Self.key(for: name)] = value }
-        return copy(depth: depth, bindings: merged)
+        return copy(depth: depth, bindings: merged, omitted: omitted)
     }
 
     /// How a name is looked up: case-folded, because Excel's names are.
@@ -94,13 +110,13 @@ struct EvaluationEnvironment {
     ///
     /// Descending is not calling: an operator is not a function and Excel does not count it.
     /// See ``FormulaEvaluator/maxCallDepth``.
-    var descended: EvaluationEnvironment { copy(depth: depth.descended, bindings: bindings) }
+    var descended: EvaluationEnvironment { copy(depth: depth.descended, bindings: bindings, omitted: omitted) }
 
     /// The same environment, one level deeper and one function call further in.
     ///
     /// - Throws: ``FormulaEvaluator/EvaluationError/callDepthExceeded`` past Excel's 65.
     func calling() throws -> EvaluationEnvironment {
-        copy(depth: try depth.calling(), bindings: bindings)
+        copy(depth: try depth.calling(), bindings: bindings, omitted: omitted)
     }
 
     /// The same environment with an entirely different set of names.
@@ -109,7 +125,16 @@ struct EvaluationEnvironment {
     /// caller's names are not part of that. Adding to them instead of replacing them is how a
     /// closure stops being lexical.
     func withBindings(_ replacement: [String: CellValue]) -> EvaluationEnvironment {
-        copy(depth: depth, bindings: replacement)
+        copy(depth: depth, bindings: replacement, omitted: omitted)
+    }
+
+    /// The same environment, recording which parameters this call left out.
+    ///
+    /// Replaces rather than adds: omission belongs to one call, and an inner call that
+    /// supplies everything must not inherit the outer one's absences.
+    func omitting(_ names: Set<String>) -> EvaluationEnvironment {
+        copy(depth: depth, bindings: bindings,
+             omitted: Set(names.map { Self.key(for: $0) }))
     }
 
     /// The same environment with a different set of counters.
@@ -117,15 +142,15 @@ struct EvaluationEnvironment {
     /// A `LAMBDA` invocation is counted here rather than by ``calling()``, because Excel keeps
     /// the two budgets apart — see ``FormulaEvaluator/maxRecursionDepth``.
     func withDepth(_ depth: FormulaEvaluator.Depth) -> EvaluationEnvironment {
-        copy(depth: depth, bindings: bindings)
+        copy(depth: depth, bindings: bindings, omitted: omitted)
     }
 
     private func copy(
-        depth: FormulaEvaluator.Depth, bindings: [String: CellValue]
+        depth: FormulaEvaluator.Depth, bindings: [String: CellValue], omitted: Set<String>
     ) -> EvaluationEnvironment {
         EvaluationEnvironment(
             cells: cells, names: names, functions: functions, callingCell: callingCell,
             currentSheet: currentSheet, random: random, simulation: simulation,
-            depth: depth, bindings: bindings)
+            depth: depth, bindings: bindings, omitted: omitted)
     }
 }

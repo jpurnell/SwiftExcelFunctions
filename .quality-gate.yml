@@ -55,3 +55,19 @@ ijs:
 # a deadline.
 boundedIO:
   kernelPath: Sources/NameRoundTrip/ProcessRunner.swift
+
+# Not a suppression: it names the type this package translates errors *into*.
+#
+# An Excel function that cannot compute an answer returns `#NUM!`. The error has not vanished
+# — it has been translated into the domain's own way of reporting failure, and the caller
+# receives it. `catch { return .error(.num) }` is correct code, and there are 56 of them here.
+#
+# The rule accepts such a block only when **every** exit produces one of these, so
+# `catch { return nil }` and `catch { }` are still reported, which is what the rule is for.
+#
+# Worth knowing why this key exists at all: `logging.catch-without-logging` used to match the
+# substring `.error(`, which `CellValue.error` satisfies by coincidence — 55 of 108 catch
+# blocks here passed while logging nothing. Fixing the detection without this would have turned
+# a rule that found nothing into one that found 56 pieces of correct code.
+logging:
+  errorValueTypes: ["CellValue.error", "ExcelError"]

@@ -65,7 +65,7 @@ enum RecursionDepthSheet {
     /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
     /// rows — reported an empty canary, a ladder one row short and twenty-one missing rows.
     /// Every one of those was a layout mismatch wearing the costume of a measurement.
-    static let round = 5
+    static let round = 6
 
     /// The column holding what was asked, the question in words, and Excel's answer.
     private enum Column {
@@ -94,6 +94,13 @@ enum RecursionDepthSheet {
         case nestingLadderAroundRecursion(step: String, depth: Int)
         /// `REDUCE` over `SEQUENCE(d)`, which iterates rather than recursing.
         case iteration
+        /// Formulas written out, where the question is not a depth.
+        ///
+        /// The ladder kinds above all vary one number and read the answer off it. Round six's
+        /// questions do not have that shape — "may a `LAMBDA` be called with fewer arguments
+        /// than it declares" is asked by writing three calls, not by counting. `depths` then
+        /// indexes this list rather than meaning anything itself.
+        case written(formulas: [(formula: String, asked: String, expected: String)])
     }
 
     /// One block of rows.
@@ -104,6 +111,39 @@ enum RecursionDepthSheet {
         /// The row its header sits on; the questions follow it.
         var headerRow = 0
     }
+
+
+    /// Round six's questions, which are about arity rather than about depth.
+    ///
+    /// **Every one of these is currently an assumption in the evaluator.** `ISOMITTED` is how
+    /// an author writes an optional parameter, because Excel has no syntax for one — the `[y]`
+    /// in Microsoft's documentation is a convention for readers. That pattern is unusable
+    /// unless a call may supply fewer arguments than the declaration, so the evaluator allows
+    /// it. The reasoning is documentation, and documentation has been wrong five times here.
+    ///
+    /// The last row is the other unmeasured number: `ERROR.TYPE` is published as returning 14
+    /// for `#CALC!`, and that is the only value in this package's `ERROR.TYPE` never checked
+    /// against Excel.
+    static let arityQuestions: [(formula: String, asked: String, expected: String)] = [
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7)",
+         "two parameters, one argument",
+         "1 if a trailing argument may be left out; #VALUE! if it may not"),
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,8)",
+         "two parameters, two arguments",
+         "2 — the control, and it must hold or the row above means nothing"),
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,,)",
+         "two parameters, the second skipped",
+         "1 if a skipped argument counts as omitted"),
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,_xlpm.x)(7,8,9)",
+         "two parameters, three arguments",
+         "#VALUE! — too many should still be refused"),
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.x+0)(7)+0",
+         "an omitted parameter used as a number",
+         "7 — an omitted argument reads as blank, which is 0"),
+        ("ERROR.TYPE(_xlfn.LAMBDA(_xlpm.x,_xlpm.x))",
+         "ERROR.TYPE of an uncalled LAMBDA",
+         "14 if the published table is right"),
+    ]
 
     /// The thin body contributes a literal 1 per level.
     static let thinStep = "1"
@@ -134,6 +174,9 @@ enum RecursionDepthSheet {
             Section(title: "control — the fat body at the boundary",
                     kind: .recursion(step: fatStep), depths: [4094, 4095]),
         ]
+        sections.append(Section(title: "new — may a LAMBDA be called with fewer arguments?",
+                                kind: .written(formulas: arityQuestions),
+                                depths: Array(arityQuestions.indices)))
         var row = 12
         for index in sections.indices {
             sections[index].headerRow = row
@@ -243,6 +286,9 @@ enum RecursionDepthSheet {
         case .iteration:
             return "_xlfn.REDUCE(0,_xlfn.SEQUENCE(\(depth)),"
                 + "_xlfn.LAMBDA(_xlpm.a,_xlpm.v,_xlpm.a+_xlpm.v))"
+        case .written(let formulas):
+            guard depth >= 0, depth < formulas.count else { return "\"no such question\"" }
+            return formulas[depth].formula
         }
     }
 
@@ -252,6 +298,9 @@ enum RecursionDepthSheet {
         case .recursion: return "LAMBDA(f,n,…)(itself, \(depth))"
         case .recursionUnderNesting(_, let layers):
             return "\(layers) nested IFs around a \(depth)-deep recursion"
+        case .written(let formulas):
+            guard depth >= 0, depth < formulas.count else { return "—" }
+            return "\(formulas[depth].asked) · expect \(formulas[depth].expected)"
         case .nestingLadderAroundRecursion(_, let fixed):
             return "\(depth) nested IFs around a \(fixed)-deep recursion"
         case .iteration: return "REDUCE(0, SEQUENCE(\(depth)), LAMBDA(a,v,a+v))"

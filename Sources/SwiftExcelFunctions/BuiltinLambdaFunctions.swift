@@ -33,7 +33,7 @@ enum BuiltinLambdaFunctions {
         .error(.calc)
     }
 
-    static let all: [ExcelFunction] = [letFunc, lambdaFunc]
+    static let all: [ExcelFunction] = [letFunc, lambdaFunc, isOmittedFunc]
 
     /// Evaluates `LET(name, value, …, calculation)`.
     ///
@@ -103,6 +103,43 @@ enum BuiltinLambdaFunctions {
         }
     }
 
+    /// The scope a lambda body runs in.
+    ///
+    /// - Parameters:
+    ///   - parameters: the names it declares.
+    ///   - arguments: the evaluated arguments, which may be fewer than the parameters.
+    ///   - omittedAt: positions the caller wrote as skipped — `f(1,,3)`.
+    ///   - closing: the bindings the body sees, which for a lambda *value* is what it captured
+    ///     and for a named lambda is the caller's scope.
+    ///   - env: the caller's environment.
+    /// - Returns: the scope, or `nil` if there are more arguments than parameters.
+    private static func scope(
+        parameters: [String], arguments: [CellValue], omittedAt: Set<Int>,
+        closing: [String: CellValue], in env: EvaluationEnvironment
+    ) throws -> EvaluationEnvironment? {
+        // Too *many* is still refused: omission is a shortfall, not a free-for-all.
+        guard arguments.count <= parameters.count else { return nil }
+
+        var values: [String: CellValue] = [:]
+        var absent: Set<String> = []
+        for (position, name) in parameters.enumerated() {
+            let supplied = position < arguments.count && !omittedAt.contains(position)
+            // An omitted parameter reads as blank where it is *used* — Excel's omitted
+            // argument behaves as empty — and is recorded as absent separately, because a
+            // blank is also an ordinary thing to pass. See `EvaluationEnvironment.omitted`.
+            values[name] = supplied ? arguments[position] : .blank
+            if !supplied { absent.insert(name) }
+        }
+
+        // The body starts its nesting budget over and carries the recursion budget. Excel's 65
+        // is a fact about one expression's text, and a lambda's body is its own expression.
+        var budgets = try env.depth.recursing()
+        budgets.calls = 0
+
+        return env.withDepth(budgets).withBindings(closing)
+            .binding(values).omitting(absent)
+    }
+
     /// Turns a `LAMBDA(…)` that nobody called into the value it is.
     ///
     /// A lambda is not a number, and a cell holding one shows `#CALC!`. But it *is* a value:
@@ -137,20 +174,16 @@ enum BuiltinLambdaFunctions {
     ///   - evaluate: evaluates the body.
     static func callValue(
         parameters: [String], body: FormulaAST, captured: [String: CellValue],
-        arguments: [CellValue],
+        arguments: [CellValue], omittedAt: Set<Int>,
         in env: EvaluationEnvironment,
         evaluating evaluate: (FormulaAST, EvaluationEnvironment) throws -> CellValue
     ) throws -> CellValue {
-        guard arguments.count == parameters.count else { return .error(.value) }
-
-        var budgets = try env.depth.recursing()
-        budgets.calls = 0
-
         // The captured frame *replaces* the caller's bindings rather than adding to them. A
         // lambda sees where it was written, not where it was called — which is what makes
         // `LET(x, 100, LET(f, LET(x, 1, LAMBDA(y, x+y)), f(0)))` answer 1 and not 100.
-        let scope = env.withDepth(budgets).withBindings(captured).binding(
-            Dictionary(zip(parameters, arguments), uniquingKeysWith: { _, last in last }))
+        guard let scope = try scope(
+            parameters: parameters, arguments: arguments, omittedAt: omittedAt,
+            closing: captured, in: env) else { return .error(.value) }
         return try evaluate(body, scope)
     }
 
@@ -169,31 +202,44 @@ enum BuiltinLambdaFunctions {
     /// - Throws: ``FormulaEvaluator/EvaluationError/recursionDepthExceeded`` past 4,096.
     static func call(
         _ lambda: Lambda,
-        arguments: [CellValue],
+        arguments: [CellValue], omittedAt: Set<Int>,
         in env: EvaluationEnvironment,
         evaluating evaluate: (FormulaAST, EvaluationEnvironment) throws -> CellValue
     ) throws -> CellValue {
-        // Excel refuses a call whose argument count does not match the declaration. There is
-        // no defaulting and no dropping — `ISOMITTED` is how an author says "may be absent",
-        // and it is not implemented yet.
-        guard arguments.count == lambda.parameters.count else { return .error(.value) }
-
-        // **The body starts its nesting budget over, and the recursion budget carries.**
-        //
-        // Excel's 65 is a fact about one expression's *text* — it is enforced at file load, by
-        // looking at the formula, before anything is evaluated. A lambda's body is its own
-        // expression and is checked on its own; a call to a lambda is not nesting inside the
-        // caller any more than `=myName` is.
-        //
-        // Counting them together is not a nicety: a recursion 4,090 deep would exhaust a
-        // 65-call budget at the 33rd level. The conformance round that put 4,090 levels of
-        // recursion inside 60 nested `IF`s and found the answer unmoved is exactly the
-        // measurement that says these are two budgets, and this is where that becomes code.
-        var budgets = try env.depth.recursing()
-        budgets.calls = 0
-
-        let scope = env.withDepth(budgets).binding(Dictionary(
-            zip(lambda.parameters, arguments), uniquingKeysWith: { _, last in last }))
+        // A named lambda closes over the workbook, which is what the caller's environment
+        // already reaches. Its own bindings are not inherited — a `LET` around the call site
+        // must not leak into a body that never saw it.
+        guard let scope = try scope(
+            parameters: lambda.parameters, arguments: arguments, omittedAt: omittedAt,
+            closing: [:], in: env) else { return .error(.value) }
         return try evaluate(lambda.body, scope)
+    }
+
+    // MARK: - ISOMITTED
+
+    /// `ISOMITTED(parameter)` — whether the current call left that argument out.
+    ///
+    /// A special form, because the answer is about the *name* rather than about the value it
+    /// stands for. Evaluated first, an omitted parameter is a blank and indistinguishable from
+    /// a blank somebody passed.
+    ///
+    /// Anything that is not a name is `FALSE`: it is a value, so it was supplied. Excel has no
+    /// syntax for an optional parameter — the `[y]` in Microsoft's documentation is a
+    /// convention for readers — so this is the only way an author writes one.
+    ///
+    /// - Parameters:
+    ///   - arguments: the unevaluated arguments; `ISOMITTED` takes exactly one.
+    ///   - env: the environment, which knows what the current call left out.
+    static func isOmitted(_ arguments: [FormulaAST], in env: EvaluationEnvironment) -> CellValue {
+        guard let first = arguments.first else { return .error(.value) }
+        guard case .namedRange(let name) = first else { return .bool(false) }
+        return .bool(env.wasOmitted(name))
+    }
+
+    /// `ISOMITTED` as the registry knows it — for its name and its arity.
+    static let isOmittedFunc = ExcelFunction(name: "ISOMITTED", minArgs: 1, maxArgs: 1) { _ in
+        // Reached only if something calls it with a value in hand, by which point the name is
+        // gone and the question cannot be answered. A value was supplied; that is all it knows.
+        .bool(false)
     }
 }
