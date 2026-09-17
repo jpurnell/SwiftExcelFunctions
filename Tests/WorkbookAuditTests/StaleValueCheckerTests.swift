@@ -185,19 +185,21 @@ final class StaleValueCheckerTests: XCTestCase {
 
     /// A name this package cannot turn into a reference is not comparable.
     ///
-    /// **A whole-column name does not resolve.** `amounts = Expenditures!$D:$D` comes back
-    /// as an unparsed formula string, because the reader's reference test wants a letter
-    /// *and* a digit in each half and `$D` has no digit. The name then evaluates to its own
-    /// text and `SUMIFS(amounts, …)` sums nothing — **1,058 cells in one corpus workbook**,
-    /// all of which would have been reported as somebody's stale values.
+    /// A name the reader could not turn into a reference is not comparable.
     ///
-    /// The parser is upstream and a second one here is what the package split exists to
-    /// prevent, so what belongs here is declining to judge a formula we knowingly cannot
-    /// evaluate. A name whose target is a text *constant* is not this case: the file writes
-    /// those quoted.
+    /// **Whole columns were this case until SwiftXLSX 0.26.0.** `amounts =
+    /// Expenditures!$D:$D` failed the reader's reference test — which wanted a letter *and* a
+    /// digit in each half, and `$D` has no digit — so the name evaluated to its own text and
+    /// `SUMIFS(amounts, …)` summed nothing: **1,058 cells in one corpus workbook**, all of
+    /// which the checker was about to report as somebody's stale values. Whole columns parse
+    /// now, so this test uses `.unparsed` directly to stand for whatever the reader cannot
+    /// read next.
+    ///
+    /// What belongs here is unchanged: declining to judge a formula we knowingly cannot
+    /// evaluate. A cell we cannot compare is not a cell that disagrees.
     func testAnUnresolvableNameIsNotComparable() throws {
         let names = Names(targets: [
-            "amounts": .formula(.text("Expenditures!$D:$D")),     // a whole column
+            "amounts": .unparsed("Expenditures!$D:$D"),            // read, but not understood
             "label": .formula(.text("\"Total\"")),                // a text constant
             "rate": .cell(CellRef("B1")),                         // an ordinary name
         ])

@@ -422,6 +422,18 @@ public enum FormulaEvaluator {
             return try evaluateNode(
                 ast, cells: cells, names: names, functions: functions,
                 callingCell: callingCell, currentSheet: currentSheet, random: random, simulation: simulation, depth: depth)
+
+        case .unparsed:
+            // **`#NAME?`, and it is the honest answer.** The name exists in the file and this
+            // package does not know what it points at, which is exactly what `#NAME?` says.
+            //
+            // The alternative was worse and was what this replaced: the reader used to hand
+            // back `.formula(.text(raw))`, so a name it had failed to read *evaluated to its
+            // own text*. `SUMIFS(amounts, …)` summed a caption and answered zero — across
+            // 1,058 cells in one corpus workbook — with no error anywhere to say why.
+            //
+            // A refusal is visible. A plausible zero is not.
+            return .error(.name)
         }
     }
 

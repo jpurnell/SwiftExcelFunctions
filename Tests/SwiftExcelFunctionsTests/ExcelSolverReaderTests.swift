@@ -267,14 +267,21 @@ final class ExcelSolverReaderTests: XCTestCase {
 
     /// **Changing cells may be several blocks.** Excel lets `By Changing` be
     /// `$A$1:$A$3,$C$5` and writes it as one name, which resolves to neither a cell nor a
-    /// range — so it arrives as text. Returning nothing for it reads as "a model with
-    /// nothing to adjust", which is a model that cannot be solved rather than one that
-    /// could not be parsed.
+    /// range — so the reader hands it back unparsed. Returning nothing for it reads as "a
+    /// model with nothing to adjust", which is a model that cannot be solved rather than one
+    /// that could not be parsed.
+    ///
+    /// **This fixture said `.formula(.text(…))` until SwiftXLSX 0.26.0**, which was the
+    /// reader's old way of reporting failure — a shape that claimed the name was a text
+    /// constant. The fixture and the code agreed with each other about something neither had
+    /// checked against a file, which is the trap this project has now hit five times. What
+    /// makes it visible here is that the *textual* parse tests exercise the reader rather
+    /// than restate it.
     func testMultiAreaChangingCells() throws {
         var pairs = Array(minimal.all.map { ($0.name, $0.reference) })
         pairs = pairs.map {
             $0.0 == "solver_adj"
-                ? ($0.0, NamedRangeTarget.formula(.text("Sheet1!$A$1:$A$3,Sheet1!$C$5")))
+                ? ($0.0, NamedRangeTarget.unparsed("Sheet1!$A$1:$A$3,Sheet1!$C$5"))
                 : $0
         }
         let model = try XCTUnwrap(ExcelSolverReader.model(from: names(pairs)))

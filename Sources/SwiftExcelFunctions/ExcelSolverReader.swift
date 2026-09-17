@@ -370,9 +370,13 @@ public enum ExcelSolverReader {
     ///
     /// **A multi-area reference is one name covering several blocks** — Excel lets the
     /// changing cells be `$A$1:$A$3,$C$5`, and writes exactly that. It resolves to no
-    /// single cell or range, so it arrives as a formula, and returning nothing for it reads
-    /// as "a model with nothing to adjust" rather than as a model this could not parse.
-    /// Each comma-separated part is therefore read on its own.
+    /// single cell or range, so the reader hands it back unparsed, and returning nothing
+    /// for it would read as "a model with nothing to adjust" rather than as a model this
+    /// could not parse. Each comma-separated part is therefore read on its own.
+    ///
+    /// It used to arrive as `.formula(.text(…))` — the reader's old way of saying it had
+    /// failed, which claimed the name was a text constant. `.unparsed` says the same thing
+    /// truthfully, and this is the code that was always relying on it.
     private static func cells(_ target: NamedRangeTarget) -> [CellRef] {
         switch target {
         case .cell(let ref): return [ref]
@@ -380,9 +384,12 @@ public enum ExcelSolverReader {
         // A `SheetReference` always carries a `CellRange`; the single-cell initialiser
         // just makes a degenerate one. So both cases read the same way.
         case .sheetCell(let reference), .sheetRange(let reference): return reference.range.cells
-        case .formula(let ast):
-            guard case .text(let reference) = ast else { return [] }
+        case .unparsed(let reference):
             return areas(in: reference)
+        case .formula:
+            // A name bound to a computed formula names no cells to adjust. Excel allows it
+            // and a Solver model cannot use it.
+            return []
         }
     }
 

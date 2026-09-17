@@ -11,14 +11,15 @@ let package = Package(
         .executable(name: "workbook-census", targets: ["WorkbookCensus"]),
         .executable(name: "conformance-workbook", targets: ["ConformanceWorkbook"]),
         .executable(name: "workbook-oracle", targets: ["WorkbookOracleTool"]),
-        .executable(name: "xlsx-audit", targets: ["XlsxAudit"])
+        .executable(name: "xlsx-audit", targets: ["XlsxAudit"]),
+        .executable(name: "name-round-trip", targets: ["NameRoundTrip"])
     ],
     dependencies: [
         // The shared vocabulary, and deliberately not `exact:`. SwiftPM must unify the
         // family on one SwiftExcelCore — two versions would mean two `CellValue` types
         // and nothing would typecheck — and `from:` enforces that better than `exact:`,
         // by resolving to the highest version satisfying everyone rather than refusing.
-        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.8.0"),
+        .package(url: "https://github.com/jpurnell/SwiftExcelCore", from: "0.10.0"),
         // The mathematics. On the 3.0.0 prerelease line, and `.upToNextMinor` rather
         // than `exact:` for two reasons. SwiftPM excludes prereleases from a version
         // range *unless the lower bound is itself a prerelease*, so `from: "2.11.0"`
@@ -48,7 +49,7 @@ let package = Package(
         // `upToNextMinor` rather than `from:`: this family ships breaking changes in
         // minor versions while it is pre-1.0, so a patch should flow freely and a minor
         // should be a deliberate bump.
-        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.25.0"))
+        .package(url: "https://github.com/jpurnell/SwiftXLSX", .upToNextMinor(from: "0.26.0"))
     ],
     targets: [
         .target(
@@ -143,6 +144,18 @@ let package = Package(
                 .product(name: "SwiftXLSX", package: "SwiftXLSX")
             ],
             path: "Sources/XlsxAudit",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
+        // Reads a corpus, writes each workbook back, and compares the name tables. The
+        // measurement that licenses reconstructing a name's text from its target rather than
+        // keeping a copy of the original beside it — see PROPOSAL_defined_names.md §12.
+        .executableTarget(
+            name: "NameRoundTrip",
+            dependencies: [
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/NameRoundTrip",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
         .target(

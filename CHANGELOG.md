@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A workbook keeps its defined names** — SwiftXLSX 0.26.0 and SwiftExcelCore 0.10.0.
+
+  The reader parsed every `<definedName>`; the writer emitted none, so a file read by this
+  family and written back came out with an **empty Name Manager** and nothing said so.
+  Measured across 2,240 workbooks: **1,022 define names, 161,901 in all**, 46% of them hidden,
+  and the largest single model carries 47,106.
+
+  The design is **one representation**: a name is held once, its target *is* its meaning, and
+  the writer derives the refers-to text from that target rather than keeping the file's string
+  beside it. Two copies of one fact drift the moment anything changes one of them — and drift
+  here means silently writing the *old* reference into somebody's workbook.
+
+  That needs a target able to say everything a name can be, so `NamedRangeTarget` gains
+  **`.unparsed(String)`**. The old fallback, `.formula(.text(raw))`, kept the characters and
+  claimed the name **was a text constant** — written back it gains quotes, so a range becomes
+  a caption and a number becomes a string.
+
+  `.unparsed` round-trips by the identity function, which is what makes reconstruction safe
+  rather than ambitious: byte-exactness is available for every name from the start, and each
+  shape the reader parses is an opt-in promise with a test behind it.
+
+- **`name-round-trip`** — the measurement that licenses that choice. Reads a corpus, writes
+  each workbook back, reads it again, and compares the name tables. Reconstruction has to be
+  right every time; the reason to accept that cost is that being right is *checkable*, where
+  drift is a future mutation no test can enumerate.
+
+### Fixed
+
+- **A whole-column name is a reference again, and `SUMIFS` over one works.** The same defect
+  seen from the other end: SwiftXLSX's `isReference` wanted a letter *and* a digit in each
+  half, so `$D` failed and `amounts = Expenditures!$D:$D` was read as not-a-range. The
+  evaluator then summed the name's own text — `SUMIFS(amounts, …)` answered **zero across
+  1,058 cells** in one corpus workbook, with no error anywhere to say why.
+
+- **A name this package cannot read answers `#NAME?`.** It exists in the file and we do not
+  know what it points at, which is what `#NAME?` says. A refusal is visible; a plausible zero
+  is not.
+
+- **`WorkbookOracle` asks instead of inferring.** Telling "could not read this" from "this is
+  a text constant" used to mean looking for a `!` and the absence of a quote. The reader says
+  which it is now.
+
+- **Two hand-built fixtures encoded the reader's old failure mode** — `ExcelSolverReaderTests`
+  and `StaleValueCheckerTests` both constructed `.formula(.text(…))` targets by hand. They
+  agreed with the code about something neither had checked against a file, which is the fifth
+  time this project has hit that trap. Both corrected.
+
+
 - **`conformance-workbook depth` — asking Excel where its own limits are.** Microsoft
   documents 64 levels of function nesting and says nothing whatever about `LAMBDA`
   recursion, so the only authority is Excel. Four sections: expression nesting, recursive

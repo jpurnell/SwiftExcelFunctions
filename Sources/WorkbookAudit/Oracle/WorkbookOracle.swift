@@ -81,20 +81,17 @@ public enum WorkbookOracle {
 
     /// A defined name in the formula that this package cannot turn into a reference.
     ///
-    /// **A whole-column name does not resolve.** `amounts = Expenditures!$D:$D` is read by
-    /// SwiftXLSX's `DefinedNameResolver` as an unparsed formula string, because its
-    /// reference test requires a letter *and* a digit in each half and `$D` has no digit.
-    /// The name then evaluates to its own text, and `SUMIFS(amounts, dates, …)` sums
-    /// nothing — 1,058 cells in one corpus workbook, every one of which the checker was
-    /// about to report as somebody's stale value.
+    /// **A name the reader could not turn into a reference.** SwiftXLSX says so directly
+    /// now, with `NamedRangeTarget.unparsed` — so this asks rather than infers.
     ///
-    /// **The defect is upstream and is recorded rather than worked around**: the parser
-    /// lives in SwiftXLSX and a second one here is exactly what the package split exists to
-    /// prevent. What belongs here is refusing to *judge* a formula we knowingly cannot
+    /// It used to have to infer. A whole-column name like `amounts = Expenditures!$D:$D`
+    /// came back as `.formula(.text(…))`, indistinguishable by type from a name that really
+    /// is a text constant, and telling them apart meant looking for a `!` and the absence of
+    /// a quote. Both halves of that are fixed upstream in SwiftXLSX 0.26.0: whole columns
+    /// parse, and what still cannot be read says so.
+    ///
+    /// What belongs here is unchanged — refusing to *judge* a formula we knowingly cannot
     /// evaluate. A cell we cannot compare is not a cell that disagrees.
-    ///
-    /// A name whose target is a text *constant* is not this case: the file writes those
-    /// quoted, so the quote is what tells the two apart.
     ///
     /// - Parameters:
     ///   - ast: The formula.
@@ -110,10 +107,9 @@ public enum WorkbookOracle {
                 // No definition at all. Excel cached a value, so it resolved for Excel.
                 return name
             }
-            if case .formula(.text(let literal)) = target,
-               literal.contains("!"), !literal.contains("\"") {
-                return name
-            }
+            // The reader now *says* when it could not read a name, so this no longer has to
+            // infer it from the shape of a text node. `.unparsed` is the statement itself.
+            if case .unparsed = target { return name }
         }
         return nil
     }
