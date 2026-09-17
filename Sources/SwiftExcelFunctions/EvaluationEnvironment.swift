@@ -103,6 +103,15 @@ struct EvaluationEnvironment {
         copy(depth: try depth.calling(), bindings: bindings)
     }
 
+    /// The same environment with an entirely different set of names.
+    ///
+    /// Not a merge: a lambda's body sees the scope the lambda was *written* in, and the
+    /// caller's names are not part of that. Adding to them instead of replacing them is how a
+    /// closure stops being lexical.
+    func withBindings(_ replacement: [String: CellValue]) -> EvaluationEnvironment {
+        copy(depth: depth, bindings: replacement)
+    }
+
     /// The same environment with a different set of counters.
     ///
     /// A `LAMBDA` invocation is counted here rather than by ``calling()``, because Excel keeps

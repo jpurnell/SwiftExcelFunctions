@@ -308,6 +308,9 @@ public enum BuiltinDateTimeFunctions {
             return try toNumber(cached ?? .blank)
         case .array:
             throw EvalError.typeMismatch
+        case .lambda:
+            // A function is not a date. `#CALC!` says the author forgot to call it.
+            throw EvalError.excelError(.calc)
         }
     }
 

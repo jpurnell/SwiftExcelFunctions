@@ -559,6 +559,13 @@ public enum FormulaEvaluator {
                     args, in: inCall, evaluating: { try evaluateNode($0, in: $1) })
             }
 
+            // A `LAMBDA` nobody called is a value, and it closes over the scope it is written
+            // in. Its parameters must not be evaluated — they are names waiting to be bound,
+            // and asking the workbook for them is how a parameter becomes `#NAME?`.
+            if fn.name == "LAMBDA" {
+                return BuiltinLambdaFunctions.lambdaValue(args, in: inCall)
+            }
+
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {
@@ -589,25 +596,32 @@ public enum FormulaEvaluator {
     private static func callNamedLambda(
         _ name: String, _ args: [FormulaAST], in env: EvaluationEnvironment
     ) throws -> CellValue? {
-        // A bound name shadows a workbook one here too, so a `LET` may name a lambda.
-        let target: NamedRangeTarget?
-        if env.bound(name) != nil {
-            // A *value* is not callable. Until `CellValue` can hold a lambda — step 4 of the
-            // proposal — a bound name in call position is out of reach rather than wrong, and
-            // saying so beats resolving to a workbook name that happens to share the spelling.
-            return .error(.value)
-        } else {
-            target = env.names.resolve(
-                name, inSheet: env.currentSheet.isEmpty ? nil : env.currentSheet)
+        // The arguments belong to the caller: they are evaluated in the scope that wrote the
+        // call, before any parameter exists. A lambda's own parameter named `x` must not
+        // capture an argument that says `x`.
+        let inCall = try env.calling()
+
+        // A local binding first, so `LET(f, LAMBDA(x, x*2), f(3))` calls the `f` it just made
+        // rather than a workbook name that happens to share the spelling.
+        if let bound = env.bound(name) {
+            guard case .lambda(let parameters, let body, let captured) = bound else {
+                // Something is bound under this name and it is not callable. `#CALC!` is not
+                // right — nothing here was left uncalled — and neither is `#NAME?`, since the
+                // name exists.
+                return .error(.value)
+            }
+            let evaluated = try args.map { try evaluateNode($0, in: inCall) }
+            return try BuiltinLambdaFunctions.callValue(
+                parameters: parameters, body: body, captured: captured,
+                arguments: evaluated, in: inCall,
+                evaluating: { try evaluateNode($0, in: $1) })
         }
 
+        let target = env.names.resolve(
+            name, inSheet: env.currentSheet.isEmpty ? nil : env.currentSheet)
         guard case .formula(let ast)? = target,
               let lambda = BuiltinLambdaFunctions.Lambda(ast) else { return nil }
 
-        // The arguments belong to the caller: they are evaluated here, in the scope that
-        // wrote the call, before any parameter exists. A lambda's own parameter named `x`
-        // must not capture an argument that says `x`.
-        let inCall = try env.calling()
         let evaluated = try args.map { try evaluateNode($0, in: inCall) }
         return try BuiltinLambdaFunctions.call(
             lambda, arguments: evaluated, in: inCall,
@@ -686,6 +700,10 @@ public enum FormulaEvaluator {
             return try coerceToNumber(cached ?? .blank)
         case .array:
             throw EvaluationError.typeMismatch(expected: "number", got: "array")
+        case .lambda:
+            // A function is not a number. Which *error* that is depends on the operand rather
+            // than on the coercion, so it is decided by `coercionFailure(_:_:)`.
+            throw EvaluationError.typeMismatch(expected: "number", got: "lambda")
         }
     }
 
@@ -731,6 +749,11 @@ public enum FormulaEvaluator {
             return coerceToString(cached ?? .blank)
         case .array:
             return ""
+        case .lambda:
+            // `#CALC!` written out, because that is what the cell would show. Concatenation
+            // is one of the places a lambda can arrive where a value belongs, and text is the
+            // one coercion with no way to refuse — it returns a `String` rather than throwing.
+            return ExcelError.calc.rawValue
         }
     }
 
@@ -754,13 +777,25 @@ public enum FormulaEvaluator {
 
     // MARK: - Arithmetic Operations
 
+    /// Whether either operand is a function rather than a value.
+    ///
+    /// Decides between the two errors a failed coercion can be. `#VALUE!` is Excel's "wrong
+    /// kind of thing"; `#CALC!` is its "you forgot to call something", and `=myLambda + 1` is
+    /// the second. Keeping them apart is the difference between a reader being told what is
+    /// wrong and being told that something is.
+    private static func eitherIsAFunction(_ left: CellValue, _ right: CellValue) -> Bool {
+        if case .lambda = left { return true }
+        if case .lambda = right { return true }
+        return false
+    }
+
     private static func addValues(_ left: CellValue, _ right: CellValue) throws -> CellValue {
         do {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
             return overflowChecked(l + r)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
 
@@ -770,7 +805,7 @@ public enum FormulaEvaluator {
             let r = try coerceToNumber(right)
             return overflowChecked(l - r)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
 
@@ -780,7 +815,7 @@ public enum FormulaEvaluator {
             let r = try coerceToNumber(right)
             return overflowChecked(l * r)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
 
@@ -791,7 +826,7 @@ public enum FormulaEvaluator {
             guard r != 0 else { return .error(.div0) }
             return overflowChecked(l / r)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
 
@@ -803,7 +838,7 @@ public enum FormulaEvaluator {
             guard result.isFinite else { return .error(.num) }
             return .number(result)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
 
@@ -825,7 +860,7 @@ public enum FormulaEvaluator {
             let n = try coerceToNumber(value)
             return .number(-n)
         } catch {
-            return .error(.value)
+            return eitherIsAFunction(value, value) ? .error(.calc) : .error(.value)
         }
     }
 

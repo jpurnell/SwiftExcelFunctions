@@ -308,6 +308,11 @@ public enum BuiltinNavigationFunctions {
             return try toNumber(cached ?? .blank)
         case .array:
             throw EvalError.typeMismatch
+        case .lambda:
+            // A function is not a value. `#CALC!` says the author forgot to call it, which is
+            // a different mistake from passing the wrong kind of thing.
+            throw EvalError.excelError(.calc)
+       
         }
     }
 

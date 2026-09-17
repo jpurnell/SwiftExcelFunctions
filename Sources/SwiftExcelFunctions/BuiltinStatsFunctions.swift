@@ -41,7 +41,7 @@ public enum BuiltinStatsFunctions {
                 result.append(contentsOf: flattenNumbers(matrix.elements))
             case .bool(let b):
                 result.append(b ? 1.0 : 0.0)
-            case .blank, .text, .error, .formula, .date:
+            case .blank, .text, .error, .formula, .date, .lambda:
                 continue
             }
         }

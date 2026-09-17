@@ -48,7 +48,7 @@ public enum BuiltinCoercingAggregates {
             case .text: result.append(0)
             case .date(let d): result.append(d.timeIntervalSince1970)
             case .array(let matrix): result.append(contentsOf: coercedValues(matrix.elements))
-            case .blank, .error, .formula: continue
+            case .blank, .error, .formula, .lambda: continue
             }
         }
         return result

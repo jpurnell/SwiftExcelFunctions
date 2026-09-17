@@ -24,7 +24,16 @@ enum BuiltinLambdaFunctions {
         .error(.value)
     }
 
-    static let all: [ExcelFunction] = [letFunc]
+    /// `LAMBDA` as the registry knows it — for its name and its arity.
+    ///
+    /// Intercepted by the evaluator like ``letFunc``, and for the same reason: the parameters
+    /// are names to be *bound*, and evaluating them would ask the workbook for names that
+    /// exist only inside this lambda.
+    static let lambdaFunc = ExcelFunction(name: "LAMBDA", minArgs: 0, maxArgs: nil) { _ in
+        .error(.calc)
+    }
+
+    static let all: [ExcelFunction] = [letFunc, lambdaFunc]
 
     /// Evaluates `LET(name, value, …, calculation)`.
     ///
@@ -92,6 +101,57 @@ enum BuiltinLambdaFunctions {
             self.parameters = declared
             self.body = body
         }
+    }
+
+    /// Turns a `LAMBDA(…)` that nobody called into the value it is.
+    ///
+    /// A lambda is not a number, and a cell holding one shows `#CALC!`. But it *is* a value:
+    /// it can be bound by a `LET`, chosen by an `IF`, or returned by another lambda, and each
+    /// of those is legal Excel that no side table of unevaluated trees can express.
+    ///
+    /// **The environment's bindings travel with it.** That is the closure, and it is the whole
+    /// reason the case carries a third payload: `LAMBDA(x, LAMBDA(y, x+y))` returns a function
+    /// that outlives the scope which gave `x` its value. Capturing the bindings at the point
+    /// the lambda is *made* is what makes the scope lexical.
+    ///
+    /// - Parameters:
+    ///   - arguments: the `LAMBDA` call's unevaluated arguments — parameters, then a body.
+    ///   - env: the environment the lambda is written in, whose names it closes over.
+    /// - Returns: the lambda as a value, or `#CALC!` if the form is malformed.
+    static func lambdaValue(
+        _ arguments: [FormulaAST], in env: EvaluationEnvironment
+    ) -> CellValue {
+        guard let lambda = Lambda(.function("LAMBDA", arguments)) else { return .error(.calc) }
+        return .lambda(parameters: lambda.parameters, body: lambda.body,
+                       captured: env.bindings)
+    }
+
+    /// Calls a lambda held as a value.
+    ///
+    /// - Parameters:
+    ///   - parameters: the names it declares.
+    ///   - body: what it computes.
+    ///   - captured: the scope it closed over, which the body sees *instead of* the caller's.
+    ///   - arguments: the evaluated arguments.
+    ///   - env: the caller's environment, for its counters and its collaborators.
+    ///   - evaluate: evaluates the body.
+    static func callValue(
+        parameters: [String], body: FormulaAST, captured: [String: CellValue],
+        arguments: [CellValue],
+        in env: EvaluationEnvironment,
+        evaluating evaluate: (FormulaAST, EvaluationEnvironment) throws -> CellValue
+    ) throws -> CellValue {
+        guard arguments.count == parameters.count else { return .error(.value) }
+
+        var budgets = try env.depth.recursing()
+        budgets.calls = 0
+
+        // The captured frame *replaces* the caller's bindings rather than adding to them. A
+        // lambda sees where it was written, not where it was called — which is what makes
+        // `LET(x, 100, LET(f, LET(x, 1, LAMBDA(y, x+y)), f(0)))` answer 1 and not 100.
+        let scope = env.withDepth(budgets).withBindings(captured).binding(
+            Dictionary(zip(parameters, arguments), uniquingKeysWith: { _, last in last }))
+        return try evaluate(body, scope)
     }
 
     /// Calls a lambda with arguments already evaluated in the caller's scope.

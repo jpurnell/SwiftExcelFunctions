@@ -93,7 +93,9 @@ public enum BuiltinAggregationFunctions {
             return d.timeIntervalSinceReferenceDate / 86_400.0
         case .formula(_, let cached):
             return numericValue(cached ?? .blank)
-        case .array:
+        case .array, .lambda:
+            // Neither is a number. A lambda reaching an aggregate means a function was
+            // passed where a value belongs, and this family skips what it cannot count.
             return nil
         }
     }
@@ -118,6 +120,9 @@ public enum BuiltinAggregationFunctions {
             return try toNumber(cached ?? .blank)
         case .array:
             throw EvalError.typeMismatch
+        case .lambda:
+            // `#CALC!` rather than `#VALUE!`: the author forgot to call something.
+            throw EvalError.excelError(.calc)
         }
     }
 

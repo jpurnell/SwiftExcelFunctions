@@ -136,6 +136,7 @@ public enum BuiltinTextConversionFunctions {
         case .date(let date): return describe(
             .number(BuiltinDateTimeFunctions.dateToSerial(date)), strict: strict)
         case .formula(_, let cached): return describe(cached ?? .blank, strict: strict)
+        case .lambda: return ExcelError.calc.rawValue
         case .array(let matrix): return matrix.elements
             .map { describe($0, strict: strict) }.joined(separator: ", ")
         }

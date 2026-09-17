@@ -134,6 +134,10 @@ public enum BuiltinLogicFunctions {
             return try isTruthy(cached ?? .blank)
         case .array:
             throw EvalError.typeMismatch
+        case .lambda:
+            // A function is neither true nor false. `#CALC!` rather than `#VALUE!`, because
+            // the author did not use the wrong kind of value — they forgot to call something.
+            throw EvalError.excelError(.calc)
         }
     }
 

@@ -93,7 +93,7 @@ public enum BuiltinArrayFunctions {
             return matrix.elements.reduce(0) { $0 + blanks(in: $1) }
         case .formula(_, let cached):
             return cached.map(blanks(in:)) ?? 1
-        case .number, .bool, .error, .date:
+        case .number, .bool, .error, .date, .lambda:
             return 0
         }
     }

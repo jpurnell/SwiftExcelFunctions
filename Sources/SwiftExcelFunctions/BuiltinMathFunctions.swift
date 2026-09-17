@@ -97,6 +97,10 @@ public enum BuiltinMathFunctions {
             return try toNumber(cached ?? .blank)
         case .array:
             throw EvalError.typeMismatch
+        case .lambda:
+            // A function is not a number, and saying so as `#CALC!` distinguishes "forgot to
+            // call it" from "wrong kind of value", which is the distinction Excel draws.
+            throw EvalError.excelError(.calc)
         }
     }
 

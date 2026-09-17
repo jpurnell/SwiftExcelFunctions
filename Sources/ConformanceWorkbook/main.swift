@@ -167,6 +167,12 @@ enum ConformanceWorkbook {
         case .ref: return "INDEX(A1:A1, 2)"
         case .name: return "NOTAFUNCTION()"
         case .null: return "SUM(A1:A1 B1:B1)"
+        case .calc:
+            // A lambda nobody called is a function sitting where a value belongs, which is
+            // what `#CALC!` means and the shortest way to produce one. The `_xlfn.`/`_xlpm.`
+            // prefixes are the file format's, not Excel's UI — a file that writes them wrong
+            // shows `#NAME?` here instead, which the sheet's canaries exist to catch.
+            return "_xlfn.LAMBDA(_xlpm.x,_xlpm.x)"
         }
     }
 

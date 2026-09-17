@@ -237,6 +237,10 @@ public struct StaleValueChecker: WorkbookChecker {
         case .date(let date): return "\(date)"
         case .array(let matrix): return "array \(matrix.rows)×\(matrix.columns)"
         case .formula(_, let cached): return cached.map(describe) ?? "(uncached formula)"
+        case .lambda(let parameters, _, _):
+            // Named in the finding rather than shown as `#CALC!`, because a person reading a
+            // finding wants to know *which* function was left uncalled.
+            return "LAMBDA(\(parameters.joined(separator: ", ")))"
         }
     }
 
