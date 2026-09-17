@@ -1,7 +1,7 @@
 # Design Proposal: A workbook keeps its defined names
 
 **Date:** 2026-09-16
-**Status:** Proposed — awaiting approval
+**Status:** **Approved 2026-09-16** — single representation, per §12
 **Category:** api · upstream (SwiftXLSX)
 
 > **Where this lands.** The defect and the fix are in SwiftXLSX's writer. The proposal lives
@@ -86,89 +86,99 @@ its reader to add two by hand — and the two rounds that cost are documented in
 
 ## 3. Proposed Architecture
 
+**One representation. There is no second copy of anything.**
+
+A name is a `NamedRange`, the writer derives its refers-to text from that `NamedRange`, and
+nothing else holds a competing version of the same fact. Two representations that can
+disagree are a defect waiting for someone to mutate one of them, and the only thing this tool
+has is that its answers can be trusted.
+
+**Modified (SwiftExcelCore)**
+
+- `NamedRangeTarget` gains **`.unparsed(String)`** — see §3.1. Breaking; §7.
+- `NamedRange` gains the attributes a round trip needs: `isHidden`, and a bag for the rest.
+
 **Modified (SwiftXLSX)**
 
-- `Reader/WorkbookXMLParser.swift` — `DefinedNameInfo` keeps every attribute, not three.
-- `Reader/WorkbookReader.swift` — hands the raw records to the workbook alongside the
-  resolved `NamedRange`s.
-- `Workbook.swift` — stores the raw records; gains a public way to add a name.
-- `Workbook.swift` (writer) — emits `<definedNames>` in its schema position.
+- `Reader/DefinedNameResolver.swift` — `isReference` accepts a whole column and a whole row.
+- `Reader/WorkbookXMLParser.swift` — `DefinedNameInfo` carries every attribute.
+- `Workbook.swift` — a public way to add a name; the writer emits `<definedNames>`.
+- `Writer` — a `NamedRangeTarget` → text serializer, which is the load-bearing new code.
 
-**Unchanged**
+### 3.1 Making the target honest, which is what the single representation requires
 
-- `SwiftExcelCore`. `NamedRange`, `NamedRangeTarget` and `NameScope` are what the *evaluator*
-  needs, and nothing here changes that. See §12 for the alternative that would have changed
-  them, and why it is worse.
+Reconstructing text from the target is only safe if the target can *say* everything a name
+can be. Today it cannot, and the gap is not cosmetic:
 
-### 3.1 Two representations, on purpose
+```
+amounts = Expenditures!$D:$D   →   .formula(.text("Expenditures!$D:$D"))
+```
 
-| | What it is | Who uses it |
+That is a **lie about the kind of thing the name is.** It claims a text constant.
+Serializing it back gives a quoted string, so the name stops being a range — and the
+naive form of this design would corrupt **3,886 names in the corpus** on its first run.
+Worse, the same lie is live in the evaluator today: `SUMIFS(amounts, …)` sums nothing,
+because `amounts` evaluates to its own text. It is upstream defect #1 and this is upstream
+defect #5, and **they are the same bug seen from two ends.**
+
+So the target learns to say three true things instead of two:
+
+| Target | Means | Round-trips by |
 |---|---|---|
-| `NamedRange` | the name **resolved** — a cell, a range, a formula | the evaluator |
-| `DefinedNameRecord` | the name **as the file wrote it** — text and attributes | the writer |
+| `.cell`, `.range`, `.sheetCell`, `.sheetRange` | a reference this package understands | serializing the reference — exact, because `CellRef` keeps its `$` markers |
+| `.formula(FormulaAST)` | a formula this package parsed | `FormulaSerializer` |
+| **`.unparsed(String)`** | **a refers-to this package could not read** | the identity function |
 
-The reader produces both. The evaluator never sees the second; the writer never consults the
-first, except for names created in code, which have no file text to preserve.
+`.unparsed` is not a parallel copy. It *is* the target — the honest statement that the
+reader did not understand this one — and writing it back is the identity. A name in that
+state cannot drift from itself.
 
-**This is the whole design**, and the argument for it is that reconstruction is lossy in a way
-that is invisible until it matters:
-
-```
-file says:   'ANSWER KEY'!$M$1
-target:      .sheetCell(SheetReference(sheet: "ANSWER KEY", cell: M1))
-```
-
-Writing that target back out means re-deciding the quoting rule, the `$` markers, and the
-sheet-name escaping — a second serializer for a syntax the reader already read. And for the
-shape the reader **cannot** parse at all, there is nothing to reconstruct from:
-
-```
-amounts = Expenditures!$D:$D    →    .formula(.text("Expenditures!$D:$D"))
-```
-
-The irony is instructive: **the names this package understands least are the ones it could
-round-trip most safely today**, because the fallback keeps the text. The parsed ones are the
-lossy ones.
-
----
+**Fixing `isReference` is most of the win.** It currently requires a letter *and* a digit in
+each half, so `$D` fails and every whole-column name falls through. With whole columns and
+whole rows parsing properly, `.unparsed` is left holding only what it should: genuine
+oddities, which the corpus round trip will enumerate rather than leave to guesswork.
 
 ## 4. API Surface
 
 ```swift
-/// A `<definedName>` exactly as the file wrote it.
-///
-/// Held beside the resolved `NamedRange` rather than instead of it: the evaluator wants a
-/// target it can read, and the writer wants the text the file used.
-public struct DefinedNameRecord: Sendable, Equatable, Hashable {
-    /// The name, as written.
-    public let name: String
-    /// The refers-to formula, verbatim.
-    public let formula: String
-    /// The sheet index for a sheet-scoped name, or `nil` for a workbook-scoped one.
-    public let localSheetId: Int?
-    /// Attributes the reader does not interpret, kept so the writer can put them back.
-    public let attributes: [String: String]
+// SwiftExcelCore
+public enum NamedRangeTarget: Sendable, Equatable, Hashable {
+    case cell(CellRef)
+    case range(CellRange)
+    case sheetCell(SheetReference)
+    case sheetRange(SheetReference)
+    case formula(FormulaAST)
+    /// A refers-to this package could not read, kept exactly as the file wrote it.
+    ///
+    /// Distinct from `.formula(.text(…))`, which claims the name *is* a text constant —
+    /// a claim that is false for every whole-column name and costs 3,886 of them.
+    case unparsed(String)
 }
 
-extension Workbook {
-    /// Every defined name, as the file wrote them.
-    public var definedNameRecords: [DefinedNameRecord] { get }
-
-    /// Adds a name to a workbook being built in code.
-    ///
-    /// The refers-to text is synthesised from the target, which is lossless because the
-    /// target was just built rather than parsed.
-    public func define(_ name: String, as target: NamedRangeTarget, scope: NameScope = .workbook)
-
-    /// Adds a name whose refers-to text is supplied directly.
-    ///
-    /// For what this package cannot yet parse — a whole-column reference, a `LAMBDA`, a
-    /// formula — so a caller is never blocked by the reader's limits.
-    public func define(_ name: String, refersTo formula: String, scope: NameScope = .workbook)
+public struct NamedRange: Sendable, Equatable, Hashable {
+    public let name: String
+    public let reference: NamedRangeTarget
+    public let scope: NameScope
+    /// Hidden names are 46% of the corpus. Dropping this un-hides half of every Name Manager.
+    public let isHidden: Bool
+    /// Attributes this package does not interpret, kept so a round trip returns them.
+    public let attributes: [String: String]
 }
 ```
 
----
+```swift
+// SwiftXLSX
+extension Workbook {
+    /// Adds a name. The refers-to text is derived from the target when the file is written,
+    /// so there is nothing to keep in step.
+    public func define(_ name: String, as target: NamedRangeTarget,
+                       scope: NameScope = .workbook, hidden: Bool = false)
+}
+```
+
+**There is no `refersTo:` overload and no record type.** A caller who needs to write something
+this package cannot parse passes `.unparsed("…")` and says so in the type, rather than
+handing the writer a string that shadows a target.
 
 ## 5. MCP Schema
 
@@ -179,27 +189,35 @@ a caller may read, and it is already JSON-shaped if anyone needs it.
 
 ## 6. Constraints & Compliance
 
-**Concurrency:** all four fields are `Sendable` value types.
-**Safety:** no force unwraps; a record whose name is empty is dropped at read, as now.
-**Fidelity:** unknown attributes are preserved as read rather than dropped or normalised.
-**Determinism:** names are written in the order they were read, so a round trip is
-byte-comparable in that element.
-
----
+**Concurrency:** every field is a `Sendable` value type.
+**Safety:** no force unwraps; a name with an empty name is dropped at read, as now.
+**Fidelity:** attributes preserved as read; `.unparsed` returns its text unchanged.
+**Determinism:** names written in read order, so a round trip is stable.
+**No drift, by construction:** one fact, one place. The written text is a *function of* the
+target rather than a copy kept beside it, so there is no state to fall out of step.
 
 ## 7. Source & API Compatibility
 
-**Breaking changes: none.** Everything is additive — a new type, two new methods, one new
-element in the output. No existing signature changes and no exhaustive switch gains a case.
+**Breaking: yes, and deliberately.** `NamedRangeTarget` gains a case, so every exhaustive
+switch over it stops compiling — in SwiftXLSX, in this package, and in anything else built on
+SwiftExcelCore.
 
-**Incremental adoption:** automatic. A caller that reads and writes gets its names back
-without changing a line.
+That is the price of the single representation, and it buys more than it costs. The
+alternative kept the enum intact by leaving `.formula(.text(…))` in place — an entry that
+lies about what a name is, and that is *already* producing wrong answers in the evaluator
+(§3.1). A case that forces every consumer to decide what to do with "I could not read this"
+is better than one that quietly hands them a text constant.
 
-**The risk is not source compatibility, it is output compatibility.** This writer has never
-emitted this element, so every file it produces from now on contains something Excel has not
-yet been asked to accept from it. §10 is mostly about that.
+**It lands with the release that already breaks.** `CellValue.lambda` and `ExcelError.calc`
+are both queued for the same SwiftExcelCore minor version. One break, one migration, three
+things fixed.
 
----
+**Incremental adoption:** a caller that reads and writes gets its names back without changing
+a line, once recompiled.
+
+**The risk that is not source compatibility:** this writer has never emitted `<definedNames>`,
+so every file it produces from now on contains something Excel has not yet been asked to
+accept from it. §10 is mostly about that.
 
 ## 8. Backend Abstraction
 
@@ -233,6 +251,16 @@ land in any order; this one changes what the writer produces and wants the longe
 
 **Reference truth:** the corpus, and Excel itself. The population is known — 1,022 workbooks,
 161,901 names — so "the round trip is exact" is a claim with a denominator.
+
+**This test carries more weight than it did.** With a parallel record it would have checked
+that bytes were copied; with reconstruction it checks that every quoting rule, every `$`
+marker and every sheet-name escape is right across 161,901 names. It is the measurement that
+justifies choosing reconstruction over copying (§12), so it runs before the change is called
+done, not after.
+
+**And it reports one number that is not a pass/fail:** how many names land in `.unparsed`.
+That is the reader's health, it should fall to near zero once whole columns and rows parse,
+and a rising count means the reader is regressing behind a safety net.
 
 **Validation traces — from real files, with the text they must round-trip to:**
 
@@ -268,107 +296,102 @@ a precise instrument and it should be pointed at this deliberately.
 
 **New ADR draft**
 
-- **Title:** A reader keeps what it cannot interpret
+- **Title:** One fact, one representation — and a reader says when it could not read
 - **Category:** api
-- **Key decision:** Where a file says something this package does not model, the *text* is
-  preserved so a round trip returns it, rather than being dropped or reconstructed from a
-  partial understanding.
+- **Key decision:** A value this package reads is held exactly once. Where a file says
+  something the package cannot model, the model gains a case that *says so* — carrying the
+  original text — rather than a parallel copy kept beside a lossy interpretation. Two
+  representations of one fact can disagree, and a library whose correctness depends on a
+  discipline no compiler enforces is correct only until someone forgets.
 
 ---
 
 ## 12. Adversarial Review
 
+> **This section changed the design.** The first draft proposed a `DefinedNameRecord` holding
+> the file's text beside the resolved `NamedRange` — two representations of one fact. The
+> review below argued against it, and the argument won: *the only thing this tool has is that
+> its answers can be trusted, and anything that can drift is not worth having.* What follows
+> now argues against the design that replaced it.
+
 **Strongest case for a different approach.**
 
-Keep one representation, not two: reconstruct the refers-to text from `NamedRangeTarget` at
-write time and store nothing extra. One source of truth, no duplicated state, no new type,
-and a smaller diff.
+Keep the parallel record after all. Copying the file's bytes and writing them back is
+*trivially* correct for all 161,901 names: no quoting rule to get right, no `$` marker to
+preserve, no sheet-name escape to reason about. The chosen design replaces a copying problem
+with a **reconstruction** problem, and reconstruction has to be right every single time.
 
-The argument for it is not parsimony, it is **drift**. Two representations of the same fact
-can disagree, and here they disagree silently in the worst possible direction: a caller
-mutates a name's target, the record still holds the old text, and the writer puts **the old
-reference** back into the file. The user's name now points somewhere else and nothing said
-so. A single reconstructed source cannot do that.
+That is a real trade and it should be named plainly: **we have exchanged a drift risk for a
+correctness-of-reconstruction risk.**
 
-That is a real hazard and the proposal must answer it rather than wave at it. The answer is
-that `DefinedNameRecord` is `let`-only and the two are produced together at read; a mutation
-path that can invalidate one without the other does not exist **today** — and §15 asks that
-`define(_:as:)` be the only way to change a name, so it cannot exist tomorrow either. If that
-discipline ever slips, this design is wrong and the reconstruction design is right.
+The reason to take it is that the two risks are not the same shape. Reconstruction is
+**measurable** — 1,022 workbooks, 161,901 names, read-write-read, and any name that comes back
+different is a defect with an address. Drift is a future mutation nobody has written yet; no
+test can enumerate it, and it would be found by a user whose file was already wrong. This
+project's whole method is to prefer the risk that can be measured over the one that has to be
+promised, and §10 is that measurement.
 
 **Where this design is most likely wrong.**
 
-1. **"Preserve the text" is necessary and nowhere near sufficient — and the census says so.**
-   `DefinedNameInfo` captures three fields, and `<definedName>` has a dozen attributes:
-   `hidden`, `comment`, `description`, `customMenu`, `shortcutKey`, `function`, `vbProcedure`,
-   `publishToServer`, `workbookParameter`.
-
-   **74,992 of the corpus's 161,901 names are hidden — 46%.** A round trip that keeps the
-   formula and drops `hidden="1"` does not lose a subtlety; it **empties half of every Name
-   Manager into the user's face**, filter ranges and print-view scaffolding and all. On the
-   Goldman model that is twenty thousand names appearing where none were visible before.
-
-   I had assumed hidden names were a rarity worth a line of defensive code. They are half the
-   population, and the `attributes` bag is the load-bearing part of this proposal rather than
-   a tidiness measure. A version that shipped without it would be a worse outcome than the
-   bug it fixes: today the names vanish silently, and that at least is uniform.
-2. **Schema position is load-bearing.** `<definedNames>` sits after `<sheets>` and before
-   `<calcPr>`. Emitting it in the wrong place yields a file Excel repairs, and the repair
-   deletes rather than reorders.
-3. **The corpus round trip may not be exact even when correct.** A file Excel wrote may
-   contain names in an order or spelling this writer normalises; an exact comparison could
-   fail for reasons that are not defects. The test should compare *name tables*, not bytes —
-   and the temptation to compare bytes because it is easier should be resisted.
-4. **This assumes the writer is worth fixing at all.** Nothing in this family writes workbooks
-   as its main job today. If the answer is that callers should never round-trip a file
-   through it, the honest fix is to make `save` refuse a workbook that was *read* rather than
-   built — which would be a strange product but a defensible one.
+1. **Reconstruction is exact only if every rule is.** `$` markers survive because `CellRef`
+   carries `absoluteColumn` and `absoluteRow`. Sheet-name quoting — `'2018 - Sorted by Area'`
+   — is a rule this package must now *own*, and Excel's rule is "quote unless the name is
+   letters, digits and underscores, starting with a letter." Get that wrong and names break
+   in exactly the files most likely to have spaces in sheet names, which is most of them.
+2. **`FormulaSerializer` is not byte-exact.** `_xlfn.LAMBDA(…)` comes back `_XLFN.LAMBDA(…)`.
+   Excel accepts either, but a round trip that is only *semantically* exact cannot be
+   verified by comparing strings, and the test must therefore compare *parsed* targets. That
+   is a weaker test than byte equality and it is the one available.
+3. **`.unparsed` could become a dumping ground.** Every shape the reader fails on lands there
+   and round-trips safely, which is the point — and also removes the pressure to parse it
+   properly. The corpus count of `.unparsed` names is the number to watch; it should fall to
+   near zero once whole columns and rows parse, and a rising count means the reader is
+   regressing behind a safety net.
+4. **The breaking change may not be worth it on its own.** If `CellValue.lambda` were not
+   already queued, forcing every consumer to recompile for this would be a harder argument.
+   It rides along; if the `LAMBDA` work were shelved, this should be reconsidered rather than
+   shipped alone.
 
 **What an experienced critic would say.**
 
-> "You are adding a parallel copy of state to a library, to fix a bug no user has reported,
-> found by your own test harness — and the parallel copy is the classic way to create the
-> next bug."
+> "You have turned a copy into a computation, and computations have bugs that copies do not.
+> You now have to be right about Excel's quoting rules for a hundred and sixty thousand names
+> you have never looked at."
 
-**Why we are proceeding anyway.** Because the bug is not hypothetical and the report would
-never come: the loss is silent, the file opens, and the user discovers it later with no way to
-connect it to us. 53% of the corpus is exposed. And the parallel-copy hazard is bounded by
-making the record immutable and the mutation path singular — a discipline worth the check,
-against a failure that is unbounded and undetectable.
-
----
+**Why we are proceeding anyway.** Because being right about those rules is *checkable*, and
+because the copy was only correct as long as nobody touched it. A tool whose correctness
+depends on a discipline no compiler enforces is a tool that is correct until it is quietly
+not — and there is no version of this library worth shipping that cannot be trusted about
+what a name points at.
 
 ## 13. Alternatives Considered
 
-**Alternative 1 — reconstruct the text from the target at write time** (the counter-design)
-- *Advantage:* one source of truth; no drift; no new type.
-- *Disadvantage:* a second serializer for a syntax the reader already parsed; lossy for
-  quoting and `$` markers; **impossible** for the shapes the reader cannot parse, which
-  currently includes every whole-column name — those hold only `.formula(.text(…))` and would
-  round-trip as a text constant, silently converting a range into a string.
-- *Why not:* §12. It is right if and only if mutation can desynchronise the pair, and the
-  design makes that unrepresentable.
+**Alternative 1 — a `DefinedNameRecord` beside the `NamedRange`** *(the first draft)*
+- *Advantage:* trivially correct round trip; no reconstruction rules to own; non-breaking.
+- *Disadvantage:* two representations of one fact, which can disagree the moment anything
+  mutates a target — and disagree *silently*, writing the old reference back into the user's
+  file.
+- *Why rejected:* §12. A correctness that depends on an unenforced discipline is not a
+  correctness this tool can offer.
 
-**Alternative 2 — put the raw text on `NamedRange` in SwiftExcelCore**
-- *Advantage:* one type, and the text travels with the name.
-- *Disadvantage:* changes a public type in the shared core for something no consumer of that
-  core needs; `NamedRange` is the *evaluator's* view, and the file's spelling is not part of
-  it. Every consumer would gain a field that means nothing to them.
-- *Why not:* the split exists to keep file-format concerns out of the vocabulary.
+**Alternative 2 — reconstruct from the target as it stands today, no new case**
+- *Advantage:* single representation with no breaking change at all.
+- *Disadvantage:* **corrupts 3,886 names on the first run.** A whole-column name is currently
+  `.formula(.text("Expenditures!$D:$D"))`, and serializing a text node produces a quoted
+  string — so the name stops being a range and becomes a caption.
+- *Why rejected:* it is the chosen design minus the one thing that makes it safe.
 
 **Alternative 3 — keep the whole `workbook.xml` and patch it on save**
 - *Advantage:* perfect fidelity for names *and* everything else the reader drops.
-- *Disadvantage:* a different product — an editor rather than a reader and writer — and it
-  makes every future change a text-surgery problem.
-- *Why not:* far beyond this defect, though §14 notes it is where fidelity pressure points.
+- *Disadvantage:* a different product — an editor rather than a reader and writer — and every
+  future change becomes text surgery.
+- *Why rejected:* far beyond this defect, though §14 notes where the pressure points.
 
-**Alternative 4 — do nothing, and document that the writer loses names**
+**Alternative 4 — do nothing; document the loss**
 - *Advantage:* free.
 - *Disadvantage:* the documentation would be read by nobody who needed it, and the failure is
   silent. "We told you" is not a mitigation for data loss.
-- *Why not:* stated so the file records that it was considered and rejected.
-
----
+- *Why rejected:* recorded so the file shows it was considered.
 
 ## 14. Future Directions
 
@@ -385,16 +408,16 @@ against a failure that is unbounded and undetectable.
 
 ## 15. Open Questions
 
-- **Should `define(_:as:)` be the only mutation path?** §12's whole defence rests on the pair
-  being immutable and produced together. If a caller can reach in and change a target, the
-  record must be invalidated — and it would be better to make that unrepresentable.
-- **What does the writer do with a name it never read and cannot synthesise?** A caller
-  supplying refers-to text directly (`define(_:refersTo:)`) can write anything; validating it
-  means parsing it, which is the thing that cannot parse whole columns.
-- **Does the corpus contain a name this design loses?** The round trip over 2,240 workbooks
-  answers it, and should run before the change is called done rather than after.
-
----
+- **What is Excel's exact sheet-name quoting rule?** The working rule is "quote unless the
+  name is letters, digits and underscores and does not begin with a digit", and it should be
+  *measured* against the corpus rather than assumed — 161,901 names is a large enough sample
+  to find the exception if there is one.
+- **How many names land in `.unparsed` once whole columns and rows parse?** The count is the
+  health metric for the reader, and it should be part of the round-trip report rather than a
+  thing someone remembers to check.
+- **Does `FormulaSerializer`'s uppercasing matter to Excel?** `_XLFN.LAMBDA` is accepted, but
+  the round trip is then not byte-stable, and a future fidelity report would flag it. Worth
+  knowing whether the serializer should preserve the case it read.
 
 ## 16. Documentation Strategy
 
