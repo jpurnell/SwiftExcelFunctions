@@ -443,18 +443,86 @@ what a name points at.
 
 ---
 
-## 15. Open Questions
+## 15. Measured — the round trip over the whole corpus
+
+This was §12's condition for the design. Reconstructing a name's refers-to text from its
+target, rather than keeping a copy beside it, means every rule the writer applies has to be
+right; the reason to accept that is that being right is *checkable*. The check is
+`swift run name-round-trip`: read every workbook, write it back, read it again, compare the
+name tables.
+
+**Run on 2026-09-17 against `~/Documents`, twice: once to measure, once to confirm the fix.**
+
+| | 0.26.1 | 0.26.2 |
+|---|---:|---:|
+| Workbooks | 2,240 | 2,240 |
+| — carrying names | 1,022 | 1,022 |
+| — carrying none | 1,214 | 1,214 |
+| — unreadable | 4 | 4 |
+| Names compared | 161,901 | 161,901 |
+| **Came back identical** | 161,847 | **161,901** |
+| **Came back different** | **54** | **0** |
+| Held as `.unparsed` | 132,548 (82%) | 132,548 (82%) |
+
+The 161,901 is the same number the census reached by a different route, which is worth one
+line of confidence: the census counted `<definedName>` elements in the XML, and this read them
+through the type the evaluator actually uses. Two independent counts agreeing is evidence the
+reader is not quietly dropping a shape.
+
+### The 54
+
+All fifty-four are `_bdm.<guid>.edm` entries — the names Excel writes for external-workbook
+links — across three saved versions of one operating model. Two defects, one measurement:
+
+`[1]AVP!$1:$1048576` is every row, and every row is also every column. Both branches of the
+short-form rule matched it and the column branch won by being written first, so it came back
+`A:XFD`: the same cells, a different form, the `$`s gone. Which form the file used is not
+recoverable from the range, because the two forms select the same cells — but it *is*
+recoverable from the markers, since `$1:$1048576` has absolute rows and relative columns and
+`$A:$XFD` is the reverse. The half carrying a `$` now decides.
+
+Writing the test for that surfaced the second: Excel writes `[1]AVP!` bare and
+`'[2]LBO Sources and Uses'!` quoted, with the brackets *inside* the quotes. So the quoting
+rule belongs to the name past the `[n]` prefix; applied to the whole string it quoted every
+external reference, because `[` is neither a letter nor a digit.
+
+Both fixed in SwiftXLSX 0.26.2, and the second pass above is the check: the three workbooks
+that produced all 54 now return 4,887 names each, every one identical.
+
+### What the measurement cost, which is the part worth recording
+
+Three separate failures stood between the design and this table, and none of them was in the
+design:
+
+1. **The tool printed only at the end** and was killed after an hour having produced nothing —
+   the same failure the workbook census was abandoned for twice. It now writes a row per
+   workbook, flushed, and the file is its own resume state.
+2. **Path order put the expensive tail first.** The run reached workbook 55 — 40 MB — and sat
+   on it at 4 GB resident while 2,185 files it could have measured in minutes queued behind.
+   The corpus median is 29 KB and eighteen files are over 10 MB. Smallest-first now.
+3. **A workbook killed the process.** Not a throw: `SIGTRAP`, from SwiftXLSX's writer, at a
+   cell holding about 1e19 — `String(Int(n))` under a whole-ness guard that every Double past
+   `Int.max` passes. Fixed upstream in 0.26.1 across five call sites; the tool now names the
+   workbook it was holding when it died and goes on past it.
+
+None of this is incidental to the proposal. The argument for reconstruction over storage is
+that the rules are checkable, and a check that cannot finish is not one.
+
+## 15a. Open Questions
 
 - **What is Excel's exact sheet-name quoting rule?** The working rule is "quote unless the
-  name is letters, digits and underscores and does not begin with a digit", and it should be
-  *measured* against the corpus rather than assumed — 161,901 names is a large enough sample
-  to find the exception if there is one.
-- **How many names land in `.unparsed` once whole columns and rows parse?** The count is the
-  health metric for the reader, and it should be part of the round-trip report rather than a
-  thing someone remembers to check.
+  name is letters, digits and underscores and does not begin with a digit". The corpus run
+  found one exception and it has been fixed — the `[n]` external-link prefix, which sits
+  inside the quotes and outside the test. 158,701 names produced no other, which is evidence
+  for the rule rather than proof of it.
+- **How many names land in `.unparsed`?** **132,548 of 161,901 — 82%.** Now measured every
+  run, which is what this question asked for. The number is high because most names in the
+  wild are formulas rather than ranges, and the reader promises nothing about those; it is the
+  reader's health metric, and a release that moves it has changed what the evaluator can see.
 - **Does `FormulaSerializer`'s uppercasing matter to Excel?** `_XLFN.LAMBDA` is accepted, but
   the round trip is then not byte-stable, and a future fidelity report would flag it. Worth
-  knowing whether the serializer should preserve the case it read.
+  knowing whether the serializer should preserve the case it read. Untouched by this run,
+  because `.unparsed` keeps the original text and never reaches the serializer.
 
 ## 16. Documentation Strategy
 
@@ -466,5 +534,7 @@ No.
 
 ---
 
-**Next action:** the corpus census the proposal leans on — how many workbooks carry names, of
-what shapes — so the round-trip test has a population before it has a fix.
+**Next action:** done — the census, the fix and the round trip that checks it have all landed.
+See §15 for the numbers. What remains is the reader's unfinished business, which this proposal
+does not cover: shared formulas shifting whole-column references, `_x000D_` where a newline
+belongs, and the call-on-parenthesised-expression grammar.
