@@ -41,3 +41,17 @@ ijs:
   decisionOwner: "jpurnell"
   defaultRiskTier: 2
   remoteURL: "git@github.com:jpurnell/org-judgement-corpus.git"
+
+# Not a suppression: this declares *where* the contained spawn site is, which the rule needs
+# and cannot infer. The default `kernelPath` points at `Sources/QualityGateCore/ProcessRunner.swift`
+# and, as the auditor's own documentation says, matches no file in any repository — so without
+# this key every correct fix still fails the rule.
+#
+# The shared `swift-process-kernel` runner was the first thing tried and is the wrong tool for
+# the one spawn here. It reads the child through pipes and returns its output after the child
+# exits. The child in question is a corpus pass whose stderr *is* its progress, and a tool that
+# withholds progress until the end is the exact failure `name-round-trip` was rewritten twice to
+# escape. So this kernel inherits stdio instead, has no pipes to drain, and bounds the wait with
+# a deadline.
+boundedIO:
+  kernelPath: Sources/NameRoundTrip/ProcessRunner.swift

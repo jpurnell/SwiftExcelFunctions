@@ -15,7 +15,7 @@ import SwiftXLSX
 /// *checkable*: read, write, read, and any name that comes back different has an address.
 ///
 /// ```
-/// swift run name-round-trip ~/Documents --out names.tsv
+/// swift run name-round-trip ~/Documents --out names.tsv --until-done
 /// ```
 ///
 /// ## A row per workbook, flushed, and the file is the resume state
@@ -28,6 +28,18 @@ import SwiftXLSX
 /// So: a row per workbook as it goes, flushed, and a re-run skips what the file already
 /// holds. A run that is interrupted has still measured everything it reached, and a run in
 /// progress can be read.
+///
+/// ## A workbook that kills the process is a finding, not an obstacle
+///
+/// The corpus contains files that do not merely fail to convert — they take the process down
+/// with a Swift runtime trap, which is not an error any `catch` can see. The first one found
+/// held a number near 1e19 and trapped in the writer.
+///
+/// A row cannot be written for a workbook that killed the run before the row existed, so the
+/// path is written to a marker file *before* it is opened and cleared after. A run that finds
+/// a stale marker knows exactly which workbook killed its predecessor, records it as that,
+/// and moves past it. Run under `--until-done` the tool relaunches itself until the corpus is
+/// exhausted, so one fatal workbook costs one workbook rather than the remainder of the run.
 struct RoundTrip {
 
     let root: URL
@@ -60,20 +72,35 @@ struct RoundTrip {
         }
     }
 
-    func run() throws {
-        let done = completed()
+    /// - Returns: `true` when the corpus is exhausted, `false` when work remains — which,
+    ///   since the only way to leave work behind is to have been killed, cannot be returned
+    ///   by the run it describes. It is what a relaunch reports about its predecessor.
+    @discardableResult
+    func run() throws -> Bool {
+        var done = completed()
         let all = try workbooks()
-        let remaining = all.filter { !done.contains($0) }
         complain("\(all.count) workbooks under \(root.path)")
-        complain("\(done.count) already measured, \(remaining.count) to go")
 
         let handle = try open()
         defer { try? handle.close() }
 
+        // Whatever the last run was holding when it died.
+        if let victim = abandoned(), !done.contains(victim) {
+            complain("\(victim) killed the previous run; recording and skipping it")
+            write(Row(path: victim, names: 0, exact: 0, unparsed: 0,
+                      note: "killed the process").line, to: handle)
+            done.insert(victim)
+        }
+
+        let remaining = all.filter { !done.contains($0) }
+        complain("\(done.count) already measured, \(remaining.count) to go")
+
         var books = 0, names = 0, exact = 0, unparsed = 0, mismatched = 0
         for path in remaining {
+            attempting(path)
             let row = measure(path)
             write(row.line, to: handle)
+            attempting(nil)
             books += 1
             names += row.names
             exact += row.exact
@@ -87,6 +114,50 @@ struct RoundTrip {
         complain("done: \(names) names, \(exact) identical, \(mismatched) differed, "
             + "\(unparsed) via .unparsed")
         complain("every row is in \(output.path)")
+        return true
+    }
+
+    // MARK: - The workbook in hand
+
+    /// Where the path of the workbook being measured is kept, so that a run which does not
+    /// survive it still says which one it was.
+    private var marker: URL {
+        output.deletingLastPathComponent()
+            .appendingPathComponent(output.lastPathComponent + ".attempting")
+    }
+
+    private func attempting(_ path: String?) {
+        do {
+            guard let path else {
+                try? FileManager.default.removeItem(at: marker)
+                return
+            }
+            try path.write(to: marker, atomically: true, encoding: .utf8)
+        } catch {
+            #if canImport(os)
+            Logger(subsystem: "NameRoundTrip", category: "marker")
+                .error("could not mark \(path ?? "-", privacy: .public): \(String(describing: error), privacy: .public)")
+            #endif
+            complain("could not write the marker: \(error)")
+        }
+    }
+
+    /// The workbook the previous run was holding when it died, if it died.
+    private func abandoned() -> String? {
+        let path: String
+        do {
+            path = try String(contentsOf: marker, encoding: .utf8)
+        } catch {
+            // The ordinary case: the last run cleared its marker, or there was no last run.
+            #if canImport(os)
+            Logger(subsystem: "NameRoundTrip", category: "marker")
+                .error("no marker: \(String(describing: error), privacy: .public)")
+            #endif
+            return nil
+        }
+        attempting(nil)
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: - One workbook
@@ -236,10 +307,45 @@ func value(after name: String) -> String? {
     return arguments[index + 1]
 }
 
+/// Runs the measurement again until it finishes.
+///
+/// A workbook that trapped took the process with it, and no amount of care inside the process
+/// can change that — so the loop lives outside one. Each child records the workbook that
+/// killed its predecessor before going on, which is what makes this terminate: every crash
+/// costs exactly one workbook, and the remainder strictly shrinks.
+///
+/// - Parameter arguments: The run's own arguments, minus the flag that brought us here.
+/// - Returns: The number of times the measurement died, which is the number of workbooks that
+///   cannot be measured at all.
+func untilDone(_ arguments: [String]) throws -> Int {
+    let me = URL(fileURLWithPath: CommandLine.arguments.first ?? "name-round-trip")
+    var deaths = 0
+    // A backstop, not a bound: each death is recorded and skipped, so the work shrinks either
+    // way. If this is ever reached, something is wrong with the recording rather than the data.
+    for attempt in 1...10_000 {
+        // Six hours is far past a whole corpus pass and far short of forever, which is the
+        // only other thing an unbounded wait can mean. A child still running at the deadline
+        // is stuck on one workbook, and is ended so the marker can name it.
+        let ended = try ProcessRunner.run(me, arguments: arguments, timeout: .seconds(6 * 3600))
+        if ended.succeeded {
+            if deaths > 0 { complain("\(deaths) workbook(s) could not be measured at all") }
+            return deaths
+        }
+        deaths += 1
+        complain("run \(attempt) \(ended.timedOut ? "hit the deadline" : "died") "
+            + "(\(ended.reason.rawValue)/\(ended.status)); starting again")
+    }
+    complain("gave up after 10,000 relaunches")
+    return deaths
+}
+
 do {
     guard let path = arguments.first, !path.hasPrefix("--") else {
-        complain("usage: name-round-trip <corpus-root> [--out names.tsv] [--every N]")
+        complain("usage: name-round-trip <corpus-root> [--out names.tsv] [--every N] [--until-done]")
         exit(2)
+    }
+    if arguments.contains("--until-done") {
+        exit(try untilDone(arguments.filter { $0 != "--until-done" }) == 0 ? 0 : 3)
     }
     try RoundTrip(
         root: URL(fileURLWithPath: path, isDirectory: true),
