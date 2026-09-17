@@ -103,6 +103,14 @@ struct EvaluationEnvironment {
         copy(depth: try depth.calling(), bindings: bindings)
     }
 
+    /// The same environment with a different set of counters.
+    ///
+    /// A `LAMBDA` invocation is counted here rather than by ``calling()``, because Excel keeps
+    /// the two budgets apart — see ``FormulaEvaluator/maxRecursionDepth``.
+    func withDepth(_ depth: FormulaEvaluator.Depth) -> EvaluationEnvironment {
+        copy(depth: depth, bindings: bindings)
+    }
+
     private func copy(
         depth: FormulaEvaluator.Depth, bindings: [String: CellValue]
     ) -> EvaluationEnvironment {

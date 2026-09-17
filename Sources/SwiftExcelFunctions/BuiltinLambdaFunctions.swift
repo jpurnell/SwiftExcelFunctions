@@ -60,4 +60,80 @@ enum BuiltinLambdaFunctions {
         }
         return try evaluate(arguments[arguments.count - 1], scope)
     }
+
+    // MARK: - LAMBDA
+
+    /// A `LAMBDA` taken apart: the names it declares, and what it computes.
+    struct Lambda {
+        let parameters: [String]
+        let body: FormulaAST
+
+        /// Reads a tree as a `LAMBDA`, or decides it is not one.
+        ///
+        /// `LAMBDA(p1, …, pn, body)` — every argument but the last is a parameter, and a
+        /// parameter is spelled as a name because that is what it is syntactically. A
+        /// `LAMBDA` whose parameter list holds something that is not a name is malformed.
+        ///
+        /// The `_xlfn.` prefix is stripped by ``FunctionRegistry/canonical(_:)``, the same way
+        /// it is for any other function newer than the file format. The `_xlpm.` prefix on the
+        /// parameters is **not** touched: it is part of the name, it matches itself wherever
+        /// the body mentions it, and depending on its presence is the mistake §12 of the
+        /// proposal warns about.
+        init?(_ ast: FormulaAST) {
+            guard case .function(let name, let arguments) = ast,
+                  FunctionRegistry.canonical(name) == "LAMBDA",
+                  let body = arguments.last else { return nil }
+
+            var declared: [String] = []
+            for parameter in arguments.dropLast() {
+                guard case .namedRange(let spelling) = parameter else { return nil }
+                declared.append(spelling)
+            }
+            self.parameters = declared
+            self.body = body
+        }
+    }
+
+    /// Calls a lambda with arguments already evaluated in the caller's scope.
+    ///
+    /// The arguments are values, not trees, because a lambda is not a branching form: Excel
+    /// evaluates what is passed, once, at the call. Laziness lives in `IF`, which is where the
+    /// recursion actually terminates.
+    ///
+    /// - Parameters:
+    ///   - lambda: the parameters and body.
+    ///   - arguments: the evaluated arguments, in order.
+    ///   - env: the environment at the call site.
+    ///   - evaluate: evaluates the body in a given environment.
+    /// - Returns: the body's value, or `#VALUE!` if the arity does not match.
+    /// - Throws: ``FormulaEvaluator/EvaluationError/recursionDepthExceeded`` past 4,096.
+    static func call(
+        _ lambda: Lambda,
+        arguments: [CellValue],
+        in env: EvaluationEnvironment,
+        evaluating evaluate: (FormulaAST, EvaluationEnvironment) throws -> CellValue
+    ) throws -> CellValue {
+        // Excel refuses a call whose argument count does not match the declaration. There is
+        // no defaulting and no dropping — `ISOMITTED` is how an author says "may be absent",
+        // and it is not implemented yet.
+        guard arguments.count == lambda.parameters.count else { return .error(.value) }
+
+        // **The body starts its nesting budget over, and the recursion budget carries.**
+        //
+        // Excel's 65 is a fact about one expression's *text* — it is enforced at file load, by
+        // looking at the formula, before anything is evaluated. A lambda's body is its own
+        // expression and is checked on its own; a call to a lambda is not nesting inside the
+        // caller any more than `=myName` is.
+        //
+        // Counting them together is not a nicety: a recursion 4,090 deep would exhaust a
+        // 65-call budget at the 33rd level. The conformance round that put 4,090 levels of
+        // recursion inside 60 nested `IF`s and found the answer unmoved is exactly the
+        // measurement that says these are two budgets, and this is where that becomes code.
+        var budgets = try env.depth.recursing()
+        budgets.calls = 0
+
+        let scope = env.withDepth(budgets).binding(Dictionary(
+            zip(lambda.parameters, arguments), uniquingKeysWith: { _, last in last }))
+        return try evaluate(lambda.body, scope)
+    }
 }

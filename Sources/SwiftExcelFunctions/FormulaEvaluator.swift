@@ -88,6 +88,24 @@ public enum FormulaEvaluator {
     /// The refusal is **not catchable**. `IFERROR` sits on the same stack that ran out, so it
     /// never gets the chance to handle anything — and an evaluator that produced `#NUM!`
     /// through its own error-handling path would be *more forgiving than Excel*.
+    ///
+    /// ## This bound is rarely the one that bites
+    ///
+    /// ``maxNodeDepth`` arrives first, and by a wide margin. `evaluateNode` recurses, so a
+    /// lambda level costs several stack frames — measured at about 3.2 — and 512 nodes is
+    /// reached at roughly **160 invocations**. Excel reaches 4,096.
+    ///
+    /// The gap is this evaluator's recursive design, and it is stated here rather than hidden
+    /// behind a larger constant, because a larger constant is precisely what does not fix it:
+    /// ``maxNodeDepth`` was measured against the stack, and raising it past what the stack
+    /// holds turns a refusal into `SIGSEGV`. The fix is an explicit stack in `evaluateNode`
+    /// instead of Swift's, which is a rewrite of the evaluator's core. A caller who needs the
+    /// depth sooner can run the evaluation on a thread with a larger stack — the same fix,
+    /// bought from the operating system instead.
+    ///
+    /// What holds regardless: the limit is *reported* rather than crashed into, and a deep
+    /// recursion is never refused for exhausting ``maxCallDepth``. A lambda body begins its
+    /// nesting budget afresh, because Excel's 65 is a property of one expression's text.
     public static let maxRecursionDepth = 4096
 
     /// How deep the tree itself may go before this evaluator stops descending.
@@ -131,12 +149,8 @@ public enum FormulaEvaluator {
         var nodes = 0
         /// Function calls entered, against ``FormulaEvaluator/maxCallDepth``.
         var calls = 0
-
-        // The third counter, for `LAMBDA` recursion against
-        // ``FormulaEvaluator/maxRecursionDepth``, belongs here and is not here yet: nothing
-        // would increment it, and a field no code touches is a claim the compiler cannot
-        // check. It arrives with `LAMBDA`. The bound itself is stated now because it is
-        // measured now.
+        /// `LAMBDA` invocations, against ``FormulaEvaluator/maxRecursionDepth``.
+        var recursions = 0
 
         /// One level further into the tree, which is not a call.
         var descended: Depth {
@@ -153,6 +167,21 @@ public enum FormulaEvaluator {
             next.calls += 1
             guard next.calls <= FormulaEvaluator.maxCallDepth else {
                 throw EvaluationError.callDepthExceeded
+            }
+            return next
+        }
+
+        /// One `LAMBDA` invocation deeper.
+        ///
+        /// Not also a call: Excel keeps the two budgets apart, established by running a
+        /// 4,090-deep recursion inside 60 nested `IF`s and finding it unmoved.
+        ///
+        /// - Throws: ``EvaluationError/recursionDepthExceeded`` past Excel's measured 4,096.
+        func recursing() throws -> Depth {
+            var next = self
+            next.recursions += 1
+            guard next.recursions <= FormulaEvaluator.maxRecursionDepth else {
+                throw EvaluationError.recursionDepthExceeded
             }
             return next
         }
@@ -175,6 +204,15 @@ public enum FormulaEvaluator {
         /// The tree went deeper than ``FormulaEvaluator/maxNodeDepth``. A stack guard rather
         /// than a rule about spreadsheets — no formula Excel can hold reaches it.
         case nodeDepthExceeded
+        /// A `LAMBDA` recursed past ``FormulaEvaluator/maxRecursionDepth``.
+        ///
+        /// **Thrown rather than returned, and that is the whole point.** The cell shows
+        /// `#NUM!` — ``evaluate(_:cells:names:functions:at:inSheet:random:simulation:)``
+        /// converts it at the boundary — but nothing inside the formula can intercept it on
+        /// the way out. In Excel `IFERROR` sits on the same stack that ran out and never gets
+        /// the chance to handle anything; an evaluator that produced `#NUM!` as an ordinary
+        /// value would let a formula recover where the real one does not.
+        case recursionDepthExceeded
     }
 
     /// Evaluates one formula and distributes its result across a span.
@@ -275,9 +313,17 @@ public enum FormulaEvaluator {
         random: (any RandomSource)? = nil,
         simulation: (any SimulationResultProvider)? = nil
     ) throws -> CellValue {
-        try evaluateNode(ast, in: EvaluationEnvironment(
+        let environment = EvaluationEnvironment(
             cells: cells, names: names, functions: functions, callingCell: callingCell,
-            currentSheet: currentSheet, random: random, simulation: simulation))
+            currentSheet: currentSheet, random: random, simulation: simulation)
+        do {
+            return try evaluateNode(ast, in: environment)
+        } catch EvaluationError.recursionDepthExceeded {
+            // The one error that travels as a throw so that no `IFERROR` inside the formula
+            // can see it, and becomes a value only here, where the formula is over. Excel
+            // shows `#NUM!` and offers the author no way to trap it.
+            return .error(.num)
+        }
     }
 
     // MARK: - Private Recursive Evaluator
@@ -476,6 +522,11 @@ public enum FormulaEvaluator {
         // MARK: Function Call
         case .function(let name, let args):
             guard let fn = functions.function(named: name) else {
+                // The registry is asked first, and that order is Excel's: a workbook cannot
+                // define a name that shadows `SUM`. Only once it misses is the name table
+                // worth asking — `=maxEXP(B2:B9, 2)` is a call to a defined name holding a
+                // `LAMBDA`, and it is not an unknown function until that has been tried.
+                if let called = try callNamedLambda(name, args, in: env) { return called }
                 throw EvaluationError.unknownFunction(name)
             }
             let maxArgs = fn.maxArgs ?? Int.max
@@ -529,6 +580,38 @@ public enum FormulaEvaluator {
             }
             return try fn.evaluate(evaluatedArgs)
         }
+    }
+
+    /// Calls a defined name that holds a `LAMBDA`, if it does.
+    ///
+    /// - Returns: the result, or `nil` if no such name exists or it is not a lambda — in
+    ///   which case the caller reports an unknown function, which is what it is.
+    private static func callNamedLambda(
+        _ name: String, _ args: [FormulaAST], in env: EvaluationEnvironment
+    ) throws -> CellValue? {
+        // A bound name shadows a workbook one here too, so a `LET` may name a lambda.
+        let target: NamedRangeTarget?
+        if env.bound(name) != nil {
+            // A *value* is not callable. Until `CellValue` can hold a lambda — step 4 of the
+            // proposal — a bound name in call position is out of reach rather than wrong, and
+            // saying so beats resolving to a workbook name that happens to share the spelling.
+            return .error(.value)
+        } else {
+            target = env.names.resolve(
+                name, inSheet: env.currentSheet.isEmpty ? nil : env.currentSheet)
+        }
+
+        guard case .formula(let ast)? = target,
+              let lambda = BuiltinLambdaFunctions.Lambda(ast) else { return nil }
+
+        // The arguments belong to the caller: they are evaluated here, in the scope that
+        // wrote the call, before any parameter exists. A lambda's own parameter named `x`
+        // must not capture an argument that says `x`.
+        let inCall = try env.calling()
+        let evaluated = try args.map { try evaluateNode($0, in: inCall) }
+        return try BuiltinLambdaFunctions.call(
+            lambda, arguments: evaluated, in: inCall,
+            evaluating: { try evaluateNode($0, in: $1) })
     }
 
     // MARK: - Named Range Resolution
