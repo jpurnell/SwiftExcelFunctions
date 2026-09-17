@@ -35,6 +35,16 @@ struct EvaluationEnvironment {
     /// How far in we are, against the three bounds.
     let depth: FormulaEvaluator.Depth
 
+    /// Names bound by an enclosing `LET` or `LAMBDA`, innermost first.
+    ///
+    /// Keyed by ``key(for:)`` rather than by the spelling, because Excel's names are
+    /// case-insensitive and `LET(Rate, 0.05, RATE*2)` is one name used twice.
+    ///
+    /// A binding **shadows** a workbook name of the same spelling, and only inside the form
+    /// that made it. That falls out of the environment being a value: an inner expression gets
+    /// a copy with one more entry, and nothing it does can reach what encloses it.
+    let bindings: [String: CellValue]
+
     init(
         cells: any CellValueProvider,
         names: any NameResolver,
@@ -43,7 +53,8 @@ struct EvaluationEnvironment {
         currentSheet: String = "",
         random: (any RandomSource)? = nil,
         simulation: (any SimulationResultProvider)? = nil,
-        depth: FormulaEvaluator.Depth = FormulaEvaluator.Depth()
+        depth: FormulaEvaluator.Depth = FormulaEvaluator.Depth(),
+        bindings: [String: CellValue] = [:]
     ) {
         self.cells = cells
         self.names = names
@@ -53,22 +64,51 @@ struct EvaluationEnvironment {
         self.random = random
         self.simulation = simulation
         self.depth = depth
+        self.bindings = bindings
     }
+
+    /// The value a local binding gives this name, if one does.
+    ///
+    /// - Parameter name: the name as the formula spells it, prefix and all.
+    /// - Returns: the bound value, or `nil` to ask the workbook.
+    func bound(_ name: String) -> CellValue? { bindings[Self.key(for: name)] }
+
+    /// The same environment with more names in scope, shadowing any it already had.
+    ///
+    /// - Parameter newBindings: name to value, spelled as the formula spells them.
+    func binding(_ newBindings: [String: CellValue]) -> EvaluationEnvironment {
+        var merged = bindings
+        for (name, value) in newBindings { merged[Self.key(for: name)] = value }
+        return copy(depth: depth, bindings: merged)
+    }
+
+    /// How a name is looked up: case-folded, because Excel's names are.
+    ///
+    /// The `_xlpm.` prefix is **not** stripped. Excel writes it on a parameter's declaration
+    /// and on every use, so it matches itself; stripping it would let a parameter and a
+    /// workbook name that differ only by the prefix collide. It is a hint about where a name
+    /// came from, and this package does not depend on it — see the `LAMBDA` proposal, §12.
+    static func key(for name: String) -> String { name.lowercased() }
 
     /// The same environment, one level further into the tree.
     ///
     /// Descending is not calling: an operator is not a function and Excel does not count it.
     /// See ``FormulaEvaluator/maxCallDepth``.
-    var descended: EvaluationEnvironment { withDepth(depth.descended) }
+    var descended: EvaluationEnvironment { copy(depth: depth.descended, bindings: bindings) }
 
     /// The same environment, one level deeper and one function call further in.
     ///
     /// - Throws: ``FormulaEvaluator/EvaluationError/callDepthExceeded`` past Excel's 65.
-    func calling() throws -> EvaluationEnvironment { withDepth(try depth.calling()) }
+    func calling() throws -> EvaluationEnvironment {
+        copy(depth: try depth.calling(), bindings: bindings)
+    }
 
-    private func withDepth(_ depth: FormulaEvaluator.Depth) -> EvaluationEnvironment {
+    private func copy(
+        depth: FormulaEvaluator.Depth, bindings: [String: CellValue]
+    ) -> EvaluationEnvironment {
         EvaluationEnvironment(
             cells: cells, names: names, functions: functions, callingCell: callingCell,
-            currentSheet: currentSheet, random: random, simulation: simulation, depth: depth)
+            currentSheet: currentSheet, random: random, simulation: simulation,
+            depth: depth, bindings: bindings)
     }
 }

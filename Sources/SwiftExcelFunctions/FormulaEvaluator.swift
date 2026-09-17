@@ -336,6 +336,12 @@ public enum FormulaEvaluator {
             }
 
         case .namedRange(let name):
+            // A local binding first. `LET` and `LAMBDA` introduce names that exist only
+            // inside them, and inside them they are what the name means — a binding shadows a
+            // workbook name of the same spelling, which is Excel's rule and the only one that
+            // makes a parameter safe to name.
+            if let bound = env.bound(name) { return bound }
+
             // **The sheet is passed, because a name means different things on different
             // sheets.** Excel scopes a defined name either to the workbook or to one sheet,
             // and a workbook may hold all three: `MarketGrapeCost` scoped to two sheets and
@@ -491,6 +497,15 @@ public enum FormulaEvaluator {
             if let branched = try LazyBranch.evaluate(
                 fn.name, arguments: args, evaluating: { try evaluateNode($0, in: inCall) }) {
                 return branched
+            }
+
+            // `LET` is the same position for a different reason: the branching forms choose
+            // among their arguments, and this one decides what an argument *means* before it
+            // is evaluated. Both have to be reached before evaluation, and only this one
+            // needs to hand a changed environment back down.
+            if fn.name == "LET" {
+                return try BuiltinLambdaFunctions.evaluateLet(
+                    args, in: inCall, evaluating: { try evaluateNode($0, in: $1) })
             }
 
             var evaluatedArgs: [CellValue] = []
