@@ -483,6 +483,16 @@ public enum FormulaEvaluator {
             // tree *and* one level of nesting; a sibling argument is not deeper than its
             // neighbour, so `SUM(1, 2, …, 200)` is one level however wide it gets.
             let inCall = try env.calling()
+
+            // A branching call chooses among its arguments instead of consuming them, so it
+            // has to be reached before any of them are evaluated. See `LazyBranch`, and note
+            // that the arity check above has already run — a malformed `IF` is still an
+            // argument-count error rather than an index out of range.
+            if let branched = try LazyBranch.evaluate(
+                fn.name, arguments: args, evaluating: { try evaluateNode($0, in: inCall) }) {
+                return branched
+            }
+
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
             for arg in args {

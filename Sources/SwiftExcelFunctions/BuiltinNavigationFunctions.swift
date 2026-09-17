@@ -25,9 +25,14 @@ public enum BuiltinNavigationFunctions {
 
     /// `CHOOSE(index, value1, …)` — the value at a one-based position.
     ///
-    /// Excel evaluates only the chosen argument. This evaluates all of them, which
-    /// gives the same answer here because an error is a value rather than a
-    /// thrown failure: an unchosen `1/0` becomes `#DIV/0!` and is discarded.
+    /// Excel evaluates only the chosen argument, and so does this: the evaluator reaches
+    /// `LazyBranch` before any argument is evaluated, and asks this closure which position it
+    /// would pick by offering it the positions themselves. Called directly, with values
+    /// already in hand, it behaves as it always has.
+    ///
+    /// The earlier note here said evaluating all of them "gives the same answer, because an
+    /// error is a value rather than a thrown failure". That is true of errors and of nothing
+    /// else: an unchosen branch that recurses does not become `#DIV/0!`, it runs.
     public static let choose = ExcelFunction(name: "CHOOSE", minArgs: 2, maxArgs: nil) { args in
         catching {
             let index = Int(try toNumber(args[0]))

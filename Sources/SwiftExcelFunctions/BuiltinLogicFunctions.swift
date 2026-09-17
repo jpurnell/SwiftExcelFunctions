@@ -233,10 +233,17 @@ public enum BuiltinLogicFunctions {
     /// `IFERROR(value, value_if_error)` -- returns `value_if_error` if the first
     /// argument is any Excel error, otherwise returns the first argument.
     static let iferror = ExcelFunction(name: "IFERROR", minArgs: 2, maxArgs: 2) { args in
-        if case .error = args[0] {
-            return args[1]
-        }
-        return args[0]
+        iferrorFallsBack(args[0]) ? args[1] : args[0]
+    }
+
+    /// Whether `IFERROR` reaches for its fallback.
+    ///
+    /// The evaluator asks this *before* evaluating the fallback, which is the whole point of
+    /// a fallback; this function asks it after, because by then it has both. One predicate,
+    /// so the two cannot disagree about what counts as an error.
+    static func iferrorFallsBack(_ value: CellValue) -> Bool {
+        if case .error = value { return true }
+        return false
     }
 
     // MARK: - IFNA
@@ -245,10 +252,13 @@ public enum BuiltinLogicFunctions {
     /// is specifically `#N/A`, otherwise returns the first argument unchanged
     /// (including other errors).
     static let ifna = ExcelFunction(name: "IFNA", minArgs: 2, maxArgs: 2) { args in
-        if case .error(let e) = args[0], e == .na {
-            return args[1]
-        }
-        return args[0]
+        ifnaFallsBack(args[0]) ? args[1] : args[0]
+    }
+
+    /// Whether `IFNA` reaches for its fallback: `#N/A` and no other error.
+    static func ifnaFallsBack(_ value: CellValue) -> Bool {
+        if case .error(let excelError) = value, excelError == .na { return true }
+        return false
     }
 
     // MARK: - The boolean literals, called
