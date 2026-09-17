@@ -314,6 +314,43 @@ a precise instrument and it should be pointed at this deliberately.
 > its answers can be trusted, and anything that can drift is not worth having.* What follows
 > now argues against the design that replaced it.
 
+### Is end-to-end correctness reachable at all?
+
+The question the design has to answer before any of the rest matters, and it is now measured
+rather than argued. `FormulaRoundTripTests` puts every shape a name takes through
+`serialize(parse(x))`:
+
+| Shape | Result | |
+|---|---|---|
+| `42`, `0.0825`, `#REF!`, `"a label"`, `SUM(A1:A10)*2` | **exact** | |
+| `'2018 - Sorted by Area'!$J$2:$J$333` | **exact** | |
+| `Definitions!$B$53` → `'Definitions'!$B$53` | cosmetic | quotes a sheet name that needs none |
+| `_xlfn.LAMBDA(…)` → `_XLFN.LAMBDA(…)` | cosmetic | upper-cases and strips spacing |
+| `Expenditures!$D:$D` → `'Expenditures'!D1:D1048576` | **visible** | the Name Manager shows the expansion |
+| `.text("42")` → `"42"` | **wrong** | a number becomes a string |
+
+**So: reachable, and not by heroics.** Three things make it so.
+
+1. **`.unparsed` is exact by construction**, and it is available for any shape at any time.
+   Byte-exactness across all 161,901 names is therefore achievable *on day one* — by parsing
+   nothing. That is the floor, and it is already perfect.
+2. **Each parsed shape is an opt-in promise**, taken only where the round trip proves it.
+   Exactness is not something to be achieved across the corpus; it is something we *have*,
+   and then spend deliberately, one shape at a time, against a test that says whether we may.
+3. **Every gap above closes with a rule, not with stored state.** Quote a sheet name only
+   where Excel would. Write a full-column span in its short form. Preserve the case the
+   parser read. None of those needs a second copy of anything, so none of them reopens the
+   drift question.
+
+The only genuinely irreducible case would be a shape whose *incidental* form matters and
+cannot be derived — a redundant parenthesis, an unusual spacing — and for those the answer is
+`.unparsed`, which is exact. **There is no shape for which this design must be wrong.** There
+are only shapes it has not yet earned the right to parse.
+
+That reframes the trade below. It is not "drift risk versus reconstruction risk" as a
+one-time bet; reconstruction risk is taken **per shape, deliberately, and only with a passing
+test in hand.**
+
 **Strongest case for a different approach.**
 
 Keep the parallel record after all. Copying the file's bytes and writing them back is
