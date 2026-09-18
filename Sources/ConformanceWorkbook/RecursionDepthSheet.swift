@@ -65,7 +65,7 @@ enum RecursionDepthSheet {
     /// in Excel; saving from Excel put round two back, and `read` — mapping round three's
     /// rows — reported an empty canary, a ladder one row short and twenty-one missing rows.
     /// Every one of those was a layout mismatch wearing the costume of a measurement.
-    static let round = 7
+    static let round = 8
 
     /// The column holding what was asked, the question in words, and Excel's answer.
     private enum Column {
@@ -124,43 +124,40 @@ enum RecursionDepthSheet {
     /// The last row is the other unmeasured number: `ERROR.TYPE` is published as returning 14
     /// for `#CALC!`, and that is the only value in this package's `ERROR.TYPE` never checked
     /// against Excel.
-    /// Round seven's questions. Round six asked four of these and got two of them wrong.
+    /// The arity and `#CALC!` questions, now **controls**.
     ///
-    /// **What round six established.** A two-parameter `LAMBDA` called with one argument is
-    /// `#VALUE!`; called with three, `#VALUE!`; called with two, it answers. So arity is exact
-    /// and a trailing argument may *not* be left out — which reversed an assumption the
-    /// evaluator had been built on, taken from Microsoft's documented `ISOMITTED` pattern
-    /// being unusable otherwise.
+    /// Every one of these has an answer, and each row stays in the sheet with it — a round
+    /// that goes wrong then says so instead of looking like news. What they established:
     ///
-    /// **What round six asked badly.** `f(7,,)` is three argument positions, not a skipped
-    /// second, so it re-measured the arity rule. The empty-position question is asked here
-    /// properly, with `f(7,)`. And `ERROR.TYPE(LAMBDA(…))` answered `#N/A` — correctly, since
-    /// an uncalled lambda handed to a function is a *value* and not an error — so the number
-    /// for `#CALC!` needs a cell that actually holds one.
+    /// - A `LAMBDA` may **not** be called with fewer arguments than it declares. `#VALUE!`.
+    ///   This reversed an assumption the evaluator was built on, taken from Microsoft's own
+    ///   `ISOMITTED` pattern being unusable otherwise.
+    /// - An empty argument *position* is a different thing. `f(7,)` is omitted where `f(7)`
+    ///   is refused, so arity counts positions and that is what `ISOMITTED` reports on.
+    /// - A **named** lambda behaves exactly as an in-place one. There is no second rule.
+    /// - `ERROR.TYPE` of a cell holding `#CALC!` is **14** — measured, where it had been the
+    ///   one value in this package's `ERROR.TYPE` taken on Microsoft's word. Asked of the
+    ///   lambda directly it is `#N/A`, because an uncalled lambda passed to a function is a
+    ///   value and not an error.
     ///
-    /// **What the defined names make possible.** Rows here call a *named* lambda, which needed
-    /// a manual step until this package learned to write `<definedName>`. Two rounds were lost
-    /// to a `depthProbe` nobody had added by hand; the name is now written into the file.
+    /// `probeOptional` is written into the file by this package's `<definedName>` writer,
+    /// which is what made the named rows askable at all — two rounds were lost to a
+    /// `depthProbe` that had to be added by hand and never was.
     static let arityQuestions: [(formula: String, asked: String, expected: String)] = [
+        ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7)",
+         "control — two parameters, one argument", "#VALUE! — arity is exact"),
         ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,)",
-         "two parameters, second position present but empty",
-         "1 if an empty position counts as omitted; #VALUE! if it is just a missing argument"),
+         "control — two parameters, second position empty", "1 — an empty position is omitted"),
         ("_xlfn.LAMBDA(_xlpm.x,_xlpm.y,IF(_xlfn.ISOMITTED(_xlpm.y),1,2))(7,8)",
-         "two parameters, two arguments",
-         "2 — the control, and it must hold or the row above means nothing"),
+         "control — two parameters, two arguments", "2"),
         ("probeOptional(7)",
-         "a NAMED two-parameter lambda, one argument",
-         "1 if a named lambda may omit where an in-place one may not; #VALUE! if arity is "
-         + "arity however the lambda is reached"),
+         "control — a NAMED lambda, one argument", "#VALUE! — the same rule"),
         ("probeOptional(7,)",
-         "a NAMED two-parameter lambda, second position empty",
-         "1 if an empty position counts as omitted"),
+         "control — a NAMED lambda, second position empty", "1 — the same rule"),
         ("probeOptional(7,8)",
-         "a NAMED two-parameter lambda, two arguments",
-         "2 — the control for the two rows above"),
+         "control — a NAMED lambda, two arguments", "2"),
         ("ERROR.TYPE($C$8)",
-         "ERROR.TYPE of a cell that holds an uncalled LAMBDA",
-         "14 if the published table is right — C8 is the #CALC! cell"),
+         "control — ERROR.TYPE of a cell holding #CALC!", "14"),
     ]
 
     /// The thin body contributes a literal 1 per level.
@@ -192,7 +189,7 @@ enum RecursionDepthSheet {
             Section(title: "control — the fat body at the boundary",
                     kind: .recursion(step: fatStep), depths: [4094, 4095]),
         ]
-        sections.append(Section(title: "new — may a LAMBDA be called with fewer arguments?",
+        sections.append(Section(title: "control — LAMBDA arity, and ERROR.TYPE of #CALC!",
                                 kind: .written(formulas: arityQuestions),
                                 depths: Array(arityQuestions.indices)))
         var row = 12

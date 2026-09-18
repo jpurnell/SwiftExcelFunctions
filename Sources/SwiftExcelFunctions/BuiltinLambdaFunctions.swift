@@ -128,11 +128,10 @@ enum BuiltinLambdaFunctions {
         // Microsoft's own `ISOMITTED` pattern being unusable otherwise. That is documentation,
         // and it was wrong, which is the sixth time in this project's life.
         //
-        // Counting positions rather than values is what keeps `ISOMITTED` meaningful: `f(7,)`
-        // supplies two positions and leaves the second empty, which is a different thing from
-        // `f(7)`. Whether Excel reads that as omitted is **not yet measured** — round 6's row
-        // for it was malformed, asking `f(7,,)`, which is three positions and re-tested the
-        // rule above.
+        // Counting positions rather than values is what keeps `ISOMITTED` meaningful, and
+        // round 7 confirmed it: `f(7,)` answers 1 where `f(7)` is `#VALUE!`. Two positions with
+        // one left blank is a different thing from one position. The same held for a *named*
+        // lambda, so there is no second rule — arity is arity however the lambda is reached.
         guard arguments.count == parameters.count else { return nil }
 
         var values: [String: CellValue] = [:]

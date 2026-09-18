@@ -28,6 +28,9 @@ swift run conformance-workbook depth-read ~/Desktop/limits.xlsx
 | Do nesting and recursion share a budget? | **No — two separate counters** |
 | Is `REDUCE` bounded like recursion? | **No limit found to 8,192** |
 | May a `LAMBDA` be called with fewer arguments than it declares? | **No.** `#VALUE!` |
+| Is an empty argument *position* the same as a missing one? | **No.** `f(7,)` is omitted; `f(7)` is refused |
+| Does a named `LAMBDA` have different arity rules? | **No.** Arity is arity however it is reached |
+| What does `ERROR.TYPE` return for `#CALC!`? | **14** |
 
 Microsoft documents exactly one line of that: *"Nested levels of functions: 64."* Everything
 else here is unpublished, and the published number needs a footnote — see §1.
@@ -242,15 +245,43 @@ documentation, and the assumption was wrong — the sixth time documentation has
 this project's life and the first time it was *this project's own reasoning about* the
 documentation rather than the documentation itself.
 
-Which leaves `ISOMITTED` with nothing to report, unless an empty argument *position* —
-`f(7,)`, two positions with the second left blank — is a different thing from a missing one.
-Round six asked that with `f(7,,)`, which is three positions against two parameters and
-therefore measured the arity rule again. **Unresolved, and asked properly in round seven.**
+### What `ISOMITTED` is for, then
 
-A second reading worth keeping: `ERROR.TYPE(LAMBDA(x,x))` is `#N/A`, not a number. An uncalled
-lambda handed to a function is a **value**, not an error — `#CALC!` is what a *cell* shows, not
-what a lambda *is*. So the published `ERROR.TYPE` code for `#CALC!` is still unmeasured, and
-round seven asks it of a cell that actually holds one.
+An empty argument **position**. Round seven asked, of an in-place lambda and of a named one:
+
+```
+LAMBDA(x,y,IF(ISOMITTED(y),1,2))(7,)     →  1     an empty position is omitted
+LAMBDA(x,y,IF(ISOMITTED(y),1,2))(7,8)    →  2     control
+
+probeOptional(7)                         →  #VALUE!
+probeOptional(7,)                        →  1
+probeOptional(7,8)                       →  2     control
+```
+
+So `f(7,)` and `f(7)` are different things. The first supplies two positions and leaves one
+blank; the second supplies one and is refused. **Arity counts positions, and an empty position
+is what `ISOMITTED` reports on.**
+
+And a named lambda behaves exactly as an in-place one. There is no second rule to learn: arity
+is arity however the lambda is reached.
+
+`probeOptional` was **written into the file by this package's `<definedName>` writer**, which
+is why round seven could ask about named lambdas at all. Two earlier rounds were lost to a
+`depthProbe` that had to be added by hand and never was — see §6.
+
+### `#CALC!` is what a cell shows, not what a lambda is
+
+Round six asked `ERROR.TYPE(LAMBDA(x,x))` and got `#N/A`. That reading is correct and measures
+nothing: an uncalled lambda handed to a function is a **value**, and `ERROR.TYPE` answers
+`#N/A` for anything that is not an error. Round seven asked it of a cell that holds one:
+
+```
+C8: =LAMBDA(x,x)        the cell shows #CALC!
+ERROR.TYPE($C$8)   →    14
+```
+
+**14, and now measured rather than published.** It was the only value in this package's
+`ERROR.TYPE` taken on Microsoft's word.
 
 ---
 
@@ -305,7 +336,8 @@ there is nothing left for the two halves to disagree about.
 | The two | **separate counters** |
 | The refusal | `#NUM!`, and **not** routed through anything a formula can catch |
 | Iteration (`REDUCE` and kin) | not bounded with recursion; no limit to 8,192 |
-| `LAMBDA` arity | **exact** — fewer arguments than parameters is `#VALUE!`, not an omission |
+| `LAMBDA` arity | **exact**, counted in argument *positions*; an empty position is what `ISOMITTED` reports |
+| `#CALC!` | `ERROR.TYPE` **14**; it is what a cell shows, not what a lambda is |
 
 A single depth counter — particularly one incremented per AST node, which is neither of the
 things Excel counts — cannot express any of this.
@@ -319,5 +351,14 @@ them is `Sources/ConformanceWorkbook/RecursionDepthSheet.swift`, and it is now e
 controls: emit it against a newer Excel, read it back, and anything that moved is news.
 
 The one thing not established is whether these numbers differ by platform or version. They
-are one Excel's answers, on one machine, on one day — which is still five more measured facts
-than the documentation contains.
+are one Excel's answers, on one machine, over two days.
+
+Every question above is now a **control** in the sheet, carrying its known answer. Round eight
+is `swift run conformance-workbook depth ~/Desktop/limits.xlsx` against a newer Excel, and
+anything that moved is news.
+
+The last round needed no manual step, which is new. `probeOptional` — the named lambda the
+arity rows call — is written into the file by this package's own `<definedName>` writer. Two
+earlier rounds were lost to a `depthProbe` that had to be added by hand and never was, each
+reporting *first refused: 1* for a limit that cannot refuse at depth 1. The instrument now
+carries its own preconditions.

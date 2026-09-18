@@ -152,12 +152,10 @@ public enum BuiltinInformationFunctions {
         case .name: return .number(5)
         case .num: return .number(6)
         case .na: return .number(7)
-        // **14 is from Microsoft's table, not from a conformance round**, which makes it the
-        // one number in this function that has not been checked against Excel itself. The
-        // published order continues 8 `#GETTING_DATA`, 9 `#SPILL!`, 10 `#CONNECT!`,
-        // 11 `#BLOCKED!`, 12 `#UNKNOWN!`, 13 `#FIELD!`, 14 `#CALC!`; only the last is
-        // representable here, and documentation has been wrong five times in this project's
-        // life. Worth a row in the conformance workbook.
+        // **Measured, conformance round 7.** A cell holding `=LAMBDA(x,x)` shows `#CALC!`,
+        // and `ERROR.TYPE` of that cell is 14 — which is what Microsoft publishes, confirmed
+        // rather than taken on trust. Asking it of the lambda directly answers `#N/A`, and
+        // correctly: an uncalled lambda handed to a function is a *value*, not an error.
         case .calc: return .number(14)
         }
     }
