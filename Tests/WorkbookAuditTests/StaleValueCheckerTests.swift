@@ -117,9 +117,18 @@ final class StaleValueCheckerTests: XCTestCase {
     }
 
     /// A formula we cannot evaluate is our gap, not the workbook's defect.
+    ///
+    /// **`RTD` rather than something merely unimplemented.** This fixture used `FILTER`, and
+    /// it worked until the day `FILTER` was implemented — at which point the test failed by
+    /// finding a real disagreement, in a workbook built to have none. That is the sixth time
+    /// a fixture in this project has encoded a temporary gap as though it were permanent.
+    ///
+    /// `RTD` asks a live data server for a value. There is no server here and there will not
+    /// be one, so it is refused by design rather than by backlog, and this fixture cannot rot
+    /// the same way twice.
     func testARefusalIsNotAFinding() throws {
         let workbook = try model(
-            formulas: [("B3", "FILTER(A1:A5,B1:B5)", .number(42))])
+            formulas: [("B3", "RTD(\"prog.id\",\"\",\"topic\")", .number(42))])
         XCTAssertEqual(audit(workbook), [])
     }
 
@@ -235,7 +244,7 @@ final class StaleValueCheckerTests: XCTestCase {
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(999)),                       // reported
                        ("B4", "BESSELJ(0,0)", .number(1.00000000283141)),   // Excel's
-                       ("B5", "FILTER(A1:A5,B1:B5)", .number(42))])         // ours
+                       ("B5", "RTD(\"prog.id\",\"\",\"t\")", .number(42))])        // ours
 
         let (findings, skipped) = StaleValueChecker.findings(in: WorkbookOracle.audit(workbook))
         XCTAssertEqual(findings.count, 1)

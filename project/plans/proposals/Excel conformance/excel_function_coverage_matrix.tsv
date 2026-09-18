@@ -312,46 +312,46 @@ EXCEL	SHEETS	information	out of scope	needs the workbook's sheet list; an evalua
 EXCEL	STOCKHISTORY	information	out of scope	calls a web service	0	0	stock, start_date, [end_date], [interval], [headers], [property0], [property1], [property2], [property3], [property4], [property5]
 EXCEL	TYPE	information	have		0	0	value
 EXCEL	ADDRESS	lookup	have	navigation	21017	32	row_num, column_num, [abs_num], [a1], [sheet_text]
-EXCEL	AREAS	lookup	unreviewed		0	0	reference
+EXCEL	AREAS	lookup	out of scope		0	0	reference
 EXCEL	CHOOSE	lookup	have	navigation	40	21	index_num, value1, [value2], ...
-EXCEL	CHOOSECOLS	lookup	unreviewed		0	0	array,col_num1,[col_num2],...
-EXCEL	CHOOSEROWS	lookup	unreviewed		0	0	array,row_num1,[row_num2],...
+EXCEL	CHOOSECOLS	lookup	have		0	0	array,col_num1,[col_num2],...
+EXCEL	CHOOSEROWS	lookup	have		0	0	array,row_num1,[row_num2],...
 EXCEL	COLUMN	lookup	have	navigation	86620	45	[reference]
 EXCEL	COLUMNS	lookup	have	navigation	0	0	array
-EXCEL	DROP	lookup	unreviewed		0	0	array, rows,[columns]
-EXCEL	EXPAND	lookup	unreviewed		0	0	array, rows, [columns], [pad_with]
-EXCEL	FILTER	lookup	unreviewed		0	0	array,include,[if_empty]
-EXCEL	FORMULATEXT	lookup	unreviewed		0	0	reference
+EXCEL	DROP	lookup	have		0	0	array, rows,[columns]
+EXCEL	EXPAND	lookup	have		0	0	array, rows, [columns], [pad_with]
+EXCEL	FILTER	lookup	have		0	0	array,include,[if_empty]
+EXCEL	FORMULATEXT	lookup	out of scope		0	0	reference
 EXCEL	GETPIVOTDATA	lookup	have	navigation	0	0	data_field, pivot_table, [field1, item1, field2, item2], ...
-EXCEL	GROUPBY	lookup	unreviewed		0	0	row_fields,values,function,[field_headers],[total_depth],[sort_order],[filter_array],[field_relationship]
+EXCEL	GROUPBY	lookup	out of scope		0	0	row_fields,values,function,[field_headers],[total_depth],[sort_order],[filter_array],[field_relationship]
 EXCEL	HLOOKUP	lookup	have	navigation	797	16	lookup_value, table_array, row_index_num, [range_lookup]
-EXCEL	HSTACK	lookup	unreviewed		0	0	array1,[array2],...
+EXCEL	HSTACK	lookup	have		0	0	array1,[array2],...
 EXCEL	HYPERLINK	lookup	have	navigation	0	0	link_location, [friendly_name]
-EXCEL	IMAGE	lookup	unreviewed		0	0	source, [alt_text], [sizing], [height], [width]
+EXCEL	IMAGE	lookup	out of scope		0	0	source, [alt_text], [sizing], [height], [width]
 EXCEL	INDEX	lookup	have	navigation	605	43	array, row_num, [column_num]
 EXCEL	INDIRECT	lookup	have	navigation	21017	32	ref_text, [a1]
 EXCEL	LOOKUP	lookup	have	navigation	8	5	lookup_value, lookup_vector, [result_vector]
 EXCEL	MATCH	lookup	have	navigation	380	18	lookup_value, lookup_array, [match_type]
 EXCEL	OFFSET	lookup	have	navigation	9798	32	reference, rows, cols, [height], [width]
-EXCEL	PIVOTBY	lookup	unreviewed		0	0	row_fields,col_fields,values,function,[field_headers],[row_total_depth],[row_sort_order],[col_total_depth],[col_sort_order],[filter_array],[relative_to]
+EXCEL	PIVOTBY	lookup	out of scope		0	0	row_fields,col_fields,values,function,[field_headers],[row_total_depth],[row_sort_order],[col_total_depth],[col_sort_order],[filter_array],[relative_to]
 EXCEL	ROW	lookup	have	navigation	1222	2	[reference]
 EXCEL	ROWS	lookup	have	navigation	0	0	array
-EXCEL	RTD	lookup	unreviewed		0	0	ProgID, server, topic1, [topic2], ...
-EXCEL	SORT	lookup	unreviewed		0	0	array,[sort_index],[sort_order],[by_col]
-EXCEL	SORTBY	lookup	unreviewed		0	0	array, by_array1, [sort_order1], [by_array2, sort_order2],...
-EXCEL	TAKE	lookup	unreviewed		0	0	array, rows,[columns]
-EXCEL	TOCOL	lookup	unreviewed		0	0	array, [ignore], [scan_by_column]
-EXCEL	TOROW	lookup	unreviewed		0	0	array, [ignore], [scan_by_column]
+EXCEL	RTD	lookup	out of scope		0	0	ProgID, server, topic1, [topic2], ...
+EXCEL	SORT	lookup	have		0	0	array,[sort_index],[sort_order],[by_col]
+EXCEL	SORTBY	lookup	have		0	0	array, by_array1, [sort_order1], [by_array2, sort_order2],...
+EXCEL	TAKE	lookup	have		0	0	array, rows,[columns]
+EXCEL	TOCOL	lookup	have		0	0	array, [ignore], [scan_by_column]
+EXCEL	TOROW	lookup	have		0	0	array, [ignore], [scan_by_column]
 EXCEL	TRANSPOSE	lookup	have	array	1	1	array
-EXCEL	TRIMRANGE	lookup	unreviewed		0	0	range,[trim_rows],[trim_cols]
-EXCEL	UNIQUE	lookup	unreviewed		0	0	array,[by_col],[exactly_once]
+EXCEL	TRIMRANGE	lookup	out of scope		0	0	range,[trim_rows],[trim_cols]
+EXCEL	UNIQUE	lookup	have		0	0	array,[by_col],[exactly_once]
 EXCEL	VLOOKUP	lookup	have	navigation	100628	69	lookup_value, table_array, col_index_num, [range_lookup]
-EXCEL	VSTACK	lookup	unreviewed		0	0	array1,[array2],...
-EXCEL	WRAPCOLS	lookup	unreviewed		0	0	vector, wrap_count, [pad_with]
-EXCEL	WRAPROWS	lookup	unreviewed		0	0	vector, wrap_count, [pad_with]
+EXCEL	VSTACK	lookup	have		0	0	array1,[array2],...
+EXCEL	WRAPCOLS	lookup	have		0	0	vector, wrap_count, [pad_with]
+EXCEL	WRAPROWS	lookup	have		0	0	vector, wrap_count, [pad_with]
 EXCEL	XLOOKUP	lookup	have	navigation	0	0	lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]
-EXCEL	XMATCH	lookup	unreviewed		0	0	lookup_value, lookup_array, [match_mode], [search_mode]
-EXCEL	FIELDVALUE	lookup	unreviewed		0	0	value, field_name
+EXCEL	XMATCH	lookup	have		0	0	lookup_value, lookup_array, [match_mode], [search_mode]
+EXCEL	FIELDVALUE	lookup	out of scope		0	0	value, field_name
 EXCEL	ASC	text	have	BuiltinTextWidthFunctions — inverse of DBCS	0	0	text
 EXCEL	ARRAYTOTEXT	text	have		0	0	array, [format]
 EXCEL	BAHTTEXT	text	have	BuiltinBahtText	0	0	number

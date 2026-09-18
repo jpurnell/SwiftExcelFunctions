@@ -351,9 +351,12 @@ public enum BuiltinMathCounting {
         guard k >= 0, k <= n else { return 0 }
         let take = Swift.min(k, n - k)
         var result = 1.0
-        // Bounded by `take`, which is at most n/2.
+        // Bounded by `take`, which is at most n/2. The divisor is `step + 1` over a range
+        // starting at zero, so it is one or more at every pass and never zero.
         for step in 0..<take {
-            result = result * Double(n - step) / Double(step + 1)
+            let divisor = Double(step + 1)
+            guard divisor > 0 else { return 0 }
+            result = result * Double(n - step) / divisor
         }
         return result.rounded()
     }

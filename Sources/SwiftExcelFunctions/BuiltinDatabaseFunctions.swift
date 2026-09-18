@@ -24,8 +24,8 @@ import SwiftExcelCore
 /// - **A blank cell is not a condition**, it is the absence of one. A criteria row that is
 ///   entirely blank therefore matches every record — which is correct and catches people out.
 ///
-/// Each condition is matched with ``BuiltinAggregationFunctions/matchesCriteria(_:_:)``, the
-/// same function `SUMIF` and `COUNTIF` use. One criteria vocabulary, so `">100"` means the
+/// Each condition is matched with `BuiltinAggregationFunctions.matchesCriteria`, the same
+/// function `SUMIF` and `COUNTIF` use. One criteria vocabulary, so `">100"` means the
 /// same thing wherever it is written.
 public enum BuiltinDatabaseFunctions {
 
@@ -208,11 +208,15 @@ public enum BuiltinDatabaseFunctions {
 
     /// Sample or population spread, optionally rooted.
     private static func spread(_ values: [Double], sample: Bool, root: Bool) -> CellValue {
-        let count = values.count
-        guard count >= (sample ? 2 : 1) else { return .error(.div0) }
-        let mean = values.reduce(0, +) / Double(count)
+        // Both divisors are guarded here, once, and named so the guard is visible at the
+        // division rather than three lines above it.
+        let count = Double(values.count)
+        let denominator = sample ? count - 1 : count
+        guard count > 0, denominator > 0 else { return .error(.div0) }
+
+        let mean = values.reduce(0, +) / count
         let sum = values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) }
-        let result = sum / Double(sample ? count - 1 : count)
+        let result = sum / denominator
         return .number(root ? result.squareRoot() : result)
     }
 }
