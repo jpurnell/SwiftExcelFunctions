@@ -587,6 +587,13 @@ public enum FormulaEvaluator {
             // needs both — but calling the lambda needs the evaluator, and an `ExcelFunction`
             // closure is handed values and no way to evaluate anything. So they are reached
             // here and given the means to call back in.
+            // `AGGREGATE` dispatches to nineteen other functions by name, so it needs the
+            // registry — which a plain `ExcelFunction` closure is not given.
+            if fn.name == "AGGREGATE" {
+                let evaluated = try args.map { try evaluateNode($0, in: inCall) }
+                return BuiltinAggregate.evaluate(evaluated, functions: functions)
+            }
+
             if BuiltinHigherOrderFunctions.governs(fn.name) {
                 let evaluated = try args.map { try evaluateNode($0, in: inCall) }
                 if let error = evaluated.first(where: { if case .error = $0 { return true }
