@@ -11,3 +11,9 @@ development-guidelines/
 # Claude Code local settings (personal preferences, not shared)
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Editor artefacts. An emacs autosave of a proposal was committed once, by a
+# `git add -A` that was not looking; it is an older snapshot of a file already tracked.
+\#*\#
+.\#*
+*~
