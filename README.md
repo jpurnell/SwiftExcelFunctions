@@ -4,21 +4,24 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.10.0 released. Two whole categories of Excel's function list are closed —
-compatibility and engineering — and the release's behaviour is **measured against Excel
-itself** rather than against its documentation: three conformance rounds, 264 questions,
-nine defects found and fixed. 467 functions registered, 1,319 tests in the main suite,
-quality gate 45/45 at 0/0.
+**Status:** 0.10.0 released; `main` ahead of it. Every category of Excel's function list is
+now closed — `unreviewed` reached **0** on 2026-09-17, leaving 473 `have`, 25 out of scope
+with a written reason each, and 20 bindable. `LAMBDA` shipped whole, including the
+higher-order six and the immediately-invoked form. Seven conformance rounds have settled ten
+facts about Excel that Microsoft documents one of. **591 functions registered, 1,736 tests.**
 
-- **292** of Microsoft's 519 documented worksheet functions.
+- **473** of Microsoft's 519 documented worksheet functions — every remaining row
+  classified, 25 of them out of scope with a written reason.
 - **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**,
-  with 5 of the remaining 6 not ours to implement — so a workbook built with Risk Solver can
-  be read without the add-in.
+  and the rest classified.
 
 Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
 reconciled against the live `FunctionRegistry` rather than maintained by hand. The
-reconciliation is arithmetic, not aspiration: 283 Excel rows plus 117 Psi rows marked `have`
-is exactly the 400 names the registry holds, and it is checked that way rather than asserted.
+reconciliation is checked rather than asserted — `CoverageReconciliationTests` fails if a row
+marked `have` names a function the registry does not answer to, and fails the other way if a
+row marked `new` turns out to be implemented. The Excel side carries all 519 documented
+functions, which is what makes "473 of 519" a coverage figure rather than a ratio of the rows
+somebody happened to type in.
 
 That check earns its keep. It last found seven byte functions and `PsiXtoP` implemented but
 still filed as outstanding, and one Psi row entered twice under two spellings of the same

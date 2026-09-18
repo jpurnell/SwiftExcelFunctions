@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`LAMBDA`, whole.** All six steps of `PROPOSAL_lambda.md`, plus a prerequisite it did not
+  have. `LET`, named and immediately-invoked lambdas, recursion, `ISOMITTED`, and the
+  higher-order six — `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`.
+
+  Two source-breaking changes in SwiftExcelCore, taken deliberately at minor versions and
+  after the measured demand had shipped without them: **`CellValue.lambda`** with
+  **`ExcelError.calc`** (0.11.0), and **`FormulaAST.call`** for the immediately-invoked form
+  (0.12.0). A lambda that is *returned* by a lambda, *bound* by a `LET` or *chosen* by an `IF`
+  is legal Excel and inexpressible without them, and each would otherwise evaluate to
+  something plausible rather than to an error.
+
+- **The unreviewed bucket reached zero.** 87 `EXCEL` rows classified: **473 have, 25 out of
+  scope with a written reason each, 20 bindable.** Seventy-three of the 87 were implemented
+  rather than merely classified.
+
+  - `logical` — `IFS`, `SWITCH`, `XOR`, and the eight that arrived with `LAMBDA`
+  - `math` — the rounding family, Roman numerals, `MDETERM`, `MUNIT`, `AGGREGATE` and the rest
+  - `database` — all twelve `D` functions, from one criteria-range design shared with `SUMIF`
+  - `lookup` — sixteen dynamic-array functions; eight out of scope, see
+    `project/docs/technical/LookupOutOfScope.md`
+  - `financial` — twenty-one, including the four `ODD*` bonds and their quasi-coupon periods
+
+  Recorded beside it: **all 87 had zero corpus usage.** The census columns are populated, so
+  that is a measurement rather than missing data, and the case for the work was completeness
+  rather than demand.
+
+### Fixed
+
+- **A branch not taken is now a branch not evaluated.** The evaluator evaluated *every*
+  argument before dispatching, which is right for `SUM` and wrong for `IF`. The difference is
+  invisible for errors — an unchosen `1/0` becomes `#DIV/0!` and is discarded — and fatal for
+  recursion, which does not become an error value but runs. **No recursive `LAMBDA` could have
+  terminated until this was fixed.** `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS` and `SWITCH` are
+  now reached before their arguments; `AND`, `OR` and `XOR` stay eager, because Excel does not
+  short-circuit them either.
+
+- **Two counters where Excel has two, and a stack bound that holds.** `maxDepth = 256`,
+  incremented per AST node, was wrong three ways against the conformance measurements: an
+  order of magnitude off, counting the wrong thing, and conflating two budgets Excel keeps
+  apart. Now `maxCallDepth` (65 function calls), `maxRecursionDepth` (4,096 invocations) and
+  `maxNodeDepth` (512, this evaluator's stack guard and not a claim about Excel).
+
+  Operators are not calls: a 300-term sum is one expression, and at 256 nodes the evaluator
+  refused something Excel computes without complaint.
+
+- **`LAMBDA` arity is exact** — conformance round 6, which reversed an assumption this
+  evaluator had been built on. A lambda may not be called with fewer arguments than it
+  declares; an empty argument *position* is a different thing, and is what `ISOMITTED` reports
+  on. A named lambda obeys the same rule.
+
+- **`ERROR.TYPE` of `#CALC!` is 14, measured.** It was the last value in that function taken
+  on Microsoft's published word.
+
+
+### Added
+
 - **A workbook keeps its defined names** — SwiftXLSX 0.26.0 and SwiftExcelCore 0.10.0.
 
   The reader parsed every `<definedName>`; the writer emitted none, so a file read by this
