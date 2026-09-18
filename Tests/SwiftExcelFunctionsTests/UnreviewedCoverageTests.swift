@@ -48,7 +48,8 @@ final class UnreviewedCoverageTests: XCTestCase {
     /// remaining work actually is.
     func testHowMuchOfTheUnreviewedBucketAlreadyAnswers() throws {
         let registry = FunctionRegistry.builtin
-        let unreviewed = try matrix().filter { $0.source == "EXCEL" && $0.status == "unreviewed" }
+        let rows = try matrix()
+        let unreviewed = rows.filter { $0.source == "EXCEL" && $0.status == "unreviewed" }
 
         var answered: [String: [String]] = [:]     // category -> functions
         var absent: [String: [String]] = [:]
@@ -94,6 +95,21 @@ final class UnreviewedCoverageTests: XCTestCase {
 
         """)
 
-        XCTAssertGreaterThan(total, 0, "the matrix had no unreviewed EXCEL rows")
+        // The matrix was read: this is the guard the assertion below used to be, and it
+        // belongs on the whole file rather than on one status.
+        XCTAssertGreaterThan(rows.count, 0, "the coverage matrix was empty or unreadable")
+
+        // **Zero, and it is meant to stay zero.** This asserted `total > 0` for as long as
+        // the bucket had rows in it — a sanity check that the file had been parsed, written
+        // when emptying it was a distant goal. It was emptied on 2026-09-17: 473 `have`,
+        // 25 out of scope with a reason each, 20 bindable.
+        //
+        // The assertion is inverted rather than deleted, because the bucket is exactly the
+        // kind of thing that refills quietly. A new Excel release adds functions, someone
+        // appends them as `unreviewed`, and nothing says so until a release goes out claiming
+        // a coverage the matrix no longer supports. Now something says so.
+        XCTAssertEqual(total, 0, """
+            \(total) EXCEL rows are unreviewed again. That is not a failure — new functions             arrive — but each needs classifying: implemented, bindable, or out of scope with             a written reason. See project/master_plan.md and, for the shape of a reason,             project/docs/technical/LookupOutOfScope.md.
+            """)
     }
 }

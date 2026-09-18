@@ -457,20 +457,34 @@ the motivating application rather than an end in itself.
 
 ### Next
 
-- **The unreviewed bucket.** **87 `EXCEL` rows and 147 `PSI`**, down from 266 EXCEL. Success
-  is `unreviewed` reaching **0** — every row *classified*, not every row implemented. Two of
-  five of the ten EXCEL categories are now closed: `compatibility`, `engineering`,
-  `datetime`, `information` and `text`.
+- ~~**The unreviewed bucket.**~~ **Closed 2026-09-17.** `unreviewed` reached **0** for the
+  `EXCEL` source: **473 have, 25 out of scope, 20 bindable, 1 new.** Every one of the ten
+  categories is resolved.
 
-  | Category | Rows | What the work is |
+  | Category | Rows | How it closed |
   |---|---|---|
-  | lookup | 24 | **Ungated.** The array shape is decided — matrix only, no `#SPILL!` |
-  | financial | 21 | Judgment per function; where the honest `out of scope` marks will come from |
-  | math | 19 | Mostly primitives, in the way the first math tranche was |
-  | database | 12 | `DSUM` and relatives; one criteria-range design serves all twelve |
-  | logical | 11 | This package's semantics again, plus the `LAMBDA` family, which is not |
-  | ~~information~~ | ~~13~~ | **Closed.** Eight implemented, five out of scope with reasons |
-  | ~~text~~ | ~~7~~ | **Closed.** All seven, the `REGEX*` trio included |
+  | ~~lookup~~ | ~~24~~ | 16 implemented — the dynamic-array family. 8 out of scope, each with a reason in `project/docs/technical/LookupOutOfScope.md` |
+  | ~~financial~~ | ~~21~~ | All 21 implemented, including the four `ODD*` bonds and their quasi-coupon periods |
+  | ~~math~~ | ~~19~~ | All 19, `AGGREGATE` included |
+  | ~~database~~ | ~~12~~ | All 12, from one criteria-range design |
+  | ~~logical~~ | ~~11~~ | All 11 — 8 arrived with `LAMBDA`, then `IFS`, `SWITCH` and `XOR` |
+  | ~~information~~ | ~~13~~ | **Closed earlier.** Eight implemented, five out of scope with reasons |
+  | ~~text~~ | ~~7~~ | **Closed earlier.** All seven, the `REGEX*` trio included |
+
+  **The original bar was "every row *classified*, not every row implemented", and 73 of the
+  87 were implemented anyway** — because once the criteria matcher, `CellMatrix` and `LAMBDA`
+  existed, most of these were a handful of lines each. The 8 lookup rows left out are the
+  ones needing a live data server, a network fetch, or a layer this package deliberately does
+  not have.
+
+  Worth keeping beside the win: **every one of the 87 had zero corpus usage.** The census
+  columns are populated — 69 `EXCEL` rows carry counts, `IFERROR` topping out at 168,779 — so
+  that zero is a measurement rather than missing data. None of this was needed to read the
+  2,240 workbooks, and the case for it was the library's completeness, which is a weaker
+  argument than demand and was worth saying out loud before the work rather than after.
+
+  147 `PSI` rows remain unreviewed. They need a simulation engine rather than a
+  classification, and are tracked separately.
 
   The original framing — *"engineering and text are the near-free ones, statistical belongs to
   BusinessMath, lookup and financial and database need judgment"* — held everywhere it has
@@ -593,7 +607,33 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-14 — reconciled for 0.10.0: the compatibility and engineering
+**Last Updated:** 2026-09-17 — the unreviewed bucket closed. `unreviewed` reached **0** for
+`EXCEL`: 473 have, 25 out of scope, 20 bindable. The bar was *classified*, and 73 of the 87
+were implemented anyway, because once the criteria matcher, `CellMatrix` and `LAMBDA` existed
+most were a handful of lines. Recorded beside it: all 87 had **zero corpus usage**, which is a
+measurement and not missing data.
+
+`LAMBDA` shipped whole — six steps plus a prerequisite the proposal did not have. `IF` was
+evaluating both branches, so no recursive lambda could have terminated; that is fixed and
+`LazyBranch` now holds the six forms Excel reaches before their arguments. Two source-breaking
+changes taken deliberately: `CellValue.lambda` with `ExcelError.calc` (SwiftExcelCore 0.11.0)
+and `FormulaAST.call` for the immediately-invoked form (0.12.0).
+
+Two more conformance rounds, 6 and 7, and round 6 **reversed a decision this evaluator was
+built on**: a `LAMBDA` may not be called with fewer arguments than it declares. The assumption
+came from Microsoft's own `ISOMITTED` pattern being unusable otherwise, which made it the sixth
+documentation failure here and the first that was *our reasoning about* the documentation. Round
+7 settled the rest: an empty argument *position* is what `ISOMITTED` reports on, a named lambda
+obeys the same arity rule, and `ERROR.TYPE` of `#CALC!` is 14 — measured, where it had been the
+last value taken on Microsoft's word. Every question in that sheet is now a control, and the
+file writes its own defined name, so the round needs nothing added by hand.
+
+Defined names survive a round trip: 2,240 workbooks, **161,901 names, zero differences** after
+two writer defects were found and fixed. Upstream: SwiftXLSX 0.26.1 through 0.29.0 — a number
+past `Int.max` that killed the process, a whole column that walked off the sheet in a shared
+formula, and `_x000D_` where a newline belonged. 1,660 tests.
+
+Earlier: 2026-09-14 — reconciled for 0.10.0: the compatibility and engineering
 categories both closed, and `conformance-workbook` built to settle what Excel does rather
 than what it is documented to do. Three rounds, 264 questions, nine defects fixed, two
 inferences corrected, and one claim about BusinessMath's Bessel accuracy retracted — scipy
