@@ -18,18 +18,22 @@ public enum BuiltinMatrixAndSeries {
 
     /// `FACT(number)` — the factorial.
     ///
-    /// **Computed in `Double`, not `Int`.** BusinessMath's `factorial` returns an `Int` and
-    /// overflows at 21!; Excel answers up to `FACT(170)` ≈ 7.26e306 and gives `#NUM!` at 171.
-    /// Binding to the `Int` form would have been a crash or a wrong answer for every argument
-    /// above 20, which is most of the range the function has.
+    /// Bound to BusinessMath's `factorialDouble`, which is exact by multiplication to 170 and
+    /// switches to Stirling beyond — where Excel has already answered `#NUM!`, so the
+    /// approximation is never reached through this path.
+    ///
+    /// **Not `factorial(_:)`**, which returns an `Int` and traps above 20 by a deliberate
+    /// precondition. That function is right for what it does; it is simply the wrong one of
+    /// the three the module offers for a spreadsheet, where `FACT(170)` ≈ 7.26e306 is an
+    /// ordinary answer. Picking it and then writing a loop instead would have been a
+    /// conclusion drawn from the first name found.
     public static let fact = ExcelFunction(name: "FACT", minArgs: 1, maxArgs: 1) { args in
         if let error = args.first(where: isError) { return error }
         guard let n = whole(args[0]) else { return .error(.value) }
         guard n >= 0 else { return .error(.num) }
-        var product = 1.0
-        // Bounded by `n`, and `finite` catches the overflow past 170 as `#NUM!`.
-        for factor in stride(from: 2, through: n, by: 1) { product *= Double(factor) }
-        return finite(product)
+        // Excel stops at 170; 171! exceeds what a `Double` can hold.
+        guard n <= 170 else { return .error(.num) }
+        return finite(factorialDouble(n))
     }
 
     /// `COMBIN(number, number_chosen)` — combinations **without** repetition.
@@ -40,16 +44,11 @@ public enum BuiltinMatrixAndSeries {
         if let error = args.first(where: isError) { return error }
         guard let n = whole(args[0]), let k = whole(args[1]) else { return .error(.value) }
         guard n >= 0, k >= 0, k <= n else { return .error(.num) }
-        // Term by term, so the factorials never exist: `COMBIN(1000, 500)` overflows every
-        // intermediate in the direct form and is an ordinary number in this one.
-        let take = Swift.min(k, n - k)
-        var result = 1.0
-        for step in 0..<take {
-            let divisor = Double(step + 1)
-            guard divisor > 0 else { return .error(.num) }
-            result = result * Double(n - step) / divisor
-        }
-        return finite(result.rounded())
+        // `combinationDouble` works in log-space, so the factorials never form: `COMBIN(1000,
+        // 500)` overflows every intermediate in the direct expression and is an ordinary
+        // number here. Rounded because the answer is a count, and a logarithm and an
+        // exponential either side of it leave `COMBIN(8, 2)` at 27.999999999999996.
+        return finite(combinationDouble(n, c: k).rounded())
     }
 
     /// `SUMXMY2(array_x, array_y)` — `Σ (xᵢ − yᵢ)²`.

@@ -39,14 +39,18 @@ public enum BuiltinLeftTailDistributions {
         guard x >= 0, df >= 1 else { return .error(.num) }
 
         guard truthy(args[2]) else {
-            // **Written out rather than bound to BusinessMath's `chi2pdf`, which is wrong.**
-            // At x = 0.5, df = 1 it answers 0.5022974900306464 where the definition gives
-            // 0.4393912894677224 — 14% out, not a rounding. Checked the same way the Bessel
-            // dispute was: against the closed form, which for a chi-squared density is not in
-            // doubt. `studentTPDF` was checked too and agrees to 1e-16, so this is one
-            // function rather than a reason to distrust the module.
+            // **Written out rather than bound to BusinessMath's `chi2pdf`, which does not
+            // compute a density.** Its body sums the density at 0.001, 0.002, … up to `x` and
+            // multiplies by the step: a Riemann sum of the integral, which is the *cumulative*
+            // function. `chi2pdf(x: 10, dF: 3)` answers 0.98144 — the CDF at 10 — where the
+            // density there is 0.0085.
             //
-            // Reported upstream; rebind when it is fixed.
+            // Not a precision defect but a naming one, and the module already holds the right
+            // answer under another name: `chiSquaredCDF`, which `CHISQ.DIST.RT` uses and which
+            // agrees with the closed form. `studentTPDF` was checked the same way and matches
+            // to 1e-16, so this is one function rather than a reason to distrust the module.
+            //
+            // Reported upstream; rebind if a real `chi2pdf` arrives.
             let k = Double(df)
             guard x > 0 else {
                 // At zero the density is unbounded below two degrees of freedom, exactly ½ at
