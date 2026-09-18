@@ -191,9 +191,9 @@ EXCEL	VARPA	statistical	have	coercing aggregates	0	0	value1, [value2], ...
 EXCEL	WEIBULL.DIST	statistical	have	statistical tests	0	0	x,alpha,beta,cumulative
 EXCEL	Z.TEST	statistical	have	statistical tests	0	0	array,x,[sigma]
 EXCEL	ACCRINT	financial	have	accruedInterest	0	0	issue, first_interest, settlement, rate, par, frequency, [basis], [calc_method]
-EXCEL	ACCRINTM	financial	unreviewed		0	0	issue, settlement, rate, par, [basis]
-EXCEL	AMORDEGRC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
-EXCEL	AMORLINC	financial	unreviewed		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
+EXCEL	ACCRINTM	financial	have		0	0	issue, settlement, rate, par, [basis]
+EXCEL	AMORDEGRC	financial	have		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
+EXCEL	AMORLINC	financial	have		0	0	cost, date_purchased, first_period, salvage, period, rate, [basis]
 EXCEL	COUPDAYBS	financial	have	CouponPeriod.daysAccrued	0	0	settlement, maturity, frequency, [basis]
 EXCEL	COUPDAYS	financial	have	CouponPeriod.daysInPeriod	0	0	settlement, maturity, frequency, [basis]
 EXCEL	COUPDAYSNC	financial	have	CouponPeriod.daysToNextCoupon	0	0	settlement, maturity, frequency, [basis]
@@ -204,17 +204,17 @@ EXCEL	CUMIPMT	financial	bindable	AmortizationSchedule.totalInterest	0	0	rate, np
 EXCEL	CUMPRINC	financial	bindable	AmortizationSchedule.totalPrincipal	0	0	rate, nper, pv, start_period, end_period, type
 EXCEL	DB	financial	have	financial	0	0	cost, salvage, life, period, [month]
 EXCEL	DDB	financial	bindable	decliningBalanceDepreciation — verified present	0	0	cost, salvage, life, period, [factor]
-EXCEL	DISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
-EXCEL	DOLLARDE	financial	unreviewed		0	0	fractional_dollar, fraction
-EXCEL	DOLLARFR	financial	unreviewed		0	0	decimal_dollar, fraction
+EXCEL	DISC	financial	have		0	0	settlement, maturity, pr, redemption, [basis]
+EXCEL	DOLLARDE	financial	have		0	0	fractional_dollar, fraction
+EXCEL	DOLLARFR	financial	have		0	0	decimal_dollar, fraction
 EXCEL	DURATION	financial	have	bondDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	EFFECT	financial	have	effectiveRate	0	0	nominal_rate, npery
 EXCEL	FV	financial	have	financial	0	0	rate, nper, pmt, [pv], [type]
-EXCEL	FVSCHEDULE	financial	unreviewed		0	0	principal, schedule
-EXCEL	INTRATE	financial	unreviewed		0	0	settlement, maturity, investment, redemption, [basis]
+EXCEL	FVSCHEDULE	financial	have		0	0	principal, schedule
+EXCEL	INTRATE	financial	have		0	0	settlement, maturity, investment, redemption, [basis]
 EXCEL	IPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
 EXCEL	IRR	financial	have	financial	13	12	values, [guess]
-EXCEL	ISPMT	financial	unreviewed		0	0	rate, per, nper, pv
+EXCEL	ISPMT	financial	have		0	0	rate, per, nper, pv
 EXCEL	MDURATION	financial	have	bondModifiedDuration	0	0	settlement, maturity, coupon, yld, frequency, [basis]
 EXCEL	MIRR	financial	bindable	mirr	0	0	values, finance_rate, reinvest_rate
 EXCEL	NOMINAL	financial	have	nominalRate	0	0	effect_rate, npery
@@ -228,23 +228,23 @@ EXCEL	PDURATION	financial	new	log(fv/pv)/log(1+rate) — arithmetic, not upstrea
 EXCEL	PMT	financial	have	financial	1352	48	rate, nper, pv, [fv], [type]
 EXCEL	PPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
 EXCEL	PRICE	financial	have	bondPrice	0	0	settlement, maturity, rate, yld, redemption, frequency, [basis]
-EXCEL	PRICEDISC	financial	unreviewed		0	0	settlement, maturity, discount, redemption, [basis]
-EXCEL	PRICEMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, yld, [basis]
+EXCEL	PRICEDISC	financial	have		0	0	settlement, maturity, discount, redemption, [basis]
+EXCEL	PRICEMAT	financial	have		0	0	settlement, maturity, issue, rate, yld, [basis]
 EXCEL	PV	financial	have	financial	39	13	rate, nper, pmt, [fv], [type]
 EXCEL	RATE	financial	have	financial	10	2	nper, pmt, pv, [fv], [type], [guess]
-EXCEL	RECEIVED	financial	unreviewed		0	0	settlement, maturity, investment, discount, [basis]
+EXCEL	RECEIVED	financial	have		0	0	settlement, maturity, investment, discount, [basis]
 EXCEL	RRI	financial	bindable	cagr	0	0	nper, pv, fv
 EXCEL	SLN	financial	have	financial	0	0	cost, salvage, life
 EXCEL	SYD	financial	have	sumOfYearsDigitsDepreciation	0	0	cost, salvage, life, per
-EXCEL	TBILLEQ	financial	unreviewed		0	0	settlement, maturity, discount
-EXCEL	TBILLPRICE	financial	unreviewed		0	0	settlement, maturity, discount
-EXCEL	TBILLYIELD	financial	unreviewed		0	0	settlement, maturity, pr
+EXCEL	TBILLEQ	financial	have		0	0	settlement, maturity, discount
+EXCEL	TBILLPRICE	financial	have		0	0	settlement, maturity, discount
+EXCEL	TBILLYIELD	financial	have		0	0	settlement, maturity, pr
 EXCEL	VDB	financial	have	variableDecliningBalanceDepreciation	0	0	cost, salvage, life, start_period, end_period, [factor], [no_switch]
 EXCEL	XIRR	financial	have	bindings	2	2	values, dates, [guess]
 EXCEL	XNPV	financial	bindable	xnpv	0	0	rate, values, dates
 EXCEL	YIELD	financial	have	bondYield	0	0	settlement, maturity, rate, pr, redemption, frequency, [basis]
-EXCEL	YIELDDISC	financial	unreviewed		0	0	settlement, maturity, pr, redemption, [basis]
-EXCEL	YIELDMAT	financial	unreviewed		0	0	settlement, maturity, issue, rate, pr, [basis]
+EXCEL	YIELDDISC	financial	have		0	0	settlement, maturity, pr, redemption, [basis]
+EXCEL	YIELDMAT	financial	have		0	0	settlement, maturity, issue, rate, pr, [basis]
 EXCEL	DATE	datetime	have	datetime	171	6	year,month,day
 EXCEL	DATEDIF	datetime	have		0	0	start_date,end_date,unit
 EXCEL	DATEVALUE	datetime	have	datetime	0	0	date_text
