@@ -105,6 +105,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinDatabaseFunctions.all,
             BuiltinDynamicArrays.all,
             BuiltinDiscountSecurities.all,
+            BuiltinOddPeriodBonds.all,
             BuiltinHigherOrderFunctions.all,
             BuiltinTextFunctions.all,
             BuiltinTextByteFunctions.all,

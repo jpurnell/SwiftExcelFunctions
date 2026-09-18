@@ -220,10 +220,10 @@ EXCEL	MIRR	financial	bindable	mirr	0	0	values, finance_rate, reinvest_rate
 EXCEL	NOMINAL	financial	have	nominalRate	0	0	effect_rate, npery
 EXCEL	NPER	financial	have	financial	0	0	rate, pmt, pv, [fv], [type]
 EXCEL	NPV	financial	have	financial	169	78	rate, value1, [value2], ...
-EXCEL	ODDFPRICE	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]
-EXCEL	ODDFYIELD	financial	unreviewed		0	0	settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis]
-EXCEL	ODDLPRICE	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis]
-EXCEL	ODDLYIELD	financial	unreviewed		0	0	settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis]
+EXCEL	ODDFPRICE	financial	have		0	0	settlement, maturity, issue, first_coupon, rate, yld, redemption, frequency, [basis]
+EXCEL	ODDFYIELD	financial	have		0	0	settlement, maturity, issue, first_coupon, rate, pr, redemption, frequency, [basis]
+EXCEL	ODDLPRICE	financial	have		0	0	settlement, maturity, last_interest, rate, yld, redemption, frequency, [basis]
+EXCEL	ODDLYIELD	financial	have		0	0	settlement, maturity, last_interest, rate, pr, redemption, frequency, [basis]
 EXCEL	PDURATION	financial	new	log(fv/pv)/log(1+rate) — arithmetic, not upstream mathematics	0	0	rate, pv, fv
 EXCEL	PMT	financial	have	financial	1352	48	rate, nper, pv, [fv], [type]
 EXCEL	PPMT	financial	have	financial	0	0	rate, per, nper, pv, [fv], [type]
