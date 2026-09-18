@@ -153,7 +153,10 @@ let package = Package(
             name: "NameRoundTrip",
             dependencies: [
                 .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
-                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+                .product(name: "SwiftXLSX", package: "SwiftXLSX"),
+                // So a file the reader refuses can say *why*. "Unreadable" covered four
+                // workbooks that were three different things.
+                "WorkbookContainer"
             ],
             path: "Sources/NameRoundTrip",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]

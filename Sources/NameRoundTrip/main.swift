@@ -4,6 +4,7 @@ import os
 #endif
 import SwiftExcelCore
 import SwiftXLSX
+import WorkbookContainer
 
 /// Reads every workbook in a corpus, writes it back, reads it again, and compares the name
 /// tables.
@@ -37,9 +38,15 @@ import SwiftXLSX
 ///
 /// A row cannot be written for a workbook that killed the run before the row existed, so the
 /// path is written to a marker file *before* it is opened and cleared after. A run that finds
-/// a stale marker knows exactly which workbook killed its predecessor, records it as that,
-/// and moves past it. Run under `--until-done` the tool relaunches itself until the corpus is
-/// exhausted, so one fatal workbook costs one workbook rather than the remainder of the run.
+/// a stale marker knows which workbook its predecessor was holding, records it, and moves
+/// past. Run under `--until-done` the tool relaunches itself until the corpus is exhausted, so
+/// one fatal workbook costs one workbook rather than the remainder of the run.
+///
+/// **The marker says where a run ended, not what ended it.** A workbook that traps and a
+/// workbook being read when somebody presses ctrl-C look identical from the next run's side,
+/// and the note is worded for that — claiming the file was the cause would be a finding
+/// invented out of a coincidence of timing. The path is still exactly what a person needs to
+/// go and look.
 struct RoundTrip {
 
     let root: URL
@@ -86,9 +93,9 @@ struct RoundTrip {
 
         // Whatever the last run was holding when it died.
         if let victim = abandoned(), !done.contains(victim) {
-            complain("\(victim) killed the previous run; recording and skipping it")
+            complain("the previous run ended on \(victim); recording and skipping it")
             write(Row(path: victim, names: 0, exact: 0, unparsed: 0,
-                      note: "killed the process").line, to: handle)
+                      note: "the previous run ended here").line, to: handle)
             done.insert(victim)
         }
 
@@ -172,7 +179,7 @@ struct RoundTrip {
             Logger(subsystem: "NameRoundTrip", category: "read")
                 .error("unreadable \(path, privacy: .public): \(String(describing: error), privacy: .public)")
             #endif
-            return Row(path: path, names: 0, exact: 0, unparsed: 0, note: "unreadable")
+            return Row(path: path, names: 0, exact: 0, unparsed: 0, note: refusal(of: url))
         }
 
         let original = before.namedRanges.all
@@ -209,6 +216,35 @@ struct RoundTrip {
         }
         return Row(path: path, names: original.count, exact: exact, unparsed: unparsed,
                    note: firstDifference)
+    }
+
+    /// Why a file could not be read, judged by its first bytes rather than by its extension.
+    ///
+    /// "Unreadable" covered four workbooks in this corpus and they were three different
+    /// things: two password-protected and completely intact, one a plain-text memo somebody
+    /// had saved as `.xlsx`, and exactly one genuinely corrupt. Only the last is a defect
+    /// worth anyone's time, and telling them apart costs eight bytes — see ``ContainerKind``.
+    ///
+    /// - Parameter url: the file.
+    /// - Returns: the note for its row.
+    private func refusal(of url: URL) -> String {
+        let head: Data
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            head = try handle.read(upToCount: 8) ?? Data()
+        } catch {
+            #if canImport(os)
+            Logger(subsystem: "NameRoundTrip", category: "read")
+                .error("could not read the signature: \(String(describing: error), privacy: .public)")
+            #endif
+            return "unreadable, and its first bytes could not be read either"
+        }
+        switch ContainerKind(of: head) {
+        case .compoundFile: return "encrypted — intact, and needs a password"
+        case .unrecognised: return "not a spreadsheet — wrong bytes for the extension"
+        case .zip: return "a ZIP this reader refused — corrupt, and the one worth investigating"
+        }
     }
 
     // MARK: - The file
