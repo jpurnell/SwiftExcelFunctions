@@ -333,6 +333,15 @@ public enum BuiltinMathCounting {
         return Int(exactly: number.rounded(.towardZero))
     }
 
+    /// A number as plain text, without an exponent for ordinary magnitudes.
+    ///
+    /// Shared with the database family, whose headers and conditions may be written as
+    /// numbers and must compare as the text a person typed.
+    static func plainNumber(_ number: Double) -> String {
+        guard let whole = Int(exactly: number) else { return String(number) }
+        return String(whole)
+    }
+
     private static func finite(_ value: Double) -> CellValue {
         value.isFinite ? .number(value) : .error(.num)
     }

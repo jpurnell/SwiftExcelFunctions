@@ -402,18 +402,18 @@ EXCEL	UPPER	text	have	text	0	0	text
 EXCEL	VALUE	text	have	text	0	0	text
 EXCEL	VALUETOTEXT	text	have		0	0	value, [format]
 EXCEL	JIS	text	have	BuiltinTextWidthFunctions — same function as DBCS	0	0	text
-EXCEL	DAVERAGE	database	unreviewed		0	0	database, field, criteria
-EXCEL	DCOUNT	database	unreviewed		0	0	database, field, criteria
-EXCEL	DCOUNTA	database	unreviewed		0	0	database, field, criteria
-EXCEL	DGET	database	unreviewed		0	0	database, field, criteria
-EXCEL	DMAX	database	unreviewed		0	0	database, field, criteria
-EXCEL	DMIN	database	unreviewed		0	0	database, field, criteria
-EXCEL	DPRODUCT	database	unreviewed		0	0	database, field, criteria
-EXCEL	DSTDEV	database	unreviewed		0	0	database, field, criteria
-EXCEL	DSTDEVP	database	unreviewed		0	0	database, field, criteria
-EXCEL	DSUM	database	unreviewed		0	0	database, field, criteria
-EXCEL	DVAR	database	unreviewed		0	0	database, field, criteria
-EXCEL	DVARP	database	unreviewed		0	0	database, field, criteria
+EXCEL	DAVERAGE	database	have		0	0	database, field, criteria
+EXCEL	DCOUNT	database	have		0	0	database, field, criteria
+EXCEL	DCOUNTA	database	have		0	0	database, field, criteria
+EXCEL	DGET	database	have		0	0	database, field, criteria
+EXCEL	DMAX	database	have		0	0	database, field, criteria
+EXCEL	DMIN	database	have		0	0	database, field, criteria
+EXCEL	DPRODUCT	database	have		0	0	database, field, criteria
+EXCEL	DSTDEV	database	have		0	0	database, field, criteria
+EXCEL	DSTDEVP	database	have		0	0	database, field, criteria
+EXCEL	DSUM	database	have		0	0	database, field, criteria
+EXCEL	DVAR	database	have		0	0	database, field, criteria
+EXCEL	DVARP	database	have		0	0	database, field, criteria
 EXCEL	CUBEKPIMEMBER	cube	out of scope		0	0	connection, kpi_name, kpi_property, [caption]
 EXCEL	CUBEMEMBER	cube	out of scope		0	0	connection, member_expression, [caption]
 EXCEL	CUBEMEMBERPROPERTY	cube	out of scope		0	0	connection, member_expression, property

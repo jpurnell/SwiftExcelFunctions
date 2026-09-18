@@ -102,6 +102,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinMathRounding.all,
             BuiltinMathCounting.all,
             BuiltinAggregate.all,
+            BuiltinDatabaseFunctions.all,
             BuiltinHigherOrderFunctions.all,
             BuiltinTextFunctions.all,
             BuiltinTextByteFunctions.all,
