@@ -976,7 +976,13 @@ public enum FormulaEvaluator {
         return .number(ExcelFinalRounding.corrected(value, lhs: lhs, rhs: rhs))
     }
 
-    private static func compareValues(_ left: CellValue, _ right: CellValue) -> ComparisonResult {
+    /// How two values order, by Excel's rules.
+    ///
+    /// Internal rather than private because `SWITCH` matches a case against a subject and must
+    /// do it the way `=` does — text without regard to case, numbers through the same
+    /// final-operation correction. A second definition of equality would be a second set of
+    /// answers to `SWITCH("Red", "RED", …)`.
+    static func compareValues(_ left: CellValue, _ right: CellValue) -> ComparisonResult {
         let lNorm = normalizeForComparison(left, against: right)
         let rNorm = normalizeForComparison(right, against: left)
 

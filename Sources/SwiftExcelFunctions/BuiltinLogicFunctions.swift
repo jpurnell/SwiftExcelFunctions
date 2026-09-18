@@ -21,9 +21,34 @@ import SwiftExcelCore
 /// ```
 public enum BuiltinLogicFunctions {
 
+    /// `XOR(logical1, …)` — true when an **odd** number of arguments are true.
+    ///
+    /// Not "exactly one", which is what people expect from the name and is only the same
+    /// thing for two arguments. Excel's `XOR` is parity, and `XOR(TRUE, TRUE, TRUE)` is TRUE.
+    public static let xor = ExcelFunction(name: "XOR", minArgs: 1, maxArgs: nil) { args in
+        catching {
+            let flat = flatten(args)
+            guard !flat.isEmpty else { return .error(.value) }
+            var truths = 0
+            for value in flat where try isTruthy(value) { truths += 1 }
+            return .bool(truths % 2 == 1)
+        }
+    }
+
+    /// `IFS` as the registry knows it — for its name and its arity.
+    ///
+    /// Intercepted by the evaluator, which reaches it before its arguments are evaluated: a
+    /// condition after the matching one is not examined, and neither is its result.
+    static let ifs = ExcelFunction(name: "IFS", minArgs: 2, maxArgs: nil) { _ in .error(.value) }
+
+    /// `SWITCH` as the registry knows it — likewise.
+    static let switchFunc = ExcelFunction(name: "SWITCH", minArgs: 3, maxArgs: nil) { _ in
+        .error(.value)
+    }
+
     /// All logical functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
-        ifFunc, and, or, not, iferror, ifna,
+        ifFunc, and, or, not, xor, iferror, ifna, ifs, switchFunc,
         isError, isErr, isNA, isBlank, isNumber, isText, na, isRef,
         trueFunc, falseFunc,
     ]

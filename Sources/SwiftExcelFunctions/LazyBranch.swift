@@ -24,10 +24,10 @@ import SwiftExcelCore
 ///
 /// ## What is here and what is not
 ///
-/// `IF`, `IFERROR`, `IFNA` and `CHOOSE`. `AND` and `OR` are deliberately absent: Excel does
-/// **not** short-circuit them, and adding a rule Excel does not have is the same class of
-/// error as missing one it does. `IFS` and `SWITCH` belong here and are not implemented at
-/// all yet; when they arrive they arrive lazy.
+/// `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS` and `SWITCH`. `AND`, `OR` and `XOR` are
+/// deliberately absent: Excel does **not** short-circuit them — `XOR` cannot, since parity
+/// needs every argument — and adding a rule Excel does not have is the same class of error as
+/// missing one it does.
 ///
 /// ## Where the semantics live
 ///
@@ -63,6 +63,10 @@ enum LazyBranch {
             return try fallback(arguments, evaluate, when: BuiltinLogicFunctions.ifnaFallsBack)
         case "CHOOSE":
             return try evaluateChoose(arguments, evaluate)
+        case "IFS":
+            return try evaluateIfs(arguments, evaluate)
+        case "SWITCH":
+            return try evaluateSwitch(arguments, evaluate)
         default:
             return nil
         }
@@ -96,6 +100,54 @@ enum LazyBranch {
             return arguments.count > 2 ? try evaluate(arguments[2]) : .bool(false)
         }
         return try evaluate(arguments[1])
+    }
+
+    /// `IFS(condition, result, …)` — the first true condition's result.
+    ///
+    /// Stops at the first match: a later condition is not examined and its result is not
+    /// evaluated, which is most of why an author writes `IFS` instead of nested `IF`s.
+    ///
+    /// No match is `#N/A`, which is Excel's answer and not `#VALUE!` — "none of these applied"
+    /// is a different statement from "this was malformed", and `IFS` can say both.
+    private static func evaluateIfs(
+        _ arguments: [FormulaAST], _ evaluate: (FormulaAST) throws -> CellValue
+    ) throws -> CellValue {
+        guard arguments.count % 2 == 0 else { return .error(.value) }
+
+        for pair in stride(from: 0, to: arguments.count, by: 2) {
+            let decision = try BuiltinLogicFunctions.ifFunc.evaluate(
+                [try evaluate(arguments[pair]), .number(1), .number(0)])
+            guard case .number(let taken) = decision else { return decision }
+            if taken == 1 { return try evaluate(arguments[pair + 1]) }
+        }
+        return .error(.na)
+    }
+
+    /// `SWITCH(expression, case, result, …, [default])` — the result whose case matches.
+    ///
+    /// A trailing odd argument is the default. With no default and no match the answer is
+    /// `#N/A`, for the same reason as `IFS`.
+    private static func evaluateSwitch(
+        _ arguments: [FormulaAST], _ evaluate: (FormulaAST) throws -> CellValue
+    ) throws -> CellValue {
+        let subject = try evaluate(arguments[0])
+        if case .error = subject { return subject }
+
+        let pairs = arguments.dropFirst()
+        var index = pairs.startIndex
+        while pairs.index(after: index) < pairs.endIndex {
+            let candidate = try evaluate(pairs[index])
+            if case .error = candidate { return candidate }
+            // Compared through the evaluator's own equality, so text matches without regard to
+            // case exactly as `=` does everywhere else in a formula.
+            if FormulaEvaluator.compareValues(subject, candidate) == .orderedSame {
+                return try evaluate(pairs[pairs.index(after: index)])
+            }
+            index = pairs.index(index, offsetBy: 2)
+        }
+        // One argument left over is the default; none left is no match at all.
+        guard index < pairs.endIndex else { return .error(.na) }
+        return try evaluate(pairs[index])
     }
 
     private static func fallback(

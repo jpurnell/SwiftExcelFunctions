@@ -271,24 +271,24 @@ EXCEL	WORKDAY.INTL	datetime	have		0	0	start_date, days, [weekend], [holidays]
 EXCEL	YEAR	datetime	have	datetime	21589	36	serial_number
 EXCEL	YEARFRAC	datetime	have	bindings	3425	9	start_date, end_date, [basis]
 EXCEL	AND	logical	have	logic	4629	50	logical1, [logical2], ...
-EXCEL	BYCOL	logical	unreviewed		0	0	array, lambda(column)
-EXCEL	BYROW	logical	unreviewed		0	0	array, lambda(row)
+EXCEL	BYCOL	logical	have		0	0	array, lambda(column)
+EXCEL	BYROW	logical	have		0	0	array, lambda(row)
 EXCEL	FALSE	logical	have	logic	0	0	(no arguments)
 EXCEL	IF	logical	have	logic	93526	239	logical_test, value_if_true, [value_if_false]
 EXCEL	IFERROR	logical	have	logic	168779	130	value, value_if_error
 EXCEL	IFNA	logical	have	logic	0	0	value, value_if_na
-EXCEL	IFS	logical	unreviewed		0	0	logical_test1, value_if_true1, [logical_test2, value_if_true2], [logical_test3, value_if_true3],...
-EXCEL	LAMBDA	logical	unreviewed		0	0	[parameter1, parameter2, ...,] calculation
-EXCEL	LET	logical	unreviewed		0	0	name1, name_value1, calculation_or_name2, [name_value2, calculation_or_name3...]
-EXCEL	MAKEARRAY	logical	unreviewed		0	0	rows, cols, lambda(row, col)
-EXCEL	MAP	logical	unreviewed		0	0	array1, lambda_or_array<#>
+EXCEL	IFS	logical	have		0	0	logical_test1, value_if_true1, [logical_test2, value_if_true2], [logical_test3, value_if_true3],...
+EXCEL	LAMBDA	logical	have		0	0	[parameter1, parameter2, ...,] calculation
+EXCEL	LET	logical	have		0	0	name1, name_value1, calculation_or_name2, [name_value2, calculation_or_name3...]
+EXCEL	MAKEARRAY	logical	have		0	0	rows, cols, lambda(row, col)
+EXCEL	MAP	logical	have		0	0	array1, lambda_or_array<#>
 EXCEL	NOT	logical	have	logic	51	6	logical
 EXCEL	OR	logical	have	logic	21055	25	logical1, [logical2], ...
-EXCEL	REDUCE	logical	unreviewed		0	0	[initial_value], array, lambda(accumulator, value, body)
-EXCEL	SCAN	logical	unreviewed		0	0	[initial_value], array, lambda(accumulator, value, body)
-EXCEL	SWITCH	logical	unreviewed		0	0	expression, value1, result1, [default or value2, result2],...[default or value3, result3]
+EXCEL	REDUCE	logical	have		0	0	[initial_value], array, lambda(accumulator, value, body)
+EXCEL	SCAN	logical	have		0	0	[initial_value], array, lambda(accumulator, value, body)
+EXCEL	SWITCH	logical	have		0	0	expression, value1, result1, [default or value2, result2],...[default or value3, result3]
 EXCEL	TRUE	logical	have	logic	0	0	(no arguments)
-EXCEL	XOR	logical	unreviewed		0	0	logical1, [logical2],...
+EXCEL	XOR	logical	have		0	0	logical1, [logical2],...
 EXCEL	CELL	information	have	navigation	0	0	info_type, [reference]
 EXCEL	ERROR.TYPE	information	have		0	0	error_val
 EXCEL	INFO	information	out of scope	reports the machine it runs on — no workbook answer exists	0	0	type_text
