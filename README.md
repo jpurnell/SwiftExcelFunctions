@@ -4,16 +4,17 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.10.0 released; `main` ahead of it. Every category of Excel's function list is
-now closed — `unreviewed` reached **0** on 2026-09-17, leaving 473 `have`, 25 out of scope
-with a written reason each, and 20 bindable. `LAMBDA` shipped whole, including the
-higher-order six and the immediately-invoked form. Seven conformance rounds have settled ten
-facts about Excel that Microsoft documents one of. **591 functions registered, 1,736 tests.**
+**Status:** 0.11.0 released. **Every function Microsoft documents is either implemented or
+out of scope with a written reason** — 494 `have`, 25 out of scope, and nothing left
+unreviewed or merely classified. `LAMBDA` shipped whole, including the higher-order six and
+the immediately-invoked form. Seven conformance rounds have settled ten facts about Excel that
+Microsoft documents one of.
 
-- **473** of Microsoft's 519 documented worksheet functions — every remaining row
-  classified, 25 of them out of scope with a written reason.
-- **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**,
-  and the rest classified.
+- **494** of Microsoft's 519 documented worksheet functions. The other 25 need a live data
+  service, a network fetch, or a layer this package deliberately does not have — see
+  `project/docs/technical/LookupOutOfScope.md`.
+- **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**.
+  147 `PSI` rows remain unreviewed; they need a simulation engine rather than a classification.
 
 Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
 reconciled against the live `FunctionRegistry` rather than maintained by hand. The

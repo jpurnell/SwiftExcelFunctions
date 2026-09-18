@@ -3,8 +3,8 @@
 **Date:** 2026-09-17 (ran into 2026-09-18)
 **Repos touched:** SwiftExcelFunctions, SwiftExcelCore (0.11.0, 0.12.0), SwiftXLSX (0.26.1 →
 0.29.0)
-**End state:** 591 functions registered · 1,736 tests · gate 45/45 uncached · zero warnings ·
-`unreviewed` (EXCEL) **0**
+**End state:** 612 functions registered · 1,763 tests · gate 45/45 uncached · zero warnings ·
+**494 of Excel's 519 documented functions, 25 out of scope**
 
 ---
 
@@ -131,7 +131,13 @@ to be added manually and never was. Every question is now a control.
 | lookup | 24 | 16 implemented; 8 out of scope with written reasons |
 | financial | 21 | All, including the four `ODD*` bonds |
 
-**Final: 473 have · 25 out of scope · 20 bindable · 1 new.**
+**Final: 494 have · 25 out of scope.** Nothing unreviewed, nothing bindable, nothing new.
+
+The last 21 came after the bucket did, and the gap between them is worth recording. They were
+marked `bindable` before this session began and were never part of the unreviewed 87 — so
+"the bucket is closed" was true and "every category closed" was not, and the README carried
+the second for a few hours until the difference was noticed. **Classified is not implemented**,
+and a status line loses that distinction easily.
 
 The bar was *classified*, not implemented — and **73 of the 87 were implemented anyway**,
 because once the criteria matcher, `CellMatrix` and `LAMBDA` existed most were a handful of

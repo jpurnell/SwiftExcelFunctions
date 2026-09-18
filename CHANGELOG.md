@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-18
+
 ### Added
+
+- **Every function Microsoft documents is now implemented or out of scope with a reason.**
+  494 `have`, 25 out of scope; nothing unreviewed and nothing merely classified.
+
+  The last 21 were a backlog marked `bindable` — known, unimplemented, mathematics available —
+  that predated this work and was never part of the unreviewed bucket. That distinction is how
+  "every row classified" and "every row implemented" came apart in a status line, and the
+  README said the wrong one for a few hours. `FACT`, `COMBIN`, `MMULT`, `MINVERSE`, `SEQUENCE`,
+  `SUMXMY2`, `DAYS360`, `MIRR`, `XNPV`, `CUMIPMT`, `CUMPRINC`, `DDB`, `RRI`, `PDURATION`,
+  `CHISQ.DIST`, `T.DIST`, `F.DIST`, `LINEST`, `LOGEST`, `TREND` and `GROWTH`.
+
+  `SEQUENCE` is worth a line of its own: the conformance workbook's `REDUCE` control writes
+  `REDUCE(0, SEQUENCE(8192), …)`, so until now this package could not evaluate the very formula
+  it uses to ask Excel a question.
 
 - **`LAMBDA`, whole.** All six steps of `PROPOSAL_lambda.md`, plus a prerequisite it did not
   have. `LET`, named and immediately-invoked lambdas, recursion, `ISOMITTED`, and the
@@ -1830,7 +1846,8 @@ mathematics BusinessMath already computes, 6 verified absent, 10 out of scope, 3
 Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than functions.
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
-[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.1...v0.9.2

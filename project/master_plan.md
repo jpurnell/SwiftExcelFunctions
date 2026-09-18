@@ -76,6 +76,39 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
+**0.11.0 — `LAMBDA`, and every Excel category closed.** The unreviewed bucket reached **0**,
+and the function library gained the one construct it had no way to express.
+
+- [x] **`unreviewed` (EXCEL) = 0** — every row now carries a status. 73 of the last 87 were
+      implemented rather than merely classified, and 8 were marked out of scope with reasons
+- [x] **The 21 `bindable` rows bound** — a backlog that predated this work and was never part
+      of the unreviewed bucket, which is how "every row classified" and "every row
+      implemented" came apart in a status line. `FACT`, `COMBIN`, `MMULT`, `MINVERSE`,
+      `SEQUENCE`, `SUMXMY2`, `DAYS360`, the seven cash-flow functions and the regression family
+- [x] **494 of Excel's 519 documented functions**, with the other 25 out of scope and reasoned
+- [x] **`LAMBDA` whole** — `LET`, named and immediately-invoked lambdas, recursion,
+      `ISOMITTED`, and the higher-order six. Two source-breaking changes taken deliberately at
+      minor versions: `CellValue.lambda` with `ExcelError.calc`, and `FormulaAST.call`
+- [x] **A branch not taken is not evaluated** — the prerequisite the `LAMBDA` proposal did not
+      have. `IF` evaluated both arms, so no recursive lambda could have terminated
+- [x] **Two counters where Excel has two** — `maxCallDepth` 65, `maxRecursionDepth` 4,096, and
+      `maxNodeDepth` 512 as this evaluator's own stack guard. The old `maxDepth = 256` was
+      wrong three ways at once
+- [x] **Defined names survive a round trip** — 2,240 workbooks, 161,901 names, zero differences
+- [x] 612 functions registered, 1,763 tests, gate 45/45 at 0/0
+
+**Conformance round 6 reversed a decision this evaluator was built on**: a `LAMBDA` may not be
+called with fewer arguments than it declares. The assumption came from Microsoft's own
+`ISOMITTED` pattern being unusable otherwise — the sixth documentation failure here, and the
+first that was *this project's reasoning about* the documentation rather than the documentation
+itself. Round 7 settled the rest and every question in that sheet is now a control.
+
+**Known and stated rather than hidden:** recursion reaches ~160 levels against Excel's 4,096,
+because `evaluateNode` recurses and the stack guard bites first. A larger constant does not fix
+it; an explicit stack does. See `HANDOFF.md`.
+
+---
+
 **0.10.0 — measured against Excel.** Two categories closed, and a way of settling what Excel
 actually does rather than what it is documented to do.
 
@@ -607,7 +640,7 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-17 — the unreviewed bucket closed. `unreviewed` reached **0** for
+**Last Updated:** 2026-09-18 — reconciled for 0.11.0. The unreviewed bucket closed. `unreviewed` reached **0** for
 `EXCEL`: 473 have, 25 out of scope, 20 bindable. The bar was *classified*, and 73 of the 87
 were implemented anyway, because once the criteria matcher, `CellMatrix` and `LAMBDA` existed
 most were a handful of lines. Recorded beside it: all 87 had **zero corpus usage**, which is a
