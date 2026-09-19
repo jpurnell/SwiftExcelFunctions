@@ -45,7 +45,7 @@ public enum BuiltinRiskSolverTheoretical {
         "PSITHEOMEAN", "PSITHEOSTDDEV", "PSITHEOVARIANCE", "PSITHEOSKEWNESS",
         "PSITHEOKURTOSIS", "PSITHEOMEDIAN", "PSITHEOMIN", "PSITHEOMAX", "PSITHEORANGE",
         "PSITHEOPERCENTILE", "PSITHEOPERCENTILED", "PSITHEOPTOX", "PSITHEOQTOX",
-        "PSITHEOXTOP", "PSITHEOXTOQ", "PSITHEOTARGET", "PSITHEOTARGETD"
+        "PSITHEOXTOP", "PSITHEOXTOQ", "PSITHEOTARGET", "PSITHEOTARGETD", "PSITHEOMODE"
     ]
 
     /// Whether this file answers a name.
@@ -63,7 +63,8 @@ public enum BuiltinRiskSolverTheoretical {
     public static let all: [ExcelFunction] = {
         let takingOnlyTheCell = ["PSITHEOMEAN", "PSITHEOSTDDEV", "PSITHEOVARIANCE",
                                  "PSITHEOSKEWNESS", "PSITHEOKURTOSIS", "PSITHEOMEDIAN",
-                                 "PSITHEOMIN", "PSITHEOMAX", "PSITHEORANGE"]
+                                 "PSITHEOMIN", "PSITHEOMAX", "PSITHEORANGE",
+                                 "PSITHEOMODE"]
         let takingAValueToo = ["PSITHEOPERCENTILE", "PSITHEOPERCENTILED", "PSITHEOPTOX",
                                "PSITHEOQTOX", "PSITHEOXTOP", "PSITHEOXTOQ",
                                "PSITHEOTARGET", "PSITHEOTARGETD"]
@@ -116,6 +117,8 @@ public enum BuiltinRiskSolverTheoretical {
         switch name {
         case "PSITHEOMEDIAN":
             return try value(at: 0.5, quantile)
+        case "PSITHEOMODE":
+            return try mode(quantile)
         case "PSITHEOMIN":
             return try value(at: extremeProbability, quantile)
         case "PSITHEOMAX":
@@ -183,6 +186,52 @@ public enum BuiltinRiskSolverTheoretical {
             if value <= x { low = middle } else { high = middle }
         }
         return .number((low + high) / 2)
+    }
+
+    /// The mode: where the density is greatest.
+    ///
+    /// ## Found through the quantile, because that is all there is
+    ///
+    /// These statistics reach a distribution only through its inverse, so there is no density
+    /// to maximise directly. There is one underneath it: a quantile function's slope is the
+    /// reciprocal of the density, `f(q(p)) = 1 / q′(p)`. So the **flattest** part of the
+    /// quantile is the **peak** of the density, and the mode is the value there.
+    ///
+    /// The same identity `DistributionMetalog.pdf` uses upstream, for the same reason — a
+    /// distribution defined by its quantile has no other way to state a density.
+    ///
+    /// ## What this cannot do
+    ///
+    /// A grid finds the largest of the values it looked at. For a **multimodal** distribution
+    /// that is whichever peak a grid point landed nearest, and for one whose density is
+    /// unbounded — a beta with a shape below one — the answer runs to the support's edge,
+    /// which is where the density genuinely does go. Both are stated rather than guarded
+    /// against: a mode is a summary that assumes a single peak, and a distribution that
+    /// breaks the assumption breaks the summary rather than the arithmetic.
+    private static func mode(
+        _ quantile: (Double) throws -> Double?
+    ) rethrows -> CellValue {
+        // The narrowest step in `p` whose difference in `x` is still meaningful — small
+        // enough to resolve a peak, wide enough that the subtraction keeps its digits.
+        let span = Double(gridPoints)
+        guard span > 0 else { return .error(.num) }
+        let step = 1.0 / span
+        var bestValue = Double.nan
+        var smallestSlope = Double.infinity
+        for index in 0..<gridPoints {
+            let p = (Double(index) + 0.5) * step
+            guard let low = try quantile(Swift.max(p - step / 2, extremeProbability)),
+                  let high = try quantile(Swift.min(p + step / 2, 1 - extremeProbability))
+            else { continue }
+            let slope = high - low
+            guard slope.isFinite, slope >= 0 else { continue }
+            if slope < smallestSlope {
+                smallestSlope = slope
+                bestValue = (low + high) / 2
+            }
+        }
+        guard bestValue.isFinite else { return .error(.num) }
+        return .number(bestValue)
     }
 
     // MARK: - Moments

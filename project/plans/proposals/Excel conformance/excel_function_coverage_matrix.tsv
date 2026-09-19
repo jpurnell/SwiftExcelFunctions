@@ -544,7 +544,7 @@ PSI	PsiCertified	distribution	not ours	names a stored SIP or declares a role —
 PSI	PsiCertify	property	out of scope	an Analytic Solver licensing and model-certification directive	0	0	name, default_value, short_description, full_description, version, author, copyright, trademark, history|confirmed
 PSI	PsiChiSquare	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiChiSquareAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
-PSI	PsiCITrials	statistic	unreviewed		0	0	cell, confidence_level, tolerance, simulation, struc_format, param_slice|confirmed
+PSI	PsiCITrials	statistic	out of scope	how many more trials a confidence target needs; a property of a run loop that can stop and restart, which a formula evaluator is not	0	0	cell, confidence_level, tolerance, simulation, struc_format, param_slice|confirmed
 PSI	PsiClassifyCT	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyCTEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyDA	other	unreviewed		0	0	UNCONFIRMED|confirmed
@@ -556,13 +556,13 @@ PSI	PsiCoeffVar	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulati
 PSI	PsiCollect	property	have	BuiltinRiskSolverProperties	0	0	UNCONFIRMED|inferred
 PSI	PsiCompound	property	out of scope	compounds one distribution's draw into another's parameter across trials, which needs the trial loop	0	0	number_cell, deduction, limit|confirmed
 PSI	PsiCon	annotation	not ours	role declaration, belongs with solver_adj	0	0	LHS, relation, RHS, active, chance_type, chance_measure, comment, model_name, critical|confirmed
-PSI	PsiConverged	statistic	unreviewed		0	0	output_cell, [simulation]|confirmed
+PSI	PsiConverged	statistic	out of scope	whether a run met its convergence criteria; the criteria are PsiConvergence, already out of scope for the same reason	0	0	output_cell, [simulation]|confirmed
 PSI	PsiConvergence	property	out of scope	sets when a run may stop; there is no run loop here to stop	0	0	tol, type, level, mean, stdev, perc, val|confirmed
 PSI	PsiCopula	property	out of scope	a dependence structure across several inputs — same reason as PsiCorrDepen, and needs the joint draw this evaluator does not make	0	0	type, param, reflection, instance|confirmed
 PSI	PsiCopulaGauss	property	out of scope	a Gaussian copula across several inputs; needs a joint draw	0	0	number_range, position, instance|confirmed
 PSI	PsiCopulaStudent	property	out of scope	a Student copula across several inputs; needs a joint draw	0	0	number_range, position, df, instance|confirmed
 PSI	PsiCorrDepen	property	out of scope	joins inputs into a correlated group; correlation is a property of a set of inputs drawn together, and this evaluator draws one cell at a time	0	0	corrname, coefficient|confirmed
-PSI	PsiCorrelation	statistic	unreviewed		0	0	cell1, cell2, simulation|confirmed
+PSI	PsiCorrelation	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell1, cell2, simulation|confirmed
 PSI	PsiCorrIndep	property	out of scope	the same, declaring independence within a group	0	0	corrname|confirmed
 PSI	PsiCorrMatrix	property	bindable	isValidCorrelationMatrix	0	0	matrix_cell_range, position, instance|confirmed
 PSI	PsiCount	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, type, simulation|confirmed
@@ -583,7 +583,7 @@ PSI	PsiDim	other	unreviewed		0	0	name, range_or_array|confirmed
 PSI	PsiDimActive	property	out of scope	selects the active slice of a multi-dimensional parametric analysis	0	0	opt, sim, sen|confirmed
 PSI	PsiDimLock	property	out of scope	locks a dimension of a multi-dimensional parametric analysis	0	0	elem_or_index|confirmed
 PSI	PsiDiscrete	distribution	have	risksolver	20	8	{x1..xn}, {p1..pn}|confirmed
-PSI	PsiDistInfo	statistic	unreviewed		0	0	cell, [info]|confirmed
+PSI	PsiDistInfo	statistic	out of scope	metadata about a distribution fitted by PsiFit's dialog; the fit is the add-in's	0	0	cell, [info]|confirmed
 PSI	PsiDisUniform	distribution	have	risksolver	0	0	{x1..xn}|confirmed
 PSI	PsiDualLower	other	unreviewed		0	0	cell, optimization|confirmed
 PSI	PsiDualUpper	other	unreviewed		0	0	cell, optimization|confirmed
@@ -594,13 +594,13 @@ PSI	PsiErf	distribution	have	risksolver	0	0	h|confirmed
 PSI	PsiErfAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
 PSI	PsiErlang	distribution	have	risksolver	0	0	k, beta|confirmed
 PSI	PsiExpGain	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiExpGainRatio	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiExpGainRatio	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiExpLoss	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiExpLossRatio	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiExpLossRatio	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiExponential	distribution	have	risksolver	0	0	beta|confirmed
 PSI	PsiExponentialAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
 PSI	PsiExport	other	unreviewed		0	0	src_name, src_type, connection, data_range, result|confirmed
-PSI	PsiExpValMargin	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiExpValMargin	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiFatigueLife	distribution	have	risksolver	0	0	loc, scale, shape|confirmed
 PSI	PsiFatigueLifeAlt	distribution	have	risksolver	0	0	3 name/value pairs, names chosen from: loc, scale, shape, or a percentile (0-1); e.g. PsiFatigueLifeAlt(5%, 1.5, 50%, 2.5, 95%, 4.5)|confirmed
 PSI	PsiFDist	distribution	have	risksolver	0	0	df1, df2|confirmed
@@ -635,7 +635,7 @@ PSI	PsiInvNormalAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: 
 PSI	PsiJohnsonSB	distribution	have	risksolver	0	0	shape1, shape2, min, max|confirmed
 PSI	PsiJohnsonSU	distribution	have	risksolver	0	0	shape1, shape2, loc, scale|confirmed
 PSI	PsiJoin	other	unreviewed		0	0	Table1, Table2, Clause, Return_table|confirmed
-PSI	PsiKendallTau	statistic	unreviewed		0	0	cell1, cell2|confirmed
+PSI	PsiKendallTau	statistic	out of scope	no Kendall tau-b upstream — BusinessMath has kendallW, a different statistic — and an O(n^2) pairwise count is not viable across a run's trials; the O(n log n) form belongs in BusinessMath beside spearmansRho, not in a binding layer	0	0	cell1, cell2|confirmed
 PSI	PsiKumaraswamy	distribution	have	risksolver	0	0	shape1, shape2, min, max|confirmed
 PSI	PsiKurtosis	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiLaplace	distribution	have	risksolver	0	0	loc, beta (scale)|confirmed
@@ -716,8 +716,8 @@ PSI	PsiPredictNN	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiPredictNNEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiPredictRT	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiPredictRTEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
-PSI	PsiPtoX	statistic	unreviewed		0	0	cell, percentile, simulation, struc_format, param_slice|confirmed
-PSI	PsiQtoX	statistic	unreviewed		0	0	cell, percentile, simulation|confirmed
+PSI	PsiPtoX	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, percentile, simulation, struc_format, param_slice|confirmed
+PSI	PsiQtoX	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, percentile, simulation|confirmed
 PSI	PsiRange	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiRayleigh	distribution	have	risksolver	0	0	beta|confirmed
 PSI	PsiRayleighAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile, var, mean|confirmed
@@ -754,7 +754,7 @@ PSI	PsiSigmaYield	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit
 PSI	PsiSigmaZLower	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, simulation, struc_format, param_slice|confirmed
 PSI	PsiSigmaZMin	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
 PSI	PsiSigmaZUpper	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSimData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
+PSI	PsiSimData	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, trial, simulation, struc_format, param_slice|confirmed
 PSI	PsiSimOutput	annotation	not ours	role declaration, belongs with solver_adj	0	0	[cell_range]|confirmed
 PSI	PsiSimParam	annotation	not ours	role declaration, belongs with solver_adj	5	2	values, upper, base_case|confirmed
 PSI	PsiSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	sip|confirmed
@@ -762,10 +762,10 @@ PSI	PsiSixSigma	property	have	BuiltinRiskSolverSixSigma	0	0	p1, p2, p3, p4, p5|c
 PSI	PsiSkewness	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
 PSI	PsiSlurp	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	slurp, j|confirmed
-PSI	PsiSpearmanRho	statistic	unreviewed		0	0	cell1, cell2|confirmed
+PSI	PsiSpearmanRho	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell1, cell2|confirmed
 PSI	PsiStatic	property	have	BuiltinRiskSolverProperties	0	0	static_val|confirmed
 PSI	PsiStdDev	statistic	have	SimulationResults.statistics.stdDev — sample, not population	4	3	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiStdDevCI	statistic	unreviewed		0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
+PSI	PsiStdDevCI	statistic	out of scope	a confidence interval on the standard deviation, and Frontline does not say whether it reports the interval, its half-width, or one end — unmeasurable here, since a Psi* workbook opens without the add-in reading #NAME?	0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdErr	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStudent	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiStudentAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
@@ -778,7 +778,7 @@ PSI	PsiTheoMax	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|conf
 PSI	PsiTheoMean	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
 PSI	PsiTheoMedian	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
 PSI	PsiTheoMin	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
-PSI	PsiTheoMode	statistic	unreviewed		0	0	cell_or_name|confirmed
+PSI	PsiTheoMode	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
 PSI	PsiTheoPercentile	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
 PSI	PsiTheoPercentileD	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
 PSI	PsiTheoPtoX	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
@@ -791,7 +791,7 @@ PSI	PsiTheoTargetD	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name,
 PSI	PsiTheoVariance	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
 PSI	PsiTheoXtoP	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
 PSI	PsiTheoXtoQ	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
-PSI	PsiTheoXtoY	statistic	unreviewed		0	0	cell_or_name, value|confirmed
+PSI	PsiTheoXtoY	statistic	out of scope	the documented argument list does not say what Y is, and there is no add-in to ask	0	0	cell_or_name, value|confirmed
 PSI	PsiTransform	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiTriangGen	distribution	have	risksolver	0	0	ap, m, br, p, r|confirmed
 PSI	PsiTriangular	distribution	have	risksolver	60	17	a (min), c (likely), b (max)|confirmed
@@ -812,4 +812,4 @@ PSI	PsiVary	distribution	not ours	names a stored SIP or declares a role — addr
 PSI	PsiWeibull	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiWeibullAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
 PSI	PsiXtoP	statistic	have	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, simulation, struc_format, param_slice|confirmed
-PSI	PsiXtoQ	statistic	unreviewed		0	0	cell_or_name, target_value, simulation|confirmed
+PSI	PsiXtoQ	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell_or_name, target_value, simulation|confirmed

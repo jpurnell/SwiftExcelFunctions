@@ -38,7 +38,10 @@ public enum BuiltinRiskSolverRunStatistics {
         psiVariance, psiSkewness, psiKurtosis, psiRange, psiCount,
         psiAbsDev, psiCoeffVar, psiStdErr,
         psiSemiVar, psiSemiDev, psiSemiVar2, psiSemiDev2,
-        psiData, psiFrequency, psiExpGain, psiExpLoss
+        psiData, psiFrequency, psiExpGain, psiExpLoss,
+        psiPtoX, psiQtoX, psiXtoQ, psiSimData,
+        psiExpGainRatio, psiExpLossRatio, psiExpValMargin,
+        psiCorrelation, psiSpearmanRho
     ]
 
     // MARK: - Shape
@@ -274,5 +277,156 @@ public enum BuiltinRiskSolverRunStatistics {
             return excess > 0 ? running + excess : running
         }
         return .number(total / Double(values.count))
+    }
+
+    // MARK: - Probability and value, both directions
+
+    /// `PsiPtoX(cell, p)` — the value at cumulative probability `p`.
+    ///
+    /// The same question `PsiPercentile` answers, under the name the `XtoP`/`PtoX` pair uses.
+    /// Kept as its own registration rather than an alias so that a later measurement can
+    /// find them disagreeing if Frontline ever intends them to.
+    public static let psiPtoX = BuiltinRiskSolverStatistics.statistic(
+        "PSIPTOX", maxArgs: 3
+    ) { results, values in
+        guard values.count >= 2, case .number(let p) = values[1] else { return .error(.value) }
+        guard p >= 0, p <= 1 else { return .error(.num) }
+        return .number(results.percentiles.percentile(p))
+    }
+
+    /// `PsiQtoX(cell, q)` — the value at **upper-tail** probability `q`.
+    ///
+    /// `Q` reads from the top where `P` reads from the bottom, so `PsiQtoX(B4, 0.05)` is the
+    /// value only five per cent of trials exceed. Reaching for the wrong one of the pair gives
+    /// the opposite tail — for a symmetric output a sign error, and for a skewed one simply a
+    /// different number with nothing to mark it as wrong.
+    public static let psiQtoX = BuiltinRiskSolverStatistics.statistic(
+        "PSIQTOX", maxArgs: 3
+    ) { results, values in
+        guard values.count >= 2, case .number(let q) = values[1] else { return .error(.value) }
+        guard q >= 0, q <= 1 else { return .error(.num) }
+        return .number(results.percentiles.percentile(1 - q))
+    }
+
+    /// `PsiXtoQ(cell, x)` — the share of trials **above** `x`.
+    ///
+    /// The complement of `PsiXtoP`, and the pair must sum to one.
+    public static let psiXtoQ = BuiltinRiskSolverStatistics.statistic(
+        "PSIXTOQ", maxArgs: 3
+    ) { results, values in
+        guard values.count >= 2, case .number(let x) = values[1] else { return .error(.value) }
+        let trials = results.values
+        guard !trials.isEmpty else { return .error(.num) }
+        let above = trials.filter { $0 > x }.count
+        return .number(Double(above) / Double(trials.count))
+    }
+
+    /// `PsiSimData(cell)` — every trial value, as a column.
+    ///
+    /// Where `PsiData(cell, n)` reads one trial, this spills all of them. A column rather
+    /// than a row because a run is a list of trials and a sheet reads a list downward — and
+    /// because a caller charting it wants it the way a chart expects.
+    public static let psiSimData = BuiltinRiskSolverStatistics.statistic(
+        "PSISIMDATA", maxArgs: 2
+    ) { results, _ in
+        let trials = results.values
+        guard !trials.isEmpty else { return .error(.num) }
+        return .array(CellMatrix(column: trials.map { CellValue.number($0) }))
+    }
+
+    // MARK: - Gain and loss, as ratios
+
+    /// `PsiExpGainRatio(cell, threshold)` — expected gain over expected loss.
+    ///
+    /// The **omega ratio**: how much upside the distribution carries for each unit of
+    /// downside about a threshold. Above one the threshold is favourable on balance.
+    ///
+    /// `#DIV/0!` where nothing falls short, rather than an infinity: a distribution entirely
+    /// above its threshold has no ratio, and no cell can hold one.
+    public static let psiExpGainRatio = BuiltinRiskSolverStatistics.statistic(
+        "PSIEXPGAINRATIO", maxArgs: 3
+    ) { results, values in
+        guard let threshold = real(values, at: 1) else { return .error(.value) }
+        return ratio(results.values, threshold: threshold, gainOverLoss: true)
+    }
+
+    /// `PsiExpLossRatio(cell, threshold)` — expected loss over expected gain.
+    public static let psiExpLossRatio = BuiltinRiskSolverStatistics.statistic(
+        "PSIEXPLOSSRATIO", maxArgs: 3
+    ) { results, values in
+        guard let threshold = real(values, at: 1) else { return .error(.value) }
+        return ratio(results.values, threshold: threshold, gainOverLoss: false)
+    }
+
+    /// `PsiExpValMargin(cell, threshold)` — the mean less the threshold.
+    ///
+    /// Signed: negative means the run sits below the threshold on average. The one-line
+    /// statistic in this family, and its sign is the whole message.
+    public static let psiExpValMargin = BuiltinRiskSolverStatistics.statistic(
+        "PSIEXPVALMARGIN", maxArgs: 3
+    ) { results, values in
+        guard let threshold = real(values, at: 1) else { return .error(.value) }
+        return .number(results.statistics.mean - threshold)
+    }
+
+    /// One tail's mean excess over the other's.
+    private static func ratio(
+        _ values: [Double], threshold: Double, gainOverLoss: Bool
+    ) -> CellValue {
+        guard !values.isEmpty else { return .error(.num) }
+        var gain = 0.0, loss = 0.0
+        for value in values {
+            if value > threshold { gain += value - threshold }
+            if value < threshold { loss += threshold - value }
+        }
+        let numerator = gainOverLoss ? gain : loss
+        let denominator = gainOverLoss ? loss : gain
+        guard denominator > 0 else { return .error(.div0) }
+        return .number(numerator / denominator)
+    }
+
+    // MARK: - Two runs at once
+
+    /// `PsiCorrelation(cell1, cell2)` — Pearson correlation between two outputs.
+    ///
+    /// The first statistic here that needs **two** runs, so it cannot use the one-cell
+    /// helper the rest share. Trials are paired by position, which is what makes the
+    /// question meaningful: trial *n* of one output and trial *n* of the other came from the
+    /// same draw of the model's inputs. Runs of different lengths are `#N/A` rather than
+    /// truncated to the shorter — pairing the first *k* of each would silently correlate two
+    /// different experiments.
+    public static let psiCorrelation = paired("PSICORRELATION") { first, second in
+        guard let value = try? correlationCoefficient(first, second, .sample),
+              value.isFinite else { return .error(.num) }
+        return .number(value)
+    }
+
+    /// `PsiSpearmanRho(cell1, cell2)` — rank correlation between two outputs.
+    ///
+    /// Rank-based, so it measures whether the two move together at all rather than whether
+    /// they move together *linearly* — which for a pair of simulation outputs joined by a
+    /// non-linear model is usually the question being asked.
+    public static let psiSpearmanRho = paired("PSISPEARMANRHO") { first, second in
+        guard let value = try? spearmansRho(first, vs: second), value.isFinite else {
+            return .error(.num)
+        }
+        return .number(value)
+    }
+
+    /// Builds a statistic over two completed runs, paired trial by trial.
+    private static func paired(
+        _ name: String,
+        read: @escaping @Sendable ([Double], [Double]) -> CellValue
+    ) -> ExcelFunction {
+        ExcelFunction(name: name, minArgs: 2, maxArgs: 3) { context, _ in
+            guard let firstCell = context.referencedCell(at: 0),
+                  let secondCell = context.referencedCell(at: 1) else { return .error(.value) }
+            guard let simulation = context.simulation,
+                  let first = simulation.results(for: firstCell),
+                  let second = simulation.results(for: secondCell) else { return .error(.na) }
+            guard first.values.count == second.values.count,
+                  first.values.count >= 2 else { return .error(.na) }
+            return read(first.values, second.values)
+        }
     }
 }
