@@ -38,6 +38,34 @@ extension BuiltinRiskSolverFunctions {
         var baseCase: CellValue?
         /// Parameters, with the property functions removed.
         var parameters: [CellValue]
+        /// `PsiShift(delta)` — a constant added to every draw.
+        var shift: Double?
+        /// `PsiTruncate(min, max)` — bounds on the **value**, either end optional.
+        var truncation: (low: Double?, high: Double?)?
+        /// `PsiTruncateP(lower, upper)` — bounds on the **probability**, either end optional.
+        var truncationByProbability: (low: Double?, high: Double?)?
+    }
+
+    /// The two numbers a truncation property carried, read back off its value.
+    ///
+    /// A blank is an open end rather than a zero, which is how a one-sided truncation says
+    /// which side it left alone — and reading it as zero would bound a distribution at the
+    /// origin, which for a cost or a duration looks entirely plausible.
+    private static func bounds(_ value: CellValue) -> (low: Double?, high: Double?)? {
+        guard case .array(let matrix) = value, matrix.elements.count == 2 else { return nil }
+        return (openEnded(matrix.elements[0]), openEnded(matrix.elements[1]))
+    }
+
+    /// One end of a truncation: a number, or `nil` for an end that was left open.
+    ///
+    /// **Not `real(_:)`**, which reads a blank as zero — the very thing the note above warns
+    /// about, and which this originally delegated to. `PsiTruncate(5,)` came back bounded at
+    /// `[5, 0]`, an empty range, and the truncation was then dropped entirely by the
+    /// span guard: a one-sided truncation silently did nothing. Caught by a test asserting
+    /// the lower bound held, not by reading the code that had the warning written on it.
+    private static func openEnded(_ value: CellValue) -> Double? {
+        if case .blank = value { return nil }
+        return real(value)
     }
 
     /// Splits evaluated arguments into parameters and properties.
@@ -47,7 +75,8 @@ extension BuiltinRiskSolverFunctions {
     ///   - values: The same arguments, evaluated.
     /// - Returns: The parameters and any attached properties.
     static func attached(_ context: EvaluationContext, _ values: [CellValue]) -> Attached {
-        var result = Attached(baseCase: nil, parameters: [])
+        var result = Attached(baseCase: nil, parameters: [], shift: nil,
+                              truncation: nil, truncationByProbability: nil)
         for (index, value) in values.enumerated() {
             guard index < context.arguments.count,
                   case .function(let rawName, _) = context.arguments[index] else {
@@ -56,11 +85,99 @@ extension BuiltinRiskSolverFunctions {
             }
             switch FunctionRegistry.canonical(rawName) {
             case "PSIBASECASE": result.baseCase = value
-            case "PSINAME": break            // a label; carries no numeric meaning
+            case "PSISHIFT": result.shift = real(value)
+            case "PSITRUNCATE": result.truncation = bounds(value)
+            case "PSITRUNCATEP": result.truncationByProbability = bounds(value)
+            // Labels and engine directives: recognised so they are not read as parameters,
+            // and carrying nothing this evaluator can act on. See
+            // `BuiltinRiskSolverProperties` for why registering them at all was the fix.
+            case "PSINAME", "PSIUNITS", "PSICATEGORY",
+                 "PSISTATIC", "PSILOCK", "PSICOLLECT", "PSISIXSIGMA":
+                break
             default: result.parameters.append(value)
             }
         }
         return result
+    }
+
+    /// Wraps a distribution's inverse with whatever properties were attached to the call.
+    ///
+    /// Order matters and is the interesting part: **truncation happens on the untouched
+    /// distribution, and the shift is applied after.** `PsiNormal(10, 2, PsiTruncate(5, 15),
+    /// PsiShift(100))` draws between 5 and 15 and then moves to between 105 and 115. Applying
+    /// the shift first would compare shifted values against unshifted bounds and truncate
+    /// almost everything away — silently, since the result is still a number.
+    ///
+    /// - Parameters:
+    ///   - inverse: the distribution's own quantile function.
+    ///   - parts: the properties read off the call.
+    /// - Returns: the quantile to draw from.
+    static func modified(
+        _ inverse: @escaping @Sendable (Double) throws -> Double, by parts: Attached
+    ) -> @Sendable (Double) throws -> Double {
+        var mapped = inverse
+        if let byProbability = parts.truncationByProbability {
+            mapped = restricted(mapped, between: byProbability.low, and: byProbability.high)
+        }
+        if let byValue = parts.truncation {
+            // The probabilities the bounds sit at, found once by bisecting the inverse —
+            // the distributions are reached through their quantiles, so there is no CDF to
+            // ask. Sixty halvings take the bracket below a `Double`'s precision.
+            let low = byValue.low.map { probability(of: $0, through: mapped) } ?? nil
+            let high = byValue.high.map { probability(of: $0, through: mapped) } ?? nil
+            mapped = restricted(mapped, between: low, and: high)
+        }
+        guard let shift = parts.shift else { return mapped }
+        let base = mapped
+        return { probability in try base(probability) + shift }
+    }
+
+    /// An inverse restricted to a span of probability, rescaled to stay a distribution.
+    ///
+    /// The remaining probability is stretched back over (0, 1) rather than clamped, which is
+    /// what keeps the truncated distribution integrating to one. Clamping would pile every
+    /// excluded draw onto an endpoint and report a spike where the model meant a bound.
+    private static func restricted(
+        _ inverse: @escaping @Sendable (Double) throws -> Double,
+        between low: Double?, and high: Double?
+    ) -> @Sendable (Double) throws -> Double {
+        let start = low ?? 0, end = high ?? 1
+        let span = end - start
+        guard span > 0 else {
+            // An upper bound at or below the lower one describes no distribution at all.
+            // Refused — the caller turns a throw into `#NUM!` — rather than quietly handing
+            // back the untruncated inverse, which is what this did and is how a one-sided
+            // truncation managed to do nothing without saying so.
+            return { _ in
+                throw FormulaEvaluator.EvaluationError.typeMismatch(
+                    expected: "a truncation whose upper bound exceeds its lower",
+                    got: "an empty range")
+            }
+        }
+        return { probability in try inverse(start + probability * span) }
+    }
+
+    /// `P(X ≤ x)`, by bisecting a quantile function.
+    ///
+    /// - Parameters:
+    ///   - x: the value to locate.
+    ///   - inverse: the quantile function to bisect.
+    /// - Returns: the probability, or `nil` if the quantile cannot be evaluated.
+    private static func probability(
+        of x: Double, through inverse: @Sendable (Double) throws -> Double
+    ) -> Double? {
+        var low = 1e-12, high = 1 - 1e-12
+        // silent: a quantile that cannot be evaluated here makes the bound unlocatable, which is what nil says
+        guard let lowest = try? inverse(low), let highest = try? inverse(high) else { return nil }
+        if x <= lowest { return 0 }
+        if x >= highest { return 1 }
+        for _ in 0..<60 {
+            let middle = (low + high) / 2
+            // silent: as above — the failure is reported by returning nil, and logging it per draw would be noise
+            guard let value = try? inverse(middle) else { return nil }
+            if value <= x { low = middle } else { high = middle }
+        }
+        return (low + high) / 2
     }
 
     /// The first error among the arguments, if any.
@@ -105,8 +222,9 @@ extension BuiltinRiskSolverFunctions {
             guard parts.parameters.count >= minArgs else { return .error(.value) }
             guard let inverse = quantile(parts.parameters) else { return .error(.num) }
             guard let random = context.random else { return parts.baseCase ?? .error(.value) }
+            let drawing = modified(inverse, by: parts)
             do {
-                return .number(try inverse(random.nextUniform()))
+                return .number(try drawing(random.nextUniform()))
             } catch {
                 // A quantile that cannot be evaluated at this probability — an
                 // iterative inverse that did not converge, or a parameter set the

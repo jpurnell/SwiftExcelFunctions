@@ -536,12 +536,12 @@ PSI	PsiBoxIterator	other	unreviewed		0	0	table_range|confirmed
 PSI	PsiBurr12	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
 PSI	PsiCalcParam	other	unreviewed		0	0	values_or_lower, upper, base_case|confirmed
 PSI	PsiCalcValue	other	unreviewed		0	0	Output_cell, paramidx|confirmed
-PSI	PsiCategory	property	unreviewed		0	0	string|confirmed
+PSI	PsiCategory	property	have	BuiltinRiskSolverProperties	0	0	string|confirmed
 PSI	PsiCauchy	distribution	have	risksolver	0	0	loc, lambda|confirmed
 PSI	PsiCauchyAlt	distribution	have	risksolver	0	0	2 percentile/value pairs: percentile1, value1, percentile2, value2|confirmed
-PSI	PsiCensor	property	unreviewed		0	0	min, max, type|confirmed
+PSI	PsiCensor	property	out of scope	marks censored observations for distribution fitting; belongs to the fitting surface, not to evaluation	0	0	min, max, type|confirmed
 PSI	PsiCertified	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	name, sipname|confirmed
-PSI	PsiCertify	property	unreviewed		0	0	name, default_value, short_description, full_description, version, author, copyright, trademark, history|confirmed
+PSI	PsiCertify	property	out of scope	an Analytic Solver licensing and model-certification directive	0	0	name, default_value, short_description, full_description, version, author, copyright, trademark, history|confirmed
 PSI	PsiChiSquare	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiChiSquareAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
 PSI	PsiCITrials	statistic	unreviewed		0	0	cell, confidence_level, tolerance, simulation, struc_format, param_slice|confirmed
@@ -553,17 +553,17 @@ PSI	PsiClassifyNB	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyNN	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyNNEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiCoeffVar	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiCollect	property	unreviewed		0	0	UNCONFIRMED|inferred
-PSI	PsiCompound	property	unreviewed		0	0	number_cell, deduction, limit|confirmed
+PSI	PsiCollect	property	have	BuiltinRiskSolverProperties	0	0	UNCONFIRMED|inferred
+PSI	PsiCompound	property	out of scope	compounds one distribution's draw into another's parameter across trials, which needs the trial loop	0	0	number_cell, deduction, limit|confirmed
 PSI	PsiCon	annotation	not ours	role declaration, belongs with solver_adj	0	0	LHS, relation, RHS, active, chance_type, chance_measure, comment, model_name, critical|confirmed
 PSI	PsiConverged	statistic	unreviewed		0	0	output_cell, [simulation]|confirmed
-PSI	PsiConvergence	property	unreviewed		0	0	tol, type, level, mean, stdev, perc, val|confirmed
-PSI	PsiCopula	property	unreviewed		0	0	type, param, reflection, instance|confirmed
-PSI	PsiCopulaGauss	property	unreviewed		0	0	number_range, position, instance|confirmed
-PSI	PsiCopulaStudent	property	unreviewed		0	0	number_range, position, df, instance|confirmed
-PSI	PsiCorrDepen	property	unreviewed		0	0	corrname, coefficient|confirmed
+PSI	PsiConvergence	property	out of scope	sets when a run may stop; there is no run loop here to stop	0	0	tol, type, level, mean, stdev, perc, val|confirmed
+PSI	PsiCopula	property	out of scope	a dependence structure across several inputs — same reason as PsiCorrDepen, and needs the joint draw this evaluator does not make	0	0	type, param, reflection, instance|confirmed
+PSI	PsiCopulaGauss	property	out of scope	a Gaussian copula across several inputs; needs a joint draw	0	0	number_range, position, instance|confirmed
+PSI	PsiCopulaStudent	property	out of scope	a Student copula across several inputs; needs a joint draw	0	0	number_range, position, df, instance|confirmed
+PSI	PsiCorrDepen	property	out of scope	joins inputs into a correlated group; correlation is a property of a set of inputs drawn together, and this evaluator draws one cell at a time	0	0	corrname, coefficient|confirmed
 PSI	PsiCorrelation	statistic	unreviewed		0	0	cell1, cell2, simulation|confirmed
-PSI	PsiCorrIndep	property	unreviewed		0	0	corrname|confirmed
+PSI	PsiCorrIndep	property	out of scope	the same, declaring independence within a group	0	0	corrname|confirmed
 PSI	PsiCorrMatrix	property	bindable	isValidCorrelationMatrix	0	0	matrix_cell_range, position, instance|confirmed
 PSI	PsiCount	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, type, simulation|confirmed
 PSI	PsiCube	other	unreviewed		0	0	range_with_values, dim1, dim2, dim3|confirmed
@@ -580,8 +580,8 @@ PSI	PsiDataSrc	other	unreviewed		0	0	src_name, val_col_names, data, idx1_name, i
 PSI	PsiDblTriang	distribution	have	risksolver	0	0	min, likely, max, p|confirmed
 PSI	PsiDecTable	other	unreviewed		0	0	table_range, output, ret_header, input_val1, input_val2|confirmed
 PSI	PsiDim	other	unreviewed		0	0	name, range_or_array|confirmed
-PSI	PsiDimActive	property	unreviewed		0	0	opt, sim, sen|confirmed
-PSI	PsiDimLock	property	unreviewed		0	0	elem_or_index|confirmed
+PSI	PsiDimActive	property	out of scope	selects the active slice of a multi-dimensional parametric analysis	0	0	opt, sim, sen|confirmed
+PSI	PsiDimLock	property	out of scope	locks a dimension of a multi-dimensional parametric analysis	0	0	elem_or_index|confirmed
 PSI	PsiDiscrete	distribution	have	risksolver	20	8	{x1..xn}, {p1..pn}|confirmed
 PSI	PsiDistInfo	statistic	unreviewed		0	0	cell, [info]|confirmed
 PSI	PsiDisUniform	distribution	have	risksolver	0	0	{x1..xn}|confirmed
@@ -606,7 +606,7 @@ PSI	PsiFatigueLifeAlt	distribution	have	risksolver	0	0	3 name/value pairs, names
 PSI	PsiFDist	distribution	have	risksolver	0	0	df1, df2|confirmed
 PSI	PsiFinalValue	other	unreviewed		0	0	cell, optimization|confirmed
 PSI	PsiFit	distribution	have	risksolver	0	0	data|confirmed
-PSI	PsiFitInfo	property	unreviewed		0	0	name, criterion|confirmed
+PSI	PsiFitInfo	property	out of scope	reports on a fit produced by PsiFit's dialog; the fit is the add-in's, not this package's	0	0	name, criterion|confirmed
 PSI	PsiForecast	other	bindable	linearRegression	0	0	Model, Input_Data, Simulate, Num_Forecasts, Header|confirmed
 PSI	PsiForecastARIMA	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiForecastDoubleExp	other	unreviewed		0	0	UNCONFIRMED|confirmed
@@ -642,7 +642,7 @@ PSI	PsiLaplace	distribution	have	risksolver	0	0	loc, beta (scale)|confirmed
 PSI	PsiLaplaceAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: two different percentiles or the standard deviation|confirmed
 PSI	PsiLevy	distribution	have	risksolver	0	0	loc, scale|confirmed
 PSI	PsiLevyAlt	distribution	have	risksolver	0	0	2 parameters: two different percentiles, or percentile and loc, or percentile and scale|confirmed
-PSI	PsiLock	property	unreviewed		0	0	value|confirmed
+PSI	PsiLock	property	have	BuiltinRiskSolverProperties	0	0	value|confirmed
 PSI	PsiLogarithmic	distribution	have	risksolver	0	0	p|confirmed
 PSI	PsiLogistic	distribution	have	risksolver	0	0	mu, s|confirmed
 PSI	PsiLogisticAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: 2 different percentiles, mean, var, scale|confirmed
@@ -724,15 +724,15 @@ PSI	PsiRayleighAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: pe
 PSI	PsiReciprocal	distribution	have	risksolver	0	0	min, max|confirmed
 PSI	PsiReduce	other	unreviewed		0	0	cube_expression, aggregation, dimension|confirmed
 PSI	PsiResample	distribution	have	risksolver	0	0	data|confirmed
-PSI	PsiSample	property	unreviewed		0	0	array_or_dist|confirmed
-PSI	PsiSeed	property	unreviewed		0	0	value|confirmed
+PSI	PsiSample	property	out of scope	chooses a sampling method for one input — Latin hypercube, Sobol — which is the engine's choice of point set, not a property of the formula	0	0	array_or_dist|confirmed
+PSI	PsiSeed	property	out of scope	seeds one input's own stream; FormulaEvaluator draws from a single RandomSource the caller supplies and has no per-input streams to seed	0	0	value|confirmed
 PSI	PsiSemiDev	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
 PSI	PsiSemiDev2	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiSemiVar	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
 PSI	PsiSemiVar2	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiSenParam	annotation	not ours	role declaration, belongs with solver_adj	15	9	values_or_lower, upper, base_case|confirmed
 PSI	PsiSenValue	other	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiShift	property	unreviewed		0	0	shift|confirmed
+PSI	PsiShift	property	have	BuiltinRiskSolverProperties	0	0	shift|confirmed
 PSI	PsiShuffle	distribution	have	risksolver	0	0	data|confirmed
 PSI	PsiSigmaCP	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
 PSI	PsiSigmaCPK	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
@@ -763,7 +763,7 @@ PSI	PsiSkewness	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulati
 PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
 PSI	PsiSlurp	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	slurp, j|confirmed
 PSI	PsiSpearmanRho	statistic	unreviewed		0	0	cell1, cell2|confirmed
-PSI	PsiStatic	property	unreviewed		0	0	static_val|confirmed
+PSI	PsiStatic	property	have	BuiltinRiskSolverProperties	0	0	static_val|confirmed
 PSI	PsiStdDev	statistic	have	SimulationResults.statistics.stdDev — sample, not population	4	3	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdDevCI	statistic	unreviewed		0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdErr	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
@@ -796,16 +796,16 @@ PSI	PsiTransform	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiTriangGen	distribution	have	risksolver	0	0	ap, m, br, p, r|confirmed
 PSI	PsiTriangular	distribution	have	risksolver	60	17	a (min), c (likely), b (max)|confirmed
 PSI	PsiTriangularAlt	distribution	have	risksolver	0	0	3 parameters combining native args (min, likely, max) with percentiles, e.g. (min, percentile1, percentile2) or (percentile1, likely, percentile2)|confirmed
-PSI	PsiTruncate	property	unreviewed		0	0	[min], [max], [type]|confirmed
-PSI	PsiTruncateP	property	unreviewed		0	0	[min], [max]|confirmed
-PSI	PsiTSIntegrate	property	unreviewed		0	0	order, c1, c2|confirmed
-PSI	PsiTSLen	property	unreviewed		0	0	length|confirmed
-PSI	PsiTSSeasonality	property	unreviewed		0	0	order, period, terms, index|confirmed
+PSI	PsiTruncate	property	have	BuiltinRiskSolverProperties	0	0	[min], [max], [type]|confirmed
+PSI	PsiTruncateP	property	have	BuiltinRiskSolverProperties	0	0	[min], [max]|confirmed
+PSI	PsiTSIntegrate	property	out of scope	a time-series differencing order for the ARIMA family, which is not implemented	0	0	order, c1, c2|confirmed
+PSI	PsiTSLen	property	out of scope	the length of a time-series forecast, for the same family	0	0	length|confirmed
+PSI	PsiTSSeasonality	property	out of scope	a seasonality period, for the same family	0	0	order, period, terms, index|confirmed
 PSI	PsiTSSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	tssip|confirmed
-PSI	PsiTSTransform	property	unreviewed		0	0	type, shift|confirmed
+PSI	PsiTSTransform	property	out of scope	a variance-stabilising transform, for the same family	0	0	type, shift|confirmed
 PSI	PsiUniform	distribution	have	risksolver	24	16	a (min), b (max)|confirmed
 PSI	PsiUniformAlt	distribution	have	risksolver	0	0	2 parameters combining native args (lower, upper) with percentiles, e.g. (lower, percentile1) or (percentile1, upper) or (percentile1, percentile2)|confirmed
-PSI	PsiUnits	property	unreviewed		0	0	string|confirmed
+PSI	PsiUnits	property	have	BuiltinRiskSolverProperties	0	0	string|confirmed
 PSI	PsiVar	annotation	not ours	role declaration, belongs with solver_adj	0	0	cell_range, type, active, comment, model_name, critical|confirmed
 PSI	PsiVariance	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiVary	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	base, min, max, [range_type], [dist_name]|confirmed
