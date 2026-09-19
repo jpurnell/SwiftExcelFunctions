@@ -518,10 +518,15 @@ enum ConformanceCases {
     /// Each row pairs with a control whose answer is not in question, so a round where the
     /// controls move says so rather than looking like news.
     ///
-    /// **These cases need data on the sheet**, which the other rounds do not — so unlike
-    /// round eight they cannot be read against `NoCells()`. `emit` writes this package's
-    /// answer as `!evaluation failed` for them, and that is expected: Excel's column is the
-    /// measurement, and the comparison is made by reading the two by hand for this round.
+    /// **Written with array constants so they need no sheet**, which is what lets `check`
+    /// compare both columns the way it does for every other round. That spelling only became
+    /// available today: `{1;2;3}` did not parse at all until this morning, and the first draft
+    /// of this comment said these rows would come back as `!evaluation failed` because it was
+    /// written before that was true. They evaluate.
+    ///
+    /// Two of the rows wrap their call in `SUM`, `ROWS` or `COLUMNS` on purpose. `GROUPBY`
+    /// spills a table, and a spilled range is awkward to compare cell-for-cell across a
+    /// workbook round trip — one number in one cell survives it intact.
     static let roundTen: [ConformanceCase] = [
         .init(family: "groupby", formula: "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM)",
               note: "the shape: is a Total row present by default, and above or below?"),
