@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -497,6 +497,52 @@ enum ConformanceCases {
               note: "d1 = 3: just above the split, where zero is expected"),
         .init(family: "density boundary", formula: "CHISQ.DIST(0, 4, FALSE)",
               note: "df = 4: control for the chi-squared rule that round eight confirmed"),
+    ]
+
+    // MARK: - Round ten: GROUPBY and PIVOTBY, whose defaults are choices
+
+    /// The optional arguments of `GROUPBY` and `PIVOTBY`.
+    ///
+    /// These are **Excel's own functions**, so unlike the `Psi*` family they can be asked.
+    /// The grouping and aggregation are not in doubt; the defaults are:
+    ///
+    /// - Is a grand total row present when `total_depth` is omitted? This package appends one,
+    ///   following Microsoft's documented default of 1 — which is documentation, and this
+    ///   project's record with documentation is seven wrongs.
+    /// - Where does the total row sit, above the groups or below?
+    /// - What does an empty intersection hold in `PIVOTBY` — a blank, a zero, or `#N/A`? This
+    ///   package answers blank, on the reasoning that no observation is not an observation of
+    ///   nothing.
+    /// - How is a mixed-type key column ordered, and are text keys matched case-insensitively?
+    ///
+    /// Each row pairs with a control whose answer is not in question, so a round where the
+    /// controls move says so rather than looking like news.
+    ///
+    /// **These cases need data on the sheet**, which the other rounds do not — so unlike
+    /// round eight they cannot be read against `NoCells()`. `emit` writes this package's
+    /// answer as `!evaluation failed` for them, and that is expected: Excel's column is the
+    /// measurement, and the comparison is made by reading the two by hand for this round.
+    static let roundTen: [ConformanceCase] = [
+        .init(family: "groupby", formula: "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM)",
+              note: "the shape: is a Total row present by default, and above or below?"),
+        .init(family: "groupby", formula: "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 0)",
+              note: "total_depth 0 — no totals, the control for the row above"),
+        .init(family: "groupby", formula: "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 1, -1)",
+              note: "descending: does -1 reverse the group order?"),
+        .init(family: "groupby", formula: "GROUPBY({\"B\";\"b\"}, {1;2}, SUM, 0, 0)",
+              note: "are text keys matched case-insensitively? We answer one group of 3"),
+        .init(family: "groupby", formula: "GROUPBY({2;1;\"a\"}, {1;2;3}, SUM, 0, 0)",
+              note: "a mixed key column: do numbers sort before text?"),
+        .init(family: "groupby", formula: "GROUPBY({\"a\";\"b\"}, {1;2}, AVERAGE)",
+              note: "the grand total of an average — over the data, or over the group means?"),
+        .init(family: "groupby", formula: "SUM(GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM))",
+              note: "one number rather than a spill, so the answer survives a single cell"),
+        .init(family: "groupby", formula: "PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM, 0, 0)",
+              note: "an empty intersection: blank, zero, or #N/A? We answer blank"),
+        .init(family: "groupby", formula: "ROWS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM, 0, 0))",
+              note: "the shape without the spill — is there a header row?"),
+        .init(family: "groupby", formula: "COLUMNS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM, 0, 0))",
+              note: "and is there a corner cell?"),
     ]
 
     // MARK: - Bessel

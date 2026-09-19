@@ -323,7 +323,7 @@ EXCEL	EXPAND	lookup	have		0	0	array, rows, [columns], [pad_with]
 EXCEL	FILTER	lookup	have		0	0	array,include,[if_empty]
 EXCEL	FORMULATEXT	lookup	out of scope		0	0	reference
 EXCEL	GETPIVOTDATA	lookup	have	navigation	0	0	data_field, pivot_table, [field1, item1, field2, item2], ...
-EXCEL	GROUPBY	lookup	out of scope		0	0	row_fields,values,function,[field_headers],[total_depth],[sort_order],[filter_array],[field_relationship]
+EXCEL	GROUPBY	lookup	have	BuiltinGroupBy	0	0	row_fields,values,function,[field_headers],[total_depth],[sort_order],[filter_array],[field_relationship]
 EXCEL	HLOOKUP	lookup	have	navigation	797	16	lookup_value, table_array, row_index_num, [range_lookup]
 EXCEL	HSTACK	lookup	have		0	0	array1,[array2],...
 EXCEL	HYPERLINK	lookup	have	navigation	0	0	link_location, [friendly_name]
@@ -333,7 +333,7 @@ EXCEL	INDIRECT	lookup	have	navigation	21017	32	ref_text, [a1]
 EXCEL	LOOKUP	lookup	have	navigation	8	5	lookup_value, lookup_vector, [result_vector]
 EXCEL	MATCH	lookup	have	navigation	380	18	lookup_value, lookup_array, [match_type]
 EXCEL	OFFSET	lookup	have	navigation	9798	32	reference, rows, cols, [height], [width]
-EXCEL	PIVOTBY	lookup	out of scope		0	0	row_fields,col_fields,values,function,[field_headers],[row_total_depth],[row_sort_order],[col_total_depth],[col_sort_order],[filter_array],[relative_to]
+EXCEL	PIVOTBY	lookup	have	BuiltinGroupBy	0	0	row_fields,col_fields,values,function,[field_headers],[row_total_depth],[row_sort_order],[col_total_depth],[col_sort_order],[filter_array],[relative_to]
 EXCEL	ROW	lookup	have	navigation	1222	2	[reference]
 EXCEL	ROWS	lookup	have	navigation	0	0	array
 EXCEL	RTD	lookup	out of scope		0	0	ProgID, server, topic1, [topic2], ...

@@ -672,6 +672,41 @@ public enum FormulaEvaluator {
                     mean: results.statistics.mean, deviation: results.statistics.stdDev)
             }
 
+            // `GROUPBY` and `PIVOTBY` take their aggregate **eta-reduced**: `GROUPBY(…, SUM)`
+            // names the function rather than calling it. Evaluated first, `SUM` is a name the
+            // workbook does not define and the call is `#NAME?` before it starts — so this is
+            // reached before argument evaluation, as `LAMBDA` is.
+            if BuiltinGroupBy.governs(fn.name) {
+                let aggregateIndex = fn.name == "GROUPBY" ? 2 : 3
+                guard args.count > aggregateIndex else { return .error(.value) }
+                guard let aggregate = try aggregator(args[aggregateIndex], in: inCall) else {
+                    return .error(.value)
+                }
+                var evaluated: [CellValue] = []
+                for (index, argument) in args.enumerated() where index != aggregateIndex {
+                    evaluated.append(try evaluateNode(argument, in: inCall))
+                }
+                if let error = evaluated.first(where: { if case .error = $0 { return true }
+                                                        return false }) {
+                    return error
+                }
+                // `total_depth` and `sort_order` sit after the aggregate, so their positions
+                // shift by one once it is removed from the list.
+                let optional = Array(evaluated.dropFirst(aggregateIndex))
+                let totalDepth = optional.count > 1
+                    ? Int(optionalNumber(optional[1]) ?? 1) : 1
+                let ascending = optional.count > 2
+                    ? (optionalNumber(optional[2]) ?? 1) >= 0 : true
+                if fn.name == "GROUPBY" {
+                    return try BuiltinGroupBy.groupBy(
+                        rowFields: evaluated[0], values: evaluated[1],
+                        totalDepth: totalDepth, ascending: ascending, aggregate: aggregate)
+                }
+                return try BuiltinGroupBy.pivotBy(
+                    rowFields: evaluated[0], columnFields: evaluated[1], values: evaluated[2],
+                    totalDepth: totalDepth, ascending: ascending, aggregate: aggregate)
+            }
+
             // The higher-order six. Their *arguments* are evaluated normally — `MAP(A1:A4, f)`
             // needs both — but calling the lambda needs the evaluator, and an `ExcelFunction`
             // closure is handed values and no way to evaluate anything. So they are reached
@@ -869,6 +904,47 @@ public enum FormulaEvaluator {
             if let found = sixSigmaCall(in: child) { return found }
         }
         return nil
+    }
+
+    /// A finite number from a cell value, for an optional argument.
+    private static func optionalNumber(_ value: CellValue) -> Double? {
+        switch value {
+        case .number(let d): return d.isFinite ? d : nil
+        case .bool(let flag): return flag ? 1 : 0
+        default: return nil
+        }
+    }
+
+    /// The aggregate a `GROUPBY` or `PIVOTBY` call names.
+    ///
+    /// Two spellings are accepted, which is what makes the aggregate open-ended rather than a
+    /// fixed list the way `SUBTOTAL`'s eleven are:
+    ///
+    /// - **A bare function name** — `SUM`, `AVERAGE`, `COUNT` — which the parser reads as a
+    ///   `.namedRange` because nothing in the grammar distinguishes it from one. Resolved
+    ///   against the registry here, where the registry is in scope.
+    /// - **A `LAMBDA`**, evaluated to a lambda value and invoked per group.
+    ///
+    /// - Parameters:
+    ///   - node: the aggregate argument, unevaluated.
+    ///   - env: the environment, for the registry and for invoking.
+    /// - Returns: a closure applying the aggregate to one group, or `nil` when the argument
+    ///   names neither a function nor a lambda.
+    private static func aggregator(
+        _ node: FormulaAST, in env: EvaluationEnvironment
+    ) throws -> BuiltinGroupBy.Aggregate? {
+        if case .namedRange(let name) = node,
+           env.bound(name) == nil,
+           let function = env.functions.function(named: FunctionRegistry.canonical(name)) {
+            return { values in
+                try function.evaluate([.array(CellMatrix(column: values))])
+            }
+        }
+        let value = try evaluateNode(node, in: env)
+        guard case .lambda = value else { return nil }
+        return { values in
+            try invoke(value, with: [.array(CellMatrix(column: values))], in: env)
+        }
     }
 
     // MARK: - Named Range Resolution

@@ -1,4 +1,4 @@
-# The eight lookup functions this package does not implement
+# The lookup functions this package does not implement
 
 **What this is:** the reasons, one per function, for the `lookup` rows classified `out of
 scope` rather than implemented. Written down because "out of scope" with no reason beside it
@@ -40,20 +40,30 @@ what lets the same evaluator serve a workbook reader, a solver and a test.
 A consumer that *does* have the sheet can implement all three in a few lines by registering
 them itself — the registry is open, and this is exactly what it is open for.
 
-## They are large, and nothing in the corpus asks for them
+## ~~They are large, and nothing in the corpus asks for them~~ — implemented 2026-09-19
 
 | Function | What it is |
 |---|---|
-| `GROUPBY` | aggregate rows by a key, with a lambda per aggregate, returning a shaped table |
-| `PIVOTBY` | the same across two dimensions |
+| ~~`GROUPBY`~~ | aggregate rows by a key, with a lambda per aggregate, returning a shaped table |
+| ~~`PIVOTBY`~~ | the same across two dimensions |
 
-These are implementable. `LAMBDA` and the higher-order six landed in this session and supply
-what they need, so the obstacle is size rather than capability — each is a small feature in
-its own right, with its own options for totals, sort order and header handling.
+**Both are implemented.** The classification above said *"when one appears in a corpus, the
+case changes and so should the classification"* — and then they were asked for directly,
+which is the same thing arriving by a different route. Neither has appeared in a corpus and
+the zero-demand measurement still stands; what changed is that demand was expressed.
 
-They are classified out of scope on evidence rather than taste: **zero calls across 2,240
-workbooks**, alongside every other function in this bucket. When one appears in a corpus, the
-case changes and so should the classification.
+The entry is struck through rather than deleted so the reasoning survives. It was right about
+the obstacle: `LAMBDA` and the higher-order six did supply what was needed, and the work was
+size rather than capability. It was also right that each carries its own options for totals,
+sort order and header handling — and **those options are where the guessing is**. The
+grouping and aggregation are not in doubt; the defaults are, so `ConformanceCases.roundTen`
+asks Excel about them rather than leaving them as this package's opinion.
+
+One implementation note worth keeping here. The aggregate arrives **eta-reduced** —
+`GROUPBY(…, SUM)` names the function rather than calling it — and the parser reads a bare
+name as a `.namedRange`. Evaluated first, `SUM` is a name the workbook does not define and
+the call is `#NAME?` before it starts, so both are reached in the evaluator before their
+arguments, the way `LAMBDA` is.
 
 ---
 
