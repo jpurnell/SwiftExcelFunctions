@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -375,23 +375,34 @@ enum ConformanceCases {
     /// mathematics and it is not in doubt. What Excel *reports* for the unbounded case is a
     /// spreadsheet convention, and this package has never asked.
     ///
-    /// It shows, because the four answers are ours rather than Excel's:
+    /// **Answered.** Excel gives *three different conventions*, none derivable from another:
     ///
-    /// | | at the boundary, shape < 1 | shape = 1 | shape > 1 |
+    /// | | shape < 1 | shape = 1 | shape > 1 |
     /// |---|---|---|---|
-    /// | `CHISQ.DIST` | `#NUM!` | ½ | 0 |
-    /// | `GAMMA.DIST` | `#NUM!` — was `+∞` as a **number** until this round | 1/β | 0 |
-    /// | `WEIBULL.DIST` | `#NUM!` — same, same round | 1/β | 0 |
-    /// | `BETA.DIST` | `#NUM!` | `#NUM!` — where the density is finite and non-zero | `#NUM!` |
-    /// | `F.DIST` | **0** | **0** — where the density is exactly 1 | 0 |
+    /// | `CHISQ.DIST` | `#NUM!` | ½ — the density | 0 |
+    /// | `GAMMA.DIST` | `#NUM!` | `#NUM!` — where the density is `1/β` | 0 |
+    /// | `BETA.DIST` | `#NUM!` | `#NUM!` — where the density is 5 | 0 |
+    /// | `WEIBULL.DIST` | **0** | **0** | 0 |
+    /// | `F.DIST` | `#NUM!` | **1** — the density | 0 |
     ///
-    /// The last two rows are the ones that cannot all be right. `BETA.DIST(0, 1, 5, FALSE)`
-    /// refuses a density that is exactly 5; `F.DIST(0, 2, 5, FALSE)` answers zero where the
-    /// density is exactly 1, and `F.DIST(0, 1, 5, FALSE)` answers zero where it is unbounded.
+    /// `WEIBULL.DIST` answers a flat zero even where the density is unbounded. `CHISQ.DIST`
+    /// and `F.DIST` honour the mathematics. `GAMMA.DIST` and `BETA.DIST` refuse one case the
+    /// other two answer. Seven of the twenty-three rows came back disagreeing, and every one
+    /// is now matched.
     ///
-    /// **Each row below has a control beside it** — an interior point of the same
-    /// distribution, which this package and Excel already agree on. A round where the
-    /// controls move is a round that went wrong, and says so rather than looking like news.
+    /// **Three had been guessed wrong**, and the third is the instructive one: `GAMMA.DIST`
+    /// and `WEIBULL.DIST` both answered `+∞` *as a number* before this round, which is
+    /// unrepresentable in a cell; the guess that replaced it — `#NUM!`, by analogy with
+    /// `CHISQ.DIST` — was right for `GAMMA.DIST` and wrong for `WEIBULL.DIST`. **Analogy
+    /// between two Excel functions is not evidence about either**, which is the whole reason
+    /// this file exists.
+    ///
+    /// **Each row has a control beside it** — an interior point of the same distribution,
+    /// which this package and Excel already agree on. All controls held.
+    ///
+    /// Kept in the sheet now that they are answered, per this project's practice: a question
+    /// that has been settled stays as a control, so a later round that goes wrong says so
+    /// rather than looking like news.
     static let roundEight: [ConformanceCase] = [
         // The question this round was opened for.
         .init(family: "density boundary", formula: "F.DIST(0, 1, 5, FALSE)",
@@ -449,6 +460,33 @@ enum ConformanceCases {
               note: "x = 0 is outside the support outright, not a shape case"),
         .init(family: "density boundary", formula: "EXPON.DIST(0, 1.5, FALSE)",
               note: "the exponential starts at lambda; no shape, so no split"),
+    ]
+
+    // MARK: - Round nine: the one boundary round eight did not ask
+
+    /// `BETA.DIST` at its **upper** endpoint, below a shape of one.
+    ///
+    /// Round eight measured the lower endpoint across α < 1, α = 1 and α > 1, and the upper
+    /// endpoint only at β = 5. The rule implemented from that — refuse at or below one,
+    /// answer zero above — is applied to the upper endpoint **by symmetry with the lower**,
+    /// and symmetry is exactly the kind of reasoning round eight just punished: `GAMMA.DIST`
+    /// and `WEIBULL.DIST` face the same boundary and disagree with each other.
+    ///
+    /// So it is asked rather than assumed. Until this comes back, the upper endpoint below a
+    /// shape of one is the only density boundary in this package resting on an inference.
+    static let roundNine: [ConformanceCase] = [
+        .init(family: "density boundary", formula: "BETA.DIST(1, 2, 0.5, FALSE)",
+              note: "upper endpoint, beta < 1: unbounded. We infer #NUM! from the lower end"),
+        .init(family: "density boundary", formula: "BETA.DIST(1, 2, 1, FALSE)",
+              note: "upper endpoint, beta = 1: the density is 2. We infer #NUM!"),
+        .init(family: "density boundary", formula: "BETA.DIST(1, 2, 3, FALSE)",
+              note: "upper endpoint, beta > 1: zero — the control, measured in round eight"),
+        // The same question one function over, since GAMMA and WEIBULL proved that a rule
+        // measured on one distribution says nothing about its neighbour.
+        .init(family: "density boundary", formula: "F.DIST(0, 3, 5, FALSE)",
+              note: "d1 = 3: just above the split, where zero is expected"),
+        .init(family: "density boundary", formula: "CHISQ.DIST(0, 4, FALSE)",
+              note: "df = 4: control for the chi-squared rule that round eight confirmed"),
     ]
 
     // MARK: - Bessel

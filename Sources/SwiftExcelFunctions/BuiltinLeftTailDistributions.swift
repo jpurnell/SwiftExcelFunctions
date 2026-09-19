@@ -104,13 +104,16 @@ public enum BuiltinLeftTailDistributions {
         guard x >= 0, d1 >= 1, d2 >= 1 else { return .error(.num) }
 
         guard truthy(args[3]) else {
-            // Zero at zero for every numerator, which is this package's rule rather than the
-            // mathematics': below three numerator degrees of freedom the density there is one
-            // or unbounded, and `DistributionF.pdf` says so. Excel has not been measured on
-            // this point, so the shipped answer is kept and pinned by a test rather than
-            // quietly changed to the mathematically correct one.
-            guard x > 0 else { return .number(0) }
-            return finite(DistributionF(df1: d1, df2: d2).pdf(x))
+            // **Measured in round eight.** This used to answer zero at zero for every
+            // numerator. Excel honours the three-way split instead: `#NUM!` at one degree of
+            // freedom where the density is unbounded, exactly **1** at two, zero above.
+            //
+            // `DistributionF.pdf` already computes all three — it is the `infinity` that
+            // needs translating, and nothing else, so the boundary now runs through the same
+            // code as the interior.
+            let density = DistributionF(df1: d1, df2: d2).pdf(x)
+            guard density.isFinite else { return .error(.num) }
+            return finite(density)
         }
         return complementOf(BuiltinStatisticalDistributions.fDistRightTail,
                             [.number(x), .number(Double(d1)), .number(Double(d2))])

@@ -137,71 +137,108 @@ final class DensityBindingTests: XCTestCase {
 
     // MARK: - The boundaries, which are Excel's rules rather than the mathematics'
 
-    /// The three-way split at zero: unbounded below a shape of one, finite at one, zero above.
+    /// **Every density boundary, as Excel answered it in round eight.**
     ///
-    /// Excel reports the unbounded case as `#NUM!` rather than as an infinity, and that is a
-    /// **spreadsheet** convention, not a fact about the distribution. Upstream's
-    /// `pdf(_:)` answers `infinity` there, correctly, so the delegation must not reach
-    /// these cases — they stay in this package where the convention lives.
-    func testTheUnboundedPointIsRefusedRatherThanInfinite() throws {
-        XCTAssertEqual(try evaluate("CHISQ.DIST", [.number(0), .number(1), .bool(false)]),
-                       .error(.num), "one degree of freedom is unbounded at zero")
-        XCTAssertEqual(try number("CHISQ.DIST", [.number(0), .number(2), .bool(false)]), 0.5,
-                       accuracy: 1e-12, "exactly two is the finite case")
-        XCTAssertEqual(try number("CHISQ.DIST", [.number(0), .number(3), .bool(false)]), 0,
-                       accuracy: 1e-12, "above two the density vanishes")
+    /// Five functions face the same situation — a shape parameter under a power of `x` at the
+    /// edge of the support — and Excel gives **three different conventions**, none of which
+    /// follows from the others:
+    ///
+    /// | | shape < 1 | shape = 1 | shape > 1 |
+    /// |---|---|---|---|
+    /// | `CHISQ.DIST` | `#NUM!` | ½ — the density | 0 |
+    /// | `GAMMA.DIST` | `#NUM!` | **`#NUM!`** — where the density is `1/β` | 0 |
+    /// | `BETA.DIST` | `#NUM!` | **`#NUM!`** — where the density is 5 | **0** |
+    /// | `WEIBULL.DIST` | **0** | **0** | 0 |
+    /// | `F.DIST` | `#NUM!` | **1** — the density | 0 |
+    ///
+    /// `WEIBULL.DIST` answers a flat zero even where the density is unbounded.
+    /// `CHISQ.DIST` and `F.DIST` honour the mathematics. `GAMMA.DIST` and `BETA.DIST` refuse
+    /// one case the other two answer. This is a measurement, not a theory about Excel, and
+    /// the workbook that produced it is round eight — `ConformanceCases.roundEight`.
+    ///
+    /// **Three of these were guessed wrong before the round ran**, two of them by this
+    /// package for years and one by the guess that was meant to fix it: `WEIBULL.DIST`'s
+    /// unbounded point was changed from `+∞` to `#NUM!` by analogy with `CHISQ.DIST`, and
+    /// the answer is 0.
+    func testEveryDensityBoundaryIsWhatExcelAnswered() throws {
+        // (formula for the record, arguments, Excel's answer)
+        let measured: [(String, [CellValue], CellValue)] = [
+            ("F.DIST(0, 1, 5, FALSE)",
+             [.number(0), .number(1), .number(5), .bool(false)], .error(.num)),
+            ("F.DIST(0, 2, 5, FALSE)",
+             [.number(0), .number(2), .number(5), .bool(false)], .number(1)),
+            ("F.DIST(0, 5, 8, FALSE)",
+             [.number(0), .number(5), .number(8), .bool(false)], .number(0)),
 
-        // GAMMA.DIST and WEIBULL.DIST face the identical split, and used to answer the
-        // unbounded case with `+∞` **as a number**. No cell can hold one — it would reach
-        // `sheet.write(_:to:)` in any workbook this evaluator feeds, and SwiftXLSX has
-        // already killed a corpus run once on a value it could not represent.
-        XCTAssertEqual(try evaluate("GAMMA.DIST",
-                                    [.number(0), .number(0.5), .number(2), .bool(false)]),
-                       .error(.num), "a shape below one is unbounded at zero")
-        XCTAssertEqual(try evaluate("WEIBULL.DIST",
-                                    [.number(0), .number(0.5), .number(3), .bool(false)]),
-                       .error(.num), "a shape below one is unbounded at zero")
+            ("CHISQ.DIST(0, 1, FALSE)", [.number(0), .number(1), .bool(false)], .error(.num)),
+            ("CHISQ.DIST(0, 2, FALSE)", [.number(0), .number(2), .bool(false)], .number(0.5)),
+            ("CHISQ.DIST(0, 3, FALSE)", [.number(0), .number(3), .bool(false)], .number(0)),
 
-        XCTAssertEqual(try number("GAMMA.DIST",
-                                  [.number(0), .number(1), .number(2), .bool(false)]), 0.5,
-                       accuracy: 1e-12, "a shape of one starts at 1/scale")
-        XCTAssertEqual(try number("GAMMA.DIST",
-                                  [.number(0), .number(3), .number(2), .bool(false)]), 0,
-                       accuracy: 1e-12, "above one the density vanishes at zero")
-        XCTAssertEqual(try number("WEIBULL.DIST",
-                                  [.number(0), .number(1), .number(3), .bool(false)]),
-                       1.0 / 3, accuracy: 1e-12, "a shape of one starts at 1/scale")
-        XCTAssertEqual(try number("WEIBULL.DIST",
-                                  [.number(0), .number(2), .number(3), .bool(false)]), 0,
-                       accuracy: 1e-12, "above one the density vanishes at zero")
+            ("GAMMA.DIST(0, 0.5, 2, FALSE)",
+             [.number(0), .number(0.5), .number(2), .bool(false)], .error(.num)),
+            ("GAMMA.DIST(0, 1, 2, FALSE)",
+             [.number(0), .number(1), .number(2), .bool(false)], .error(.num)),
+            ("GAMMA.DIST(0, 3, 2, FALSE)",
+             [.number(0), .number(3), .number(2), .bool(false)], .number(0)),
 
-        // Nothing this package answers as a density may be non-finite, whatever the
-        // convention turns out to be — that is the part which does not depend on Excel.
-        for shape in [0.25, 0.5, 0.75, 1.0, 2.0] {
-            for name in ["GAMMA.DIST", "WEIBULL.DIST"] {
-                let answer = try evaluate(name, [.number(0), .number(shape), .number(2),
-                                                 .bool(false)])
-                if case .number(let d) = answer {
-                    XCTAssertTrue(d.isFinite, "\(name) at shape \(shape) gave \(d)")
+            ("WEIBULL.DIST(0, 0.5, 3, FALSE)",
+             [.number(0), .number(0.5), .number(3), .bool(false)], .number(0)),
+            ("WEIBULL.DIST(0, 1, 3, FALSE)",
+             [.number(0), .number(1), .number(3), .bool(false)], .number(0)),
+            ("WEIBULL.DIST(0, 2, 3, FALSE)",
+             [.number(0), .number(2), .number(3), .bool(false)], .number(0)),
+
+            ("BETA.DIST(0, 0.5, 5, FALSE)",
+             [.number(0), .number(0.5), .number(5), .bool(false)], .error(.num)),
+            ("BETA.DIST(0, 1, 5, FALSE)",
+             [.number(0), .number(1), .number(5), .bool(false)], .error(.num)),
+            ("BETA.DIST(0, 2, 5, FALSE)",
+             [.number(0), .number(2), .number(5), .bool(false)], .number(0)),
+            ("BETA.DIST(1, 2, 5, FALSE)",
+             [.number(1), .number(2), .number(5), .bool(false)], .number(0)),
+
+            ("LOGNORM.DIST(0, 0, 1, FALSE)",
+             [.number(0), .number(0), .number(1), .bool(false)], .error(.num)),
+            ("EXPON.DIST(0, 1.5, FALSE)",
+             [.number(0), .number(1.5), .bool(false)], .number(1.5)),
+        ]
+
+        for (formula, arguments, excel) in measured {
+            let name = String(formula.prefix(while: { $0 != "(" }))
+            let ours = try evaluate(name, arguments)
+            switch (excel, ours) {
+            case (.number(let expected), .number(let actual)):
+                XCTAssertEqual(actual, expected, accuracy: 1e-12,
+                               "\(formula): Excel says \(expected), we say \(actual)")
+            default:
+                XCTAssertEqual(ours, excel, "\(formula): Excel says \(excel), we say \(ours)")
+            }
+        }
+    }
+
+    /// Nothing answered as a density may be non-finite, whatever the convention.
+    ///
+    /// The one part of the boundary question that never needed Excel. A cell cannot hold an
+    /// infinity, and the value reaches `sheet.write(_:to:)` in any workbook this evaluator
+    /// feeds — SwiftXLSX has already killed a corpus run once on a value it could not
+    /// represent. `GAMMA.DIST` and `WEIBULL.DIST` both returned `+∞` here until round eight.
+    func testNoDensityIsEverNonFinite() throws {
+        for shape in [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0] {
+            for x in [0.0, 1e-300, 0.5, 4.0] {
+                for name in ["GAMMA.DIST", "WEIBULL.DIST"] {
+                    let answer = try evaluate(name, [.number(x), .number(shape), .number(2),
+                                                     .bool(false)])
+                    if case .number(let d) = answer {
+                        XCTAssertTrue(d.isFinite, "\(name)(\(x), \(shape), 2) gave \(d)")
+                    }
+                }
+                let beta = try evaluate("BETA.DIST", [.number(Swift.min(x, 1)), .number(shape),
+                                                      .number(5), .bool(false)])
+                if case .number(let d) = beta {
+                    XCTAssertTrue(d.isFinite, "BETA.DIST at shape \(shape) gave \(d)")
                 }
             }
         }
-
-        // F.DIST answers zero at zero for every numerator, which is this package's rule and
-        // not the mathematics': at one numerator degree of freedom the density there is
-        // unbounded, and at exactly two it is 1. **Both are open questions**, asked of Excel
-        // in round eight of the conformance workbook (`ConformanceCases.roundEight`) rather
-        // than settled here by argument. Pinned meanwhile so the answer cannot drift before
-        // the measurement arrives, and so that changing it is a deliberate act.
-        XCTAssertEqual(try number("F.DIST",
-                                  [.number(0), .number(1), .number(5), .bool(false)]), 0,
-                       accuracy: 1e-12, "unbounded in the mathematics; awaiting Excel")
-        XCTAssertEqual(try number("F.DIST",
-                                  [.number(0), .number(2), .number(5), .bool(false)]), 0,
-                       accuracy: 1e-12, "exactly 1 in the mathematics; awaiting Excel")
-        XCTAssertEqual(try number("F.DIST",
-                                  [.number(0), .number(5), .number(8), .bool(false)]), 0,
-                       accuracy: 1e-12, "above two, zero is simply correct")
     }
 
     /// Outside the support, and outside the parameters' domain.
@@ -218,17 +255,16 @@ final class DensityBindingTests: XCTestCase {
                        .error(.num))
         XCTAssertEqual(try evaluate("CHISQ.DIST", [.number(-1), .number(5), .bool(false)]),
                        .error(.num))
-        // BETA.DIST refuses both endpoints of its density, on the unit interval and off it.
-        XCTAssertEqual(try evaluate("BETA.DIST",
-                                    [.number(0), .number(2), .number(5), .bool(false)]),
-                       .error(.num))
-        XCTAssertEqual(try evaluate("BETA.DIST",
-                                    [.number(1), .number(2), .number(5), .bool(false)]),
-                       .error(.num))
+        // Outside `[A, B]` altogether is refused; the endpoints themselves follow the
+        // measured rule in `testEveryDensityBoundaryIsWhatExcelAnswered`.
         XCTAssertEqual(try evaluate("BETA.DIST",
                                     [.number(1), .number(2), .number(5), .bool(false),
                                      .number(2), .number(10)]),
                        .error(.num), "below A is outside the support")
+        XCTAssertEqual(try evaluate("BETA.DIST",
+                                    [.number(12), .number(2), .number(5), .bool(false),
+                                     .number(2), .number(10)]),
+                       .error(.num), "above B is outside the support")
     }
 
     /// `A` and `B` scale the density down by the width, and leave the cumulative alone.

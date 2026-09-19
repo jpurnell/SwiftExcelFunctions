@@ -115,14 +115,13 @@ public enum BuiltinStatisticalDistributions {
             // and choosing between them by label rather than by arithmetic is the point:
             // a model built against the wrong one reports a distribution stretched by 1/β².
             guard x > 0 else {
-                // Below a shape of one the density at zero is genuinely unbounded, and this
-                // used to answer `+∞` as a **number**. No cell can hold one: it would reach
-                // `sheet.write(_:to:)` in any workbook this evaluator feeds, and the writer
-                // has already killed a corpus run once on a value it could not represent.
-                // Refused instead, which is what `CHISQ.DIST` does at the identical
-                // three-way split and had already decided.
-                guard shape >= 1 else { return .error(.num) }
-                return .number(shape == 1 ? 1 / scale : 0)
+                // **Measured in round eight.** Excel refuses at or below a shape of one and
+                // answers zero above it — so a shape of exactly **one** is `#NUM!` here, even
+                // though the density there is an ordinary `1/β`. That is not the three-way
+                // split `CHISQ.DIST` honours, and guessing by analogy with it would have been
+                // wrong; the two functions genuinely differ.
+                guard shape > 1 else { return .error(.num) }
+                return .number(0)
             }
             guard let distribution = DistributionGamma(shape: shape, scale: scale) else {
                 return .error(.num)
@@ -189,11 +188,17 @@ public enum BuiltinStatisticalDistributions {
             return .number(probability)
         }
 
-        // `DistributionBetaGeneralised` *is* a beta rescaled onto `[A, B]`, so it carries
-        // the width Jacobian itself rather than leaving it to be remembered here. The
-        // endpoints stay this package's business: upstream answers `infinity` there when a
-        // shape is below one, which is the density, where Excel answers `#NUM!`.
-        guard unit > 0, unit < 1 else { return .error(.num) }
+        // **The endpoints, measured in round eight.** This used to refuse both, always.
+        // Excel answers **zero** when the shape facing that endpoint is above one, and
+        // `#NUM!` at or below it — the same rule `GAMMA.DIST` turned out to follow, and the
+        // reason `BETA.DIST(0, 2, 5, FALSE)` is 0 while `BETA.DIST(0, 1, 5, FALSE)` is
+        // `#NUM!` despite the density there being an ordinary 5.
+        //
+        // The upper endpoint below a shape of one — `BETA.DIST(B, α, 1, FALSE)` — is the one
+        // case round eight did not ask. It is implemented by symmetry with the lower, and
+        // asked in the next round rather than left as a silent assumption.
+        if unit <= 0 { return alpha > 1 ? .number(0) : .error(.num) }
+        if unit >= 1 { return beta > 1 ? .number(0) : .error(.num) }
         guard let distribution = DistributionBetaGeneralised(shape1: alpha, shape2: beta,
                                                              min: lower, max: upper) else {
             return .error(.num)

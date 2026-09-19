@@ -88,10 +88,15 @@ public enum BuiltinStatisticalTests {
         // here while the cumulative delegated, which is one function holding two opinions
         // about the same distribution.
         guard cumulative else {
-            // `pdf(_:)` answers `infinity` at zero when the shape is below one, which is
-            // correct — the density is unbounded there — and unrepresentable in a cell.
-            // Refused here, where the spreadsheet conventions live, as `CHISQ.DIST` does.
-            guard x > 0 || shape >= 1 else { return .error(.num) }
+            // **Measured in round eight, and it is a flat zero.** Excel answers 0 at x = 0
+            // for *every* shape — including 0.5, where the density is unbounded, and 1,
+            // where it is `1/β`. No three-way split, no `#NUM!`.
+            //
+            // Worth stating plainly because this was guessed wrong twice in one day: the
+            // old code answered `+∞` as a number, and the guess that replaced it was `#NUM!`
+            // by analogy with `CHISQ.DIST`. Five functions face this boundary and Excel gives
+            // three different conventions; none of them is derivable from the others.
+            guard x > 0 else { return .number(0) }
             return .number(distribution.pdf(x))
         }
         return .number(distribution.cdf(x))

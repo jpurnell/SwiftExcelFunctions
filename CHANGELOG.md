@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Five functions answered the density at a support boundary five different ways, and
+  Excel was never asked.** Round eight of the conformance workbook asked it. Seven of
+  twenty-three rows came back disagreeing, and Excel turns out to use **three different
+  conventions** across the family, none derivable from another:
+
+  | | shape < 1 | shape = 1 | shape > 1 |
+  |---|---|---|---|
+  | `CHISQ.DIST` | `#NUM!` | ½ — the density | 0 |
+  | `GAMMA.DIST` | `#NUM!` | `#NUM!` — where the density is `1/β` | 0 |
+  | `BETA.DIST` | `#NUM!` | `#NUM!` — where the density is 5 | 0 |
+  | `WEIBULL.DIST` | **0** | **0** | 0 |
+  | `F.DIST` | `#NUM!` | **1** — the density | 0 |
+
+  `F.DIST(0, 1, 5, FALSE)` answered 0 where Excel answers `#NUM!`, and
+  `F.DIST(0, 2, 5, FALSE)` answered 0 where Excel answers exactly 1. `GAMMA.DIST` answered
+  `1/β` at a shape of one where Excel refuses. `BETA.DIST` refused both endpoints
+  unconditionally where Excel answers zero above a shape of one. `WEIBULL.DIST` is a flat
+  zero at x = 0 for every shape — including where the density is unbounded.
+
+- **`GAMMA.DIST` and `WEIBULL.DIST` returned `+∞` as a number** at a shape below one. The
+  density there genuinely is unbounded, so the mathematics was right and the
+  *representation* was not: no cell can hold an infinity, and the value reaches
+  `sheet.write(_:to:)` in any workbook this evaluator feeds. SwiftXLSX has already killed a
+  corpus run once on a value it could not represent — a number past `Int.max`, fixed in
+  0.26.1. **This is the one part of the boundary question that never needed Excel**, and it
+  is now a test in its own right: nothing answered as a density may be non-finite.
+
+  Worth recording how the rest went: the guess that replaced `+∞` was `#NUM!`, by analogy
+  with `CHISQ.DIST`. It was right for `GAMMA.DIST` and **wrong for `WEIBULL.DIST`**.
+  Analogy between two Excel functions is not evidence about either.
+
 ### Changed
 
 - **BusinessMath 3.0.0-alpha.6 → 3.0.0-alpha.7**, which required no `Package.swift` edit: the
