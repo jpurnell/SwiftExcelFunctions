@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -364,6 +364,91 @@ enum ConformanceCases {
         // threshold is a power of two rather than a decimal.
         .init(family: "threshold", formula: "1-0.9999999999999964",
               note: "r near 2^-48 = 3.55e-15, in case the bound is binary"),
+    ]
+
+    // MARK: - Round eight: the density at a support boundary
+
+    /// **Five functions face the same three-way split, and answer it four different ways.**
+    ///
+    /// Where a shape parameter sits under a power of `x`, the density at the boundary is
+    /// unbounded below a shape of one, finite at exactly one, and zero above. That is the
+    /// mathematics and it is not in doubt. What Excel *reports* for the unbounded case is a
+    /// spreadsheet convention, and this package has never asked.
+    ///
+    /// It shows, because the four answers are ours rather than Excel's:
+    ///
+    /// | | at the boundary, shape < 1 | shape = 1 | shape > 1 |
+    /// |---|---|---|---|
+    /// | `CHISQ.DIST` | `#NUM!` | ½ | 0 |
+    /// | `GAMMA.DIST` | `#NUM!` — was `+∞` as a **number** until this round | 1/β | 0 |
+    /// | `WEIBULL.DIST` | `#NUM!` — same, same round | 1/β | 0 |
+    /// | `BETA.DIST` | `#NUM!` | `#NUM!` — where the density is finite and non-zero | `#NUM!` |
+    /// | `F.DIST` | **0** | **0** — where the density is exactly 1 | 0 |
+    ///
+    /// The last two rows are the ones that cannot all be right. `BETA.DIST(0, 1, 5, FALSE)`
+    /// refuses a density that is exactly 5; `F.DIST(0, 2, 5, FALSE)` answers zero where the
+    /// density is exactly 1, and `F.DIST(0, 1, 5, FALSE)` answers zero where it is unbounded.
+    ///
+    /// **Each row below has a control beside it** — an interior point of the same
+    /// distribution, which this package and Excel already agree on. A round where the
+    /// controls move is a round that went wrong, and says so rather than looking like news.
+    static let roundEight: [ConformanceCase] = [
+        // The question this round was opened for.
+        .init(family: "density boundary", formula: "F.DIST(0, 1, 5, FALSE)",
+              note: "unbounded: d1 = 1. We answer 0. Excel?"),
+        .init(family: "density boundary", formula: "F.DIST(0, 2, 5, FALSE)",
+              note: "the density here is exactly 1. We answer 0. Excel?"),
+        .init(family: "density boundary", formula: "F.DIST(0, 5, 8, FALSE)",
+              note: "d1 > 2, so zero is correct — the control for the two above"),
+        .init(family: "density boundary", formula: "F.DIST(0.5, 5, 8, FALSE)",
+              note: "interior control: already agreed"),
+
+        // The one case in the family that was already decided, and never measured either.
+        .init(family: "density boundary", formula: "CHISQ.DIST(0, 1, FALSE)",
+              note: "unbounded. We answer #NUM! — this is where that convention came from"),
+        .init(family: "density boundary", formula: "CHISQ.DIST(0, 2, FALSE)",
+              note: "exactly two: the density is ½"),
+        .init(family: "density boundary", formula: "CHISQ.DIST(0, 3, FALSE)",
+              note: "above two: zero"),
+        .init(family: "density boundary", formula: "CHISQ.DIST(2, 5, FALSE)",
+              note: "interior control: already agreed"),
+
+        .init(family: "density boundary", formula: "GAMMA.DIST(0, 0.5, 2, FALSE)",
+              note: "unbounded. Answered +INF as a number until this round; now #NUM!"),
+        .init(family: "density boundary", formula: "GAMMA.DIST(0, 1, 2, FALSE)",
+              note: "shape one: the density is 1/scale = 0.5"),
+        .init(family: "density boundary", formula: "GAMMA.DIST(0, 3, 2, FALSE)",
+              note: "shape above one: zero"),
+        .init(family: "density boundary", formula: "GAMMA.DIST(4, 3, 2, FALSE)",
+              note: "interior control: already agreed"),
+
+        .init(family: "density boundary", formula: "WEIBULL.DIST(0, 0.5, 3, FALSE)",
+              note: "unbounded. Answered +INF as a number until this round; now #NUM!"),
+        .init(family: "density boundary", formula: "WEIBULL.DIST(0, 1, 3, FALSE)",
+              note: "shape one: the density is 1/scale = 0.3333…"),
+        .init(family: "density boundary", formula: "WEIBULL.DIST(0, 2, 3, FALSE)",
+              note: "shape above one: zero"),
+        .init(family: "density boundary", formula: "WEIBULL.DIST(2, 2, 3, FALSE)",
+              note: "interior control: already agreed"),
+
+        // BETA.DIST refuses its endpoints unconditionally. Two of these three have a
+        // perfectly ordinary density there.
+        .init(family: "density boundary", formula: "BETA.DIST(0, 0.5, 5, FALSE)",
+              note: "unbounded: alpha < 1. We answer #NUM!"),
+        .init(family: "density boundary", formula: "BETA.DIST(0, 1, 5, FALSE)",
+              note: "the density here is exactly 5. We answer #NUM!. Excel?"),
+        .init(family: "density boundary", formula: "BETA.DIST(0, 2, 5, FALSE)",
+              note: "the density here is exactly 0. We answer #NUM!. Excel?"),
+        .init(family: "density boundary", formula: "BETA.DIST(1, 2, 5, FALSE)",
+              note: "the upper endpoint, density 0. We answer #NUM!. Excel?"),
+        .init(family: "density boundary", formula: "BETA.DIST(0.4, 2, 5, FALSE)",
+              note: "interior control: already agreed"),
+
+        // Two boundaries that are not the three-way split, for contrast.
+        .init(family: "density boundary", formula: "LOGNORM.DIST(0, 0, 1, FALSE)",
+              note: "x = 0 is outside the support outright, not a shape case"),
+        .init(family: "density boundary", formula: "EXPON.DIST(0, 1.5, FALSE)",
+              note: "the exponential starts at lambda; no shape, so no split"),
     ]
 
     // MARK: - Bessel

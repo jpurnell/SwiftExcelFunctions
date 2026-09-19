@@ -151,23 +151,57 @@ final class DensityBindingTests: XCTestCase {
         XCTAssertEqual(try number("CHISQ.DIST", [.number(0), .number(3), .bool(false)]), 0,
                        accuracy: 1e-12, "above two the density vanishes")
 
-        // GAMMA.DIST's zero follows the same shape rule, and answers rather than refuses.
+        // GAMMA.DIST and WEIBULL.DIST face the identical split, and used to answer the
+        // unbounded case with `+∞` **as a number**. No cell can hold one — it would reach
+        // `sheet.write(_:to:)` in any workbook this evaluator feeds, and SwiftXLSX has
+        // already killed a corpus run once on a value it could not represent.
+        XCTAssertEqual(try evaluate("GAMMA.DIST",
+                                    [.number(0), .number(0.5), .number(2), .bool(false)]),
+                       .error(.num), "a shape below one is unbounded at zero")
+        XCTAssertEqual(try evaluate("WEIBULL.DIST",
+                                    [.number(0), .number(0.5), .number(3), .bool(false)]),
+                       .error(.num), "a shape below one is unbounded at zero")
+
         XCTAssertEqual(try number("GAMMA.DIST",
                                   [.number(0), .number(1), .number(2), .bool(false)]), 0.5,
                        accuracy: 1e-12, "a shape of one starts at 1/scale")
         XCTAssertEqual(try number("GAMMA.DIST",
                                   [.number(0), .number(3), .number(2), .bool(false)]), 0,
                        accuracy: 1e-12, "above one the density vanishes at zero")
+        XCTAssertEqual(try number("WEIBULL.DIST",
+                                  [.number(0), .number(1), .number(3), .bool(false)]),
+                       1.0 / 3, accuracy: 1e-12, "a shape of one starts at 1/scale")
+        XCTAssertEqual(try number("WEIBULL.DIST",
+                                  [.number(0), .number(2), .number(3), .bool(false)]), 0,
+                       accuracy: 1e-12, "above one the density vanishes at zero")
+
+        // Nothing this package answers as a density may be non-finite, whatever the
+        // convention turns out to be — that is the part which does not depend on Excel.
+        for shape in [0.25, 0.5, 0.75, 1.0, 2.0] {
+            for name in ["GAMMA.DIST", "WEIBULL.DIST"] {
+                let answer = try evaluate(name, [.number(0), .number(shape), .number(2),
+                                                 .bool(false)])
+                if case .number(let d) = answer {
+                    XCTAssertTrue(d.isFinite, "\(name) at shape \(shape) gave \(d)")
+                }
+            }
+        }
 
         // F.DIST answers zero at zero for every numerator, which is this package's rule and
-        // not the mathematics': below three numerator degrees of freedom the density there is
-        // one or unbounded. Pinned so a rebinding cannot change it silently.
+        // not the mathematics': at one numerator degree of freedom the density there is
+        // unbounded, and at exactly two it is 1. **Both are open questions**, asked of Excel
+        // in round eight of the conformance workbook (`ConformanceCases.roundEight`) rather
+        // than settled here by argument. Pinned meanwhile so the answer cannot drift before
+        // the measurement arrives, and so that changing it is a deliberate act.
         XCTAssertEqual(try number("F.DIST",
                                   [.number(0), .number(1), .number(5), .bool(false)]), 0,
-                       accuracy: 1e-12)
+                       accuracy: 1e-12, "unbounded in the mathematics; awaiting Excel")
+        XCTAssertEqual(try number("F.DIST",
+                                  [.number(0), .number(2), .number(5), .bool(false)]), 0,
+                       accuracy: 1e-12, "exactly 1 in the mathematics; awaiting Excel")
         XCTAssertEqual(try number("F.DIST",
                                   [.number(0), .number(5), .number(8), .bool(false)]), 0,
-                       accuracy: 1e-12)
+                       accuracy: 1e-12, "above two, zero is simply correct")
     }
 
     /// Outside the support, and outside the parameters' domain.

@@ -114,7 +114,16 @@ public enum BuiltinStatisticalDistributions {
             // for by name. `DistributionGamma` also offers `shape:rate:` — the reciprocal —
             // and choosing between them by label rather than by arithmetic is the point:
             // a model built against the wrong one reports a distribution stretched by 1/β².
-            guard x > 0 else { return .number(shape < 1 ? .infinity : (shape == 1 ? 1 / scale : 0)) }
+            guard x > 0 else {
+                // Below a shape of one the density at zero is genuinely unbounded, and this
+                // used to answer `+∞` as a **number**. No cell can hold one: it would reach
+                // `sheet.write(_:to:)` in any workbook this evaluator feeds, and the writer
+                // has already killed a corpus run once on a value it could not represent.
+                // Refused instead, which is what `CHISQ.DIST` does at the identical
+                // three-way split and had already decided.
+                guard shape >= 1 else { return .error(.num) }
+                return .number(shape == 1 ? 1 / scale : 0)
+            }
             guard let distribution = DistributionGamma(shape: shape, scale: scale) else {
                 return .error(.num)
             }

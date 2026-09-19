@@ -87,7 +87,13 @@ public enum BuiltinStatisticalTests {
         // Both branches now come from the same value. The density used to be written out
         // here while the cumulative delegated, which is one function holding two opinions
         // about the same distribution.
-        guard cumulative else { return .number(distribution.pdf(x)) }
+        guard cumulative else {
+            // `pdf(_:)` answers `infinity` at zero when the shape is below one, which is
+            // correct — the density is unbounded there — and unrepresentable in a cell.
+            // Refused here, where the spreadsheet conventions live, as `CHISQ.DIST` does.
+            guard x > 0 || shape >= 1 else { return .error(.num) }
+            return .number(distribution.pdf(x))
+        }
         return .number(distribution.cdf(x))
     }
 
