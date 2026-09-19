@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ROWS(A:A)` answered the height of the used range, not 1,048,576.** Ten on a sheet with
+  ten rows of data; zero on an empty one. Excel answers 1,048,576 on every sheet, whatever is
+  in the column.
+
+  Not a wrong formula — a consequence of a decision that is right everywhere else.
+  `CellRange.clipped(to:)` pulls a whole-column reference back to the used range, because
+  `$B:$B` in a real workbook means "whatever is in column B" and the alternative is
+  materialising a million values per reference. Every function that *reads* those values wants
+  the clipped range. `ROWS` and `COLUMNS` do not read them — they count positions, and a
+  position exists whether or not anything was typed into it.
+
+  `CellRange` had already worked out half of this: it keeps a whole **row** at its full 16,384
+  columns and gives the reason — *"`INDEX`, `COLUMNS`, `ROWS` and the lookups all count
+  positions"* — while clipping a whole column, where the same argument applies. New
+  `ReferenceShape` answers both from the reference as written, before it resolves to values. A
+  defined name pointing at a whole column counts like one; array literals and computed
+  references (`OFFSET`, `INDIRECT`) fall through to the ordinary path, which is right for them.
+
+  **This had been dismissed as a harness artifact** — the conformance row was assumed to fail
+  because the tool evaluates against `NoCells()`. It fails on a populated sheet too. Checking
+  that took one probe, and was not done for seven rounds.
+
+- **`COLUMNS(1:1)` could not be parsed, so it could never be asked.** Fixed upstream in
+  SwiftXLSX 0.30.0, where the whole-row branch existed and was unreachable — it sat below the
+  plain `.number` case in `parsePrimary`, and `1:1` lexes as a number. The `$3:$3` form was
+  unaffected, which is why the shorthand's failure read as a missing feature rather than a
+  defect. This package now pins 0.30.0.
+
+### Changed
+
+- **`conformance-workbook check` matches rows by formula, and compares against a live
+  evaluation.** It used to walk `ConformanceCases.all` and index the sheet by position, which
+  made the tool's own claim — *"no manifest, no ordering assumption, nothing to fall out of
+  step"* — untrue. The formula was in column B the whole time, written by `emit` and never
+  read. Appending a round was harmless; inserting a case anywhere else would have compared
+  Excel's answer for one formula against this package's answer for another, and reported
+  agreement or disagreement that meant nothing.
+
+  Column D — this package's answer at emit time — is still written and still reported, as
+  provenance. It is no longer the comparison: `check` re-evaluates each formula, so **a fix is
+  verifiable against the same workbook** instead of needing a fresh round in Excel. That was
+  the position after round eight: seven conventions corrected, and no way to confirm them
+  without asking a person to open a spreadsheet again. Rows whose answer has changed since
+  emit are reported as `CHANGED`, and cases the workbook predates as `NOT ASKED` — which
+  points at `emit`, where the old wording ("not calculated") pointed at Excel.
+
+### Fixed
+
 - **Five functions answered the density at a support boundary five different ways, and
   Excel was never asked.** Round eight of the conformance workbook asked it. Seven of
   twenty-three rows came back disagreeing, and Excel turns out to use **three different

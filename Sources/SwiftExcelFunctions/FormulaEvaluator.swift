@@ -552,6 +552,15 @@ public enum FormulaEvaluator {
             // neighbour, so `SUM(1, 2, …, 200)` is one level however wide it gets.
             let inCall = try env.calling()
 
+            // `ROWS` and `COLUMNS` count the positions a *reference* has, which is not the
+            // same as the shape of the values behind it: a whole column is pulled back to the
+            // used range before it is read, correctly, and `ROWS(A:A)` is 1,048,576 anyway.
+            // Reached before evaluation for that reason. See `ReferenceShape`.
+            if let shape = ReferenceShape.evaluate(
+                fn.name, arguments: args, names: env.names, inSheet: env.currentSheet) {
+                return shape
+            }
+
             // A branching call chooses among its arguments instead of consuming them, so it
             // has to be reached before any of them are evaluated. See `LazyBranch`, and note
             // that the arity check above has already run — a malformed `IF` is still an

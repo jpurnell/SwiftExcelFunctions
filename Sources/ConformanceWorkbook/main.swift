@@ -24,9 +24,19 @@ import SwiftXLSX
 ///
 /// ## The workbook is the whole record
 ///
-/// This package's answer travels in the file beside the formula, so `check` needs nothing
-/// but the file — no manifest, no ordering assumption, nothing to fall out of step. A
-/// workbook someone mailed back a month later still checks.
+/// Every row carries its own formula, so `check` needs nothing but the file — no manifest and
+/// no ordering assumption. A workbook someone mailed back a month later still checks.
+///
+/// **That was the claim before it was true.** `check` used to walk `ConformanceCases.all` and
+/// index the sheet by position, so inserting a case anywhere but the end shifted every row
+/// below it and compared Excel's answer for one formula against this package's answer for
+/// another. The formula was in column B the whole time, written by `emit` and never read.
+/// It is read now, and rows are matched by it.
+///
+/// The stored answer in column D is **provenance, not the comparison**: it records what this
+/// package said when the workbook was emitted. `check` re-evaluates each formula and compares
+/// Excel against *that*, so a fix is verifiable against the same file instead of needing a
+/// fresh round in Excel. A row whose answer has changed since emit is reported as `CHANGED`.
 enum ConformanceWorkbook {
 
     /// Columns, once, so `emit` and `check` cannot disagree about them.
@@ -277,17 +287,56 @@ enum ConformanceWorkbook {
 
     // MARK: - Check
 
+    /// Reads Excel's answers back and compares them against this package's, **now**.
+    ///
+    /// ## Rows are matched by formula, not by position
+    ///
+    /// This used to walk `ConformanceCases.all` and index the sheet by `firstRow + offset`,
+    /// which made the type's own claim — *"`check` needs nothing but the file: no manifest,
+    /// no ordering assumption, nothing to fall out of step"* — untrue. There **was** an
+    /// ordering assumption, and the file already carried what would have removed it: the
+    /// formula, in column B, written by `emit` and then ignored.
+    ///
+    /// Appending a round was harmless. Inserting a case anywhere else silently shifted every
+    /// row below it, so Excel's answer for one formula was compared against this package's
+    /// answer for another — and the result, agreement or disagreement, would have meant
+    /// nothing either way. Found when adding a round made five rows report as "not
+    /// calculated", which reads as *Excel never opened this file* and was not that at all.
+    ///
+    /// ## And the comparison is against a live evaluation
+    ///
+    /// Column D holds what this package said when the workbook was **emitted**. Comparing
+    /// against that means a fix cannot be verified without a fresh round in Excel — which
+    /// was the position after round eight: seven boundary conventions corrected, and the only
+    /// way to confirm them was to ask a person to open a spreadsheet again.
+    ///
+    /// So the formula is re-evaluated here and Excel's cached answer is compared against
+    /// *that*. Column D is still written, still read, and still reported — as the answer at
+    /// emit time, which is provenance worth keeping — but it is no longer the thing being
+    /// checked. A workbook mailed back a month later still checks, which was the point of
+    /// storing it; it now checks against the package as it stands rather than as it was.
     static func check(_ path: String) throws {
         let workbook = try Workbook(xlsxData: try Data(contentsOf: URL(fileURLWithPath: path)))
         guard let sheet = workbook.sheets.first(where: { $0.name == "Conformance" }) else {
             throw Failure.noConformanceSheet
         }
 
-        var agreed = 0, differed = 0, uncalculated = 0, diverged = 0
-        for (offset, testCase) in ConformanceCases.all.enumerated() {
-            let row = firstRow + offset
+        let byFormula = Dictionary(ConformanceCases.all.map { ($0.formula, $0) },
+                                   uniquingKeysWith: { first, _ in first })
+        var agreed = 0, differed = 0, uncalculated = 0, diverged = 0, drifted = 0
+        var seen: Set<String> = []
+
+        var row = firstRow
+        while let formula = text(sheet.cell(at: "\(Column.formula)\(row)")) {
+            defer { row += 1 }
+            seen.insert(formula)
+            let testCase = byFormula[formula]
+            let family = testCase?.family ?? "unlisted"
+            let note = testCase?.note ?? "in the workbook but no longer in ConformanceCases"
+
             let excel = cached(sheet.cell(at: "\(Column.excel)\(row)"))
-            let ours = cached(sheet.cell(at: "\(Column.ours)\(row)"))
+            let atEmit = cached(sheet.cell(at: "\(Column.ours)\(row)"))
+            let ours = liveAnswer(to: formula)
 
             guard let excel else {
                 // Excel writes a cached value for every formula it calculates. Its absence
@@ -295,38 +344,97 @@ enum ConformanceWorkbook {
                 uncalculated += 1
                 continue
             }
+            // Reported whether or not the row agrees: a row that changed since emit is worth
+            // seeing even when the change was a fix, because it is the only signal that this
+            // workbook's stored column is stale.
+            if let atEmit, let ours, !agree(atEmit, ours) {
+                drifted += 1
+                say("CHANGED [\(family)]  \(formula)")
+                say("        at emit: \(describe(atEmit))")
+                say("        now:     \(describe(ours))")
+            }
+
             if let ours, agree(excel, ours) {
                 agreed += 1
-            } else if let why = ConformanceCases.knownDivergences[testCase.formula] {
+            } else if let why = ConformanceCases.knownDivergences[formula] {
                 // A disagreement that has already been chased down and attributed. Counted
                 // and named, never silently skipped: a divergence that quietly stopped
                 // happening would be worth knowing about too.
                 diverged += 1
-                say("KNOWN   [\(testCase.family)]  \(testCase.formula)")
+                say("KNOWN   [\(family)]  \(formula)")
                 say("        excel: \(describe(excel))")
                 say("        ours:  \(ours.map(describe) ?? "—")")
                 say("        \(why)")
             } else {
                 differed += 1
-                say("DIFFER  [\(testCase.family)]  \(testCase.formula)")
+                say("DIFFER  [\(family)]  \(formula)")
                 say("        excel: \(describe(excel))")
                 say("        ours:  \(ours.map(describe) ?? "—")")
-                say("        why it is here: \(testCase.note)")
+                say("        why it is here: \(note)")
             }
+        }
+
+        // A case added since this workbook was written is **not** an unanswered question —
+        // it was never asked. Saying so points at `emit`, where the previous wording pointed
+        // at Excel.
+        let unasked = ConformanceCases.all.filter { !seen.contains($0.formula) }
+        for testCase in unasked {
+            say("NOT ASKED  [\(testCase.family)]  \(testCase.formula)")
         }
 
         say("")
         say("agreed \(agreed), known divergence \(diverged), differed \(differed), "
-            + "not calculated \(uncalculated)")
+            + "not calculated \(uncalculated), not asked \(unasked.count)")
+        if drifted > 0 {
+            say("\(drifted) row(s) changed since this workbook was emitted — the comparison "
+                + "above used the current answer, not the stored one.")
+        }
         if uncalculated > 0 {
             say("`not calculated` means Excel has not opened and saved this file yet —")
             say("those rows are unanswered, not agreed.")
         }
+        if !unasked.isEmpty {
+            say("`not asked` means this workbook predates those cases. Re-emit to ask them.")
+        }
         if differed > 0 || uncalculated > 0 {
             // The exit code is what makes this runnable as a check rather than read as a
-            // report. A known divergence is not a failure; anything else is.
+            // report. A known divergence is not a failure; anything else is. Neither is a
+            // `not asked` row: the fix for one is to emit a new workbook, not to change code.
             throw Failure.disagreed(differed: differed, uncalculated: uncalculated)
         }
+    }
+
+    /// This package's answer to a formula, evaluated now.
+    ///
+    /// - Parameter formula: The formula as stored in the sheet, without a leading `=`.
+    /// - Returns: The answer, or `nil` if it cannot be parsed or evaluated — which is itself
+    ///   a disagreement with any answer Excel gave, and reported as one.
+    private static func liveAnswer(to formula: String) -> CellValue? {
+        do {
+            return try FormulaEvaluator.evaluate(try FormulaParser.parse(formula),
+                                                 cells: NoCells(), names: NoNames())
+        } catch let failure {
+            // Said out loud rather than swallowed. A formula this package can no longer read
+            // is a disagreement with whatever Excel answered, and the row below reports it as
+            // one — but the *reason* only exists here, and a row that reads "ours: —" with no
+            // explanation is how `COLUMNS(1:1)` went seven rounds as a harness artifact.
+            report("could not evaluate \(formula): \(failure)")
+            #if canImport(os)
+            Logger(subsystem: "ConformanceWorkbook", category: "check")
+                .error("could not evaluate \(formula, privacy: .public): \(String(describing: failure), privacy: .public)")
+            #endif
+            return nil
+        }
+    }
+
+    /// The text a cell holds, when it holds text.
+    ///
+    /// - Parameter value: The cell.
+    /// - Returns: Its text, or `nil` for anything else — including an empty string, which is
+    ///   how the row walk above learns it has run off the end of the written rows.
+    private static func text(_ value: CellValue?) -> String? {
+        guard case .text(let string) = value, !string.isEmpty else { return nil }
+        return string
     }
 
     /// A formula cell's cached value, or a literal's own value.
