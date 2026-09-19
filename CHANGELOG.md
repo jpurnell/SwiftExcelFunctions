@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Array constants evaluate: `{1,2,3;4,5,6}`.** Core Excel syntax this package could not read
+  at all — parsed in SwiftXLSX 0.31.0 against `FormulaAST.arrayConstant` from SwiftExcelCore
+  0.13.0, and turned into a `CellMatrix` here. Every function that already takes an array now
+  takes one written in the formula: `SUM({1,2,3})`, `SUMPRODUCT({1,2},{3,4})`,
+  `INDEX({1,2;3,4},2,1)`, `ROWS`/`COLUMNS`, the lot.
+
+  An error element is a **value**, not a failure to build the array, so it behaves like an
+  error cell would: `COUNT({1,#N/A,3})` is 2 because `COUNT` counts numbers, and
+  `SUM({1,#N/A,3})` is `#N/A` because summing an error is an error. Both follow from the
+  element being an ordinary `CellValue` rather than from a rule written for arrays.
+
+  **Refused by the `Lowerer`**, which compiles scalar bytecode for the solver. `SUM({1,2,3})`
+  could in principle fold to a constant, but folding *some* array constants and refusing the
+  rest would make which models compile depend on where the array sits — worse than refusing
+  all of them plainly, which is what a range outside an aggregate already gets.
+
+  This was found from the side: `ReferenceShapeTests` wanted a two-row array to check that
+  `ROWS` still counts an array from its values, and could not spell one. That test now spells
+  it, and keeps the `SEQUENCE(2,3)` form beside it, since the two reach an array by different
+  paths.
+
 ### Verified
 
 - **Round nine came back with zero disagreements across all 158 cases** — the first round in

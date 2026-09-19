@@ -357,6 +357,29 @@ public enum FormulaEvaluator {
         case .error(let e):
             return .error(e)
 
+        case .arrayConstant(let rows):
+            // Rectangular by construction — the parser refuses `{1,2;3}` — so the matrix
+            // initialiser cannot fail on a parsed formula. It is still checked, because an
+            // array built in code rather than parsed can break the rule, and a `#VALUE!` is
+            // a better account of that than a crash or a silent reshape.
+            let elements = rows.flatMap { row in
+                row.map { element -> CellValue in
+                    switch element {
+                    case .number(let n): return .number(n)
+                    case .text(let s): return .text(s)
+                    case .bool(let b): return .bool(b)
+                    case .error(let e): return .error(e)
+                    // Unreachable through the parser, which admits only the four above.
+                    default: return .error(.value)
+                    }
+                }
+            }
+            guard let matrix = CellMatrix(elements: elements, rows: rows.count,
+                                          columns: rows.first?.count ?? 0) else {
+                return .error(.value)
+            }
+            return .array(matrix)
+
         case .call(let callee, let args):
             // A call written in place — `LAMBDA(x,x+1)(5)`, and `add(3)(4)` where the callee
             // is itself a call. Syntactically a call, so it costs a nesting level like any

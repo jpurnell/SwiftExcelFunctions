@@ -55,6 +55,12 @@ public extension FormulaAST {
         case .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error, .missing:
             return []
+        case .arrayConstant(let rows):
+            // The elements are children, flattened. Structurally true, and a traversal that
+            // walks them finds only literals — the grammar guarantees that. `[]` would be
+            // quicker and would also be a claim about the tree's *shape* rather than about
+            // its contents, which is not this property's business to make.
+            return rows.flatMap { $0 }
         case .call(let callee, let arguments):
             // The callee is a child too. A lambda written in place holds a whole expression,
             // and a traversal that walked only the arguments would miss every reference in it.

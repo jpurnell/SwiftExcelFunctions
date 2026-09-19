@@ -185,6 +185,13 @@ public struct Lowerer: Sendable {
             // function value has no place in it — the honest answer is to refuse the model
             // rather than to lower something that is not what the formula says.
             failures.append(.unsupportedNode("a lambda called in place", at: cell)); return
+        case .arrayConstant:
+            // Refused for the same reason a range outside an aggregate is: the bytecode is
+            // scalar arithmetic, and an array is a shape. `SUM({1,2,3})` could in principle
+            // fold to a constant, but folding *some* array constants and refusing the rest
+            // would make which models compile depend on where the array sits, which is worse
+            // than refusing all of them plainly.
+            failures.append(.unsupportedNode("an array constant", at: cell)); return
 
         case .cellRef(let ref):
             // An uncertain cell is an input and stops the walk; anything else is inlined,
@@ -393,6 +400,8 @@ extension Lowerer {
             failure = .unsupportedNode("sheet reference", at: cell); return nil
         case .namedRange(let name):
             failure = .unsupportedNode("named range \(name)", at: cell); return nil
+        case .arrayConstant:
+            failure = .unsupportedNode("an array constant", at: cell); return nil
         case .call:
             failure = .unsupportedNode("a lambda called in place", at: cell); return nil
 

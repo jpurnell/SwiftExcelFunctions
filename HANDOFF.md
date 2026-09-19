@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-19
 **Branch:** `main`, pushed, clean
-**State:** 1,705 tests · gate 45/45 uncached · zero warnings
+**State:** 1,714 tests · gate 45/45 uncached · zero warnings
 
 Read this first, then `project/summaries/2026-09-17_LambdaAndTheUnreviewedBucket.md` for how
 the state before this session was reached.
@@ -22,8 +22,8 @@ The last session ran across four repos. All are pushed:
 | Repo | Version | What moved |
 |---|---|---|
 | SwiftExcelFunctions | `main`, ahead of the 0.11.0 tag | densities rebound, `ROWS`/`COLUMNS`, `check` |
-| SwiftExcelCore | **v0.12.0** | unchanged |
-| SwiftXLSX | **v0.30.0** | `1:1` parses |
+| SwiftExcelCore | **v0.13.0** | `FormulaAST.arrayConstant` |
+| SwiftXLSX | **v0.31.0** | `1:1` parses; array constants parse |
 | **BusinessMath** | **v3.0.0-alpha.7** | `pdf(_:)` on `ContinuousDistribution`, 46 conformers |
 
 **BusinessMath is a dependency of this package and was not previously tracked here.** It is
@@ -66,8 +66,10 @@ Neither blocks anything; both are real and cheap to check.
   parser handles `A:A` correctly — this is the `String` initialiser in SwiftExcelCore only.
   Found while writing `ReferenceShapeTests`, where the obvious spelling of a test silently
   built a one-row range.
-- **Array literals — `{1,2,3;4,5,6}` — do not parse at all.** Core Excel syntax. Found the
-  same way, and worked around in that test with `SEQUENCE(2,3)`.
+- ~~**Array literals — `{1,2,3;4,5,6}` — do not parse at all.**~~ **Closed 2026-09-19.**
+  `FormulaAST.arrayConstant` (SwiftExcelCore 0.13.0), parsing and serializing (SwiftXLSX
+  0.31.0), evaluation here. The lexer had no `{`, `}` or `;` token, so the gap read as a
+  decision nobody had got to rather than as something simply absent.
 
 ### 3. The 147 `PSI` rows
 

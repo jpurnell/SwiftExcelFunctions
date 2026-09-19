@@ -122,10 +122,13 @@ final class ReferenceShapeTests: XCTestCase {
 
     /// An array's shape *is* its values, and must still come from them.
     ///
-    /// Spelled through `SEQUENCE` rather than the `{1,2,3;4,5,6}` literal, which this
-    /// package's parser does not accept — found while writing this test, and recorded rather
-    /// than worked around silently.
+    /// This was spelled through `SEQUENCE(2,3)` when it was written, because the
+    /// `{1,2,3;4,5,6}` literal did not parse — the gap that discovery led to, now closed in
+    /// SwiftXLSX 0.31.0. Both spellings are kept: they exercise different paths to an array,
+    /// and the literal is the one a person writes.
     func testArraysAreStillCountedFromTheirValues() throws {
+        XCTAssertEqual(try number("ROWS({1,2,3;4,5,6})"), 2)
+        XCTAssertEqual(try number("COLUMNS({1,2,3;4,5,6})"), 3)
         XCTAssertEqual(try number("ROWS(SEQUENCE(2,3))"), 2)
         XCTAssertEqual(try number("COLUMNS(SEQUENCE(2,3))"), 3)
     }

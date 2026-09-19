@@ -103,6 +103,11 @@ public struct OracleFinding {
         case .cellRef, .cellRange, .sheetRef, .namedRange,
              .number, .text, .bool, .error, .missing:
             return []
+        case .arrayConstant(let rows):
+            // Flattened, matching `FormulaAST.children`. The elements are literals, so a
+            // walker finds nothing in them — but the two walkers must agree about the tree's
+            // shape, and this is the one place that would not have noticed if they stopped.
+            return rows.flatMap { $0 }
         case .call(let callee, let arguments):
             // The callee counts: a lambda written in place is an expression with children of
             // its own, and a census that walked only the arguments would undercount them.
