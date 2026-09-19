@@ -518,7 +518,7 @@ EXCEL	VAR	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	VARP	compatibility	have	stats	0	0	number1,[number2],...
 EXCEL	WEIBULL	compatibility	have	SwiftExcelFunctions	0	0	x,alpha,beta,cumulative
 EXCEL	ZTEST	compatibility	have	SwiftExcelFunctions	0	0	array,x,[sigma]
-PSI	PsiAbsDev	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiAbsDev	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiAPARCH11	distribution	have	AsymmetricPowerArch(unconditionalVolatility:) — BusinessMath 2.17.0	0	0	mean, volatility, delta, gamma, err_coef, ar_coef, val0, stdev0|confirmed
 PSI	PsiAR1	distribution	have	risksolver	0	0	mean, volatility, coef1, val0|confirmed
 PSI	PsiAR2	distribution	have	risksolver	0	0	mean, volatility, coef1, coef2, val0, val1|confirmed
@@ -552,7 +552,7 @@ PSI	PsiClassifyLR	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyNB	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyNN	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiClassifyNNEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
-PSI	PsiCoeffVar	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiCoeffVar	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiCollect	property	unreviewed		0	0	UNCONFIRMED|inferred
 PSI	PsiCompound	property	unreviewed		0	0	number_cell, deduction, limit|confirmed
 PSI	PsiCon	annotation	not ours	role declaration, belongs with solver_adj	0	0	LHS, relation, RHS, active, chance_type, chance_measure, comment, model_name, critical|confirmed
@@ -565,7 +565,7 @@ PSI	PsiCorrDepen	property	unreviewed		0	0	corrname, coefficient|confirmed
 PSI	PsiCorrelation	statistic	unreviewed		0	0	cell1, cell2, simulation|confirmed
 PSI	PsiCorrIndep	property	unreviewed		0	0	corrname|confirmed
 PSI	PsiCorrMatrix	property	bindable	isValidCorrelationMatrix	0	0	matrix_cell_range, position, instance|confirmed
-PSI	PsiCount	statistic	unreviewed		0	0	cell, type, simulation|confirmed
+PSI	PsiCount	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, type, simulation|confirmed
 PSI	PsiCube	other	unreviewed		0	0	range_with_values, dim1, dim2, dim3|confirmed
 PSI	PsiCubeData	other	unreviewed		0	0	output_cell, struc_format|confirmed
 PSI	PsiCubeOutput	other	unreviewed		0	0	output_cell|confirmed
@@ -575,7 +575,7 @@ PSI	PsiCurrentOpt	other	unreviewed		0	0	(none)|inferred
 PSI	PsiBVaR	statistic	have	SimulationResults.valueAtRisk — negate at binding	4	3	cell, percentile, simulation, [struc_format], [param_slice]|confirmed
 PSI	PsiCVaR	statistic	have	SimulationResults.conditionalValueAtRisk — negate at binding; tail exact	1	1	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiDagum	distribution	have	risksolver	0	0	loc, scale, shape1, shape2|confirmed
-PSI	PsiData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
+PSI	PsiData	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, trial, simulation, struc_format, param_slice|confirmed
 PSI	PsiDataSrc	other	unreviewed		0	0	src_name, val_col_names, data, idx1_name, idx1_elem, idx2_name, idx2_elem|confirmed
 PSI	PsiDblTriang	distribution	have	risksolver	0	0	min, likely, max, p|confirmed
 PSI	PsiDecTable	other	unreviewed		0	0	table_range, output, ret_header, input_val1, input_val2|confirmed
@@ -593,9 +593,9 @@ PSI	PsiEngine	annotation	not ours	role declaration, belongs with solver_adj	0	0	
 PSI	PsiErf	distribution	have	risksolver	0	0	h|confirmed
 PSI	PsiErfAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
 PSI	PsiErlang	distribution	have	risksolver	0	0	k, beta|confirmed
-PSI	PsiExpGain	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiExpGain	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiExpGainRatio	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
-PSI	PsiExpLoss	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiExpLoss	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiExpLossRatio	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiExponential	distribution	have	risksolver	0	0	beta|confirmed
 PSI	PsiExponentialAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile or var|confirmed
@@ -617,7 +617,7 @@ PSI	PsiForecastLinear	other	unreviewed		0	0	X, known_ys, known_xs, simulate|conf
 PSI	PsiForecastMovingAvg	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiFrechet	distribution	have	risksolver	0	0	loc, scale, shape|confirmed
 PSI	PsiFrechetAlt	distribution	have	risksolver	0	0	3 name/value pairs, names chosen from: loc, scale, shape, or a percentile (0-1)|confirmed
-PSI	PsiFrequency	statistic	unreviewed		0	0	cell, freq_type, bin_bounds, simulation|confirmed
+PSI	PsiFrequency	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, freq_type, bin_bounds, simulation|confirmed
 PSI	PsiGamma	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiGammaAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: percentile1, percentile2, mean, var, shape, scale|confirmed
 PSI	PsiGARCH11	distribution	have	risksolver	0	0	mean, volatility, err_coef, ar_coef, val0, stdev0|confirmed
@@ -637,7 +637,7 @@ PSI	PsiJohnsonSU	distribution	have	risksolver	0	0	shape1, shape2, loc, scale|con
 PSI	PsiJoin	other	unreviewed		0	0	Table1, Table2, Clause, Return_table|confirmed
 PSI	PsiKendallTau	statistic	unreviewed		0	0	cell1, cell2|confirmed
 PSI	PsiKumaraswamy	distribution	have	risksolver	0	0	shape1, shape2, min, max|confirmed
-PSI	PsiKurtosis	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiKurtosis	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiLaplace	distribution	have	risksolver	0	0	loc, beta (scale)|confirmed
 PSI	PsiLaplaceAlt	distribution	have	risksolver	0	0	2 parameters, chosen from: two different percentiles or the standard deviation|confirmed
 PSI	PsiLevy	distribution	have	risksolver	0	0	loc, scale|confirmed
@@ -718,7 +718,7 @@ PSI	PsiPredictRT	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiPredictRTEnsemble	other	unreviewed		0	0	UNCONFIRMED|confirmed
 PSI	PsiPtoX	statistic	unreviewed		0	0	cell, percentile, simulation, struc_format, param_slice|confirmed
 PSI	PsiQtoX	statistic	unreviewed		0	0	cell, percentile, simulation|confirmed
-PSI	PsiRange	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiRange	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiRayleigh	distribution	have	risksolver	0	0	beta|confirmed
 PSI	PsiRayleighAlt	distribution	have	risksolver	0	0	1 parameter, chosen from: percentile, var, mean|confirmed
 PSI	PsiReciprocal	distribution	have	risksolver	0	0	min, max|confirmed
@@ -726,10 +726,10 @@ PSI	PsiReduce	other	unreviewed		0	0	cube_expression, aggregation, dimension|conf
 PSI	PsiResample	distribution	have	risksolver	0	0	data|confirmed
 PSI	PsiSample	property	unreviewed		0	0	array_or_dist|confirmed
 PSI	PsiSeed	property	unreviewed		0	0	value|confirmed
-PSI	PsiSemiDev	statistic	unreviewed		0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
-PSI	PsiSemiDev2	statistic	unreviewed		0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
-PSI	PsiSemiVar	statistic	unreviewed		0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
-PSI	PsiSemiVar2	statistic	unreviewed		0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
+PSI	PsiSemiDev	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
+PSI	PsiSemiDev2	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
+PSI	PsiSemiVar	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, q, target, simulation, struc_format, param_slice|confirmed
+PSI	PsiSemiVar2	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, [lowerdata], [simulation], [strucformat], [paramslice]|confirmed
 PSI	PsiSenParam	annotation	not ours	role declaration, belongs with solver_adj	15	9	values_or_lower, upper, base_case|confirmed
 PSI	PsiSenValue	other	unreviewed		0	0	cell_or_name|confirmed
 PSI	PsiShift	property	unreviewed		0	0	shift|confirmed
@@ -759,14 +759,14 @@ PSI	PsiSimOutput	annotation	not ours	role declaration, belongs with solver_adj	0
 PSI	PsiSimParam	annotation	not ours	role declaration, belongs with solver_adj	5	2	values, upper, base_case|confirmed
 PSI	PsiSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	sip|confirmed
 PSI	PsiSixSigma	property	unreviewed		0	0	p1, p2, p3, p4, p5|confirmed
-PSI	PsiSkewness	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiSkewness	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
 PSI	PsiSlurp	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	slurp, j|confirmed
 PSI	PsiSpearmanRho	statistic	unreviewed		0	0	cell1, cell2|confirmed
 PSI	PsiStatic	property	unreviewed		0	0	static_val|confirmed
 PSI	PsiStdDev	statistic	have	SimulationResults.statistics.stdDev — sample, not population	4	3	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStdDevCI	statistic	unreviewed		0	0	cell, confidence_level, simulation, struc_format, param_slice|confirmed
-PSI	PsiStdErr	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiStdErr	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiStudent	distribution	have	risksolver	0	0	df|confirmed
 PSI	PsiStudentAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
 PSI	PsiTableCube	other	unreviewed		0	0	table_description, table_values|confirmed
@@ -807,7 +807,7 @@ PSI	PsiUniform	distribution	have	risksolver	24	16	a (min), b (max)|confirmed
 PSI	PsiUniformAlt	distribution	have	risksolver	0	0	2 parameters combining native args (lower, upper) with percentiles, e.g. (lower, percentile1) or (percentile1, upper) or (percentile1, percentile2)|confirmed
 PSI	PsiUnits	property	unreviewed		0	0	string|confirmed
 PSI	PsiVar	annotation	not ours	role declaration, belongs with solver_adj	0	0	cell_range, type, active, comment, model_name, critical|confirmed
-PSI	PsiVariance	statistic	unreviewed		0	0	cell, simulation, struc_format, param_slice|confirmed
+PSI	PsiVariance	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiVary	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	base, min, max, [range_type], [dist_name]|confirmed
 PSI	PsiWeibull	distribution	have	risksolver	0	0	alpha, beta|confirmed
 PSI	PsiWeibullAlt	distribution	have	risksolver	0	0	1 percentile parameter|confirmed
