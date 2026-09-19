@@ -130,6 +130,7 @@ public struct FunctionRegistry: Sendable {
             BuiltinRiskSolverStatistics.all,
             BuiltinRiskSolverRunStatistics.all,
             BuiltinRiskSolverTheoretical.all,
+            BuiltinRiskSolverSixSigma.all,
             BuiltinBindingFunctions.all,
         ]
         for category in allCategories {

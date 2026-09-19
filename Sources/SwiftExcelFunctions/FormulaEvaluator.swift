@@ -643,6 +643,35 @@ public enum FormulaEvaluator {
                     })
             }
 
+            // `PsiSigma*` needs two things at once: the run, for the mean and spread, and
+            // the cell's *formula*, for the specification limits a `PsiSixSigma(…)` call
+            // carries. No limits exist in a run — no number of trials reveals what the
+            // customer will accept — so they are read structurally, which is why this is
+            // here rather than in an `ExcelFunction` closure.
+            if BuiltinRiskSolverSixSigma.governs(fn.name) {
+                guard let subject = args.first,
+                      let reference = referencedCell(of: subject, in: inCall) else {
+                    return .error(.value)
+                }
+                guard let simulation = inCall.simulation,
+                      let results = simulation.results(for: reference) else {
+                    return .error(.na)
+                }
+                guard let formula = distributionFormula(of: subject, in: inCall),
+                      let call = sixSigmaCall(in: formula) else {
+                    // The cell carries no specification. `#N/A` rather than `#VALUE!`: the
+                    // question is well-formed and the model simply has not said what the
+                    // limits are, which is a thing a modeller fixes in the sheet.
+                    return .error(.na)
+                }
+                let arguments = try call.map { try evaluateNode($0, in: inCall) }
+                guard let specification = BuiltinRiskSolverSixSigma
+                    .specification(from: arguments) else { return .error(.value) }
+                return BuiltinRiskSolverSixSigma.evaluate(
+                    fn.name, specification: specification, values: results.values,
+                    mean: results.statistics.mean, deviation: results.statistics.stdDev)
+            }
+
             // The higher-order six. Their *arguments* are evaluated normally — `MAP(A1:A4, f)`
             // needs both — but calling the lambda needs the evaluator, and an `ExcelFunction`
             // closure is handed values and no way to evaluate anything. So they are reached
@@ -805,6 +834,41 @@ public enum FormulaEvaluator {
         // moments of a single point as though they were a distribution's.
         guard case .formula(let ast, _) = value else { return nil }
         return ast
+    }
+
+    /// The cell an argument names, for a statistic that needs one.
+    ///
+    /// - Parameters:
+    ///   - subject: the first argument, unevaluated.
+    ///   - env: the environment, for the current sheet.
+    /// - Returns: the cell, or `nil` when the argument is not a reference.
+    private static func referencedCell(
+        of subject: FormulaAST, in env: EvaluationEnvironment
+    ) -> CellRef? {
+        switch subject {
+        case .cellRef(let ref): return ref
+        case .sheetRef(let reference): return reference.range.start
+        default: return nil
+        }
+    }
+
+    /// The arguments of the `PsiSixSigma(…)` call a formula carries, if it carries one.
+    ///
+    /// Searched for through `FormulaAST.children` rather than by walking the cases here, so
+    /// a call nested inside arithmetic — which is how it is always written, added onto a real
+    /// formula — is found wherever it sits.
+    ///
+    /// - Parameter formula: the output cell's formula.
+    /// - Returns: the unevaluated arguments, or `nil` if there is no such call.
+    private static func sixSigmaCall(in formula: FormulaAST) -> [FormulaAST]? {
+        if case .function(let name, let arguments) = formula,
+           FunctionRegistry.canonical(name) == "PSISIXSIGMA" {
+            return arguments
+        }
+        for child in formula.children {
+            if let found = sixSigmaCall(in: child) { return found }
+        }
+        return nil
     }
 
     // MARK: - Named Range Resolution

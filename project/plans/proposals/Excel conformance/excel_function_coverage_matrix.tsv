@@ -734,31 +734,31 @@ PSI	PsiSenParam	annotation	not ours	role declaration, belongs with solver_adj	15
 PSI	PsiSenValue	other	unreviewed		0	0	cell_or_name|confirmed
 PSI	PsiShift	property	unreviewed		0	0	shift|confirmed
 PSI	PsiShuffle	distribution	have	risksolver	0	0	data|confirmed
-PSI	PsiSigmaCP	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaCPK	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaCPKLower	statistic	unreviewed		0	0	cell, lower_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaCPKUpper	statistic	unreviewed		0	0	cell, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaCPM	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, target, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaDefectPPM	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaDefectShiftPPM	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaDefectShiftPPMLower	statistic	unreviewed		0	0	cell, lower_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaDefectShiftPPMUpper	statistic	unreviewed		0	0	cell, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaK	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaLowerBound	statistic	unreviewed		0	0	cell, number_stdev, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaProbDefectShift	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaProbDefectShiftLower	statistic	unreviewed		0	0	cell, lower_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaProbDefectShiftUpper	statistic	unreviewed		0	0	cell, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaSigmaLevel	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaUpperBound	statistic	unreviewed		0	0	cell, number_stdev, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaYield	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaZLower	statistic	unreviewed		0	0	cell, lower_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaZMin	statistic	unreviewed		0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
-PSI	PsiSigmaZUpper	statistic	unreviewed		0	0	cell, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaCP	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaCPK	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaCPKLower	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaCPKUpper	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaCPM	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, target, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaDefectPPM	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaDefectShiftPPM	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaDefectShiftPPMLower	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaDefectShiftPPMUpper	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaK	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaLowerBound	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, number_stdev, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaProbDefectShift	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaProbDefectShiftLower	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaProbDefectShiftUpper	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaSigmaLevel	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaUpperBound	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, number_stdev, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaYield	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, shift, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaZLower	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaZMin	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, lower_limit, upper_limit, simulation, struc_format, param_slice|confirmed
+PSI	PsiSigmaZUpper	statistic	have	BuiltinRiskSolverSixSigma	0	0	cell, upper_limit, simulation, struc_format, param_slice|confirmed
 PSI	PsiSimData	statistic	unreviewed		0	0	cell, trial, simulation, struc_format, param_slice|confirmed
 PSI	PsiSimOutput	annotation	not ours	role declaration, belongs with solver_adj	0	0	[cell_range]|confirmed
 PSI	PsiSimParam	annotation	not ours	role declaration, belongs with solver_adj	5	2	values, upper, base_case|confirmed
 PSI	PsiSip	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	sip|confirmed
-PSI	PsiSixSigma	property	unreviewed		0	0	p1, p2, p3, p4, p5|confirmed
+PSI	PsiSixSigma	property	have	BuiltinRiskSolverSixSigma	0	0	p1, p2, p3, p4, p5|confirmed
 PSI	PsiSkewness	statistic	have	BuiltinRiskSolverRunStatistics	0	0	cell, simulation, struc_format, param_slice|confirmed
 PSI	PsiSlackValue	other	unreviewed		0	0	cell, optimization, upper|confirmed
 PSI	PsiSlurp	distribution	not ours	names a stored SIP or declares a role — address arithmetic, not mathematics	0	0	slurp, j|confirmed
