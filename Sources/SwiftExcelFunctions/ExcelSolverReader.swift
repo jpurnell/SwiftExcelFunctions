@@ -393,6 +393,20 @@ public enum ExcelSolverReader {
         }
     }
 
+    /// The largest area a Solver model may name, enumerated cell by cell.
+    ///
+    /// A whole column is 1,048,576 references — about 25 MB for a model that cannot use
+    /// them, since Excel's own Solver caps decision variables at 200 and constraints at 100.
+    /// 4,096 is four columns of a thousand rows: larger than any model a person builds
+    /// deliberately, and the same bound `DependencyGraph.exactEnumerationLimit` uses for the
+    /// same reason.
+    ///
+    /// **Refused rather than truncated.** Half a model is worse than none — a caller handed
+    /// the first 4,096 cells of a column has something that looks complete and optimises the
+    /// wrong thing. An area past the limit names no cells, which is what `.formula` already
+    /// answers for a name a Solver model cannot use.
+    static let maximumModelCells = 4_096
+
     /// The cells of a possibly multi-area reference string.
     ///
     /// - Parameter reference: Something like `Sheet1!$A$1:$A$3,Sheet1!$C$5`.
@@ -407,9 +421,25 @@ public enum ExcelSolverReader {
             // list mixing `A1` with `$C$5` invites a caller to compare two of its own
             // entries and find them unequal. Position is what a model means here; the `$`
             // is notation from the file.
-            let parsed = body.contains(":") ? CellRange(body).cells : [CellRef(body)]
+            let parsed: [CellRef]
+            if body.contains(":") {
+                let range = CellRange(body)
+                // Multiplied rather than counted: `cells` is what must not be built.
+                guard range.rowCount * range.columnCount <= maximumModelCells else { return [] }
+                parsed = range.cells
+            } else {
+                parsed = [CellRef(body)]
+            }
             return parsed.map { CellRef(column: $0.column, row: $0.row) }
         }
+    }
+
+    /// `areas(in:)`, for tests.
+    ///
+    /// - Parameter reference: A possibly multi-area reference string.
+    /// - Returns: Every cell it covers, areas past ``maximumModelCells`` dropped.
+    static func cellsForTesting(_ reference: String) -> [CellRef] {
+        areas(in: reference)
     }
 
     /// The single cell a name points at, if it points at one.

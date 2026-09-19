@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Solver model naming a whole column tried to enumerate 1,048,576 cells.**
+  `ExcelSolverReader` turns a model's references into one `CellRef` each — about 25 MB for a
+  model that cannot use them, since Excel's own Solver caps decision variables at 200.
+
+  **This was already reachable before today**, by the defined-name path:
+  `DefinedNameResolver` has always read `Sheet1!$A:$A` as the whole column it is. Fixing
+  `CellRange(_:)` in SwiftExcelCore 0.14.0 added a second way in — a literal `A:A` in a
+  multi-area reference string — which is what made it worth looking at.
+
+  An area larger than `maximumModelCells` (4,096, the bound
+  `DependencyGraph.exactEnumerationLimit` already uses for the same reason) now names **no**
+  cells. **Refused rather than truncated**: half a model is worse than none, because a caller
+  handed the first 4,096 cells of a column has something that looks complete and optimises the
+  wrong thing. Areas beside an oversized one are kept.
+
+- Dependency floors: SwiftExcelCore **0.14.0**, SwiftXLSX **0.31.1** — where `A:A` and `1:1`
+  stop being read as `A1` and as a range in column zero.
+
 ### Added
 
 - **Array constants evaluate: `{1,2,3;4,5,6}`.** Core Excel syntax this package could not read

@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-19
 **Branch:** `main`, pushed, clean
-**State:** 1,714 tests · gate 45/45 uncached · zero warnings
+**State:** 1,718 tests · gate 45/45 uncached · zero warnings
 
 Read this first, then `project/summaries/2026-09-17_LambdaAndTheUnreviewedBucket.md` for how
 the state before this session was reached.
@@ -22,8 +22,8 @@ The last session ran across four repos. All are pushed:
 | Repo | Version | What moved |
 |---|---|---|
 | SwiftExcelFunctions | `main`, ahead of the 0.11.0 tag | densities rebound, `ROWS`/`COLUMNS`, `check` |
-| SwiftExcelCore | **v0.13.0** | `FormulaAST.arrayConstant` |
-| SwiftXLSX | **v0.31.0** | `1:1` parses; array constants parse |
+| SwiftExcelCore | **v0.14.0** | `FormulaAST.arrayConstant`; whole spans |
+| SwiftXLSX | **v0.31.1** | `1:1` parses; array constants; whole-span reader |
 | **BusinessMath** | **v3.0.0-alpha.7** | `pdf(_:)` on `ContinuousDistribution`, 46 conformers |
 
 **BusinessMath is a dependency of this package and was not previously tracked here.** It is
@@ -57,15 +57,16 @@ today, is to run the evaluation on a thread with a larger stack.
 Documented on `FormulaEvaluator.maxRecursionDepth` and pinned by
 `NamedLambdaTests.testTooDeepIsRefusedRatherThanCrashing`.
 
-### 2. Two parser gaps, both found from the side
+### 2. Two parser gaps, both found from the side — **both now closed**
 
 Neither blocks anything; both are real and cheap to check.
 
-- **`CellRange("A:A")` does not understand whole-column shorthand.** It splits on the colon
-  and parses `"A"` as a cell reference, so the range comes back one row tall. The *formula*
-  parser handles `A:A` correctly — this is the `String` initialiser in SwiftExcelCore only.
-  Found while writing `ReferenceShapeTests`, where the obvious spelling of a test silently
-  built a one-row range.
+- ~~**`CellRange("A:A")` does not understand whole-column shorthand.**~~ **Closed
+  2026-09-19**, and it was larger than it looked: whole-*row* forms produced references in
+  column **zero**, `CellRange("")` trapped, and a descending span trapped in `cells`. The rule
+  had two implementations and only SwiftXLSX's `DefinedNameResolver` had it right — which is
+  why whole-column defined names round-tripped across 161,901 of them while `CellRange(_:)`
+  answered `A1`, and why nobody found it. SwiftExcelCore 0.14.0, SwiftXLSX 0.31.1.
 - ~~**Array literals — `{1,2,3;4,5,6}` — do not parse at all.**~~ **Closed 2026-09-19.**
   `FormulaAST.arrayConstant` (SwiftExcelCore 0.13.0), parsing and serializing (SwiftXLSX
   0.31.0), evaluation here. The lexer had no `{`, `}` or `;` token, so the gap read as a
