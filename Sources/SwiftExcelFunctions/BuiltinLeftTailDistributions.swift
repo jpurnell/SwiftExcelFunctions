@@ -39,29 +39,30 @@ public enum BuiltinLeftTailDistributions {
         guard x >= 0, df >= 1 else { return .error(.num) }
 
         guard truthy(args[2]) else {
-            // **Written out rather than bound to BusinessMath's `chi2pdf`, which does not
-            // compute a density.** Its body sums the density at 0.001, 0.002, … up to `x` and
-            // multiplies by the step: a Riemann sum of the integral, which is the *cumulative*
-            // function. `chi2pdf(x: 10, dF: 3)` answers 0.98144 — the CDF at 10 — where the
-            // density there is 0.0085.
+            // This used to be written out, because BusinessMath's `chi2pdf` did not compute
+            // a density: its body summed the density at 0.001, 0.002, … up to `x` and
+            // multiplied by the step — a Riemann sum of the integral, which is the
+            // *cumulative* function. `chi2pdf(x: 10, dF: 3)` answered 0.98144, the CDF at 10,
+            // where the density is 0.0085.
             //
-            // Not a precision defect but a naming one, and the module already holds the right
-            // answer under another name: `chiSquaredCDF`, which `CHISQ.DIST.RT` uses and which
-            // agrees with the closed form. `studentTPDF` was checked the same way and matches
-            // to 1e-16, so this is one function rather than a reason to distrust the module.
-            //
-            // Reported upstream; rebind if a real `chi2pdf` arrives.
-            let k = Double(df)
+            // **Fixed upstream in 3.0.0-alpha.7**, which this package now pins.
+            // `chiSquaredPDF(x:df:)` is a real density, and the hand-rolled expression it
+            // replaces agreed with it — so this is a de-duplication rather than a correction,
+            // and `DensityBindingTests` was written against the old code precisely so that
+            // "still green" afterwards means something.
             guard x > 0 else {
                 // At zero the density is unbounded below two degrees of freedom, exactly ½ at
                 // two, and zero above. Compared as integers, which is what `df` is — an
                 // equality on the `Double` would be asking the wrong question of the value.
+                //
+                // Kept here rather than delegated: `chiSquaredPDF` throws on the unbounded
+                // case, correctly, and the mapping from that throw onto `#NUM!` is a
+                // spreadsheet convention rather than a fact about the distribution.
                 if df < 2 { return .error(.num) }
                 return .number(df == 2 ? 0.5 : 0)
             }
-            let logDensity = -(k / 2) * Foundation.log(2) - logGamma(k / 2)
-                + (k / 2 - 1) * Foundation.log(x) - x / 2
-            return finite(Foundation.exp(logDensity))
+            guard let density = try? chiSquaredPDF(x: x, df: df) else { return .error(.num) }
+            return finite(density)
         }
         return complementOf(BuiltinStatisticalDistributions.chiSquaredDistRightTail,
                             [.number(x), .number(Double(df))])
@@ -103,14 +104,13 @@ public enum BuiltinLeftTailDistributions {
         guard x >= 0, d1 >= 1, d2 >= 1 else { return .error(.num) }
 
         guard truthy(args[3]) else {
+            // Zero at zero for every numerator, which is this package's rule rather than the
+            // mathematics': below three numerator degrees of freedom the density there is one
+            // or unbounded, and `DistributionF.pdf` says so. Excel has not been measured on
+            // this point, so the shipped answer is kept and pinned by a test rather than
+            // quietly changed to the mathematically correct one.
             guard x > 0 else { return .number(0) }
-            let n1 = Double(d1), n2 = Double(d2)
-            let logDensity =
-                (n1 / 2) * Foundation.log(n1) + (n2 / 2) * Foundation.log(n2)
-                + (n1 / 2 - 1) * Foundation.log(x)
-                - ((n1 + n2) / 2) * Foundation.log(n2 + n1 * x)
-                + logGamma((n1 + n2) / 2) - logGamma(n1 / 2) - logGamma(n2 / 2)
-            return finite(Foundation.exp(logDensity))
+            return finite(DistributionF(df1: d1, df2: d2).pdf(x))
         }
         return complementOf(BuiltinStatisticalDistributions.fDistRightTail,
                             [.number(x), .number(Double(d1)), .number(Double(d2))])
@@ -238,16 +238,6 @@ public enum BuiltinLeftTailDistributions {
         guard !targets.isEmpty else { return .error(.value) }
         let values = targets.map { CellValue.number(body(m, c, $0)) }
         return shaped(values, rows: values.count, columns: 1)
-    }
-
-    /// `log Γ(x)`.
-    ///
-    /// Foundation's, rather than a series written here: the F density needs it only to keep a
-    /// ratio of large gammas from overflowing, and a second implementation of log-gamma would
-    /// be a second set of answers in a package that already has one.
-    private static func logGamma(_ x: Double) -> Double {
-        var sign: Int32 = 1
-        return lgamma_r(x, &sign)
     }
 
     private static func isError(_ value: CellValue) -> Bool {

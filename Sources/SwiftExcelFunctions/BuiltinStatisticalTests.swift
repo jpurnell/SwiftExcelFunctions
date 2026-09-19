@@ -84,13 +84,10 @@ public enum BuiltinStatisticalTests {
         guard x >= 0, shape > 0, scale > 0 else { return .error(.num) }
 
         let distribution = DistributionWeibull(shape: shape, scale: scale)
-        guard cumulative else {
-            // The density: (α/β)·(x/β)^(α−1)·e^(−(x/β)^α).
-            let scaled = x / scale
-            let density = (shape / scale) * Foundation.pow(scaled, shape - 1)
-                * Foundation.exp(-Foundation.pow(scaled, shape))
-            return .number(density)
-        }
+        // Both branches now come from the same value. The density used to be written out
+        // here while the cumulative delegated, which is one function holding two opinions
+        // about the same distribution.
+        guard cumulative else { return .number(distribution.pdf(x)) }
         return .number(distribution.cdf(x))
     }
 

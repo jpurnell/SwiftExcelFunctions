@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BusinessMath 3.0.0-alpha.6 → 3.0.0-alpha.7**, which required no `Package.swift` edit: the
+  `.upToNextMinor(from: "3.0.0-alpha.3")` range already admitted it, as the note beside that
+  line predicted. The bump takes 29 upstream commits — branch-and-bound determinism, two
+  bytecode miscompilations, a false optimality certificate, simulated annealing, constrained
+  optimisation, and two numerical finite-difference defects. All 1,691 existing tests pass
+  across it unchanged.
+
+- **Seven densities stop keeping their own copy of the mathematics.** `EXPON.DIST`,
+  `GAMMA.DIST`, `LOGNORM.DIST`, `BETA.DIST`, `WEIBULL.DIST`, `CHISQ.DIST` and `F.DIST` each
+  wrote out a closed-form density when their `cumulative` flag was `FALSE`, because
+  `ContinuousDistribution` had no `pdf(_:)` to bind. alpha.7 adds one, and they now delegate.
+
+  **No Excel-visible behaviour changes.** Every domain rule stays in this package: the `#NUM!`
+  at a chi-squared's unbounded point, `BETA.DIST` refusing both endpoints, `F.DIST` answering
+  zero at zero for every numerator. Upstream answers `infinity` in the first and third of
+  those — correctly, because that is the density — and the mapping onto `#NUM!` or zero is a
+  spreadsheet convention rather than a fact about the distribution.
+
+  `WEIBULL.DIST` was the sharpest case: it already constructed a `DistributionWeibull` for its
+  cumulative branch and hand-wrote the density two lines below it. One function, two opinions.
+
+### Added
+
+- **`DensityBindingTests`** — the seven densities pinned to **the numerical derivative of their
+  own cumulative branches**, plus quadrature, the boundary conventions above, and `BETA.DIST`'s
+  `A`/`B` Jacobian. Written and run **against the hand-rolled code first**, so that "still
+  green" after the rebinding says something; then checked by deliberately breaking two things a
+  rebinding plausibly breaks — Excel's gamma `beta` read as a rate rather than a scale, and
+  `BETA.DIST`'s width Jacobian dropped — which produced 9 failures across 4 of the 5 tests.
+
+  That last check is the reason the file exists. A delegation is where a **parameterisation**
+  slips without anything failing to compile, and all three candidates here are silent:
+  `GAMMA.DIST`'s scale-versus-rate, `LOGNORM.DIST`'s parameters being of `ln(x)`, and
+  `BETA.DIST`'s bounds carrying a Jacobian that a unit-interval test could never detect.
+
+### Removed
+
+- **A private `logGamma`**, whose own documentation said "the F density needs it". It did, and
+  the F density is no longer written here. Found by the gate rather than by reading — a
+  de-duplication removes the reason a helper existed, and nothing in the build notices.
+
 ## [0.11.0] - 2026-09-18
 
 ### Added

@@ -90,7 +90,7 @@ public enum BuiltinStatisticalDistributions {
               let cumulative = flag(values[2]) else { return .error(.value) }
         guard x >= 0, lambda > 0 else { return .error(.num) }
 
-        guard cumulative else { return .number(lambda * Foundation.exp(-lambda * x)) }
+        guard cumulative else { return .number(DistributionExponential(lambda).pdf(x)) }
         return .number(exponentialCDF(x, λ: lambda))
     }
 
@@ -110,11 +110,15 @@ public enum BuiltinStatisticalDistributions {
         guard x >= 0, shape > 0, scale > 0 else { return .error(.num) }
 
         guard cumulative else {
-            // The density, from its definition: x^(α−1)·e^(−x/β) / (β^α·Γ(α)).
+            // Excel's `beta` is a scale, so the `shape:scale:` initialiser is the one asked
+            // for by name. `DistributionGamma` also offers `shape:rate:` — the reciprocal —
+            // and choosing between them by label rather than by arithmetic is the point:
+            // a model built against the wrong one reports a distribution stretched by 1/β².
             guard x > 0 else { return .number(shape < 1 ? .infinity : (shape == 1 ? 1 / scale : 0)) }
-            let logDensity = (shape - 1) * Foundation.log(x) - x / scale
-                - shape * Foundation.log(scale) - Foundation.lgamma(shape)
-            return .number(Foundation.exp(logDensity))
+            guard let distribution = DistributionGamma(shape: shape, scale: scale) else {
+                return .error(.num)
+            }
+            return .number(distribution.pdf(x))
         }
         return .number(gammaCDF(x, shape: shape, scale: scale))
     }
@@ -134,10 +138,9 @@ public enum BuiltinStatisticalDistributions {
         guard x > 0, deviation > 0 else { return .error(.num) }
 
         guard cumulative else {
-            let z = (Foundation.log(x) - mean) / deviation
-            let density = Foundation.exp(-z * z / 2)
-                / (x * deviation * (2 * Double.pi).squareRoot())
-            return .number(density)
+            // `logMean` and `logStdDev` by name upstream, which is what Excel's `mean` and
+            // `standard_dev` are here — parameters of ln(x), not of x.
+            return .number(DistributionLogNormal(logMean: mean, logStdDev: deviation).pdf(x))
         }
         return .number(logNormalCDF(x, mean: mean, stdDev: deviation))
     }
@@ -177,12 +180,16 @@ public enum BuiltinStatisticalDistributions {
             return .number(probability)
         }
 
-        // The density, from the log form: the beta function overflows for ordinary shapes
-        // long before the density itself does.
+        // `DistributionBetaGeneralised` *is* a beta rescaled onto `[A, B]`, so it carries
+        // the width Jacobian itself rather than leaving it to be remembered here. The
+        // endpoints stay this package's business: upstream answers `infinity` there when a
+        // shape is below one, which is the density, where Excel answers `#NUM!`.
         guard unit > 0, unit < 1 else { return .error(.num) }
-        let logBeta = lgamma(alpha) + lgamma(beta) - lgamma(alpha + beta)
-        let logDensity = (alpha - 1) * log(unit) + (beta - 1) * log1p(-unit) - logBeta
-        let density = exp(logDensity) / width
+        guard let distribution = DistributionBetaGeneralised(shape1: alpha, shape2: beta,
+                                                             min: lower, max: upper) else {
+            return .error(.num)
+        }
+        let density = distribution.pdf(x)
         guard density.isFinite else { return .error(.num) }
         return .number(density)
     }
