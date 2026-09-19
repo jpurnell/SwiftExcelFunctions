@@ -154,7 +154,13 @@ final class DensityBindingTests: XCTestCase {
     /// `WEIBULL.DIST` answers a flat zero even where the density is unbounded.
     /// `CHISQ.DIST` and `F.DIST` honour the mathematics. `GAMMA.DIST` and `BETA.DIST` refuse
     /// one case the other two answer. This is a measurement, not a theory about Excel, and
-    /// the workbook that produced it is round eight — `ConformanceCases.roundEight`.
+    /// the workbooks that produced it are rounds eight and nine — `ConformanceCases.roundEight`
+    /// and `roundNine`.
+    ///
+    /// **Every value below is measured. None is inferred.** The last inference — `BETA.DIST`'s
+    /// upper endpoint below a shape of one, applied by symmetry with its lower endpoint — was
+    /// put to Excel in round nine and held. Round nine came back with **zero** disagreements
+    /// across all 158 cases.
     ///
     /// **Three of these were guessed wrong before the round ran**, two of them by this
     /// package for years and one by the guess that was meant to fix it: `WEIBULL.DIST`'s
@@ -196,6 +202,21 @@ final class DensityBindingTests: XCTestCase {
              [.number(0), .number(2), .number(5), .bool(false)], .number(0)),
             ("BETA.DIST(1, 2, 5, FALSE)",
              [.number(1), .number(2), .number(5), .bool(false)], .number(0)),
+
+            // Round nine: the upper endpoint, which round eight measured at only one shape.
+            // The rule had been applied there by symmetry with the lower endpoint — and
+            // symmetry is the reasoning round eight punished, since GAMMA.DIST and
+            // WEIBULL.DIST face the same boundary and disagree with each other. Asked
+            // rather than assumed, and the inference held.
+            ("BETA.DIST(1, 2, 0.5, FALSE)",
+             [.number(1), .number(2), .number(0.5), .bool(false)], .error(.num)),
+            ("BETA.DIST(1, 2, 1, FALSE)",
+             [.number(1), .number(2), .number(1), .bool(false)], .error(.num)),
+            ("BETA.DIST(1, 2, 3, FALSE)",
+             [.number(1), .number(2), .number(3), .bool(false)], .number(0)),
+            ("F.DIST(0, 3, 5, FALSE)",
+             [.number(0), .number(3), .number(5), .bool(false)], .number(0)),
+            ("CHISQ.DIST(0, 4, FALSE)", [.number(0), .number(4), .bool(false)], .number(0)),
 
             ("LOGNORM.DIST(0, 0, 1, FALSE)",
              [.number(0), .number(0), .number(1), .bool(false)], .error(.num)),

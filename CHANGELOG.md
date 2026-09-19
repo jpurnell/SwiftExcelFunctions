@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified
+
+- **Round nine came back with zero disagreements across all 158 cases** — the first round in
+  this project's life to do so. It confirmed the `ROWS(A:A)` and `COLUMNS(1:1)` fixes below
+  against Excel, and settled the one density boundary still resting on an inference:
+  `BETA.DIST`'s upper endpoint below a shape of one, which had been applied by symmetry with
+  its lower endpoint. **The inference held** — Excel refuses at or below a shape of one and
+  answers zero above it, so `BETA.DIST(1, 2, 1, FALSE)` is `#NUM!` where the density is an
+  ordinary 2.
+
+  The reasoning is kept rather than deleted now that it came out right. Being correct is not
+  the same as being entitled to guess: `GAMMA.DIST` and `WEIBULL.DIST` face the identical
+  boundary and disagree with each other, so the symmetry that held here was a coin that landed
+  the right way up. **No density boundary in this package now rests on an inference.**
+
 ### Fixed
 
 - **`ROWS(A:A)` answered the height of the used range, not 1,048,576.** Ten on a sheet with

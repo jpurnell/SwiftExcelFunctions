@@ -1,30 +1,34 @@
 # Handoff
 
-**Updated:** 2026-09-18
+**Updated:** 2026-09-19
 **Branch:** `main`, pushed, clean
-**State:** 591 functions · 1,736 tests · gate 45/45 uncached · zero warnings
+**State:** 1,705 tests · gate 45/45 uncached · zero warnings
 
 Read this first, then `project/summaries/2026-09-17_LambdaAndTheUnreviewedBucket.md` for how
-the current state was reached.
+the state before this session was reached.
 
 ---
 
 ## Where the project is
 
-Nothing is in progress. Nothing is blocked. The last session closed the two things that had
-been open longest:
+Nothing is in progress. Nothing is blocked.
 
-- **`LAMBDA`** — all six proposal steps, plus a prerequisite the proposal did not have.
-- **The unreviewed bucket** — 87 `EXCEL` rows → **0**. Final: 473 `have`, 25 out of scope with
-  a written reason each, 20 bindable, 1 new.
+**Round nine of the conformance workbook returned zero disagreements across all 158 cases** —
+the first clean round in this project's life. Every density boundary is measured; none rests
+on an inference.
 
-The three repos are in step and all pushed:
+The last session ran across four repos. All are pushed:
 
-| Repo | Version |
-|---|---|
-| SwiftExcelFunctions | `main`, ahead of the 0.10.0 tag |
-| SwiftExcelCore | **v0.12.0** |
-| SwiftXLSX | **v0.29.0** |
+| Repo | Version | What moved |
+|---|---|---|
+| SwiftExcelFunctions | `main`, ahead of the 0.11.0 tag | densities rebound, `ROWS`/`COLUMNS`, `check` |
+| SwiftExcelCore | **v0.12.0** | unchanged |
+| SwiftXLSX | **v0.30.0** | `1:1` parses |
+| **BusinessMath** | **v3.0.0-alpha.7** | `pdf(_:)` on `ContinuousDistribution`, 46 conformers |
+
+**BusinessMath is a dependency of this package and was not previously tracked here.** It is
+pinned by `.upToNextMinor(from: "3.0.0-alpha.3")`, which already admits alpha.7 — a bump needs
+no `Package.swift` edit, only `swift package update`.
 
 **`main` is ahead of the last release tag and has not been versioned.** Numbers here are
 assigned at release rather than reserved, so the next release decides its own. A release would
@@ -53,26 +57,38 @@ today, is to run the evaluation on a thread with a larger stack.
 Documented on `FormulaEvaluator.maxRecursionDepth` and pinned by
 `NamedLambdaTests.testTooDeepIsRefusedRatherThanCrashing`.
 
-### 2. The 147 `PSI` rows
+### 2. Two parser gaps, both found from the side
+
+Neither blocks anything; both are real and cheap to check.
+
+- **`CellRange("A:A")` does not understand whole-column shorthand.** It splits on the colon
+  and parses `"A"` as a cell reference, so the range comes back one row tall. The *formula*
+  parser handles `A:A` correctly — this is the `String` initialiser in SwiftExcelCore only.
+  Found while writing `ReferenceShapeTests`, where the obvious spelling of a test silently
+  built a one-row range.
+- **Array literals — `{1,2,3;4,5,6}` — do not parse at all.** Core Excel syntax. Found the
+  same way, and worked around in that test with `SEQUENCE(2,3)`.
+
+### 3. The 147 `PSI` rows
 
 Still `unreviewed`, and deliberately not touched: they need a simulation engine rather than a
 classification. Tracked separately from the EXCEL bucket, which is closed.
 
-### 3. `GROUPBY` and `PIVOTBY`
+### 4. `GROUPBY` and `PIVOTBY`
 
 Classified **out of scope on zero demand**, not on difficulty — `LAMBDA` and the higher-order
 six now supply everything they need. The reason is written down in
 `project/docs/technical/LookupOutOfScope.md`, and **the classification should move the moment
 one appears in a corpus.**
 
-### 4. The sibling logging rules
+### 5. The sibling logging rules
 
 `quality-gate-swift-project/plans/proposals/ACatchThatSwallows.md` §7 records that
 `logging.silent-try` and `hasPrintOrNSLog` use the same substring technique that produced a
 **51% false-negative rate** in `logging.catch-without-logging`. Both halves of that proposal
 have landed upstream; neither sibling rule has been measured.
 
-### 5. `ERROR.TYPE` codes 8–13
+### 6. `ERROR.TYPE` codes 8–13
 
 `#GETTING_DATA`, `#SPILL!`, `#CONNECT!`, `#BLOCKED!`, `#UNKNOWN!`, `#FIELD!` — unrepresentable
 in `ExcelError` and therefore unmeasured. Only `#CALC!` was reachable, and its 14 is now
@@ -84,8 +100,16 @@ measured rather than published.
 
 Four practices that are load-bearing, each of which exists because ignoring it cost something:
 
-**Measure, do not reason from documentation.** Microsoft's documentation has been wrong **six**
-times here. `conformance-workbook` writes questions into a workbook, you open it in Excel and
+**Measure, do not reason from documentation.** Microsoft's documentation — or this project's
+reasoning about it — has been wrong **seven** times here. The seventh was inference between two
+Excel functions: `GAMMA.DIST` and `WEIBULL.DIST` face the identical density boundary and
+answer it differently, so a convention measured on one says nothing about its neighbour.
+
+**A disagreement dismissed as a harness artifact is a disagreement.** `ROWS(A:A)` and
+`COLUMNS(1:1)` sat in the conformance output for seven rounds, explained away as consequences
+of evaluating against `NoCells()`. Both were real: `ROWS(A:A)` answered the used range's height
+on a fully populated sheet, and `COLUMNS(1:1)` could not be parsed at all, so the question was
+never put to Excel. One probe each. `conformance-workbook` writes questions into a workbook, you open it in Excel and
 save, and `depth-read` reads the answers back. Seven rounds so far, recorded in
 `project/docs/technical/ExcelEvaluationLimits.md`. Round 6 reversed a decision the evaluator
 had been built on.

@@ -472,8 +472,18 @@ enum ConformanceCases {
     /// and symmetry is exactly the kind of reasoning round eight just punished: `GAMMA.DIST`
     /// and `WEIBULL.DIST` face the same boundary and disagree with each other.
     ///
-    /// So it is asked rather than assumed. Until this comes back, the upper endpoint below a
-    /// shape of one is the only density boundary in this package resting on an inference.
+    /// So it was asked rather than assumed. **Answered: the inference held.** Excel refuses
+    /// the upper endpoint at or below a shape of one and answers zero above it, mirroring the
+    /// lower endpoint exactly — and `BETA.DIST(1, 2, 1, FALSE)` is `#NUM!` where the density
+    /// is an ordinary 2.
+    ///
+    /// Worth keeping the reasoning rather than deleting it now that it came out right: being
+    /// correct is not the same as being entitled to guess. `GAMMA.DIST` and `WEIBULL.DIST`
+    /// face the same boundary and disagree, so the symmetry that held here was a coin that
+    /// happened to land the right way up.
+    ///
+    /// Round nine returned **zero disagreements** across all 158 cases. No density boundary in
+    /// this package now rests on an inference.
     static let roundNine: [ConformanceCase] = [
         .init(family: "density boundary", formula: "BETA.DIST(1, 2, 0.5, FALSE)",
               note: "upper endpoint, beta < 1: unbounded. We infer #NUM! from the lower end"),
