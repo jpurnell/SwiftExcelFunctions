@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-19
 **Branch:** `main`, pushed, clean
-**State:** 1,718 tests · gate 45/45 uncached · zero warnings
+**State:** 1,779 tests · gate 45/45 uncached · zero warnings
 
 Read this first, then `project/summaries/2026-09-17_LambdaAndTheUnreviewedBucket.md` for how
 the state before this session was reached.
@@ -72,10 +72,33 @@ Neither blocks anything; both are real and cheap to check.
   0.31.0), evaluation here. The lexer had no `{`, `}` or `;` token, so the gap read as a
   decision nobody had got to rather than as something simply absent.
 
-### 3. The 147 `PSI` rows
+### 3. ~~The 147 `PSI` rows~~ — **closed 2026-09-19**
 
-Still `unreviewed`, and deliberately not touched: they need a simulation engine rather than a
-classification. Tracked separately from the EXCEL bucket, which is closed.
+**Every row in the coverage matrix is now classified**, EXCEL and PSI alike. `PSI` reads
+**189 have · 71 out of scope · 17 bindable · 17 not ours · 1 new**, and
+`UnreviewedCoverageTests` no longer filters to `EXCEL` — it watches the whole file, so either
+bucket refilling now fails the suite.
+
+They did **not** need a simulation engine. `SimulationResultProvider` and
+`SimulationResults.values` had been there since the first seven statistics landed; what was
+missing was arithmetic. Two things that were not visible from the matrix:
+
+- **The property functions were failing whole cells.** `PsiTruncate` and the rest were
+  unregistered, and an unregistered name fails the *enclosing* call — so
+  `PsiNormal(10, 2, PsiTruncate(5, 15))` produced no number at all.
+- **`PsiTheo*` needed no second registry of distributions.** Evaluating a cell's own formula
+  with a random source that returns `p` yields `q(p)`, so the theoretical statistics read the
+  sampler's own path and cannot disagree with it — and every `*Alt` percentile-parameterised
+  form is covered without being named.
+
+**17 bindable is the honest remainder.** Classified is not implemented: 13 predate this work,
+and 4 are the forecasting family whose mathematics BusinessMath already has
+(`PsiForecastMovingAvg`, `PsiForecastExp`, `PsiForecastDoubleExp`, `PsiForecastLinear`).
+
+**One upstream branch is open.** `PsiKendallTau` is out of scope because BusinessMath had no
+tau-b — `kendallW` is a different statistic. It now does, on `origin/kendall-tau-b`, one
+commit off `main`; the BusinessMath session has been asked to merge it. Once tagged,
+`PsiKendallTau` becomes a one-line binding here.
 
 ### 4. `GROUPBY` and `PIVOTBY`
 

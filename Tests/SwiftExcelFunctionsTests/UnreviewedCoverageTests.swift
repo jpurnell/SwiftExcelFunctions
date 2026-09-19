@@ -49,7 +49,11 @@ final class UnreviewedCoverageTests: XCTestCase {
     func testHowMuchOfTheUnreviewedBucketAlreadyAnswers() throws {
         let registry = FunctionRegistry.builtin
         let rows = try matrix()
-        let unreviewed = rows.filter { $0.source == "EXCEL" && $0.status == "unreviewed" }
+        // **Every source, not only EXCEL.** This filtered to `EXCEL` because the 147 `PSI`
+        // rows were known to be unreviewed and would have failed the assertion below — a
+        // guard scoped around a gap it could see, which is how a fixture rots. PSI reached
+        // zero on 2026-09-19, so the scope comes off and the whole matrix is watched.
+        let unreviewed = rows.filter { $0.status == "unreviewed" }
 
         var answered: [String: [String]] = [:]     // category -> functions
         var absent: [String: [String]] = [:]
@@ -84,7 +88,7 @@ final class UnreviewedCoverageTests: XCTestCase {
         print("""
 
         ── The unreviewed bucket, asked ────────────────────────────
-          unreviewed (EXCEL)   \(total)
+          unreviewed (all)     \(total)
           already answer       \(answeredCount)  (\(Int(share.rounded()))%)
           still absent         \(total - answeredCount)
 
@@ -101,15 +105,18 @@ final class UnreviewedCoverageTests: XCTestCase {
 
         // **Zero, and it is meant to stay zero.** This asserted `total > 0` for as long as
         // the bucket had rows in it — a sanity check that the file had been parsed, written
-        // when emptying it was a distant goal. It was emptied on 2026-09-17: 473 `have`,
-        // 25 out of scope with a reason each, 20 bindable.
+        // when emptying it was a distant goal. EXCEL was emptied on 2026-09-17 and PSI on
+        // 2026-09-19, and the filter above now covers both.
         //
         // The assertion is inverted rather than deleted, because the bucket is exactly the
         // kind of thing that refills quietly. A new Excel release adds functions, someone
         // appends them as `unreviewed`, and nothing says so until a release goes out claiming
         // a coverage the matrix no longer supports. Now something says so.
         XCTAssertEqual(total, 0, """
-            \(total) EXCEL rows are unreviewed again. That is not a failure — new functions             arrive — but each needs classifying: implemented, bindable, or out of scope with             a written reason. See project/master_plan.md and, for the shape of a reason,             project/docs/technical/LookupOutOfScope.md.
+            \(total) rows are unreviewed again. That is not a failure — new functions arrive \
+            — but each needs classifying: implemented, bindable, or out of scope with a \
+            written reason. See project/master_plan.md and, for the shape of a reason, \
+            project/docs/technical/LookupOutOfScope.md.
             """)
     }
 }

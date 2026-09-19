@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Every row of the coverage matrix is classified.** The `PSI` bucket went from 147
+  unreviewed to **zero**: 189 have, 71 out of scope with a written reason each, 17 bindable,
+  17 not ours, 1 new. The `EXCEL` bucket closed on 2026-09-17, so nothing in the file is
+  unreviewed for the first time.
+
+  `UnreviewedCoverageTests` now watches **every source**. It filtered to `EXCEL` because the
+  147 `PSI` rows would have failed its assertion — a guard scoped around a gap it could see,
+  which is how a fixture rots. The scope is off.
+
+  Implemented along the way: 16 run statistics, 17 theoretical statistics, 20 Six Sigma
+  metrics plus `PsiSixSigma`, 8 property functions, and 10 further statistics including the
+  two that need two runs at once.
+
+- **`ISOMITTED` was marked out of scope**, with the recorded reason *"there is no LAMBDA"*.
+  LAMBDA shipped in the previous session and `ISOMITTED` with it; the row never moved. EXCEL
+  reads 495 have, 24 out of scope. A classification that encodes a temporary gap rots exactly
+  as a fixture does.
+
 ### Fixed
 
 - **A Solver model naming a whole column tried to enumerate 1,048,576 cells.**
