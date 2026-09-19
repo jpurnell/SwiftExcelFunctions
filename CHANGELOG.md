@@ -29,6 +29,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The oracle's corpus walk could not be resumed, and a run was lost to it.** A run over
+  `~/Documents` was started, spent four minutes inside `NSURLDirectoryEnumerator.nextObject`
+  — a Dropbox-backed tree, so the enumeration was I/O-bound and slow — and the machine shut
+  down before the first workbook was audited. It had written nothing at all, so the restart
+  had to redo the whole walk.
+
+  This project's rule that **the output file is the resume state** was already written down
+  twice, on `Row` and in the census. It had been applied to the audit and not to the walk
+  that feeds it, and the walk was the expensive half. A rule applied to the cheap half of a
+  program is not a rule, it is a coincidence.
+
+  `CorpusWalk.CorpusManifest` now records the enumeration as it happens: a line per workbook
+  flushed as it is found, a checkpoint per top-level directory, and a completion line that
+  distinguishes a finished walk from a truncated one — trusting a partial list would silently
+  shrink the corpus, and a run that audits 200 of 2,252 workbooks and reports on 200 looks
+  exactly like a correct run over a corpus of 200. A finished walk is never repeated; an
+  interrupted one resumes at the directory it failed in.
+
+  It also **says which directory it is walking**. The lost run could not be told apart from a
+  hung one without `sample`-ing the process, which is the other half of the same rule.
+
+  **A directory that could not be read is never checkpointed**, and a walk that met one never
+  writes its completion line. `FileManager`'s enumerator skips what it cannot open unless it
+  is given an error handler, so an unreadable subtree read as an empty one — and an empty one
+  earns a checkpoint and is skipped for ever after. The census has the matching scar: 42
+  workbooks written off on a timeout that had cleared minutes later.
+
+  `--manifest` names the file; it defaults to sitting beside `--out` and named after it, so
+  two runs with different outputs cannot silently share one corpus.
+
+  The census has the same unrecorded walk and has not been changed.
+
 - **A Solver model naming a whole column tried to enumerate 1,048,576 cells.**
   `ExcelSolverReader` turns a model's references into one `CellRef` each — about 25 MB for a
   model that cannot use them, since Excel's own Solver caps decision variables at 200.

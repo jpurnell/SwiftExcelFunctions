@@ -1,3 +1,4 @@
+import CorpusWalk
 import Foundation
 #if canImport(os)
 import os
@@ -36,6 +37,11 @@ func say(_ line: String) {
 /// and a second file naming every cell that disagreed, because a tally says *how many* and
 /// triage needs *which*.
 ///
+/// **The walk that feeds it is recorded the same way**, in a third file. That was not true
+/// until a run over `~/Documents` was lost to a shutdown four minutes into the enumeration,
+/// having written nothing: the rule about resume state had been applied to the audit and not
+/// to the walk, and the walk was the expensive half. `CorpusManifest` holds that now.
+///
 /// ```
 /// swift run workbook-oracle ~/Documents --out oracle.tsv --findings findings.tsv
 /// ```
@@ -44,6 +50,8 @@ struct OracleRun {
     let root: URL
     let output: URL
     let findings: URL
+    /// Where the enumeration of the corpus is written down, and resumed from.
+    let manifest: URL
     let progressEvery: Int
     let limit: Int?
 
@@ -53,7 +61,6 @@ struct OracleRun {
         let remaining = books.filter { !already.contains($0) }
         let batch = limit.map { Array(remaining.prefix($0)) } ?? remaining
 
-        report("\(books.count) workbooks under \(root.path)")
         report("\(already.count) already done, \(remaining.count) to go")
         if batch.count < remaining.count {
             report("limited to \(batch.count) this run; \(remaining.count - batch.count) left")
@@ -184,37 +191,29 @@ struct OracleRun {
         }
     }
 
+    /// Every `.xlsx` under the root, from the manifest where it can be had and from the
+    /// filesystem where it cannot.
+    ///
+    /// **This used to be an unrecorded walk**, and a run over `~/Documents` was lost to it:
+    /// four minutes inside the enumerator, a shutdown, and nothing whatever to resume from,
+    /// because the only thing the run had accomplished was held in memory. The audit obeyed
+    /// the project's rule about resume state and the walk did not — so the rule now covers
+    /// both halves, and `CorpusManifest` is where it lives.
     private func workbooks() throws -> [String] {
-        let base = root.standardized.resolvingSymlinksInPath()
-        guard let walker = FileManager.default.enumerator(
-            at: base, includingPropertiesForKeys: [.isRegularFileKey]) else {
-            throw Failure.notADirectory(base.path)
-        }
-        let prefix = base.path.hasSuffix("/") ? base.path : base.path + "/"
-        var found: [String] = []
-        for case let url as URL in walker {
-            guard url.pathExtension == "xlsx", !url.lastPathComponent.hasPrefix("~$") else {
-                continue
-            }
-            let resolved = url.standardized.resolvingSymlinksInPath().path
-            guard resolved.hasPrefix(prefix) else { continue }
-            found.append(String(resolved.dropFirst(prefix.count)))
-        }
-        return found.sorted()
+        try CorpusManifest(root: root, location: manifest, report: report).workbooks()
     }
 
     enum Failure: Error, CustomStringConvertible {
         case usage
         case cannotWrite
-        case notADirectory(String)
 
         var description: String {
             switch self {
             case .usage:
                 return "usage: workbook-oracle <root> [--out oracle.tsv] "
-                    + "[--findings findings.tsv] [--every N] [--limit N]"
+                    + "[--findings findings.tsv] [--manifest oracle-manifest.tsv] "
+                    + "[--every N] [--limit N]"
             case .cannotWrite: return "cannot open the output files"
-            case .notADirectory(let path): return "not a directory: \(path)"
             }
         }
     }
@@ -230,14 +229,28 @@ func option(_ name: String, default fallback: String) -> String {
     return arguments[index + 1]
 }
 
+/// Where the corpus enumeration is kept when the operator does not say.
+///
+/// Beside the summary and named after it, so that two runs writing to different output files
+/// do not silently share one manifest — which would hand the second run the first one's
+/// corpus, and every path in it would fail to open.
+func defaultManifest(besides output: URL) -> URL {
+    let stem = output.deletingPathExtension().lastPathComponent
+    return output.deletingLastPathComponent()
+        .appendingPathComponent(stem + "-manifest.tsv")
+}
+
 do {
     guard let rootPath = arguments.first, !rootPath.hasPrefix("--") else {
         throw OracleRun.Failure.usage
     }
+    let output = URL(fileURLWithPath: option("--out", default: "oracle.tsv"))
     try OracleRun(
         root: URL(fileURLWithPath: rootPath, isDirectory: true),
-        output: URL(fileURLWithPath: option("--out", default: "oracle.tsv")),
+        output: output,
         findings: URL(fileURLWithPath: option("--findings", default: "findings.tsv")),
+        manifest: URL(fileURLWithPath: option(
+            "--manifest", default: defaultManifest(besides: output).path)),
         progressEvery: Int(option("--every", default: "50")) ?? 50,
         limit: arguments.firstIndex(of: "--limit")
             .flatMap { _ in Int(option("--limit", default: "")) }

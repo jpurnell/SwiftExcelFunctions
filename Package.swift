@@ -124,6 +124,7 @@ let package = Package(
         .executableTarget(
             name: "WorkbookOracleTool",
             dependencies: [
+                "CorpusWalk",
                 "SwiftExcelFunctions",
                 "WorkbookAudit",
                 .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
@@ -161,6 +162,15 @@ let package = Package(
             path: "Sources/NameRoundTrip",
             swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
         ),
+        // Enumerating a corpus, written down as it is discovered. A library rather than a
+        // part of the tool, because the tool is an executable and an executable cannot be
+        // tested — and the resume logic here is the half of a corpus run that, when it goes
+        // wrong, costs everything the run had done.
+        .target(
+            name: "CorpusWalk",
+            path: "Sources/CorpusWalk",
+            swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
+        ),
         .target(
             name: "WorkbookAudit",
             dependencies: [
@@ -181,6 +191,13 @@ let package = Package(
         ),
         // The census is an executable, and its resume logic is the part worth testing:
         // a row wrongly recorded as a failure is skipped by every later run, permanently.
+        // The walk is the expensive half of a corpus run and the half that was not
+        // resumable, which is how a run over ~/Documents came to be lost entirely.
+        .testTarget(
+            name: "CorpusWalkTests",
+            dependencies: ["CorpusWalk"],
+            path: "Tests/CorpusWalkTests"
+        ),
         .testTarget(
             name: "WorkbookCensusTests",
             dependencies: ["WorkbookCensus"],
