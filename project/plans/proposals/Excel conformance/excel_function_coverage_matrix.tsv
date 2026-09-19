@@ -302,7 +302,7 @@ EXCEL	ISNA	information	have	logic	272	8	value
 EXCEL	ISNONTEXT	information	have		0	0	value
 EXCEL	ISNUMBER	information	have	logic	493	1	value
 EXCEL	ISODD	information	have		0	0	number
-EXCEL	ISOMITTED	information	out of scope	asks whether a LAMBDA argument was supplied; there is no LAMBDA	0	0	argument
+EXCEL	ISOMITTED	information	have	BuiltinLambdaFunctions	0	0	argument
 EXCEL	ISREF	information	have	logic	12	12	value
 EXCEL	ISTEXT	information	have	logic	35	5	value
 EXCEL	N	information	have		0	0	value
@@ -773,24 +773,24 @@ PSI	PsiTableCube	other	unreviewed		0	0	table_description, table_values|confirmed
 PSI	PsiTarget	statistic	have	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	5	2	cell, target_value, simulation, struc_format, param_slice|confirmed
 PSI	PsiTargetCI	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell, target_value, confidence_level, [simulation]|confirmed
 PSI	PsiTargetD	statistic	bindable	computed at binding — no inclusive form upstream (probabilityBelow is strict <)	0	0	cell_or_name, target_value, simulation|confirmed
-PSI	PsiTheoKurtosis	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoMax	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoMean	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoMedian	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoMin	statistic	unreviewed		0	0	cell_or_name|confirmed
+PSI	PsiTheoKurtosis	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoMax	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoMean	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoMedian	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoMin	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
 PSI	PsiTheoMode	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoPercentile	statistic	unreviewed		0	0	cell_or_name, percentile|confirmed
-PSI	PsiTheoPercentileD	statistic	unreviewed		0	0	cell_or_name, percentile|confirmed
-PSI	PsiTheoPtoX	statistic	unreviewed		0	0	cell_or_name, percentile|confirmed
-PSI	PsiTheoQtoX	statistic	unreviewed		0	0	cell_or_name, percentile|confirmed
-PSI	PsiTheoRange	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoSkewness	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoStdDev	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoTarget	statistic	unreviewed		0	0	cell_or_name, target|confirmed
-PSI	PsiTheoTargetD	statistic	unreviewed		0	0	cell_or_name, target|confirmed
-PSI	PsiTheoVariance	statistic	unreviewed		0	0	cell_or_name|confirmed
-PSI	PsiTheoXtoP	statistic	unreviewed		0	0	cell_or_name, target|confirmed
-PSI	PsiTheoXtoQ	statistic	unreviewed		0	0	cell_or_name, target|confirmed
+PSI	PsiTheoPercentile	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
+PSI	PsiTheoPercentileD	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
+PSI	PsiTheoPtoX	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
+PSI	PsiTheoQtoX	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, percentile|confirmed
+PSI	PsiTheoRange	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoSkewness	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoStdDev	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoTarget	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
+PSI	PsiTheoTargetD	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
+PSI	PsiTheoVariance	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name|confirmed
+PSI	PsiTheoXtoP	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
+PSI	PsiTheoXtoQ	statistic	have	BuiltinRiskSolverTheoretical	0	0	cell_or_name, target|confirmed
 PSI	PsiTheoXtoY	statistic	unreviewed		0	0	cell_or_name, value|confirmed
 PSI	PsiTransform	other	unreviewed		0	0	Model, Input_Data, Header|confirmed
 PSI	PsiTriangGen	distribution	have	risksolver	0	0	ap, m, br, p, r|confirmed

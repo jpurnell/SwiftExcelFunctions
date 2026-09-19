@@ -145,6 +145,23 @@ struct EvaluationEnvironment {
         copy(depth: depth, bindings: bindings, omitted: omitted)
     }
 
+    /// The same environment drawing from a different source of randomness.
+    ///
+    /// `PsiTheo*` reads a distribution's quantile by evaluating the cell's own formula with a
+    /// source that returns a chosen `p`, so the theoretical statistics and the samples take
+    /// the identical path and cannot disagree about what a call means. Nothing else about the
+    /// environment changes — the depth counters in particular are carried, so a distribution
+    /// buried in a deep formula is still bounded.
+    ///
+    /// - Parameter source: the randomness to draw from.
+    /// - Returns: a copy reading from it.
+    func drawing(from source: any RandomSource) -> EvaluationEnvironment {
+        EvaluationEnvironment(
+            cells: cells, names: names, functions: functions, callingCell: callingCell,
+            currentSheet: currentSheet, random: source, simulation: simulation,
+            depth: depth, bindings: bindings, omitted: omitted)
+    }
+
     private func copy(
         depth: FormulaEvaluator.Depth, bindings: [String: CellValue], omitted: Set<String>
     ) -> EvaluationEnvironment {

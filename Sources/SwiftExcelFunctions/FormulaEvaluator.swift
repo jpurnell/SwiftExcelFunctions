@@ -615,6 +615,34 @@ public enum FormulaEvaluator {
                 return BuiltinLambdaFunctions.isOmitted(args, in: inCall)
             }
 
+            // `PsiTheo*` asks about the **distribution** a cell draws from, not about the
+            // cell's value and not about a run. Reached here because answering needs the
+            // evaluator: the quantile is read by evaluating that cell's own formula with a
+            // random source that returns a chosen `p`, which is the same path the sampler
+            // takes and therefore cannot disagree with it. See `BuiltinRiskSolverTheoretical`.
+            if BuiltinRiskSolverTheoretical.governs(fn.name) {
+                guard let subject = args.first else { return .error(.value) }
+                let evaluated = try args.dropFirst().map { try evaluateNode($0, in: inCall) }
+                if let error = evaluated.first(where: { if case .error = $0 { return true }
+                                                        return false }) {
+                    return error
+                }
+                guard let formula = distributionFormula(of: subject, in: inCall) else {
+                    // The argument is not a reference, or names a cell that draws nothing.
+                    // `#VALUE!` either way: a theoretical statistic about a constant is a
+                    // question with no subject, not a question with no answer yet.
+                    return .error(.value)
+                }
+                return try BuiltinRiskSolverTheoretical.evaluate(
+                    fn.name, arguments: evaluated,
+                    quantile: { probability in
+                        let fixed = FixedUniform(probability)
+                        let drawn = try evaluateNode(formula, in: inCall.drawing(from: fixed))
+                        if case .number(let value) = drawn { return value }
+                        return nil
+                    })
+            }
+
             // The higher-order six. Their *arguments* are evaluated normally — `MAP(A1:A4, f)`
             // needs both — but calling the lambda needs the evaluator, and an `ExcelFunction`
             // closure is handed values and no way to evaluate anything. So they are reached
@@ -741,6 +769,42 @@ public enum FormulaEvaluator {
         return try BuiltinLambdaFunctions.call(
             lambda, arguments: evaluated, omittedAt: skippedPositions(in: args), in: inCall,
             evaluating: { try evaluateNode($0, in: $1) })
+    }
+
+    /// The formula that draws, for a `PsiTheo*` subject.
+    ///
+    /// The subject is normally a reference — `PsiTheoMean(B4)` — and the distribution is
+    /// whatever `B4`'s formula calls. Frontline also accepts the call written in place, so a
+    /// `Psi*` call as the argument is used as it stands.
+    ///
+    /// - Parameters:
+    ///   - subject: the first argument, unevaluated.
+    ///   - env: the environment, for the cells and the sheet.
+    /// - Returns: the formula to read a quantile from, or `nil` when the subject names no
+    ///   distribution — a constant, an empty cell, or a formula that only computes.
+    private static func distributionFormula(
+        of subject: FormulaAST, in env: EvaluationEnvironment
+    ) -> FormulaAST? {
+        // Written in place: `PsiTheoMean(PsiNormal(10, 2))`. Taken as it stands rather than
+        // looked up, since there is no cell to look up.
+        if case .function(let name, _) = subject, name.hasPrefix("PSI") {
+            return subject
+        }
+        let value: CellValue?
+        switch subject {
+        case .cellRef(let ref):
+            value = env.cells.value(at: ref, inSheet: env.currentSheet)
+        case .sheetRef(let reference):
+            value = env.cells.value(at: reference.range.start, inSheet: reference.sheetName)
+        default:
+            return nil
+        }
+        // A cell holding a literal draws nothing. Its *cached* value is deliberately not
+        // consulted: a cell that once held a distribution and now holds the number it drew
+        // has no distribution to describe, and answering from the number would report the
+        // moments of a single point as though they were a distribution's.
+        guard case .formula(let ast, _) = value else { return nil }
+        return ast
     }
 
     // MARK: - Named Range Resolution
