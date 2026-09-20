@@ -4,6 +4,72 @@ import SwiftExcelCore
 
 final class BuiltinDateTimeFunctionTests: XCTestCase {
 
+    // MARK: - WEEKDAY's return types, measured in round thirteen
+
+    /// `return_type` 11 through 17 start the week on a named day.
+    ///
+    /// **The corpus found this and could only half-answer it.** `Digital Sales Budget 2.0.xlsx`
+    /// holds 9,166 cells reading `WEEKDAY(AEn, week_end_day)`, and `week_end_day` resolves
+    /// through `Definitions!$E$61` to **17** — a return type this package refused with `#NUM!`,
+    /// implementing only 1, 2 and 3. Every one of those cells was a refusal of an ordinary
+    /// argument.
+    ///
+    /// The corpus exercises 17 and nothing else, so round thirteen asked all seven rather than
+    /// reasoning from documentation to the other six. Serial 41640 is 1 January 2014, a
+    /// Wednesday, and Excel answered:
+    ///
+    /// | `return_type` | week starts | Wednesday is |
+    /// |---|---|---|
+    /// | 11 | Monday | 3 |
+    /// | 12 | Tuesday | 2 |
+    /// | 13 | Wednesday | 1 |
+    /// | 14 | Thursday | 7 |
+    /// | 15 | Friday | 6 |
+    /// | 16 | Saturday | 5 |
+    /// | 17 | Sunday | 4 |
+    func testTheWeekCanStartOnAnyNamedDay() throws {
+        // 41640 is Wednesday, 1 January 2014.
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(11)), 3)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(12)), 2)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(13)), 1)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(14)), 7)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(15)), 6)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(16)), 5)
+        assertNumber(try eval("WEEKDAY", .number(41640), .number(17)), 4)
+    }
+
+    /// A second and third date, so no convention rests on one day's coincidence.
+    func testTheNamedStartDaysHoldAcrossTheWeekend() throws {
+        // 41643 is Saturday, 41644 is Sunday.
+        assertNumber(try eval("WEEKDAY", .number(41643), .number(17)), 7, accuracy: 0)
+        assertNumber(try eval("WEEKDAY", .number(41644), .number(17)), 1, accuracy: 0)
+        assertNumber(try eval("WEEKDAY", .number(41644), .number(16)), 2, accuracy: 0)
+    }
+
+    /// 11 and 17 are the old 2 and 1 under new names, which is worth pinning.
+    func testTheNewTypesAgreeWithTheOldOnesTheyRestate() throws {
+        for serial in [41640.0, 41643, 41644, 1, 0] {
+            XCTAssertEqual(try eval("WEEKDAY", .number(serial), .number(11)),
+                           try eval("WEEKDAY", .number(serial), .number(2)),
+                           "11 starts the week on Monday, as 2 does — serial \(serial)")
+            XCTAssertEqual(try eval("WEEKDAY", .number(serial), .number(17)),
+                           try eval("WEEKDAY", .number(serial), .number(1)),
+                           "17 starts it on Sunday, as 1 does — serial \(serial)")
+        }
+    }
+
+    /// The numbers either side of the set are refused.
+    ///
+    /// Measured: 0, 4, 10, 18 and −1 are all `#NUM!`, and this package already agreed. Kept
+    /// as the control that makes the seven above meaningful — widening the set must not
+    /// widen it further than Excel does.
+    func testAReturnTypeOutsideTheSetIsRefused() throws {
+        for type in [0.0, 4, 5, 10, 18, -1] {
+            XCTAssertEqual(try eval("WEEKDAY", .number(41640), .number(type)), .error(.num),
+                           "return_type \(type)")
+        }
+    }
+
     // MARK: - The serial floor and ceiling, measured in round eleven
 
     /// Serial 0 is January 0, 1900 — a date that does not exist, and every date function

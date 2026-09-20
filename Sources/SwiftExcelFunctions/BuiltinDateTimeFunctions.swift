@@ -50,6 +50,16 @@ public enum BuiltinDateTimeFunctions {
             case 1: return .number(Double(sundayBased))
             case 2: return .number(Double((sundayBased + 5) % 7 + 1))   // 1 = Monday
             case 3: return .number(Double((sundayBased + 5) % 7))       // 0 = Monday
+            case 11...17:
+                // **11 through 17 start the week on a named day**, counting 1…7 from it:
+                // 11 is Monday and 17 is Sunday, so 11 restates 2 and 17 restates 1.
+                //
+                // Measured in round thirteen, all seven of them. The corpus exercises only
+                // 17 — 9,166 cells of one workbook, through a name resolving to it — and
+                // this package refused every type but 1, 2 and 3 with `#NUM!`. Asking one
+                // and assuming the other six is the inference this project keeps losing to.
+                let start = (type - 10) % 7 + 1
+                return .number(Double((sundayBased - start + 7) % 7 + 1))
             default: throw EvalError.numError
             }
         }

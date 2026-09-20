@@ -29,6 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`WEEKDAY` accepts return types 11 through 17.** They start the week on a named day —
+  11 is Monday through 17 is Sunday — counting 1…7 from it, so 11 restates 2 and 17 restates
+  1. This package implemented 1, 2 and 3 and refused the rest with `#NUM!`.
+
+  **The corpus found it: 9,166 cells** of `Digital Sales Budget 2.0.xlsx` read
+  `WEEKDAY(AEn, week_end_day)`, where the name resolves through `Definitions!$E$61` to **17**.
+  Every one was a refusal of an ordinary argument.
+
+  The corpus exercises 17 and nothing else, so round thirteen asked all seven on a known
+  Wednesday rather than reasoning from one to the other six. Excel: 11→3, 12→2, 13→1, 14→7,
+  15→6, 16→5, 17→4, confirmed across a Saturday and a Sunday too. The invalid neighbours —
+  0, 4, 10, 18, −1 — were asked in the same round and already agreed, and are kept as the
+  control that widening the set must not widen it further than Excel does.
+
+  Round thirteen reads **agreed 223, differed 0**, from 213 and 10.
+
+### Fixed
+
 - **`GROUPBY` and `PIVOTBY` now do what round twelve measured.** All ten disagreements are
   closed; the round reads **agreed 204, differed 0**, up from 194 and 10.
 
