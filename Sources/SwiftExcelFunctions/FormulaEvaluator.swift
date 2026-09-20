@@ -412,6 +412,9 @@ public enum FormulaEvaluator {
 
         case .sheetRef(let sheetRef):
             let range = sheetRef.range
+            if sheetRef.span != nil {
+                return threeDimensional(sheetRef, in: cells)
+            }
             if range.start == range.end {
                 // Single cell reference
                 return cells.value(at: range.start, inSheet: sheetRef.sheetName) ?? .blank
@@ -1012,6 +1015,35 @@ public enum FormulaEvaluator {
             // A refusal is visible. A plausible zero is not.
             return .error(.name)
         }
+    }
+
+    /// The same range read from every sheet a 3-D reference spans.
+    ///
+    /// **`SUM('Q1:Q4'!B7)` is four cells, one per sheet.** This package could not read one at
+    /// all until the span became expressible, and the failure was silent rather than loud: a
+    /// corpus workbook summed a mixture of spans and single sheets, the single sheets
+    /// resolved, and the total came out 28 against Excel's 47 with nothing anywhere to say a
+    /// term had been dropped. 9,958 cells.
+    ///
+    /// **Flattened into one column**, because a stack of rectangles is not a rectangle and
+    /// `CellMatrix` is a rectangle. Nothing is lost for the callers that matter: Excel only
+    /// admits a 3-D reference where an aggregate is expected, and an aggregate reads values,
+    /// not positions. A function that wanted the shape could not have been handed one anyway.
+    ///
+    /// A span covering no sheets reads as blank — `SUM` of it is 0 — which is what an end
+    /// naming no sheet already means one level down.
+    private static func threeDimensional(
+        _ reference: SheetReference, in cells: CellValueProvider
+    ) -> CellValue {
+        var elements: [CellValue] = []
+        for sheet in reference.sheets(in: cells) {
+            elements.append(contentsOf: cells.matrix(in: reference.range, inSheet: sheet).elements)
+        }
+        guard !elements.isEmpty,
+              let matrix = CellMatrix(elements: elements, rows: elements.count, columns: 1) else {
+            return .blank
+        }
+        return .array(matrix)
     }
 
     // MARK: - Type Coercion

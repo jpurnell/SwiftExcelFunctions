@@ -29,6 +29,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **3-D references work: `SUM('Q1:Q4'!B7)` reads every sheet in the span.** This package
+  could not express one, and the failure was silent rather than loud — a corpus workbook
+  summed a mixture of spans and single sheets, the single sheets resolved perfectly, and the
+  total came out **28** against Excel's **47** with nothing anywhere to say a term had been
+  dropped. **9,958 cells** in one file.
+
+  The span had been arriving intact all along: the parser puts `'first:last'!A1` into
+  `sheetName` whole. SwiftExcelCore 0.15.0 reads it back out (`SheetReference.span`) and
+  expands it against the workbook's order (`sheets(in:)`, `CellValueProvider.sheetNames()`).
+
+  The evaluator reads the range from each sheet in the span, **flattened into one column**: a
+  stack of rectangles is not a rectangle, and Excel only admits a 3-D reference where an
+  aggregate is expected — an aggregate reads values, not positions. `WorkbookSnapshot` already
+  walked `workbook.sheets` in order and threw the order away; it keeps it now.
+
+  An end naming no sheet spans **nothing**, rather than quietly falling back to one end. That
+  would be the 28-instead-of-47 bug wearing a new face, and a test holds it shut.
+
+  **That workbook now agrees with Excel on all 1,210,790 of its comparable cells**, from 9,958
+  findings to zero.
+
+### Added
+
 - **A conformance case can carry its own cells.** Every round since the eighth has been built
   from array constants, which is what lets `check` compare both columns without anyone opening
   a sheet. `SUMIF` and its family take a **range** — an array constant is `#VALUE!` there — so

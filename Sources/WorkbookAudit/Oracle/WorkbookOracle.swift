@@ -257,6 +257,9 @@ public enum WorkbookOracle {
 
         func value(at ref: CellRef) -> CellValue? { value(at: ref, inSheet: sheet) }
 
+        /// The workbook's sheets, in order, so a 3-D reference can be expanded.
+        func sheetNames() -> [String] { snapshot.order }
+
         func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
             Self.reading(snapshot.value(at: ref, inSheet: sheet))
         }
@@ -328,6 +331,13 @@ public enum WorkbookOracle {
 
         private let cells: [String: [Int: CellValue]]
         private let corners: [String: CellRef?]
+        /// The sheets in the order the file lists them.
+        ///
+        /// **A 3-D reference needs the order and nothing else does.** `'Q1:Q4'!B7` covers
+        /// every sheet positionally between its ends, so a dictionary of sheets cannot answer
+        /// it — the names alone do not say what sits between them. The snapshot already walks
+        /// `workbook.sheets` in order; it simply threw the order away.
+        let order: [String]
 
         // Justification: the lock makes every access to `rectangles` exclusive, and it is the only mutable state here.
         private let lock = NSLock()
@@ -346,7 +356,9 @@ public enum WorkbookOracle {
         init(_ workbook: Workbook) {
             var cells: [String: [Int: CellValue]] = [:]
             var corners: [String: CellRef?] = [:]
+            var order: [String] = []
             for sheet in workbook.sheets {
+                order.append(sheet.name)
                 var values: [Int: CellValue] = [:]
                 values.reserveCapacity(sheet.cellReferences.count)
                 for reference in sheet.cellReferences {
@@ -357,6 +369,7 @@ public enum WorkbookOracle {
             }
             self.cells = cells
             self.corners = corners
+            self.order = order
         }
 
         /// The value in a cell.

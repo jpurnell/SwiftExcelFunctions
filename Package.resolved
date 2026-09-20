@@ -1,5 +1,5 @@
 {
-  "originHash" : "f20015acad914453e5f65c35df7290b79d0d19f7ed3b869aa2d1f35b500849c5",
+  "originHash" : "11a735274f128a3163868363393f31445a61ad4e93c310df0ccad5cec91829a3",
   "pins" : [
     {
       "identity" : "businessmath",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftExcelCore",
       "state" : {
-        "revision" : "372bba9cc09472b038a52374e7546e2e36907137",
-        "version" : "0.14.0"
+        "revision" : "9a551ad3e692ef1d74723f2896ed79d46f50e3e0",
+        "version" : "0.15.0"
       }
     },
     {
