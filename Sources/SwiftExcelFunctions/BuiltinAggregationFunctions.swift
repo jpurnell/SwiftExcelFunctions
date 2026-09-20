@@ -509,12 +509,23 @@ public enum BuiltinAggregationFunctions {
                 guard let criteria = criteriaString(from: args[idx + 1]) else {
                     return .error(.value)
                 }
-                // **The ranges must match, and `SUMIFS` refuses when they do not.** Measured
-                // in round fifteen: given three keys and a one-cell sum range, Excel answers
-                // `#VALUE!` here and `4` for the `SUMIF` spelling — the clearest proof that
-                // these are two functions rather than one with its arguments moved. This
-                // package answered the same number to both.
-                guard criteriaRange.count == sumValues.count else { return .error(.value) }
+                // **A one-cell sum range against a larger criteria range is `#VALUE!`.**
+                // Measured in round fifteen: given three keys and a one-cell sum range Excel
+                // answers `#VALUE!` here and `4` for the `SUMIF` spelling, which is the
+                // clearest proof that these are two functions rather than one with its
+                // arguments moved.
+                //
+                // **Narrowed to exactly what was measured**, after a broader `count !=
+                // count` guard refused 15 corpus cells that Excel answers. Two ranges written
+                // the same way in a file can still materialise to different lengths here — a
+                // named range, a whole column pulled back to its used extent — and a
+                // disagreement about *this package's* materialisation is not a reason to
+                // destroy a cell. A false `#VALUE!` is worse than a missed refusal: one is a
+                // wrong answer where Excel had a number, the other only fails to catch a
+                // formula the author would have seen break in Excel already.
+                guard !(sumValues.count == 1 && criteriaRange.count > 1) else {
+                    return .error(.value)
+                }
                 criteriaPairs.append((criteriaRange, criteria))
                 idx += 2
             }

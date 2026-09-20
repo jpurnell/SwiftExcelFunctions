@@ -29,6 +29,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`SUMIFS`' shape check was too broad, and refused 15 cells Excel answers.** A regression
+  introduced in the same release: the rule measured in round fifteen is that a **one-cell**
+  sum range against a larger criteria range is `#VALUE!`, and it was implemented as
+  `criteriaRange.count != sumValues.count`.
+
+  Two ranges written identically in a file can still materialise to different lengths here — a
+  named range, a whole column pulled back to its used extent — so the broader guard destroyed
+  cells over a disagreement about *this package's* materialisation rather than about the
+  formula. `Subscribers & Viewers by Month, Platform.xlsx` went from 0 findings to 15.
+
+  Narrowed to exactly what was measured. That workbook is back to **100% agreement over all
+  1,879 of its comparable cells**.
+
+  A false `#VALUE!` is worse than a missed refusal: one is a wrong answer where Excel had a
+  number, the other only fails to catch a formula whose author would already have seen it
+  break in Excel.
+
+### Fixed
+
 - **`SUMPRODUCT` evaluates its arguments as arrays, and `SUM` does not.** 48 corpus cells
   count alternating columns with `SUMPRODUCT((MOD(COLUMN(C38:GT38),2)=$A$1) * … )` and
   answered 18 against Excel's 12.
