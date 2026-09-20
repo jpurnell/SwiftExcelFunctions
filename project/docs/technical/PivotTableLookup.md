@@ -139,6 +139,38 @@ write today — it writes formulas and values, not pivot parts. So either the ro
 hand from a workbook with pivots in it, or the emitter learns to carry one. That is a real
 prerequisite and not a footnote.
 
+### The corpus answered it, and the prerequisite is gone
+
+**`Dot Com YTD Performance Report 6 20.xlsx` contains both cases**, which makes it the natural
+experiment this section was asking for:
+
+| pivots | `rowGrandTotals` | `colGrandTotals` |
+|---:|---|---|
+| 10 | `0` | `0` |
+| 3 | `0` | default |
+| 36 | default | `0` |
+| 1 | default | default |
+
+Reading the last row of each declared `location ref`:
+
+| | last row |
+|---|---|
+| `rowGrandTotals="0"`, `AD130:AL176` | `AD175` is `"KEY Total"` — a **subtotal**; `AD176` is empty |
+| `rowGrandTotals` defaulted, `BA286:BJ383` | `BA383` is **`"Grand Total"`** |
+
+**The structural rule holds.** When row grand totals are on, the grand total is the last row of
+the location; when they are off, there is none — and the last populated row is an ordinary
+subtotal that a label match would have mistaken for one, since `"KEY Total"` ends in the same
+word.
+
+So the grand total is found by `location ref` and `rowGrandTotals`, never by matching
+`"Grand Total"`, and **no hand-built round is needed**. The locale trap is avoided by not
+reading labels at all.
+
+One thing this turned up for phase two: `"KEY Total"` and `"WNE Total"` are **subtotal** rows,
+so these pivots carry more than one row field. Matching field/item pairs will have to
+distinguish a subtotal row from a data row, which the two-argument form never has to.
+
 ## Why this is a capability and not a defect
 
 The same shape as 3-D references: the corpus says *that* 3,802 cells need it, and only the
