@@ -18,6 +18,11 @@ records, model fields and items, reimplement Excel's aggregation, and reconcile 
 with whatever the workbook's author last refreshed. One corpus file carries **76 cache parts**.
 None of that is needed.
 
+> **Narrowed by measurement, later.** This holds exactly for the two-argument form that
+> shipped. Field/item pairs do need the cache **definitions** — field identity in a pivot
+> table definition is positional, and only `pivotCacheDefinition*.xml` carries the names. The
+> **records** are still never read and nothing is ever recomputed. See *Phase two, measured*.
+
 The evidence, end to end, for
 
 ```
@@ -173,6 +178,116 @@ still a lookup, still no aggregation.
 It is also **one workbook**. 3,574 cells is a large number attached to a single file, and a
 capability built to satisfy one file needs its round of independent evidence before it is
 believed — the same bar every other fix here was held to.
+
+## Phase two, measured — and two things above are wrong
+
+The 50 pivots in `Dot Com YTD Performance Report 6 20.xlsx` were read rather than assumed.
+`pivotTable2.xml`, at `BA393:BJ502`, is the one the formulas hit hardest:
+
+```
+<location ref="BA393:BJ502" firstHeaderRow="1" firstDataRow="2" firstDataCol="4"
+          rowPageCount="2" colPageCount="1"/>
+<rowFields count="4"><field x="4"/><field x="0"/><field x="7"/><field x="16"/></rowFields>
+<colFields count="1"><field x="1"/></colFields>
+<pageFields count="2"><pageField fld="9"/><pageField fld="6" item="0"/></pageFields>
+<dataFields count="1"><dataField name="Sum of Subs" fld="11"/></dataFields>
+```
+
+and the corpus formula against it is
+
+```
+GETPIVOTDATA("Subs", $BA$393, "Region", $R$216, "FME_Calc", X$181,
+             "Scenario", "CY", "LOBMix_noXH", "D")
+```
+
+### Correction 1 — a pair is not necessarily a row field
+
+`Region`, `Scenario` and `LOBMix_noXH` are row fields; **`FME_Calc` is a column field.** This
+document said throughout that pairs are matched against *row labels*. They are matched against
+whichever axis the field sits on, and a page (filter) field is a third case again — a pair
+naming one must agree with the filter's current selection or the answer is `#REF!`.
+
+Across the 50 pivots: **40 carry page fields, 38 carry column fields, 39 carry more than one
+row field.** The single-row-field pivot the phase-one fixture models is the minority shape
+here, not the normal one.
+
+### Correction 2 — `xl/pivotCache/` is not optional for phase two
+
+The headline of this document — *`GETPIVOTDATA` does not need the pivot cache* — holds for the
+two-argument form and does not survive field/item pairs. **Field identity in a pivot table
+definition is positional.** `<field x="4"/>` and `fld="11"` are indices, and nothing in
+`pivotTables/` says index 4 is `Scenario` or index 11 is `Subs`. Only
+`xl/pivotCache/pivotCacheDefinition*.xml` carries `<cacheField name="…"/>`.
+
+The distinction that matters is **definitions versus records**:
+
+| part | size here | needed |
+|---|---:|---|
+| `pivotCacheDefinition*.xml` | 7 parts, 0.8–12 KB | **yes** — the field names, and nothing else |
+| `pivotCacheRecords*.xml` | 2 parts, 32 KB | no — still never read, still never aggregated |
+
+So the insight is narrower than first written, not wrong: the *records* are never read and
+nothing is ever recomputed. One corpus workbook's 76 cache parts remain unopened for phase
+one; phase two opens the definitions of them and reads names out.
+
+### Correction 3 — the data field is matched by source name, not only by caption
+
+The formula asks for `"Subs"`. The sheet caption is `"Sum of Subs"` and the definition reads
+`<dataField name="Sum of Subs" fld="11"/>`, where field 11 is the cache field named `Subs`.
+Excel accepts either. **Phase one matches captions only** — `layout.dataFields.contains(field)`
+— which worked on the Amazon fixture because that formula spells out the full caption, and
+would refuse every one of these. It is not a bug in what shipped, but it is a gap that phase
+two closes with the cache definition it is already reading.
+
+The caption list in this workbook also contains `" B1"`, `" CDV"`, `" HSI"` — **leading
+spaces**, written by whoever built it. Whatever matches names has to be exact, because
+trimming would make three captions collide with nothing and a "helpful" trim is how a lookup
+starts answering the wrong column.
+
+### The rendering, which is where the real work is
+
+`BA391:BB391` — the page fields, above the table.
+`BA393` — the data field caption.
+`BA394:BD394` — the row field **names**, one per row-label column.
+`BE393` — the column field name; `BE394:…` its items.
+`BA395` down — the data.
+
+```
+        BA            BB       BC             BD       BE    BF    BG
+ 391  ActivityDetail  119                                                ← page field
+ 393  Sum of Subs                             FME_Calc                   ← captions
+ 394  Scenario        Region   LOBMix_noXH    BP/IP     20    21    22    ← names / col items
+ 395  42              3        103                      303   301   256
+ 396                           105                      1633  1233  944
+ 397                           115                      44    34    29
+ 398                           107            140       487   319   390
+ 399                                          141       183   218   238
+```
+
+**The row labels are sparse.** `BA395` reads `42` and `BA396:BA399` are empty: an outline
+rendering writes a label once and the rows beneath inherit it. A lookup that scans the column
+for a matching item finds one row in five. Matching a pair means carrying the last non-blank
+value down each row-label column first, then intersecting the four columns' constraints.
+
+Two further traps visible in those seven rows: the items are **numbers rendered as numbers**
+(`42`, `3`, `103`), so item comparison is value equality and not string equality; and the row
+field names sit in the same column as the labels, one row above the data, so an off-by-one
+reads `Scenario` as an item.
+
+### What this makes phase two
+
+1. Parse `pivotCacheDefinition*.xml` for `<cacheField name>`, following the pivot table's own
+   relationship to find the right one. Definitions only.
+2. Carry the row/col/page field **indices** on the layout, resolved to names.
+3. Resolve each formula pair to its field, then to its axis.
+4. Row-axis pairs: fill down the label columns, intersect. Column-axis pairs: match the header
+   items. Page-axis pairs: compare against the rendered selection; disagree and it is `#REF!`.
+5. Subtotal rows (`"KEY Total"`, `"WNE Total"`) are not data rows and must be skipped.
+
+It is three repositories again — `PivotTableLayout` grows, the parser grows, the function
+grows — and it is **one workbook**. 3,574 cells behind a single file is a large number with a
+narrow base, and a capability built to satisfy one file needs independent evidence before it
+is believed, exactly as every other fix here did.
 
 ## What must be measured before writing it
 
