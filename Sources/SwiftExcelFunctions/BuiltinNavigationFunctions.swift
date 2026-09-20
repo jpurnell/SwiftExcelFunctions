@@ -391,7 +391,11 @@ public enum BuiltinNavigationFunctions {
         case .number(let n):
             return n != 0
         case .blank:
-            return true // default is approximate
+            // An *empty* argument slot, not an absent one — `VLOOKUP(x, t, 2, )`. Absence is
+            // handled by the caller counting arguments; reaching here means the argument was
+            // written and left empty, which supplies 0, which is FALSE, which is exact.
+            // This answered `true` and cost 70 cells of one corpus workbook their answer.
+            return false
         default:
             return true
         }

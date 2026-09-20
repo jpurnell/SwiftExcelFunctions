@@ -190,7 +190,11 @@ public enum FormulaEvaluator {
     /// Errors that can occur during formula evaluation.
     public enum EvaluationError: Error, Equatable, Sendable {
         /// The function name was not found in the registry.
-        case unknownFunction(String)
+        ///
+        /// **No longer thrown**: an unknown name evaluates to `#NAME?`, as it does in Excel.
+        /// The case is kept because it is public API a consumer may still switch over, and
+        /// removing it would break them to no purpose.
+        case unknownFunction(String) // LIVE: public API for consumers
         /// The argument count did not match the function's expected range.
         case argumentCount(function: String, expected: ClosedRange<Int>, got: Int)
         /// A circular reference was detected.
@@ -561,7 +565,13 @@ public enum FormulaEvaluator {
                 // worth asking — `=maxEXP(B2:B9, 2)` is a call to a defined name holding a
                 // `LAMBDA`, and it is not an unknown function until that has been tried.
                 if let called = try callNamedLambda(name, args, in: env) { return called }
-                throw EvaluationError.unknownFunction(name)
+                // `#NAME?` as a **value**, which is what Excel answers — not a throw. A throw
+                // destroys the enclosing formula before anything can catch it, and catching
+                // is often the entire point: a Google Sheets export writes
+                // `IFERROR(__XLUDF.DUMMYFUNCTION("<the Sheets formula>"), <fallback>)` for
+                // every formula Excel cannot express, and the corpus oracle found 751 cells
+                // where we returned nothing and Excel returned the fallback.
+                return .error(.name)
             }
             let maxArgs = fn.maxArgs ?? Int.max
             let expectedRange = fn.minArgs...maxArgs

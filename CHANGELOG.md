@@ -29,6 +29,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Three evaluation defects, each found by the corpus oracle and each measured before and
+  after.** A pilot over 100 workbooks of the private corpus — 876,111 comparable cells —
+  agreed with Excel's own cached values on 99.68% of them. The residue was six files, and
+  three of the disagreements were ours.
+
+  **`VLOOKUP` and `HLOOKUP` read an empty fourth argument as approximate.** Spelled
+  `VLOOKUP(B33, lookupPlatform, 2, )`, the argument is *present and empty*, which supplies 0,
+  which is `FALSE`, which is exact. Absence is handled by counting arguments, so reaching
+  `.blank` means the slot was written and left empty — and it answered "approximate". 70 cells
+  of one workbook held plausible wrong answers, "Churn" where Excel had "Android", rather than
+  `#N/A`, which is why it had survived.
+
+  **An unknown function name threw instead of evaluating to `#NAME?`.** A throw destroys the
+  enclosing formula before anything can catch it, so `IFERROR(NOSUCHFN(1), "x")` produced
+  nothing where Excel produces `"x"`. 751 cells across two workbooks exported from Google
+  Sheets, every one of them `IFERROR(__XLUDF.DUMMYFUNCTION("<the Sheets formula>"),
+  <fallback>)` — the exporter writes that placeholder for a formula Excel cannot express, and
+  catching it is the entire point of the wrapper. `EvaluationError.unknownFunction` is no
+  longer thrown; the case is kept, because it is public API a consumer may still switch over.
+
+  **The conditional aggregates ignored an error passed as an argument.** `SUMIFS(#REF!, …)` is
+  `#REF!`; it returned 0, because `toArray` was reached without anything having looked at the
+  arguments and an error flattens to no values at all. So a broken reference read as "the
+  total is zero", and the enclosing `IF(… = 0, "", …)` turned that into an empty-looking cell
+  — a wrong answer wearing the same clothes as a legitimately blank one. 202 cells.
+  `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF` and `AVERAGEIFS` all had the gap;
+  `propagatedError` had been written once, for the lookup family, and never applied elsewhere.
+
+  **Re-measured on the same 100 workbooks: 99.68% → 99.76%.** `threw` fell by exactly 751,
+  `agreedOnError` rose by exactly 202, and `VLOOKUP` left the findings file entirely. Outside
+  the two Google Sheets exports, the whole residue across 100 workbooks is 228 `GETPIVOTDATA`
+  refusals, which need a pivot cache and are refused by design.
+
 - **The oracle's corpus walk could not be resumed, and a run was lost to it.** A run over
   `~/Documents` was started, spent four minutes inside `NSURLDirectoryEnumerator.nextObject`
   — a Dropbox-backed tree, so the enumeration was I/O-bound and slow — and the machine shut

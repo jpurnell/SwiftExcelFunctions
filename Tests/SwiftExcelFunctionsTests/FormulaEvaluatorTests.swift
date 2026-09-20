@@ -579,18 +579,32 @@ final class FormulaEvaluatorTests: XCTestCase {
         assertNumber(result, 3)
     }
 
-    func testUnknownFunctionThrowsError() throws {
-        XCTAssertThrowsError(try eval(.function("NOTAFUNCTION", [.number(1)]))) { error in
-            guard let evalError = error as? FormulaEvaluator.EvaluationError else {
-                XCTFail("Expected EvaluationError, got \(error)")
-                return
-            }
-            if case .unknownFunction(let name) = evalError {
-                XCTAssertEqual(name, "NOTAFUNCTION")
-            } else {
-                XCTFail("Expected unknownFunction, got \(evalError)")
-            }
-        }
+    /// An unknown name is `#NAME?`, and `#NAME?` is a **value**.
+    ///
+    /// This threw, and a throw kills the enclosing formula before anything can catch it — so
+    /// `IFERROR(NOSUCHFN(1), "x")` produced nothing whatever where Excel produces `"x"`.
+    ///
+    /// Found by the corpus oracle in **751 cells** across two workbooks exported from Google
+    /// Sheets. Every one of them reads `IFERROR(__XLUDF.DUMMYFUNCTION("<the Sheets formula>"),
+    /// <fallback>)` — Sheets writes that placeholder for a formula Excel cannot express, Excel
+    /// answers `#NAME?`, and catching it is the entire purpose of the wrapper the exporter
+    /// wrote. We threw instead, and lost the cell.
+    ///
+    /// The same shape is recorded in the `PSI` work: an unregistered `PsiTruncate` failed the
+    /// enclosing `PsiNormal` call rather than yielding an error the caller could see. That was
+    /// treated by registering the name; this is the behaviour underneath it.
+    func testUnknownFunctionIsANameErrorRatherThanAThrow() throws {
+        XCTAssertEqual(try eval(.function("NOTAFUNCTION", [.number(1)])), .error(.name),
+                       "Excel's answer for a name it does not know")
+    }
+
+    /// And because it is a value, the wrapper the exporter wrote does its job.
+    func testAnUnknownFunctionCanBeCaughtByIFERROR() throws {
+        let formula = FormulaAST.function("IFERROR", [
+            .function("__XLUDF.DUMMYFUNCTION", [.text("ARRAY_CONSTRAIN(…)")]),
+            .text("the fallback the exporter recorded"),
+        ])
+        XCTAssertEqual(try eval(formula), .text("the fallback the exporter recorded"))
     }
 
     func testFunctionArgumentCountMismatch() throws {

@@ -147,6 +147,22 @@ public enum BuiltinAggregationFunctions {
     }
 
     /// Flattens nested arrays in a list of `CellValue` arguments into a single flat list.
+    /// The first argument that is itself an error, if any.
+    ///
+    /// An error handed to a function as an argument is the function's answer: `SUMIFS(#REF!,
+    /// …)` is `#REF!`. Without this the error flattened to no values at all, which sums to
+    /// zero — so a broken reference read as "the total is zero", and in the workbook that
+    /// found it the enclosing `IF(… = 0, "", …)` turned that into an empty-looking cell.
+    ///
+    /// This is about the **argument**, not about error cells *inside* a range: Excel treats
+    /// those function by function, and that question is not settled here.
+    private static func propagatedError(_ args: [CellValue]) -> CellValue? {
+        for argument in args {
+            if case .error = argument { return argument }
+        }
+        return nil
+    }
+
     private static func flatten(_ args: [CellValue]) -> [CellValue] {
         var result: [CellValue] = []
         for arg in args {
@@ -372,6 +388,7 @@ public enum BuiltinAggregationFunctions {
     /// where the `range` value matches the criteria.
     static let sumif = ExcelFunction(name: "SUMIF", minArgs: 2, maxArgs: 3) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let rangeValues = toArray(args[0])
             guard let criteria = criteriaString(from: args[1]) else {
                 return .error(.value)
@@ -405,6 +422,7 @@ public enum BuiltinAggregationFunctions {
     /// criteria_range and criteria string.
     static let sumifs = ExcelFunction(name: "SUMIFS", minArgs: 3, maxArgs: nil) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             guard args.count >= 3 else { return .error(.value) }
             // Remaining args after sum_range must be in pairs
             guard (args.count - 1) % 2 == 0 else { return .error(.value) }
@@ -448,6 +466,7 @@ public enum BuiltinAggregationFunctions {
     /// `COUNTIF(range, criteria)` -- counts the number of cells matching a criteria.
     static let countif = ExcelFunction(name: "COUNTIF", minArgs: 2, maxArgs: 2) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let rangeValues = toArray(args[0])
             guard let criteria = criteriaString(from: args[1]) else {
                 return .error(.value)
@@ -470,6 +489,7 @@ public enum BuiltinAggregationFunctions {
     /// Arguments come in pairs: criteria_range and criteria string.
     static let countifs = ExcelFunction(name: "COUNTIFS", minArgs: 2, maxArgs: nil) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             guard args.count >= 2 else { return .error(.value) }
             guard args.count % 2 == 0 else { return .error(.value) }
 
@@ -515,6 +535,7 @@ public enum BuiltinAggregationFunctions {
     /// Returns `#DIV/0!` if no cells match.
     static let averageif = ExcelFunction(name: "AVERAGEIF", minArgs: 2, maxArgs: 3) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             let rangeValues = toArray(args[0])
             guard let criteria = criteriaString(from: args[1]) else {
                 return .error(.value)
@@ -566,6 +587,7 @@ public enum BuiltinAggregationFunctions {
     /// as zero, which is what changes a mean rather than merely a total.
     static let averageifs = ExcelFunction(name: "AVERAGEIFS", minArgs: 3, maxArgs: nil) { args in
         catching {
+            if let error = propagatedError(args) { return error }
             // The value range, then (range, criterion) pairs — so an odd count is a
             // criterion with no range or a range with no criterion.
             guard args.count >= 3, (args.count - 1) % 2 == 0 else { return .error(.value) }

@@ -246,13 +246,14 @@ final class NamedLambdaTests: XCTestCase {
     }
 
     /// A name that is not a lambda is still not a function.
+    ///
+    /// `#NAME?` rather than a thrown error since the corpus run: an unknown name is a value
+    /// Excel hands back, not a failure that destroys the formula around it.
     func testANameHoldingSomethingElseIsStillUnknown() throws {
         let names = Names(targets: ["taxrate": .cell(CellRef("A1"))])
-        XCTAssertThrowsError(try eval(.function("TAXRATE", [.number(1)]), names: names)) { error in
-            XCTAssertEqual(error as? FormulaEvaluator.EvaluationError,
-                           .unknownFunction("TAXRATE"))
-        }
-        XCTAssertThrowsError(try eval(.function("NOSUCHNAME", [.number(1)]), names: names))
+        XCTAssertEqual(try eval(.function("TAXRATE", [.number(1)]), names: names), .error(.name))
+        XCTAssertEqual(try eval(.function("NOSUCHNAME", [.number(1)]), names: names),
+                       .error(.name))
     }
 
     /// A registered function wins over a name that shares its spelling.

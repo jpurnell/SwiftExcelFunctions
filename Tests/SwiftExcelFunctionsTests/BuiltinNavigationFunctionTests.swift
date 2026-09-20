@@ -90,6 +90,32 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
         XCTAssertEqual(result, .number(1))
     }
 
+    /// `VLOOKUP(x, table, 2, )` — the fourth argument present, and empty.
+    ///
+    /// **An empty argument slot is not an absent one.** Omitting the argument entirely asks
+    /// for an approximate match; supplying it as nothing supplies `0`, which is `FALSE`,
+    /// which is exact. Excel draws that line and this package did not: `args.count > 3` saw
+    /// a fourth argument, `isApproximate` saw `.blank`, and `.blank` answered "approximate".
+    ///
+    /// Found by the corpus oracle in 70 cells of one Excel-written workbook, every one
+    /// spelling `VLOOKUP(B33, lookupPlatform, 2, )`. They held plausible wrong answers —
+    /// "Churn" where Excel had "Android" — rather than `#N/A`, which is why nobody noticed.
+    ///
+    /// Sorted numeric keys here rather than the corpus's text ones: approximate matching is
+    /// only defined over sorted keys, so this is the table where the two modes disagree by
+    /// rule rather than by accident.
+    func testVLOOKUPWithAnEmptyFourthArgumentIsExact() throws {
+        let table = grid([[.number(10), .text("Ten")],
+                          [.number(20), .text("Twenty")],
+                          [.number(30), .text("Thirty")]])
+
+        assertError(try eval("VLOOKUP", .number(25), table, .number(2), .blank), .na)
+
+        let absent = try eval("VLOOKUP", .number(25), table, .number(2))
+        XCTAssertEqual(absent, .text("Twenty"),
+                       "omitted entirely, it stays approximate: the largest key below 25")
+    }
+
     func testVLOOKUPApproximateMatch() throws {
         // Sorted ascending table
         let table = grid([[.number(10), .text("Low")],

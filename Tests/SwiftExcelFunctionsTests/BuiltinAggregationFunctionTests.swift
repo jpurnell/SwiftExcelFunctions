@@ -161,6 +161,27 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
         assertNumber(result, 30) // Only index 2 matches (A and 3 > 1)
     }
 
+    /// An argument that is *itself* an error poisons the call.
+    ///
+    /// `SUMIFS(#REF!, …)` is `#REF!`. This returned `0` — `toArray` was reached without
+    /// anything having looked at the arguments, and an error flattened to no values at all,
+    /// which sums to nothing.
+    ///
+    /// Found by the corpus oracle in **202 cells** of one Excel-written workbook, every one
+    /// spelling `IF(SUMIFS(#REF!, 'Daily'!A1:XFD1, …)=0, "", …)`. A broken reference inside
+    /// the model therefore read as "the total is zero", and the `IF` returned the empty
+    /// string — a wrong answer wearing the same clothes as a legitimately empty cell, which
+    /// is why nobody saw it.
+    ///
+    /// This is about an **argument** that is an error, not about error *cells inside a range*
+    /// — Excel treats those differently function by function, and that is a separate question.
+    func testSUMIFSPropagatesAnErrorArgument() throws {
+        let criteriaRange: CellValue = .array(CellMatrix(row: [.text("A"), .text("B")]))
+        let result = try eval("SUMIFS", .error(.ref), criteriaRange, .text("A"))
+        XCTAssertEqual(result, .error(.ref),
+                       "a broken reference is not an empty sum")
+    }
+
     func testSUMIFSSingleCriteria() throws {
         let sumRange: CellValue = .array(CellMatrix(row: [.number(10), .number(20), .number(30)]))
         let criteriaRange: CellValue = .array(CellMatrix(row: [.text("A"), .text("B"), .text("A")]))
