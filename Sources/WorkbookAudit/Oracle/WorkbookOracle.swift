@@ -260,6 +260,9 @@ public enum WorkbookOracle {
         /// The workbook's sheets, in order, so a 3-D reference can be expanded.
         func sheetNames() -> [String] { snapshot.order }
 
+        /// The pivot tables the workbook renders, for `GETPIVOTDATA`.
+        func pivotTables() -> [PivotTableLayout] { snapshot.pivots }
+
         func value(at ref: CellRef, inSheet sheet: String) -> CellValue? {
             Self.reading(snapshot.value(at: ref, inSheet: sheet))
         }
@@ -331,6 +334,9 @@ public enum WorkbookOracle {
 
         private let cells: [String: [Int: CellValue]]
         private let corners: [String: CellRef?]
+        /// The pivot tables the workbook renders, read once with everything else.
+        let pivots: [PivotTableLayout]
+
         /// The sheets in the order the file lists them.
         ///
         /// **A 3-D reference needs the order and nothing else does.** `'Q1:Q4'!B7` covers
@@ -370,6 +376,7 @@ public enum WorkbookOracle {
             self.cells = cells
             self.corners = corners
             self.order = order
+            self.pivots = workbook.pivotTables
         }
 
         /// The value in a cell.

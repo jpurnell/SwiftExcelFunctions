@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`GETPIVOTDATA` answers the two-argument grand-total form.** 3,802 corpus cells across four
+  workbooks used it — 90% of everything a 300-workbook run still disagreed on — and every one
+  of them answered `#REF!`, because this package had never read a pivot table definition.
+
+  **A pivot table's values are already on the worksheet.** Excel renders them into cells and
+  caches them there like any other formula result, so `GETPIVOTDATA` is a lookup, not a
+  recomputation: it aggregates nothing and `xl/pivotCache/` is never opened. One corpus
+  workbook carries 76 cache parts and needs none of them.
+
+  Requires SwiftXLSX 0.33.1, which reads `xl/pivotTables/` (and whose `init(xlsxData:)`
+  dropped the pivots it had just parsed until 0.33.1), and SwiftExcelCore 0.16.0 for
+  `PivotTableLayout` and `CellValueProvider.pivotTables()`.
+
+  The grand total row is the last row of the declared `location ref` when `rowGrandTotals` is
+  on — **never** a row labelled `"Grand Total"`. Measured: a pivot in `Dot Com YTD Performance
+  Report 6 20.xlsx` with `rowGrandTotals="0"` ends on a row reading `"KEY Total"`, a
+  *subtotal*, which a label match would have returned as a grand total, quietly and wrongly.
+  It also sidesteps the locale trap — the same label is `"Gesamtergebnis"` in German.
+
+  Measured result: the three Amazon workbooks went from 228 findings to **zero**, each now at
+  100% agreement on every comparable cell. Field/item pairs refuse, which is honest.
+
 - **Every row of the coverage matrix is classified.** The `PSI` bucket went from 147
   unreviewed to **zero**: 189 have, 71 out of scope with a written reason each, 17 bindable,
   17 not ours, 1 new. The `EXCEL` bucket closed on 2026-09-17, so nothing in the file is
@@ -28,6 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a fixture does.
 
 ### Fixed
+
+- **The count that sized this work was wrong, and the error was in the measurement.** The
+  design document recorded a phase split of 1,800 two-argument cells against 2,002 field/item
+  ones. Both numbers came from classifying formulas with the regex
+  `GETPIVOTDATA\([^,]*,[^,)]*\)`, which counts arguments by counting commas and breaks the
+  moment the first argument is itself a call — and in this corpus it usually is
+  (`GETPIVOTDATA(TEXT($B87,""),$C$267,"Region",$D87,…)`). Five-pair calls were counted as
+  two-argument ones.
+
+  Counted properly, by parsing: of the 3,574 findings that survive, **none** is two-argument.
+  1,612 carry three pairs, 1,758 carry four, 204 carry five, and all of them sit in a single
+  workbook. The real two-argument population was 228 cells and is now cleared.
+
+  It was caught by reading the tool's own output rather than its summary line — a row printed
+  under the heading *two-argument forms still failing* had `"Region",$D87` visible in it. The
+  rule earned: **a population count is a measurement and gets the same scrutiny as a result**,
+  and a heuristic that happens to confirm the plan is the one least likely to be checked.
 
 - **`SUMIFS`' shape check was too broad, and refused 15 cells Excel answers.** A regression
   introduced in the same release: the rule measured in round fifteen is that a **one-cell**

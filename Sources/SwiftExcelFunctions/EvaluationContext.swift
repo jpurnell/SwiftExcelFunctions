@@ -67,6 +67,10 @@ public struct EvaluationContext: Sendable {
     ///   - arguments: The unevaluated argument trees.
     ///   - random: Where `RAND()` draws from, or `nil` for none.
     ///   - simulation: A completed run for the `Psi*` statistics, or `nil` for none.
+    ///   - evaluatesArrays: Whether the enclosing call wants its arguments evaluated as
+    ///     arrays. `false` — the ordinary case — is what `SUM` and every scalar call pass;
+    ///     `SUMPRODUCT` passes `true`, and `COLUMN` and `ROW` read it to decide between the
+    ///     whole range and its leftmost cell.
     public init(
         callingCell: CellAddress?,
         currentSheet: String,
@@ -101,6 +105,23 @@ public struct EvaluationContext: Sendable {
         case .sheetRef(let reference): return reference.range.start
         default: return nil
         }
+    }
+
+    /// The sheet an argument names, where it names one.
+    ///
+    /// `GETPIVOTDATA`'s second argument is a cell of the pivot it means, and one corpus
+    /// workbook renders a pivot at `M1` on dozens of sheets — one per week. Matching on the
+    /// address alone would answer from whichever sheet happened to be read first.
+    ///
+    /// `nil` where the reference names no sheet, which means the formula's own.
+    ///
+    /// - Parameter index: Which argument to look at.
+    /// - Returns: The sheet name, or `nil`.
+    public func referencedSheet(at index: Int) -> String? {
+        guard index < arguments.count, case .sheetRef(let reference) = arguments[index] else {
+            return nil
+        }
+        return reference.sheetName
     }
 
     /// The whole range an argument names, rather than only its first cell.

@@ -1,5 +1,6 @@
 import XCTest
 import SwiftExcelCore
+import SwiftXLSX
 @testable import SwiftExcelFunctions
 
 /// Behaviour taken from Microsoft's published function reference, not from ours.
@@ -829,24 +830,44 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // MARK: - GETPIVOTDATA
 
     // `GETPIVOTDATA(data_field, pivot_table, [field, item]…)` reads a value out of a
-    // PivotTable report. The number is not computed from the arguments — it is looked
-    // up in a pivot cache, which lives in `xl/pivotCache/` and which this family does
-    // not read. Pivot caches are out of scope.
+    // PivotTable report. It is **not** looked up in a pivot cache, which is what this
+    // note used to say: a pivot's values are already rendered onto the worksheet and
+    // cached there, so the function reads a table that is already present and
+    // `xl/pivotCache/` is never opened.
     //
-    // So it answers `#REF!`, which is what Excel itself answers when the PivotTable
-    // being pointed at is not available. That is the honest report of our situation
-    // rather than a stand-in: the pivot table really is not here.
+    // It still answers `#REF!` wherever it cannot resolve — a cell in no pivot, a data
+    // field the table does not have, a table rendering no grand total — which is what
+    // Excel answers when the PivotTable pointed at is not available.
     //
     // Deliberately not `#NAME?`. The function exists and its name is known; what is
     // missing is the data it reads, and those are different failures. A caller
     // debugging a sheet needs to know which.
+    //
+    // These go through the evaluator rather than calling the function directly: it needs
+    // the reference its second argument names, and a bare `evaluate(_:)` hands it values
+    // with no addresses in them.
 
     func testGetPivotDataReportsAMissingPivotTable() throws {
-        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
-            [.text("Sales"), .text("$A$3")]), .error(.ref))
-        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
-            [.text("Sales"), .text("$A$3"), .text("Region"), .text("North")]),
-            .error(.ref))
+        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3)"), .error(.ref))
+        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3, \"Region\", \"North\")"),
+                       .error(.ref))
+    }
+
+    /// Evaluates against a provider that models no workbook, so it has no pivots to offer.
+    private func pivotAnswer(_ formula: String) throws -> CellValue {
+        struct Bare: CellValueProvider {
+            func value(at ref: CellRef) -> CellValue? { nil }
+            func value(at ref: CellRef, inSheet: String) -> CellValue? { nil }
+            func lastPopulatedCell() -> CellRef? { nil }
+            func lastPopulatedCell(inSheet: String) -> CellRef? { nil }
+            func values(in range: CellRange) -> [CellValue] { [] }
+            func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
+        }
+        struct NoNames: NameResolver {
+            func resolve(_ name: String, inSheet: String?) -> NamedRangeTarget? { nil }
+        }
+        return try FormulaEvaluator.evaluate(try FormulaParser.parse(formula),
+                                             cells: Bare(), names: NoNames())
     }
 
     /// It is registered, so a workbook full of it reads as a known function that
@@ -857,8 +878,7 @@ final class MicrosoftSpecificationTests: XCTestCase {
 
     /// An error argument still propagates, so the first failure is the one reported.
     func testGetPivotDataPropagatesAnError() throws {
-        XCTAssertEqual(try function("GETPIVOTDATA").evaluate(
-            [.error(.name), .text("$A$3")]), .error(.name))
+        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(#NAME?, $A$3)"), .error(.name))
     }
 
     // MARK: - Legacy spellings

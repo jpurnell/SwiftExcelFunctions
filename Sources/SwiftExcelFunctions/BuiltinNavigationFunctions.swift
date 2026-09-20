@@ -861,22 +861,67 @@ public enum BuiltinNavigationFunctions {
     /// this family does not read. Pivot caches are out of scope — a decision, not an
     /// omission.
     ///
-    /// `#REF!` because that is what Excel answers when the PivotTable being pointed
-    /// at is not available, which is exactly our situation: the pivot table really is
-    /// not here. It is the honest report rather than a stand-in.
+    /// **That was wrong, and this now answers.** A pivot table's values are already
+    /// rendered onto the worksheet and cached there like any other formula result, so
+    /// `GETPIVOTDATA` is a lookup into a table that is already present — it aggregates
+    /// nothing, and the cache never has to be read. One corpus workbook carries 76 cache
+    /// parts and needs none of them. The claim above that *"every one of those cells would
+    /// need the cache to answer correctly"* is the opposite of the truth, and is left
+    /// standing because a decision recorded and then disproved is worth more than a
+    /// decision quietly rewritten.
     ///
-    /// Deliberately **not** `#NAME?`. The function exists and its name is known; what
-    /// is missing is the data behind it, and a caller debugging a sheet needs to be
-    /// able to tell those apart. Registering it is what makes that distinction
-    /// available at all.
+    /// The resolution: the second argument names any cell of a pivot, which says **which**
+    /// table; the first names a data field, whose text is also its column header on the
+    /// sheet; with no further arguments the answer is the grand total row, found as the last
+    /// row of the declared range when `rowGrandTotals` is on.
     ///
-    /// The corpus writes it 1,398 times across six workbooks. Every one of those
-    /// cells would need the cache to answer correctly, so none of them is a near
-    /// miss.
+    /// `#REF!` still, at every step that cannot be resolved — a cell in no pivot, a field
+    /// the table does not have, a table rendering no grand total. Deliberately not `#NAME?`:
+    /// the function exists and its name is known, and a caller debugging a sheet needs to
+    /// tell those apart.
+    ///
+    /// **Field/item pairs are not implemented.** 3,574 corpus cells use them — counted by
+    /// parsing rather than by a regex over the formula text, which had read a call whose
+    /// first argument is `TEXT($B87,"")` as a two-argument one and undercounted them badly.
+    /// They need the row labels matched against item values, hierarchically, with subtotal
+    /// rows to distinguish from data rows. Those refuse, which is honest.
     static let getPivotData = ExcelFunction(
         name: "GETPIVOTDATA", minArgs: 2, maxArgs: nil
-    ) { args in
+    ) { context, args in
         if let error = propagatedError(args) { return error }
+        // Field/item pairs are phase two: they need the row labels matched against item
+        // values, hierarchically in a multi-field pivot and with subtotal rows to tell apart
+        // from data rows. Refusing is honest; picking a row would not be.
+        guard args.count == 2 else { return .error(.ref) }
+        guard case .text(let field) = args[0] else { return .error(.ref) }
+        guard let anchor = context.referencedCell(at: 1) else { return .error(.ref) }
+
+        // **The sheet matters.** One corpus workbook renders a pivot at `M1` on dozens of
+        // sheets, one per week, so containment alone would answer from whichever came first.
+        let sheet = context.referencedSheet(at: 1) ?? context.currentSheet
+        guard let layout = context.cells.pivotTables().first(where: {
+            $0.sheet == sheet && $0.contains(anchor)
+        }) else {
+            return .error(.ref)
+        }
+        guard layout.dataFields.contains(field) else { return .error(.ref) }
+        // No grand total row means the two-argument form has nothing to answer with. The
+        // last row is then an ordinary one — in the corpus, a subtotal reading "KEY Total" —
+        // and returning it would be a wrong number reported quietly.
+        guard let totalRow = layout.grandTotalRow else { return .error(.ref) }
+
+        // The field's column is where its name is written in the header row. Matched by text
+        // because that is the only thing the name and the sheet have in common: the file
+        // gives an ordered list of names, and the sheet gives a row of headers.
+        for column in layout.range.start.column...layout.range.end.column {
+            let header = CellRef(column: column, row: layout.headerRow)
+            guard case .text(let name)? = context.cells.value(at: header, inSheet: layout.sheet),
+                  name == field else {
+                continue
+            }
+            let total = CellRef(column: column, row: totalRow)
+            return context.cells.value(at: total, inSheet: layout.sheet) ?? .blank
+        }
         return .error(.ref)
     }
 

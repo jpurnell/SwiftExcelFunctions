@@ -1,8 +1,9 @@
 # GETPIVOTDATA — a lookup into a rendered table, not a recomputation
 
-**Status:** scoped, not started. 3,802 cells across four corpus workbooks, 77% of everything
-a 300-workbook run still disagrees on.
+**Status:** phase one shipped. 3,802 cells across four corpus workbooks, 77% of everything
+a 300-workbook run still disagrees on; **228 of them now agree** and 3,574 remain.
 **Written:** 2026-09-20, from evidence in `Amazon Reporting thru 05-15-18.xlsx`.
+**Revised:** 2026-09-20, after measuring the phase split properly — see below.
 
 ---
 
@@ -97,25 +98,81 @@ Resolve in this order, refusing rather than guessing at each step:
    every field/item pair.
 5. Read that cell through the provider.
 
-## Phasing, and the honest split
+## Phasing, and the split — corrected after measuring it
 
-The 3,802 cells divide almost evenly, and the halves are not the same difficulty.
+**The split first recorded here was wrong, and the error was in the measurement, not the
+plan.** It read:
 
-**Phase one — 1,800 cells.** The two-argument grand-total form, exactly the shape proved
-above. Steps 1–3 and the grand-total half of step 4. This is modest: a definition parser, a
-layout type, and a lookup.
+> **Phase one — 1,800 cells.** The two-argument grand-total form.
+> **Phase two — 2,002 cells.** Field/item pairs.
 
-**Phase two — 2,002 cells.** Field/item pairs:
+Those numbers came from classifying formulas with the regex
+`GETPIVOTDATA\([^,]*,[^,)]*\)` — "an open paren, something with no comma, a comma, something
+with no comma, a close paren". It counts a call's arguments by counting commas, and it breaks
+the moment the **first argument is itself a call**, which in this corpus it usually is:
+
+```
+IFERROR(GETPIVOTDATA(TEXT($B87,""),$C$267,"Region",$D87, … ),0)
+                                ^ this comma ended the match
+```
+
+`TEXT($B87,"")` contains a comma, so the regex stopped there and read a **five-pair call as a
+two-argument one**. Every such cell was counted into phase one.
+
+### What the corpus actually contains
+
+Counted by parsing — tracking paren depth and string literals rather than matching commas —
+across all 3,574 `GETPIVOTDATA` findings that survive phase one:
+
+| arguments | field/item pairs | cells |
+|---:|---:|---:|
+| 8 | 3 | 1,612 |
+| 10 | 4 | 1,758 |
+| 12 | 5 | 204 |
+| **2** | **0** | **0** |
+
+**Not one two-argument call is left.** The two-argument population was 228 cells, every one of
+them in the three Amazon workbooks, and phase one cleared all of them: those three files now
+agree with Excel on every comparable cell.
+
+| | cells | where |
+|---|---:|---|
+| phase one — two-argument grand total | 228 | three Amazon workbooks, **all now agreeing** |
+| phase two — field/item pairs | 3,574 | all in `Dot Com YTD Performance Report 6 20.xlsx` |
+
+So phase one was a quarter the size it was sold as, and phase two is the whole remainder.
+
+### Why the correction is worth as much as the fix
+
+The regex agreed with the plan. It was written to confirm a split that had already been
+described in prose, it produced a number close enough to "almost evenly" to look right, and
+nothing downstream would ever have contradicted it — phase two's work is the same work whether
+it is 2,002 cells or 3,574.
+
+What caught it was reading the tool's own output rather than its summary line: a row printed
+under the heading `two-argument forms still failing` had `"Region",$D87` plainly visible in it.
+A classifier that disagrees with the text it just printed is wrong about the text, not about
+the printing.
+
+The rule this earns: **a population count is a measurement and gets the same scrutiny as a
+result.** Parse when the grammar is nested; a regex over formula text is a heuristic, and a
+heuristic that happens to confirm the plan is the one least likely to be checked.
+
+### Phase two, sized honestly
 
 ```
 GETPIVOTDATA("Subs", $BA$393, "Region", $R$196, "FME_Calc", U$181, "Scenario", "CY")
 ```
 
-Four pairs, most read from *other cells* rather than written as literals. This needs the row
-labels matched against item values, and in a multi-field pivot the labels are laid out
-hierarchically rather than one per column. Harder, still a lookup, still no aggregation.
+Three to five pairs, most read from *other cells* rather than written as literals. This needs
+the row labels matched against item values, and in a multi-field pivot the labels are laid out
+hierarchically rather than one per column — and subtotal rows (`"KEY Total"`, `"WNE Total"`)
+have to be told apart from data rows, which the two-argument form never had to do. Harder,
+still a lookup, still no aggregation.
 
-Phase one is worth doing alone. 1,800 cells is larger than any single defect fixed today.
+It is also **one workbook**. 3,574 cells is a large number attached to a single file, and a
+capability built to satisfy one file needs its round of independent evidence before it is
+believed — the same bar every other fix here was held to.
 
 ## What must be measured before writing it
 
@@ -173,15 +230,16 @@ distinguish a subtotal row from a data row, which the two-argument form never ha
 
 ## Why this is a capability and not a defect
 
-The same shape as 3-D references: the corpus says *that* 3,802 cells need it, and only the
+The same shape as 3-D references: the corpus says *that* these cells need it, and only the
 file format says *how*. No conformance round can settle it, because there is nothing to
 compare — this package does not refuse `GETPIVOTDATA` because it computes it wrongly, but
 because it has never read a pivot definition.
 
-`GETPIVOTDATA` currently answers `#REF!`, which is honest, and 1,268 of the findings are
-recorded as `refused` rather than `differed` for that reason. The remaining 2,534 are
-`differed` because the refusal happens inside an `IFERROR` or a `TEXT` that then produces a
-value.
+`GETPIVOTDATA` answers `#REF!` where it cannot answer, which is honest, and 1,040 of the
+remaining findings are recorded as `refused` rather than `differed` for that reason. The other
+2,534 are `differed` because the refusal happens inside an `IFERROR` or a `TEXT` that then
+produces a value — which is also why a phase-two failure will read as `ours=[0.0]` rather than
+as an error, and why the raw outcome column cannot be trusted to say what failed.
 
 ## Risks worth naming now
 
