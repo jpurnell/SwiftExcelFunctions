@@ -597,6 +597,16 @@ public enum FormulaEvaluator {
                 return shape
             }
 
+            // `SUMIF` stretches a short `sum_range` to the criteria range's shape, and
+            // `SUMIFS` refuses one — measured in round fifteen, and the clearest proof that
+            // they are two functions rather than one with its arguments moved.
+            //
+            // Done here because stretching needs the **reference**: which cells the range
+            // would cover. An `ExcelFunction` is handed evaluated values, so by the time one
+            // runs a one-cell `sum_range` is a single number with no address, and the shape
+            // it should have grown to is unrecoverable.
+            let args = FormulaEvaluator.stretchingSumRange(fn.name, args)
+
             // A branching call chooses among its arguments instead of consuming them, so it
             // has to be reached before any of them are evaluated. See `LazyBranch`, and note
             // that the arity check above has already run — a malformed `IF` is still an
@@ -767,9 +777,15 @@ public enum FormulaEvaluator {
 
             var evaluatedArgs: [CellValue] = []
             evaluatedArgs.reserveCapacity(args.count)
+            // **`SUMPRODUCT` evaluates its arguments as arrays**, measured in round fifteen:
+            // `SUM(COLUMN($H:$M))` is the leftmost column and
+            // `SUMPRODUCT((MOD(COLUMN($H:$M),2)=0)*1)` is a count over all six. The
+            // difference is the caller, not `COLUMN`.
+            let argumentEnvironment = FormulaEvaluator.forcesArrayArguments(fn.name)
+                ? inCall.evaluatingArrays() : inCall
             for arg in args {
                 let val = try evaluateNode(
-                    arg, in: inCall
+                    arg, in: argumentEnvironment
                 )
                 evaluatedArgs.append(val)
             }
@@ -781,11 +797,62 @@ public enum FormulaEvaluator {
                     currentSheet: currentSheet,
                     cells: cells,
                     arguments: args,
-                    random: random, simulation: simulation)
+                    random: random, simulation: simulation,
+                    evaluatesArrays: env.evaluatesArrays)
                 return try inContext(context, evaluatedArgs)
             }
             return try fn.evaluate(evaluatedArgs)
         }
+    }
+
+    /// `SUMIF`'s `sum_range`, grown to the criteria range's shape.
+    ///
+    /// Excel takes the top-left of a short `sum_range` and extends it to match the criteria
+    /// range: `SUMIF(A1:A5, ">1", B1)` sums `B1:B5`. Measured in round fifteen, where three
+    /// keys against a one-cell sum range answered 4 — the two matching rows — while `SUMIFS`
+    /// written the same way answered `#VALUE!`.
+    ///
+    /// **`SUMIF` only.** `AVERAGEIF` takes the same shape of arguments and was not asked, so
+    /// it is left alone; the two have already been shown to disagree about things they look
+    /// like they should share.
+    ///
+    /// - Parameters:
+    ///   - name: The function being called.
+    ///   - arguments: Its unevaluated arguments.
+    /// - Returns: The arguments, with the third grown where it was short.
+    static func stretchingSumRange(_ name: String, _ arguments: [FormulaAST]) -> [FormulaAST] {
+        guard name == "SUMIF", arguments.count == 3,
+              let criteria = referencedRange(arguments[0]),
+              let target = referencedRange(arguments[2]),
+              criteria.rowCount != target.rowCount
+                || criteria.columnCount != target.columnCount else {
+            return arguments
+        }
+        let start = target.start
+        let end = CellRef(column: start.column + criteria.columnCount - 1,
+                          row: start.row + criteria.rowCount - 1)
+        var grown = arguments
+        grown[2] = .cellRange(CellRange(from: start, to: end))
+        return grown
+    }
+
+    /// The range an argument names, where it names one.
+    private static func referencedRange(_ ast: FormulaAST) -> CellRange? {
+        switch ast {
+        case .cellRef(let ref): return CellRange(from: ref, to: ref)
+        case .cellRange(let range): return range
+        default: return nil
+        }
+    }
+
+    /// Whether a function evaluates its arguments as arrays rather than as single values.
+    ///
+    /// **Only what has been measured.** Round fifteen asked `SUMPRODUCT` and `SUM` and found
+    /// them different; every other function here is unasked, and listing one on a hunch is
+    /// the move that has been wrong repeatedly in this package. `SUMPRODUCT` is the whole
+    /// list until a round makes it longer.
+    static func forcesArrayArguments(_ name: String) -> Bool {
+        name == "SUMPRODUCT"
     }
 
     /// Calls a lambda **value** with arguments already in hand.

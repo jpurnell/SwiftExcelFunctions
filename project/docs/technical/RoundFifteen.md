@@ -1,7 +1,7 @@
 # Round fifteen — the tail, and whether SUMIF is a SUMIFS
 
-**Status:** answered 2026-09-20. Five of seven findings implemented; two recorded as
-scoped gaps below. Round fifteen reads **agreed 276, differed 2**, from 261 and 17.
+**Status:** closed 2026-09-20. All seven findings implemented, including the two first
+recorded as scoped gaps. Round fifteen reads **agreed 278, differed 0**, from 261 and 17.
 **Written:** 2026-09-20, before the answers, so the predictions are on the record rather than
 reconstructed afterwards.
 
@@ -207,10 +207,11 @@ acting on it would have broken the case that already agreed. The real rule is th
 The decomposition is the only reason this was caught. A round asking the whole idiom would
 have shown one disagreement and pointed at the wrong function.
 
-# The two scoped gaps
+# The two scoped gaps — since closed
 
-Neither is a defect to patch; both need a structural change, and both are written down rather
-than approximated.
+Both needed a structural change rather than a patch, which is why they were written down
+before being attempted. Both are now implemented; the descriptions below are kept as the
+reasoning that produced them.
 
 ## `SUMPRODUCT` does not establish array context — 48 cells
 
@@ -241,3 +242,27 @@ Of the corpus residue this round set out to explain:
 | `TEXT` on text | 22 | closed |
 | `SUMPRODUCT`/`COLUMN` | 48 | scoped, above |
 | `GETPIVOTDATA` | 3,802 | `PivotTableLookup.md` |
+
+
+## How the gaps were closed
+
+**Array context.** `EvaluationEnvironment` gained `evaluatesArrays`, set when a function on a
+measured list evaluates its arguments — a list with exactly one name on it, `SUMPRODUCT`,
+because that is all round fifteen asked. `EvaluationContext` carries it through to `COLUMN`
+and `ROW`, which answer the whole range when it is set and the leftmost cell when it is not.
+
+The flag propagates through nesting, because the corpus shape wraps `COLUMN` in `MOD`, in a
+comparison, in a multiplication. **Whether a nested aggregate should stop it —
+`SUMPRODUCT(SUM(COLUMN(…)))` — is not measured**, and it propagates rather than guessing at a
+boundary nobody has asked Excel about.
+
+`MOD` then needed `mappedOverArrays()`, since `COLUMN` now hands it one. The text family was
+wrapped that way after the oracle found 400 cells; this is the same rule reaching a math
+function for the first time, and **only `MOD`** — wrapping the family on a hunch is how a
+dozen functions acquire a dozen slightly different broadcast behaviours.
+
+**The `sum_range` stretch.** Done in the evaluator, before arguments are evaluated, by
+rewriting the third argument's range to the criteria range's shape. It has to happen there:
+an `ExcelFunction` receives values, and by then a one-cell sum range is a number with no
+address. `SUMIF` only — `AVERAGEIF` takes the same shape of arguments, was not asked, and
+these two have already been shown to disagree about things they look like they should share.

@@ -19,7 +19,7 @@ public enum BuiltinMathFunctions {
     /// All math functions for registration in a ``FunctionRegistry``.
     public static let all: [ExcelFunction] = [
         abs, round, roundUp, roundDown, sqrt, ln, log, exp,
-        power, mod, intFunc, ceiling, floor, sign, pi,
+        power, mod.mappedOverArrays(), intFunc, ceiling, floor, sign, pi,
         rand, randbetween,
         sin, cos, tan, asin, acos, atan, atan2, log10, trunc, product, gcd, lcm,
         dec2hex, dec2bin, dec2oct, hex2dec, bin2dec, oct2dec, baseFunc, decimalFunc,
@@ -262,6 +262,17 @@ public enum BuiltinMathFunctions {
     /// `MOD(-7, 3) = 2` (not `-1`).
     ///
     /// Returns `#DIV/0!` when the divisor is zero.
+    /// `MOD(number, divisor)` — mapped over arrays, because `SUMPRODUCT` hands it one.
+    ///
+    /// **Measured in round fifteen.** `SUMPRODUCT((MOD(COLUMN($H:$M),2)=0)*1)` counts three
+    /// even columns, and `COLUMN` now answers all six in that context — so `MOD` receives an
+    /// array and answered `#VALUE!` for it. The text family was wrapped this way after the
+    /// oracle found 400 cells failing for want of it; this is the same rule reaching a math
+    /// function for the first time.
+    ///
+    /// **Only `MOD`.** The rest of the family is unwrapped, and stays that way until
+    /// something measures a need: wrapping on a hunch is how a dozen functions acquire a
+    /// dozen slightly different broadcast behaviours.
     static let mod = ExcelFunction(name: "MOD", minArgs: 2, maxArgs: 2) { args in
         catching {
             let number = try toNumber(args[0])

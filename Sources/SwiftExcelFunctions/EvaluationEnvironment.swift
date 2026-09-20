@@ -35,6 +35,19 @@ struct EvaluationEnvironment {
     /// How far in we are, against the three bounds.
     let depth: FormulaEvaluator.Depth
 
+    /// Whether the enclosing call wants its arguments evaluated as **arrays**.
+    ///
+    /// **`SUMPRODUCT` forces this and `SUM` does not**, measured in round fifteen:
+    /// `SUM(COLUMN($H:$M))` is 8 — the leftmost column — while
+    /// `SUMPRODUCT((MOD(COLUMN($H:$M),2)=0)*1)` is 3, which only works if `COLUMN` yields
+    /// all six column numbers. The difference is the caller, not `COLUMN`.
+    ///
+    /// It reaches through nesting, because the corpus shape it exists for wraps `COLUMN` in
+    /// `MOD`, in a comparison, in a multiplication. **Whether a nested *aggregate* should
+    /// stop it — `SUMPRODUCT(SUM(COLUMN(…)))` — is not measured**, and this propagates
+    /// rather than guessing at a boundary nobody has asked Excel about.
+    var evaluatesArrays: Bool = false
+
     /// Names bound by an enclosing `LET` or `LAMBDA`, innermost first.
     ///
     /// Keyed by ``key(for:)`` rather than by the spelling, because Excel's names are
@@ -165,9 +178,18 @@ struct EvaluationEnvironment {
     private func copy(
         depth: FormulaEvaluator.Depth, bindings: [String: CellValue], omitted: Set<String>
     ) -> EvaluationEnvironment {
-        EvaluationEnvironment(
+        var next = EvaluationEnvironment(
             cells: cells, names: names, functions: functions, callingCell: callingCell,
             currentSheet: currentSheet, random: random, simulation: simulation,
             depth: depth, bindings: bindings, omitted: omitted)
+        next.evaluatesArrays = evaluatesArrays
+        return next
+    }
+
+    /// The same environment, evaluating arguments as arrays.
+    func evaluatingArrays() -> EvaluationEnvironment {
+        var next = self
+        next.evaluatesArrays = true
+        return next
     }
 }

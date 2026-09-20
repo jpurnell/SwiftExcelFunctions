@@ -77,6 +77,22 @@ public enum BuiltinNavigationFunctions {
             guard let cell = context.callingCell else { return .error(.value) }
             return .number(Double(cell.cell.column))
         }
+        // **In array context the answer is every column, not the leftmost.** Measured in
+        // round fifteen: `SUM(COLUMN($H:$M))` is 8 and
+        // `SUMPRODUCT((MOD(COLUMN($H:$M),2)=0)*1)` is 3. The difference is the caller —
+        // `SUMPRODUCT` evaluates its arguments as arrays and `SUM` does not — so returning
+        // an array unconditionally would have broken the case that already agreed.
+        if context.evaluatesArrays, let range = context.referencedRange(at: 0),
+           range.columnCount > 1 {
+            let numbers = (0..<range.columnCount).map {
+                CellValue.number(Double(range.start.column + $0))
+            }
+            guard let matrix = CellMatrix(elements: numbers, rows: 1,
+                                          columns: range.columnCount) else {
+                return .error(.value)
+            }
+            return .array(matrix)
+        }
         guard let referenced = context.referencedCell(at: 0) else { return .error(.value) }
         return .number(Double(referenced.column))
     }
@@ -86,6 +102,18 @@ public enum BuiltinNavigationFunctions {
         guard !context.arguments.isEmpty else {
             guard let cell = context.callingCell else { return .error(.value) }
             return .number(Double(cell.cell.row))
+        }
+        // The same rule as `COLUMN`, turned ninety degrees — see the note there.
+        if context.evaluatesArrays, let range = context.referencedRange(at: 0),
+           range.rowCount > 1 {
+            let numbers = (0..<range.rowCount).map {
+                CellValue.number(Double(range.start.row + $0))
+            }
+            guard let matrix = CellMatrix(elements: numbers, rows: range.rowCount,
+                                          columns: 1) else {
+                return .error(.value)
+            }
+            return .array(matrix)
         }
         guard let referenced = context.referencedCell(at: 0) else { return .error(.value) }
         return .number(Double(referenced.row))

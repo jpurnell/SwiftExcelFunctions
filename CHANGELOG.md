@@ -29,6 +29,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`SUMPRODUCT` evaluates its arguments as arrays, and `SUM` does not.** 48 corpus cells
+  count alternating columns with `SUMPRODUCT((MOD(COLUMN(C38:GT38),2)=$A$1) * … )` and
+  answered 18 against Excel's 12.
+
+  `COLUMN` returning the leftmost column is **correct** — `SUM(COLUMN($H:$M))` is 8 in Excel
+  too. The difference is the caller. `EvaluationEnvironment` gained `evaluatesArrays`, set for
+  the functions on a measured list — one name long, because that is all round fifteen asked —
+  and `COLUMN` and `ROW` answer the whole range when it is set.
+
+  The flag propagates through nesting, since the corpus shape wraps `COLUMN` in `MOD`, in a
+  comparison, in a multiplication. Whether a nested *aggregate* should stop it is unmeasured
+  and left propagating rather than guessed at.
+
+  `MOD` needed `mappedOverArrays()` as a consequence — the text family was wrapped that way
+  after the oracle found 400 cells, and this is the same rule reaching a math function for the
+  first time. Only `MOD`.
+
+- **`SUMIF` stretches a short `sum_range`** to the criteria range's shape, as Excel does.
+  Handled in the evaluator before arguments are evaluated, because stretching needs the
+  *reference*: an `ExcelFunction` receives values, and by then a one-cell sum range is a
+  number with no address. `SUMIF` only — `AVERAGEIF` was not asked.
+
+  **Round fifteen is closed: agreed 278, differed 0**, from 261 and 17.
+
+### Fixed
+
 - **`TEXT` passes non-numeric text through unchanged**, and coerces text that reads as a date.
   **22 corpus cells**: the failing formula is `TEXT($J$7,"mmm")` where `$J$7` is *itself* a
   `TEXT(...)` call caching the string `"May"` — so the real shape is `TEXT("May","mmm")`, a

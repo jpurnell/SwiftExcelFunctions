@@ -39,6 +39,13 @@ public struct EvaluationContext: Sendable {
     /// The unevaluated argument trees, in order, alongside the evaluated values.
     public let arguments: [FormulaAST]
 
+    /// Whether the enclosing call wanted its arguments evaluated as **arrays**.
+    ///
+    /// `SUMPRODUCT` does and `SUM` does not, measured in round fifteen. `COLUMN` and `ROW`
+    /// answer the whole range when this is set and the leftmost cell when it is not — which
+    /// is the difference between 3 and 1 in the idiom that counts alternating columns.
+    public let evaluatesArrays: Bool
+
     /// Where randomness comes from, when a formula asks for any.
     ///
     /// `nil` means none was supplied, and `RAND()` answers `#VALUE!` rather than
@@ -66,7 +73,8 @@ public struct EvaluationContext: Sendable {
         cells: any CellValueProvider,
         arguments: [FormulaAST],
         random: (any RandomSource)? = nil,
-        simulation: (any SimulationResultProvider)? = nil
+        simulation: (any SimulationResultProvider)? = nil,
+        evaluatesArrays: Bool = false
     ) {
         self.random = random
         self.simulation = simulation
@@ -74,6 +82,7 @@ public struct EvaluationContext: Sendable {
         self.currentSheet = currentSheet
         self.cells = cells
         self.arguments = arguments
+        self.evaluatesArrays = evaluatesArrays
     }
 
     /// The address an argument names, if it names one.
@@ -90,6 +99,23 @@ public struct EvaluationContext: Sendable {
         case .cellRef(let ref): return ref
         case .cellRange(let range): return range.start
         case .sheetRef(let reference): return reference.range.start
+        default: return nil
+        }
+    }
+
+    /// The whole range an argument names, rather than only its first cell.
+    ///
+    /// `COLUMN` needs this when its caller evaluates arguments as arrays: the answer is then
+    /// every column in the range rather than the leftmost one.
+    ///
+    /// - Parameter index: Which argument to look at.
+    /// - Returns: The range it names, or `nil` when it names none.
+    public func referencedRange(at index: Int) -> CellRange? {
+        guard index < arguments.count else { return nil }
+        switch arguments[index] {
+        case .cellRef(let ref): return CellRange(from: ref, to: ref)
+        case .cellRange(let range): return range
+        case .sheetRef(let reference): return reference.range
         default: return nil
         }
     }

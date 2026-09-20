@@ -227,17 +227,10 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
         XCTAssertEqual(try eval("SUMIFS", oneCell, keys, .text("x")), .error(.value),
                        "SUMIFS requires the shapes to match")
 
-        // **`SUMIF`'s half is not asserted here, and that is a gap rather than an opinion.**
-        // Excel answers 4: it stretches the one-cell sum range to the criteria range's shape
-        // and takes the two rows keyed `x`. Stretching needs the *reference* — which cells
-        // the range would cover — and an `ExcelFunction` is handed evaluated values, so the
-        // information is gone by the time this code runs. `GROUPBY` is reached before its
-        // arguments are evaluated for a comparable reason.
-        //
-        // Recorded in `project/docs/technical/RoundFifteen.md`. Asserting the reachable half
-        // and writing down the unreachable one is better than a test that quietly encodes
-        // this package's limit as Excel's behaviour.
-        assertNumber(try eval("SUMIF", keys, .text("x"), oneCell), 1, accuracy: 0)
+        // `SUMIF`'s half is asserted through the evaluator rather than here: stretching needs
+        // the **reference**, and an `ExcelFunction` is handed values, so a one-cell sum range
+        // has no address by the time this code runs. See
+        // `SumRangeStretchTests.testSUMIFStretchesAShortSumRange`.
     }
 
     // MARK: - An error cell inside a range, measured in round fourteen
