@@ -479,8 +479,22 @@ enum ConformanceWorkbook {
             throw Failure.noConformanceSheet
         }
 
-        let byFormula = Dictionary(ConformanceCases.all.map { ($0.formula, $0) },
-                                   uniquingKeysWith: { first, _ in first })
+        // **Cases sharing a formula are told apart by their order.** A round that carries
+        // data asks the *same* formula several times over different cells —
+        // `SUMIF($H{r}:$J{r}, "x", $K{r}:$M{r})` four times, once per arrangement of errors —
+        // so the text alone stopped identifying a case the moment `data` existed. Keyed by
+        // formula and taken in order, every row still finds the case it was written from,
+        // and a workbook whose rows have shifted still lines up by text as it always did.
+        var remaining: [String: [ConformanceCase]] = [:]
+        for testCase in ConformanceCases.all {
+            remaining[testCase.formula, default: []].append(testCase)
+        }
+        func nextCase(for formula: String) -> ConformanceCase? {
+            guard var queue = remaining[formula], !queue.isEmpty else { return nil }
+            let first = queue.removeFirst()
+            remaining[formula] = queue
+            return first
+        }
         var agreed = 0, differed = 0, uncalculated = 0, diverged = 0, drifted = 0
         var uncalculatedFormulas: [String] = []
         var seen: Set<String> = []
@@ -489,7 +503,7 @@ enum ConformanceWorkbook {
         while let formula = text(sheet.cell(at: "\(Column.formula)\(row)")) {
             defer { row += 1 }
             seen.insert(formula)
-            let testCase = byFormula[formula]
+            let testCase = nextCase(for: formula)
             let family = testCase?.family ?? "unlisted"
             let note = testCase?.note ?? "in the workbook but no longer in ConformanceCases"
 

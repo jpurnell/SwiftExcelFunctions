@@ -175,6 +175,73 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
     ///
     /// This is about an **argument** that is an error, not about error *cells inside a range*
     /// — Excel treats those differently function by function, and that is a separate question.
+    // MARK: - An error cell inside a range, measured in round fourteen
+
+    /// An error in a **selected** row poisons the call; one in a row the criteria skips does
+    /// not.
+    ///
+    /// **Measured, and not what blanket propagation would give.** Round fourteen asked with
+    /// real cells — `SUMIF` takes a range, so the question cannot be built from array
+    /// constants — and separated the two cases a single corpus row could not:
+    ///
+    /// | data | Excel |
+    /// |---|---|
+    /// | error in a matching row | `#REF!` |
+    /// | error in a non-matching row | 4 |
+    /// | error in the criteria range | 4 |
+    ///
+    /// The corpus found this as 12,960 cells across four workbooks reading
+    /// `SUMIF($EU$12:$EU$178, $B223, AO$12:AO$178)`, where `AO12` holds a literal `#REF!`.
+    /// It could not say *which* rule was at work, because there the error row happened to
+    /// match — and assuming the blanket rule from that would have been wrong twice over.
+    ///
+    /// This is a separate question from an error passed as an *argument*, which propagates
+    /// whatever it selects.
+    func testSUMIFPropagatesAnErrorOnlyFromASelectedRow() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .text("y"), .text("x")]))
+
+        let matching: CellValue = .array(CellMatrix(row: [.error(.ref), .number(2), .number(3)]))
+        XCTAssertEqual(try eval("SUMIF", keys, .text("x"), matching), .error(.ref),
+                       "the error sits in a row the criteria selects")
+
+        let skipped: CellValue = .array(CellMatrix(row: [.number(1), .error(.ref), .number(3)]))
+        // The error sits in the row keyed y, which is not summed.
+        assertNumber(try eval("SUMIF", keys, .text("x"), skipped), 4)
+
+        let inCriteria: CellValue = .array(CellMatrix(row: [.text("x"), .error(.ref), .text("x")]))
+        let values: CellValue = .array(CellMatrix(row: [.number(1), .number(2), .number(3)]))
+        // An error in the criteria range matches nothing, and poisons nothing.
+        assertNumber(try eval("SUMIF", inCriteria, .text("x"), values), 4)
+    }
+
+    /// `SUMIFS` follows the same rule, which it need not have.
+    func testSUMIFSPropagatesAnErrorOnlyFromASelectedRow() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .text("y"), .text("x")]))
+
+        let matching: CellValue = .array(CellMatrix(row: [.error(.ref), .number(2), .number(3)]))
+        XCTAssertEqual(try eval("SUMIFS", matching, keys, .text("x")), .error(.ref))
+
+        let skipped: CellValue = .array(CellMatrix(row: [.number(1), .error(.ref), .number(3)]))
+        assertNumber(try eval("SUMIFS", skipped, keys, .text("x")), 4)
+    }
+
+    /// And `AVERAGEIF`, which was asked because it need not have agreed either.
+    func testAVERAGEIFPropagatesAnErrorFromASelectedRow() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .text("y"), .text("x")]))
+        let matching: CellValue = .array(CellMatrix(row: [.error(.ref), .number(2), .number(3)]))
+        XCTAssertEqual(try eval("AVERAGEIF", keys, .text("x"), matching), .error(.ref))
+    }
+
+    /// `COUNTIF` counts around an error rather than propagating it — measured, and the
+    /// control that says the rule above is about summing rather than about ranges.
+    func testCOUNTIFCountsAroundAnError() throws {
+        let inCriteria: CellValue = .array(CellMatrix(row: [.text("x"), .error(.ref), .text("x")]))
+        assertNumber(try eval("COUNTIF", inCriteria, .text("x")), 2)
+
+        let numbers: CellValue = .array(CellMatrix(row: [.number(1), .error(.ref), .number(3)]))
+        assertNumber(try eval("COUNTIF", numbers, .text(">1")), 1)
+    }
+
     func testSUMIFSPropagatesAnErrorArgument() throws {
         let criteriaRange: CellValue = .array(CellMatrix(row: [.text("A"), .text("B")]))
         let result = try eval("SUMIFS", .error(.ref), criteriaRange, .text("A"))

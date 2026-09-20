@@ -405,6 +405,21 @@ public enum BuiltinAggregationFunctions {
             for (i, val) in rangeValues.enumerated() {
                 if matchesCriteria(val, criteria) {
                     let sumVal = i < sumValues.count ? sumValues[i] : .blank
+                    // **An error in a selected row is the answer; one in a skipped row is
+                    // not.** Measured in round fourteen, and selective rather than blanket:
+                    // Excel answers `#REF!` when the error sits in a matching row and the
+                    // ordinary total when it sits in a row the criteria passes over. An
+                    // error in the *criteria* range propagates nothing — it matches nothing.
+                    //
+                    // The corpus found this as 12,960 cells across four workbooks and could
+                    // not say which rule was at work, because there the error row happened
+                    // to match. Assuming the blanket rule from that one shape would have
+                    // been wrong on two of the round's eleven cases.
+                    //
+                    // `COUNTIF` counts around an error instead, measured in the same round,
+                    // which is why this guard is where values are summed and not where rows
+                    // are counted.
+                    if case .error = sumVal { return sumVal }
                     if let n = numericValue(sumVal) {
                         total += n
                     }
@@ -452,6 +467,8 @@ public enum BuiltinAggregationFunctions {
                     }
                 }
                 if allMatch {
+                    // Selected, so an error here is the answer — see the note in `SUMIF`.
+                    if case .error = sumValues[i] { return sumValues[i] }
                     if let n = numericValue(sumValues[i]) {
                         total += n
                     }
@@ -553,6 +570,8 @@ public enum BuiltinAggregationFunctions {
             for (i, val) in rangeValues.enumerated() {
                 if matchesCriteria(val, criteria) {
                     let avgVal = i < avgValues.count ? avgValues[i] : .blank
+                    // Selected, so an error here is the answer — see the note in `SUMIF`.
+                    if case .error = avgVal { return avgVal }
                     if let n = numericValue(avgVal) {
                         total += n
                         count += 1

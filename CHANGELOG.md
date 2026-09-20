@@ -27,6 +27,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads 495 have, 24 out of scope. A classification that encodes a temporary gap rots exactly
   as a fixture does.
 
+### Fixed
+
+- **A conditional aggregate propagates an error only from a row its criteria selects.**
+  Round fourteen measured it, and the rule is selective rather than blanket:
+
+  | | Excel |
+  |---|---|
+  | error in a **matching** row of the sum range | `#REF!` |
+  | error in a **non-matching** row | the ordinary total |
+  | error in the **criteria** range | the ordinary total |
+  | `COUNTIF` either way | counts around it |
+
+  `SUMIF`, `SUMIFS` and `AVERAGEIF` answered the ordinary total in every case, ignoring error
+  cells the way they ignore text. **12,960 cells across four workbooks** — the largest bucket
+  in a 300-workbook corpus run — read `SUMIF($EU$12:$EU$178, $B223, AO$12:AO$178)` where
+  `AO12` holds a literal `#REF!`.
+
+  **The corpus could not have settled this.** There the error row happened to match, so a
+  single shape was consistent with both rules, and assuming the blanket one would have been
+  wrong on two of the round's eleven cases. It took a round built with real cells to separate
+  them — which is what the `data` support was added for.
+
+  This is distinct from an error passed as an *argument*, fixed earlier and unchanged.
+
+- **`check` told duplicate formulas apart by order.** A round carrying data asks the *same*
+  formula several times over different cells — four `SUMIF($H{r}:$J{r}, "x", $K{r}:$M{r})`
+  rows differing only in where the errors sit — and the text alone stopped identifying a case
+  the moment `data` existed. Every row was evaluated against the first matching case's cells,
+  which reported two disagreements that were the harness misreading itself.
+
 ### Added
 
 - **3-D references work: `SUM('Q1:Q4'!B7)` reads every sheet in the span.** This package
