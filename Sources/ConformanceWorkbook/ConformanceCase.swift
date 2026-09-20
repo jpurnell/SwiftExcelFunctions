@@ -58,6 +58,26 @@ enum ConformanceCases {
         "IMSQRT(\"-4\")": "√-4 is exactly 2i. Excel keeps 1.2e-16 of polar rounding.",
         "IMPOWER(\"i\", 2)": "i² is exactly -1. Excel returns -1+1.22464679914735E-16i, "
             + "computing it as exp(log(i)·2); this multiplies instead.",
+
+        // A spilled result caches only its anchor. Excel writes the top-left cell of the
+        // spill into the formula cell and the rest into the cells around it, so comparing a
+        // cached value against our whole matrix compares a corner to a rectangle. Our anchor
+        // matches Excel's in every one of these — the shape is measured by the `ROWS`,
+        // `COLUMNS` and `SUM` rows beside them, which is what round ten wrapped its questions
+        // for and what these six were left bare of.
+        "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM)":
+            "a spill caches its anchor only; ours is the whole array. Anchor agrees: \"a\".",
+        "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 0)":
+            "a spill caches its anchor only. Anchor agrees: \"a\".",
+        "GROUPBY({\"b\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 1, -1)":
+            "a spill caches its anchor only. Anchor agrees: \"b\".",
+        "GROUPBY({\"B\";\"b\"}, {1;2}, SUM, 0, 0)":
+            "a spill caches its anchor only. Anchor agrees: \"B\" — case-insensitive "
+            + "grouping, keeping the casing first seen.",
+        "GROUPBY({2;1;\"a\"}, {1;2;3}, SUM, 0, 0)":
+            "a spill caches its anchor only. Anchor agrees: 1 — numbers sort before text.",
+        "GROUPBY({\"a\";\"b\"}, {1;2}, AVERAGE)":
+            "a spill caches its anchor only. Anchor agrees: \"a\".",
     ]
 
     /// Every case, in the order they are written to the sheet.

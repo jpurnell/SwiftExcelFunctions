@@ -192,7 +192,8 @@ enum ConformanceWorkbook {
         case .lessOrEqual(let l, let r):
             return .lessOrEqual(prefixingCalls(in: l), prefixingCalls(in: r))
         case .function(let name, let arguments):
-            let inner = arguments.map { prefixingCalls(in: $0) }
+            let inner = aggregateReferenced(in: arguments.map { prefixingCalls(in: $0) },
+                                            of: name)
             guard requiringPrefix.contains(name) else { return .function(name, inner) }
             return .function(storedSpelling(of: name), inner)
         case .call(let callee, let arguments):
@@ -200,6 +201,49 @@ enum ConformanceWorkbook {
         case .arrayConstant(let rows):
             return .arrayConstant(rows.map { row in row.map { prefixingCalls(in: $0) } })
         }
+    }
+
+    /// A function passed as a *value* is spelled `_xleta.SUM`, not `SUM`.
+    ///
+    /// **Measured, after two wrong guesses.** `GROUPBY` and `PIVOTBY` take the aggregate as a
+    /// reference rather than a call, and Excel writes that reference with its own prefix. A
+    /// workbook where the function was typed by hand stores
+    ///
+    /// ```
+    /// <f t="array" ref="C2:D4">_xlfn.GROUPBY({"b";"a";"b"},{1;2;3},_xleta.SUM)</f>
+    /// ```
+    ///
+    /// We wrote the aggregate bare, so Excel read a name it did not know and answered
+    /// `#NAME?` — which points at the argument and reads exactly like a `#NAME?` about the
+    /// function. That cost two rounds and two conclusions about the build, both wrong: the
+    /// spelling `_xlfn.GROUPBY` was right the whole time, and the same file answered
+    /// `_xlfn.XLOOKUP` and `_xlfn.TEXTSPLIT` correctly while these failed.
+    ///
+    /// The parser reads a bare name in that position as `.namedRange`, which is what makes it
+    /// reachable here at all.
+    ///
+    /// - Parameters:
+    ///   - arguments: The call's arguments, already prefixed.
+    ///   - name: The function being called.
+    /// - Returns: The arguments, with the aggregate reference respelled.
+    private static func aggregateReferenced(in arguments: [FormulaAST],
+                                            of name: String) -> [FormulaAST] {
+        // GROUPBY(row_fields, values, function, …) and
+        // PIVOTBY(row_fields, col_fields, values, function, …).
+        let position: Int
+        switch name {
+        case "GROUPBY": position = 2
+        case "PIVOTBY": position = 3
+        default: return arguments
+        }
+        guard arguments.indices.contains(position),
+              case .namedRange(let aggregate) = arguments[position],
+              !aggregate.hasPrefix("_xleta.") else {
+            return arguments
+        }
+        var respelled = arguments
+        respelled[position] = .namedRange("_xleta." + aggregate)
+        return respelled
     }
 
     /// Writes this package's answer as a value Excel will not recompute.

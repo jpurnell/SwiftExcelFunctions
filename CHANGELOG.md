@@ -29,6 +29,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A function passed as a value is spelled `_xleta.SUM`, and we wrote it bare.** `GROUPBY`
+  and `PIVOTBY` take the aggregate as a *reference* rather than a call, and Excel stores that
+  reference with its own prefix:
+
+  ```xml
+  <f t="array" ref="C2:D4">_xlfn.GROUPBY({"b";"a";"b"},{1;2;3},_xleta.SUM)</f>
+  ```
+
+  Written bare, Excel read a name it did not know and answered `#NAME?` — which points at the
+  *argument* and is indistinguishable from a `#NAME?` about the function. That was read twice
+  as an Excel without `GROUPBY`, and both readings were wrong: `_xlfn.GROUPBY` had been
+  correct all along, and the same file was answering `_xlfn.XLOOKUP` and `_xlfn.TEXTSPLIT`
+  perfectly while these failed.
+
+  Settled by measurement rather than a third guess — the function typed by hand into Excel,
+  saved, and the XML read back.
+
+### Added
+
+- **Round twelve's `GROUPBY` and `PIVOTBY` answers, measured at last.** 194 agreed, 10
+  disagreed, and the disagreements are ours:
+
+  | Argument | Excel | This package |
+  |---|---|---|
+  | `field_headers` omitted or 1 | detects and consumes a header row | treats it as data |
+  | `total_depth` −1 | totals present, placed above | reads it as "no totals" |
+  | `total_depth` 2, one grouping level | `#VALUE!` | answers anyway |
+  | `sort_order` 2 / −2 | sorts by column 2, asc / desc | ignored |
+  | `filter_array` | excludes the rows it marks false | ignored |
+  | `COLUMNS(PIVOTBY(…,0,0))` | 4 | 3 |
+  | `SUM(PIVOTBY(…))`, repeated intersection | 12 | 6 |
+
+  Already agreeing: groups ascending, a grand total present by default and below,
+  case-insensitive grouping keeping the casing first seen, numbers before text in a mixed key
+  column, `COUNT` and `MAX` as aggregates.
+
+  **Recorded rather than fixed**, on `BuiltinGroupBy`, so that what is known and what is built
+  do not drift apart unnoticed.
+
+- **Six spilling rows attributed as known divergences.** A spilled result caches only its
+  **anchor** — Excel writes the top-left cell into the formula cell — so comparing that cache
+  against our whole matrix compares a corner to a rectangle. Our anchor agrees with Excel's in
+  all six. Round ten wrapped most of its questions in `SUM`, `ROWS` or `COLUMNS` for exactly
+  this reason; these six were left bare.
+
+### Fixed
+
 - **The `_xlfn.` prefix was applied to the root of a formula and nowhere else.** Excel stores
   every post-2007 function with that prefix, and a file spelling one plainly is invalid — so
   Excel strikes the formula on open and says so in a repair log. `SUM(FILTER(…))` wrote

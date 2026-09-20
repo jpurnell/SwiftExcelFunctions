@@ -24,12 +24,37 @@ import SwiftExcelCore
 /// ## What is implemented, and what is asked rather than assumed
 ///
 /// The grouping, the aggregation, ascending order and the grand total are the function.
-/// Several of Microsoft's optional arguments select behaviour this package has **not
-/// measured** — the default `total_depth`, whether headers are detected, the sort
-/// conventions. Unlike the `Psi*` family these *can* be measured: they are Excel functions,
-/// and `ConformanceCases.roundTen` asks about exactly these points. Until that returns, the
-/// choices below are stated in the documentation of each argument rather than presented as
-/// settled.
+///
+/// **Round twelve measured the rest, and this package is wrong about six of them.** The
+/// answers are recorded here rather than fixed, so that what is known and what is built do
+/// not quietly drift; each is a defect with a measurement behind it.
+///
+/// What Excel does, measured:
+///
+/// | Argument | Excel | This package |
+/// |---|---|---|
+/// | `field_headers` omitted | detects and consumes a header row | treats it as data |
+/// | `field_headers` 1 | consumes the header row | treats it as data |
+/// | `field_headers` 0 | treats it as data | **agrees** |
+/// | `total_depth` −1 | totals present, placed **above** | reads it as "no totals" |
+/// | `total_depth` 2 with one grouping level | `#VALUE!` | answers anyway |
+/// | `sort_order` 2 | sorts by **column 2**, ascending | ignored |
+/// | `sort_order` −2 | sorts by column 2, descending | ignored |
+/// | `filter_array` | excludes the rows it marks false | ignored |
+///
+/// And what it already agrees on: groups ascending by key, a grand total present by default
+/// and placed below, case-insensitive grouping keeping the casing first seen, numbers before
+/// text in a mixed key column, `COUNT` and `MAX` as aggregates, and `ROWS` of a `PIVOTBY`
+/// with both total depths at zero.
+///
+/// `PIVOTBY` is further out: it is one column wider than this package builds, and a repeated
+/// intersection totals 12 where this answers 6.
+///
+/// **Getting the question asked took three attempts**, none of which was about the
+/// mathematics. The name needs the `_xlfn.` prefix; the aggregate is passed as a *reference*
+/// and needs `_xleta.SUM`; and a prefix applied only to a formula's outermost call leaves
+/// every nested one bare. Each failure produced `#NAME?`, which is indistinguishable from an
+/// Excel that does not have the function — and was twice read as exactly that.
 public enum BuiltinGroupBy {
 
     /// Both functions, for registration in a ``FunctionRegistry``.
