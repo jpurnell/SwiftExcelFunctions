@@ -700,21 +700,40 @@ public enum FormulaEvaluator {
                                                         return false }) {
                     return error
                 }
-                // `total_depth` and `sort_order` sit after the aggregate, so their positions
-                // shift by one once it is removed from the list.
+                // The optional arguments sit after the aggregate, so their positions shift by
+                // one once it is removed from the list. `GROUPBY` reads
+                // `field_headers, total_depth, sort_order, filter_array`; `PIVOTBY` reads
+                // `field_headers, row_total_depth, row_sort_order, col_total_depth,
+                // col_sort_order, filter_array` — a different layout that was being read
+                // with `GROUPBY`'s indices.
                 let optional = Array(evaluated.dropFirst(aggregateIndex))
-                let totalDepth = optional.count > 1
-                    ? Int(optionalNumber(optional[1]) ?? 1) : 1
-                let ascending = optional.count > 2
-                    ? (optionalNumber(optional[2]) ?? 1) >= 0 : true
+                func whole(_ index: Int) -> Int? {
+                    guard optional.indices.contains(index),
+                          let value = optionalNumber(optional[index]) else { return nil }
+                    return Int(value)
+                }
+                func flags(_ index: Int) -> [Bool]? {
+                    guard optional.indices.contains(index),
+                          case .array(let matrix) = optional[index] else { return nil }
+                    return matrix.elements.map { element in
+                        switch element {
+                        case .bool(let flag): return flag
+                        case .number(let value): return value != 0
+                        default: return false
+                        }
+                    }
+                }
                 if fn.name == "GROUPBY" {
                     return try BuiltinGroupBy.groupBy(
                         rowFields: evaluated[0], values: evaluated[1],
-                        totalDepth: totalDepth, ascending: ascending, aggregate: aggregate)
+                        fieldHeaders: whole(0), totalDepth: whole(1) ?? 1,
+                        sortOrder: whole(2) ?? 1, filter: flags(3), aggregate: aggregate)
                 }
                 return try BuiltinGroupBy.pivotBy(
                     rowFields: evaluated[0], columnFields: evaluated[1], values: evaluated[2],
-                    totalDepth: totalDepth, ascending: ascending, aggregate: aggregate)
+                    fieldHeaders: whole(0), rowTotalDepth: whole(1) ?? 1,
+                    rowSortOrder: whole(2) ?? 1, columnTotalDepth: whole(3) ?? 1,
+                    columnSortOrder: whole(4) ?? 1, filter: flags(5), aggregate: aggregate)
             }
 
             // The higher-order six. Their *arguments* are evaluated normally — `MAP(A1:A4, f)`

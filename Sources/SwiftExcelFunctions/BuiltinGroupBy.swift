@@ -86,30 +86,94 @@ public enum BuiltinGroupBy {
     /// - Returns: two columns — the group key and its aggregate — one row per group.
     static func groupBy(
         rowFields: CellValue, values: CellValue,
-        totalDepth: Int, ascending: Bool, aggregate: Aggregate
+        fieldHeaders: Int?, totalDepth: Int, sortOrder: Int,
+        filter: [Bool]?, aggregate: Aggregate
     ) rethrows -> CellValue {
-        let keys = column(of: rowFields)
-        let data = column(of: values)
+        var keys = column(of: rowFields)
+        var data = column(of: values)
         guard !keys.isEmpty, keys.count == data.count else { return .error(.value) }
 
-        let groups = grouped(keys: keys, data: data, ascending: ascending)
+        // One grouping level, so one level of totals. Excel refuses a deeper request rather
+        // than clamping it — measured in round twelve, where `total_depth` 2 is `#VALUE!`.
+        guard abs(totalDepth) <= 1 else { return .error(.value) }
+
+        // Omitted means *detect*, which is the default Excel keeps and this package had
+        // backwards: only an explicit 0 makes the first row data.
+        let consumesHeader = fieldHeaders.map { $0 != 0 } ?? headerLooksPresent(in: data)
+        if consumesHeader, keys.count > 1 {
+            keys.removeFirst()
+            data.removeFirst()
+        }
+
+        if let filter, filter.count == keys.count {
+            let kept = keys.indices.filter { filter[$0] }
+            keys = kept.map { keys[$0] }
+            data = kept.map { data[$0] }
+        }
+        guard !keys.isEmpty else { return .error(.value) }
+
+        var rows: [(key: CellValue, value: CellValue)] = []
+        for group in grouped(keys: keys, data: data, ascending: true) {
+            rows.append((group.key, try aggregate(group.values)))
+        }
+        rows = ordered(rows, by: sortOrder)
+
+        // The grand total aggregates **every** value, not the group aggregates. Summing sums
+        // agrees; averaging averages does not, and would report the mean of the group means
+        // as though it were the mean of the data.
+        var total: [CellValue] = []
+        if totalDepth != 0 {
+            total = [.text("Total"), try aggregate(data)]
+        }
+
         var elements: [CellValue] = []
-        for group in groups {
-            elements.append(group.key)
-            elements.append(try aggregate(group.values))
+        // A negative depth places the total **above**. It does not remove it — which is what
+        // this package read the sign as, answering one row short.
+        if totalDepth < 0 { elements += total }
+        for row in rows {
+            elements.append(row.key)
+            elements.append(row.value)
         }
-        if totalDepth >= 1 {
-            // The grand total aggregates **every** value, not the group aggregates. Summing
-            // sums agrees; averaging averages does not, and would report the mean of the
-            // group means as though it were the mean of the data.
-            elements.append(.text("Total"))
-            elements.append(try aggregate(data))
-        }
-        let rows = groups.count + (totalDepth >= 1 ? 1 : 0)
-        guard let matrix = CellMatrix(elements: elements, rows: rows, columns: 2) else {
+        if totalDepth > 0 { elements += total }
+
+        let rowCount = rows.count + (totalDepth != 0 ? 1 : 0)
+        guard let matrix = CellMatrix(elements: elements, rows: rowCount, columns: 2) else {
             return .error(.value)
         }
         return .array(matrix)
+    }
+
+    /// Whether the first row reads as a header rather than as data.
+    ///
+    /// **Excel detects one when `field_headers` is omitted**, measured in round twelve on
+    /// `{"k";"a";"b"}` over `{"v";1;2}`: text where the column is otherwise numbers.
+    private static func headerLooksPresent(in data: [CellValue]) -> Bool {
+        guard data.count > 1, case .text = data[0] else { return false }
+        return data.dropFirst().contains { if case .number = $0 { return true }
+                                           return false }
+    }
+
+    /// The groups in the order `sort_order` asks for.
+    ///
+    /// **The magnitude names a column and the sign is the direction** — 2 sorts by the
+    /// aggregate, −1 by the key descending. This package read only the sign, so every order
+    /// came out by key.
+    ///
+    /// Decorated with the original position and compared on it last, so keys this package
+    /// cannot order keep the order the data had. An unstable sort would make the same
+    /// workbook answer differently between runs.
+    private static func ordered(
+        _ rows: [(key: CellValue, value: CellValue)], by sortOrder: Int
+    ) -> [(key: CellValue, value: CellValue)] {
+        let ascending = sortOrder >= 0
+        let byAggregate = abs(sortOrder) == 2
+        guard byAggregate || !ascending else { return rows }
+        return rows.enumerated().sorted { left, right in
+            let a = byAggregate ? left.element.value : left.element.key
+            let b = byAggregate ? right.element.value : right.element.key
+            guard let ordering = order(a, b) else { return left.offset < right.offset }
+            return ascending ? ordering : !ordering
+        }.map(\.element)
     }
 
     // MARK: - PIVOTBY
@@ -125,48 +189,83 @@ public enum BuiltinGroupBy {
     /// the real ones.
     static func pivotBy(
         rowFields: CellValue, columnFields: CellValue, values: CellValue,
-        totalDepth: Int, ascending: Bool, aggregate: Aggregate
+        fieldHeaders: Int?, rowTotalDepth: Int, rowSortOrder: Int,
+        columnTotalDepth: Int, columnSortOrder: Int,
+        filter: [Bool]?, aggregate: Aggregate
     ) rethrows -> CellValue {
-        let rowKeys = column(of: rowFields)
-        let columnKeys = column(of: columnFields)
-        let data = column(of: values)
+        var rowKeys = column(of: rowFields)
+        var columnKeys = column(of: columnFields)
+        var data = column(of: values)
         guard !rowKeys.isEmpty, rowKeys.count == data.count,
               columnKeys.count == data.count else { return .error(.value) }
+        guard abs(rowTotalDepth) <= 1, abs(columnTotalDepth) <= 1 else { return .error(.value) }
+        // A sort order of zero names no column, and Excel refuses it rather than ignoring it
+        // — measured in round twelve, where a `col_sort_order` of 0 is `#VALUE!`.
+        guard rowSortOrder != 0, columnSortOrder != 0 else { return .error(.value) }
 
-        let rowOrder = distinct(rowKeys, ascending: ascending)
-        let columnOrder = distinct(columnKeys, ascending: ascending)
+        let consumesHeader = fieldHeaders.map { $0 != 0 } ?? headerLooksPresent(in: data)
+        if consumesHeader, rowKeys.count > 1 {
+            rowKeys.removeFirst()
+            columnKeys.removeFirst()
+            data.removeFirst()
+        }
+        if let filter, filter.count == rowKeys.count {
+            let kept = rowKeys.indices.filter { filter[$0] }
+            rowKeys = kept.map { rowKeys[$0] }
+            columnKeys = kept.map { columnKeys[$0] }
+            data = kept.map { data[$0] }
+        }
+        guard !rowKeys.isEmpty else { return .error(.value) }
 
-        var elements: [CellValue] = [.blank]
-        elements.append(contentsOf: columnOrder)
-        if totalDepth >= 1 { elements.append(.text("Total")) }
+        let rowOrder = distinct(rowKeys, ascending: rowSortOrder >= 0)
+        let columnOrder = distinct(columnKeys, ascending: columnSortOrder >= 0)
+        // **The two depths are independent**, which this package did not have: one value
+        // drove both, so a suppressed total row took the total column with it. Measured in
+        // round twelve, where `row_total_depth` 0 with `col_total_depth` left to its default
+        // gives three rows and four columns.
+        let hasTotalRow = rowTotalDepth != 0
+        let hasTotalColumn = columnTotalDepth != 0
 
+        func cell(row: CellValue, column: CellValue) throws -> CellValue {
+            let matching = data.indices.filter {
+                same(rowKeys[$0], row) && same(columnKeys[$0], column)
+            }.map { data[$0] }
+            // Empty rather than zero — see the note on this method.
+            return matching.isEmpty ? .blank : try aggregate(matching)
+        }
+
+        var header: [CellValue] = [.blank]
+        header.append(contentsOf: columnOrder)
+        if hasTotalColumn { header.append(.text("Total")) }
+
+        var body: [[CellValue]] = []
         for rowKey in rowOrder {
-            elements.append(rowKey)
-            for columnKey in columnOrder {
-                let matching = (0..<data.count).filter {
-                    same(rowKeys[$0], rowKey) && same(columnKeys[$0], columnKey)
-                }.map { data[$0] }
-                // Empty rather than zero — see the note on this method.
-                elements.append(matching.isEmpty ? .blank : try aggregate(matching))
+            var line: [CellValue] = [rowKey]
+            for columnKey in columnOrder { line.append(try cell(row: rowKey, column: columnKey)) }
+            if hasTotalColumn {
+                let matching = data.indices.filter { same(rowKeys[$0], rowKey) }.map { data[$0] }
+                line.append(try aggregate(matching))
             }
-            if totalDepth >= 1 {
-                let matching = (0..<data.count).filter { same(rowKeys[$0], rowKey) }
-                    .map { data[$0] }
-                elements.append(try aggregate(matching))
-            }
-        }
-        if totalDepth >= 1 {
-            elements.append(.text("Total"))
-            for columnKey in columnOrder {
-                let matching = (0..<data.count).filter { same(columnKeys[$0], columnKey) }
-                    .map { data[$0] }
-                elements.append(matching.isEmpty ? .blank : try aggregate(matching))
-            }
-            elements.append(try aggregate(data))
+            body.append(line)
         }
 
-        let width = columnOrder.count + 1 + (totalDepth >= 1 ? 1 : 0)
-        let height = rowOrder.count + 1 + (totalDepth >= 1 ? 1 : 0)
+        var footer: [CellValue] = []
+        if hasTotalRow {
+            footer.append(.text("Total"))
+            for columnKey in columnOrder {
+                let matching = data.indices.filter { same(columnKeys[$0], columnKey) }
+                    .map { data[$0] }
+                footer.append(matching.isEmpty ? .blank : try aggregate(matching))
+            }
+            if hasTotalColumn { footer.append(try aggregate(data)) }
+        }
+
+        var elements = header
+        for line in body { elements.append(contentsOf: line) }
+        elements.append(contentsOf: footer)
+
+        let width = columnOrder.count + 1 + (hasTotalColumn ? 1 : 0)
+        let height = rowOrder.count + 1 + (hasTotalRow ? 1 : 0)
         guard let matrix = CellMatrix(elements: elements, rows: height, columns: width) else {
             return .error(.value)
         }

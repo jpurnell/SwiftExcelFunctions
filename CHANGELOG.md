@@ -29,6 +29,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`GROUPBY` and `PIVOTBY` now do what round twelve measured.** All ten disagreements are
+  closed; the round reads **agreed 204, differed 0**, up from 194 and 10.
+
+  - **A header row is detected and consumed.** Omitted `field_headers` means *detect*, and
+    only an explicit `0` makes the first row data. This package had the default backwards.
+  - **A negative `total_depth` puts the total above**, it does not remove it.
+  - **A `total_depth` deeper than the grouping is `#VALUE!`**, not an answer.
+  - **`sort_order` names a column and its sign is the direction** — `2` sorts by the
+    aggregate ascending, `−2` descending. Only the sign had been read, so every order came
+    out by key.
+  - **`filter_array` excludes the rows it marks false.** It had been ignored.
+  - **`PIVOTBY`'s two total depths are independent.** One value drove both, so suppressing
+    the total row took the total column with it; `col_total_depth` defaults to 1, which is
+    the column this package was missing and the reason a repeated intersection totalled 6
+    where Excel gives 12.
+  - **A `sort_order` of zero names no column**, and is refused rather than ignored.
+
+  The argument layouts were also being read as though they were the same: `PIVOTBY` takes
+  `field_headers, row_total_depth, row_sort_order, col_total_depth, col_sort_order,
+  filter_array` and was being read with `GROUPBY`'s four positions.
+
+- **`check` no longer claims a calculated file was never opened.** A spilled result caches
+  only its anchor, and a `PIVOTBY` grid's anchor is its blank corner cell — so Excel
+  calculates the formula and has nothing to write. That was reported as "Excel has not opened
+  and saved this file yet", which was false. Where other rows carry values the file has
+  plainly been opened, and the message now says what is actually happening and names the rows.
+
+### Fixed
+
 - **A function passed as a value is spelled `_xleta.SUM`, and we wrote it bare.** `GROUPBY`
   and `PIVOTBY` take the aggregate as a *reference* rather than a call, and Excel stores that
   reference with its own prefix:

@@ -457,6 +457,7 @@ enum ConformanceWorkbook {
         let byFormula = Dictionary(ConformanceCases.all.map { ($0.formula, $0) },
                                    uniquingKeysWith: { first, _ in first })
         var agreed = 0, differed = 0, uncalculated = 0, diverged = 0, drifted = 0
+        var uncalculatedFormulas: [String] = []
         var seen: Set<String> = []
 
         var row = firstRow
@@ -472,9 +473,15 @@ enum ConformanceWorkbook {
             let ours = liveAnswer(to: formula)
 
             guard let excel else {
-                // Excel writes a cached value for every formula it calculates. Its absence
-                // means the file was never opened, not that the answers matched.
+                // Excel writes a cached value for every formula it calculates, so an absent
+                // one usually means the file was never opened — never that the answers
+                // matched. **Usually.** A spilled result caches only its anchor, and a
+                // `PIVOTBY` grid's anchor is the blank corner cell, so Excel calculates the
+                // formula and has nothing to write. The two look identical in one row and
+                // are told apart by the file: if any row carries a value, the file has been
+                // opened and this row's silence means something else.
                 uncalculated += 1
+                uncalculatedFormulas.append(formula)
                 continue
             }
             // Reported whether or not the row agrees: a row that changed since emit is worth
@@ -523,8 +530,18 @@ enum ConformanceWorkbook {
                 + "above used the current answer, not the stored one.")
         }
         if uncalculated > 0 {
-            say("`not calculated` means Excel has not opened and saved this file yet —")
-            say("those rows are unanswered, not agreed.")
+            if agreed + differed + diverged == 0 {
+                say("`not calculated` means Excel has not opened and saved this file yet —")
+                say("those rows are unanswered, not agreed.")
+            } else {
+                say("`not calculated`: Excel calculated this file — other rows carry values —")
+                say("but cached nothing for these. A spill caches only its anchor, and a")
+                say("PIVOTBY grid's anchor is its blank corner, so there is nothing to cache.")
+                say("Their shape is measured by the ROWS and COLUMNS rows beside them:")
+                for formula in uncalculatedFormulas.prefix(10) {
+                    say("  \(formula)")
+                }
+            }
         }
         if !unasked.isEmpty {
             say("`not asked` means this workbook predates those cases. Re-emit to ask them.")

@@ -81,7 +81,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -757,6 +757,51 @@ enum ConformanceCases {
         .init(family: "groupby2",
               formula: "SUM(PIVOTBY({\"a\";\"b\";\"a\"}, {\"x\";\"y\";\"x\"}, {1;2;3}, SUM, 0, 0))",
               note: "a repeated intersection — is 1+3 summed into one cell?"),
+    ]
+
+    // MARK: - Round thirteen: WEEKDAY's return types, which the corpus cannot finish
+
+    /// What `WEEKDAY` does with each `return_type`.
+    ///
+    /// **The corpus found this and can only half-answer it.** `Digital Sales Budget 2.0.xlsx`
+    /// holds 9,166 cells reading `WEEKDAY(AEn, week_end_day)`, where `week_end_day` resolves
+    /// through `Definitions!$E$61` to **17**. This package implements return types 1, 2 and 3
+    /// and refuses everything else with `#NUM!`, so every one of those cells is a refusal of
+    /// an ordinary argument. Excel answered 7, 6 and 1 for the dates in question.
+    ///
+    /// The corpus exercises **17 and nothing else**, so 11 through 16 would be reasoning from
+    /// documentation — which is the move that has been wrong seven times here. Each is asked.
+    ///
+    /// Serial 41640 is 1 January 2014, a Wednesday, and the same date the corpus's own control
+    /// column uses. Every row below asks the same day under a different convention, so the
+    /// answers can be read against each other as well as against us.
+    static let roundThirteen: [ConformanceCase] = [
+        .init(family: "weekday", formula: "WEEKDAY(41640)",
+              note: "omitted — Sunday is 1, so a Wednesday should be 4"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 1)", note: "1 — the same as omitted"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 2)", note: "2 — Monday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 3)", note: "3 — Monday is 0"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 11)", note: "11 — Monday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 12)", note: "12 — Tuesday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 13)", note: "13 — Wednesday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 14)", note: "14 — Thursday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 15)", note: "15 — Friday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 16)", note: "16 — Saturday is 1"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 17)",
+              note: "17 — the one the corpus exercises, and the reason for this round"),
+
+        // A second date, so a convention cannot be confirmed by one day's coincidence.
+        .init(family: "weekday", formula: "WEEKDAY(41643, 17)", note: "the Saturday after"),
+        .init(family: "weekday", formula: "WEEKDAY(41644, 17)", note: "and the Sunday"),
+        .init(family: "weekday", formula: "WEEKDAY(41644, 16)", note: "that Sunday, Saturday-first"),
+
+        // Where the argument stops being one.
+        .init(family: "weekday", formula: "WEEKDAY(41640, 0)", note: "0 — expect #NUM!"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 4)",
+              note: "4 — between the old set and the new. #NUM!?"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 10)", note: "10 — just below 11"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, 18)", note: "18 — just above 17"),
+        .init(family: "weekday", formula: "WEEKDAY(41640, -1)", note: "negative"),
     ]
 
     // MARK: - Bessel

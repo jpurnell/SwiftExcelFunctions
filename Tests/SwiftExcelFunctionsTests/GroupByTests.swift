@@ -189,10 +189,82 @@ final class GroupByTests: XCTestCase {
             cells: sparse, names: NoNames())
         guard case .array(let result) = answer else { return XCTFail("got \(answer)") }
         // North/Q2 and South/Q1 have no rows.
+        //
+        // The `Total` column is here because `col_total_depth` was omitted, and omitted is 1
+        // — measured in round twelve, where `COLUMNS(PIVOTBY(…, SUM, 0, 0))` is 4. The two
+        // depths are independent, and `0` in the fifth position suppresses only the total
+        // *row*. This test asserted a 3×3 grid before that was known.
         XCTAssertEqual(result.elements, [
-            .blank,         .text("Q1"), .text("Q2"),
-            .text("North"), .number(10), .blank,
-            .text("South"), .blank,      .number(20),
+            .blank,         .text("Q1"), .text("Q2"), .text("Total"),
+            .text("North"), .number(10), .blank,      .number(10),
+            .text("South"), .blank,      .number(20), .number(20),
         ])
+    }
+
+    // MARK: - What round twelve measured
+
+    /// Excel detects a header row, and consumes it.
+    ///
+    /// **Measured in round twelve**, on `{"k";"a";"b"}` over `{"v";1;2}`: with
+    /// `field_headers` at 1 *or omitted* Excel answers three rows — two groups and a total —
+    /// and only an explicit 0 treats the first row as data. This package had the default
+    /// backwards, counting `k` as a third group.
+    func testAHeaderRowIsDetectedAndConsumed() throws {
+        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 1)").rows, 3,
+                       "field_headers 1 consumes the header")
+        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM)").rows, 3,
+                       "omitted detects it, which is the default Excel documents and keeps")
+        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 0)").rows, 4,
+                       "and an explicit 0 makes it data — the one case already agreeing")
+    }
+
+    /// A negative `total_depth` puts the total **above**, it does not remove it.
+    ///
+    /// Measured: `ROWS(GROUPBY({"a";"a";"b"}, {1;2;3}, SUM, 0, -1))` is 3 — two groups and a
+    /// total. This package read the sign as "no totals" and answered 2.
+    func testANegativeTotalDepthPutsTheTotalAbove() throws {
+        let result = try matrix("GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, -1)")
+        XCTAssertEqual(result.rows, 3, "the total is present, not suppressed")
+        XCTAssertEqual(result[0, 0], .text("Total"), "and it is the first row, not the last")
+        XCTAssertEqual(result[0, 1], .number(6))
+    }
+
+    /// A `total_depth` deeper than the grouping is `#VALUE!`.
+    ///
+    /// Measured: one grouping level and `total_depth` 2 is refused. This package answered.
+    func testATotalDepthDeeperThanTheGroupingIsRefused() throws {
+        XCTAssertEqual(try evaluate("GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 2)"),
+                       .error(.value))
+    }
+
+    /// `sort_order` names a **column**, and its sign is the direction.
+    ///
+    /// Measured: over keys `{"a";"b"}` and values `{2;1}`, `sort_order` 2 puts `"b"` first —
+    /// sorted by the values column ascending — and −2 puts `"a"` first. This package ignored
+    /// the magnitude and read only the sign, so both answered by key.
+    func testSortOrderNamesAColumn() throws {
+        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 2)")[0, 0],
+                       .text("b"), "column 2 ascending: b holds 1, a holds 2")
+        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -2)")[0, 0],
+                       .text("a"), "and descending")
+        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 1)")[0, 0],
+                       .text("a"), "column 1 ascending is still by key")
+        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -1)")[0, 0],
+                       .text("b"), "and by key descending")
+    }
+
+    /// `filter_array` excludes the rows it marks false.
+    ///
+    /// Measured: `SUM(GROUPBY({"a";"b";"c"}, {1;2;3}, SUM, 0, 0, 1, {TRUE;FALSE;TRUE}))` is 4
+    /// — 1 and 3, with the middle row dropped. This package ignored the argument and summed 6.
+    func testAFilterArrayExcludesRows() throws {
+        let result = try matrix(
+            "GROUPBY({\"a\";\"b\";\"c\"}, {1;2;3}, SUM, 0, 0, 1, {TRUE;FALSE;TRUE})")
+        XCTAssertEqual(result.rows, 2, "two groups survive the filter")
+        var total = 0.0
+        for row in 0..<result.rows {
+            if case .number(let value) = result[row, 1] { total += value }
+        }
+        XCTAssertEqual(total, 4, accuracy: 1e-12, "1 and 3, not 6")
     }
 }
