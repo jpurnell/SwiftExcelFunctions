@@ -98,14 +98,14 @@ struct Finding {
             self.outcome = "differed"
             self.ours = Finding.describe(ours)
             self.excel = Finding.describe(excel)
-        case .refused(let error):
+        case .refused(let error, let excel):
             self.outcome = "refused"
             self.ours = error.rawValue
-            self.excel = "(a value)"
-        case .threw(let message):
+            self.excel = Finding.describe(excel)
+        case .threw(let message, let excel):
             self.outcome = "threw"
             self.ours = message
-            self.excel = "(a value)"
+            self.excel = Finding.describe(excel)
         case .agreed, .agreedOnError, .notComparable:
             self.outcome = "agreed"
             self.ours = ""

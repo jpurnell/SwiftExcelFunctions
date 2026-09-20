@@ -29,6 +29,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An external reference reached through a name counted as a disagreement.** Excel writes
+  one as `[1]Sheet!A1`, and `WorkbookOracle.externalReference(in:)` looked for a bracketed
+  sheet name among the formula's nodes. `VLOOKUP(B157, month_lookup, 2, 0)` has none: the
+  bracket is in the **name table**, where `month_lookup` resolves to
+  `[1]Definitions!$C$75:$E$86`. The formula therefore read as ordinary, we answered `#N/A`
+  having nothing to look in, and Excel's cached `"October"` counted against us — 216 cells in
+  one corpus workbook, a false accusation each.
+
+  That is precisely the failure the simpler check was written to avoid; its own doc comment
+  says counting these "put a floor under the failure rate that no amount of work could lift".
+  It reached that floor by the one path it did not walk. The check now follows names, and a
+  name holding a formula is followed into as well. **That workbook went from 233 findings to
+  zero**, at 100% agreement over its 57 genuinely comparable cells.
+
+- **A refusal did not record what Excel had.** `OracleOutcome.refused` carried only the error
+  we answered, and the findings file wrote `excel=(a value)` — leaving out the one thing that
+  makes a refusal actionable. A corpus run produced 1,664 `MONTH` refusals in one workbook and
+  learning that Excel had cached `1` meant unzipping the file and reading sheet XML by hand.
+  `refused` and `threw` now both carry Excel's cached value.
+
 - **Three evaluation defects, each found by the corpus oracle and each measured before and
   after.** A pilot over 100 workbooks of the private corpus — 876,111 comparable cells —
   agreed with Excel's own cached values on 99.68% of them. The residue was six files, and

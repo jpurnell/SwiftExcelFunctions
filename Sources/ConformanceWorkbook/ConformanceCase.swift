@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -548,6 +548,92 @@ enum ConformanceCases {
               note: "the shape without the spill — is there a header row?"),
         .init(family: "groupby", formula: "COLUMNS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM, 0, 0))",
               note: "and is there a corner cell?"),
+    ]
+
+    // MARK: - Round eleven: the date serial floor, which the corpus moved
+
+    /// Where the date functions stop accepting a serial number.
+    ///
+    /// **This round exists because the corpus answered one of these and not the other five.**
+    /// `Digital Sales Budget 2.0.xlsx` holds 1,664 cells reading `MONTH(AFn)` where `AFn`
+    /// caches `0`, and Excel cached **1** for every one of them — with a control in the same
+    /// column, `MONTH(AF4)` over serial 41640, answering 1 for January 2014. So Excel treats
+    /// serial 0 as January 0, 1900: a date that does not exist, and is accepted anyway.
+    ///
+    /// This package guards `serial >= 1` and refuses with `#NUM!`. That guard is written **six
+    /// times**, in `WEEKDAY`, `EOMONTH`, `EDATE`, `YEAR`, `MONTH` and `DAY`, and the corpus
+    /// measured exactly one of them.
+    ///
+    /// **Moving the other five on the strength of `MONTH` is the inference this project has
+    /// been wrong about seven times.** The seventh was `GAMMA.DIST` and `WEIBULL.DIST`, which
+    /// face an identical density boundary and answer it differently. One function's floor
+    /// says nothing about its neighbour's, so each is asked here.
+    ///
+    /// Three other boundaries ride along, because the workbook costs the same either way:
+    ///
+    /// - **Serial 60 is 1900-02-29**, a day that never happened — Excel keeps it to stay
+    ///   bug-compatible with Lotus 1-2-3. What the date functions say about it is not
+    ///   something this package should be guessing.
+    /// - **Fractions.** Serial 0.5 is noon on that non-existent January 0.
+    /// - **The ceiling**, at 9999-12-31, and one step past it.
+    ///
+    /// Every question is paired with a control whose answer is not in doubt, so a round that
+    /// goes wrong says so rather than reading as news.
+    static let roundEleven: [ConformanceCase] = [
+        // The measured one, kept as a control now that the corpus has answered it.
+        .init(family: "dateFloor", formula: "MONTH(0)",
+              note: "MEASURED: the corpus says 1 — kept as the control for this round"),
+        .init(family: "dateFloor", formula: "MONTH(41640)",
+              note: "the corpus's own control: January 2014, answered 1 by both"),
+
+        // The five the corpus did not answer.
+        .init(family: "dateFloor", formula: "YEAR(0)", note: "1900, or #NUM!?"),
+        .init(family: "dateFloor", formula: "DAY(0)", note: "0 for a zeroth day, or #NUM!?"),
+        .init(family: "dateFloor", formula: "WEEKDAY(0)", note: "a weekday for a non-day?"),
+        .init(family: "dateFloor", formula: "WEEKDAY(0, 2)",
+              note: "and the same question with a return_type"),
+        .init(family: "dateFloor", formula: "EOMONTH(0, 0)",
+              note: "the end of the month containing a date that is not one"),
+        .init(family: "dateFloor", formula: "EDATE(0, 0)", note: "zero months from nothing"),
+        .init(family: "dateFloor", formula: "EDATE(0, 1)", note: "and one month from it"),
+
+        // Serial 1 — the floor we currently enforce, and certainly valid.
+        .init(family: "dateFloor", formula: "YEAR(1)", note: "control: 1900"),
+        .init(family: "dateFloor", formula: "MONTH(1)", note: "control: 1"),
+        .init(family: "dateFloor", formula: "DAY(1)", note: "control: 1"),
+        .init(family: "dateFloor", formula: "WEEKDAY(1)", note: "control: 1 January 1900"),
+
+        // Below the floor.
+        .init(family: "dateFloor", formula: "MONTH(-1)", note: "below zero: #NUM! expected"),
+        .init(family: "dateFloor", formula: "YEAR(-1)", note: "below zero"),
+        .init(family: "dateFloor", formula: "DAY(-1)", note: "below zero"),
+        .init(family: "dateFloor", formula: "WEEKDAY(-1)", note: "below zero"),
+        .init(family: "dateFloor", formula: "EOMONTH(-1, 0)", note: "below zero"),
+        .init(family: "dateFloor", formula: "EDATE(-1, 0)", note: "below zero"),
+
+        // Fractions: noon on the day that does not exist.
+        .init(family: "dateFloor", formula: "MONTH(0.5)", note: "is a fraction truncated?"),
+        .init(family: "dateFloor", formula: "DAY(0.5)", note: "the same question for DAY"),
+        .init(family: "dateFloor", formula: "YEAR(0.99)",
+              note: "just under one — still the zeroth day?"),
+
+        // The Lotus leap day. 1900 was not a leap year; Excel says it was.
+        .init(family: "dateFloor", formula: "DAY(59)", note: "control: 28 February 1900"),
+        .init(family: "dateFloor", formula: "DAY(60)",
+              note: "29 February 1900, a day that never happened"),
+        .init(family: "dateFloor", formula: "MONTH(60)", note: "and its month"),
+        .init(family: "dateFloor", formula: "WEEKDAY(60)", note: "and its weekday"),
+        .init(family: "dateFloor", formula: "DAY(61)", note: "control: 1 March 1900"),
+        .init(family: "dateFloor", formula: "EOMONTH(60, 0)",
+              note: "the end of a month containing a day that never happened"),
+
+        // The ceiling.
+        .init(family: "dateFloor", formula: "YEAR(2958465)", note: "control: 9999"),
+        .init(family: "dateFloor", formula: "MONTH(2958465)", note: "control: 12"),
+        .init(family: "dateFloor", formula: "DAY(2958465)", note: "control: 31"),
+        .init(family: "dateFloor", formula: "YEAR(2958466)", note: "one past the end"),
+        .init(family: "dateFloor", formula: "EOMONTH(2958465, 1)",
+              note: "a month past the end — overflow, or a date Excel will not name?"),
     ]
 
     // MARK: - Bessel

@@ -79,6 +79,51 @@ public enum WorkbookOracle {
         return nil
     }
 
+    /// The same question, asked of the name table as well as the formula.
+    ///
+    /// **A formula can reach into another workbook without saying so.**
+    /// `VLOOKUP(B157, month_lookup, 2, 0)` holds no bracketed sheet name anywhere in its AST;
+    /// the bracket is in the name table, where `month_lookup` resolves to
+    /// `[1]Definitions!$C$75:$E$86`. Walking the nodes alone therefore read the formula as
+    /// ordinary, we answered `#N/A` having nothing to look in, and Excel's cached `"October"`
+    /// counted against us — 216 cells in one corpus workbook, and a false accusation each.
+    ///
+    /// That is exactly the floor the simpler check was written to avoid, reached by the one
+    /// path it did not walk.
+    ///
+    /// - Parameters:
+    ///   - ast: The formula.
+    ///   - names: The workbook's name table.
+    ///   - sheet: The sheet the formula sits on, for sheet-scoped names.
+    /// - Returns: A description of the first external reference found, or `nil`.
+    public static func externalReference(
+        in ast: FormulaAST, names: NameResolver, sheet: String
+    ) -> String? {
+        if let direct = externalReference(in: ast) { return direct }
+        for node in OracleFinding.nodes(in: ast) {
+            guard case .namedRange(let name) = node else { continue }
+            guard let target = names.resolve(name, inSheet: sheet.isEmpty ? nil : sheet) else {
+                continue
+            }
+            guard let external = externalSheet(of: target) else { continue }
+            return "\(name) → \(external)"
+        }
+        return nil
+    }
+
+    /// The external sheet a name points at, if it points at one.
+    private static func externalSheet(of target: NamedRangeTarget) -> String? {
+        switch target {
+        case .sheetCell(let reference), .sheetRange(let reference):
+            return reference.sheetName.hasPrefix("[") ? reference.sheetName : nil
+        case .formula(let ast):
+            // A name can hold a formula, and that formula can reach outward too.
+            return externalReference(in: ast)
+        case .cell, .range, .unparsed:
+            return nil
+        }
+    }
+
     /// A defined name in the formula that this package cannot turn into a reference.
     ///
     /// **A name the reader could not turn into a reference.** SwiftXLSX says so directly
@@ -412,7 +457,7 @@ public enum WorkbookOracle {
         if let stochastic = named.first(where: { Self.isStochastic($0) }) {
             return .notComparable("stochastic: \(stochastic)")
         }
-        if let external = externalReference(in: ast) {
+        if let external = externalReference(in: ast, names: names, sheet: sheet) {
             return .notComparable("external workbook: \(external)")
         }
         if let name = unresolvableName(in: ast, names: names, sheet: sheet) {
@@ -455,7 +500,7 @@ public enum WorkbookOracle {
                 OracleTolerance.iterativeFunctions.contains($0)
             }) ? OracleTolerance.iterative : nil
             if OracleTolerance.agree(ours, excel, tolerance: tolerance) { return .agreed }
-            if case .error(let kind) = ours { return .refused(kind) }
+            if case .error(let kind) = ours { return .refused(kind, excel: excel) }
             return .differed(ours: ours, excel: excel)
         } catch let failure {
             // The throw is carried in the outcome and counted, but it is logged too. A
@@ -466,7 +511,7 @@ public enum WorkbookOracle {
             Logger(subsystem: "WorkbookAudit", category: "oracle")
                 .error("\(sheet, privacy: .public)!\(cell.reference, privacy: .public) threw: \(String(describing: failure), privacy: .public)")
             #endif
-            return .threw("\(failure)")
+            return .threw("\(failure)", excel: excel)
         }
     }
 }

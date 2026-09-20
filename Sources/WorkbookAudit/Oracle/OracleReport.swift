@@ -19,10 +19,17 @@ public enum OracleOutcome: Equatable {
     /// Kept apart from ``differed`` because it usually means something is missing
     /// rather than wrong — an unimplemented function, a reference that did not
     /// resolve — and those are fixed differently.
-    case refused(ExcelError)
+    ///
+    /// **Excel's value rides along**, because a refusal without it says only that we gave up
+    /// and not what the answer was. A corpus run once produced 1,664 `MONTH` refusals whose
+    /// rows read `#NUM!` against nothing at all, and learning that Excel had cached `1` — a
+    /// date boundary worth knowing — meant unzipping the workbook and reading sheet XML.
+    case refused(ExcelError, excel: CellValue)
 
     /// Evaluation threw.
-    case threw(String)
+    ///
+    /// Carries Excel's value for the same reason ``refused`` does.
+    case threw(String, excel: CellValue)
 
     /// Excel recorded an error and so did we, and they match.
     ///
