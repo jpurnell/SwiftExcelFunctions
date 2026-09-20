@@ -29,6 +29,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A criterion that selects nothing gives zero, and an error criterion is one of them.**
+  Round fifteen measured what round fourteen could only point at:
+
+  | | Excel | was |
+  |---|---|---|
+  | `SUMIF(range, #REF!, sum)` | `0` | `#REF!` |
+  | `SUMIFS(sum, range, #REF!)` | `0` | `#REF!` |
+  | `SUMIF`/`SUMIFS` with a **blank** criterion | `0` | `2` |
+  | `COUNTIF`/`COUNTIFS` with a blank criterion | `0` | `1` |
+
+  **This corrects an over-generalisation.** An earlier fix propagated an error from *any*
+  argument position having measured only the **sum-range** position, and 672 corpus cells
+  reading `SUMIF($G$8:$G$250, #REF!, K$8:K$250)` disagreed with Excel ever since. Errors
+  propagate from a range and not from a criterion.
+
+  The `.blank` branch of `criteriaString(from:)` carried the opposite belief in a comment —
+  *"matches the empty cells, which is what Excel does"* — never measured, and not what Excel
+  does. `AVERAGEIF` and `AVERAGEIFS` are deliberately left out: it was not asked of them, and
+  an average over no rows is `#DIV/0!` rather than `0`, so the answer does not carry across.
+
+- **`SUMIFS` refuses ranges that do not match.** Given three keys and a one-cell sum range,
+  Excel answers `#VALUE!` for `SUMIFS` and `4` for `SUMIF` — which stretches the short range
+  to the criteria range's shape. This package answered the same number to both.
+
+  **They are not one function with its arguments moved**, which was an open question and is
+  now measured. Every rule established for one has to be established for the other.
+
+  `SUMIF`'s stretching is **not** implemented, and that is a gap rather than an opinion: it
+  needs the *reference* — which cells the range would cover — and an `ExcelFunction` is handed
+  evaluated values. Recorded in `project/docs/technical/RoundFifteen.md`.
+
+- **A blank lookup value matches nothing in `MATCH`**, including a blank sitting in the range.
+  **82 corpus cells**: `INDEX(lookup_ordersURL, MATCH($G35, lookup_shortName, 0))` where
+  `$G35` is an absent cell. Excel answers `#N/A`; this package matched the blank *inside* the
+  range, answered `2`, and `INDEX` returned the value there.
+
+  A lookup that found nothing wearing the clothes of an empty cell — the same shape as the
+  `VLOOKUP` that returned a neighbour rather than `#N/A`, and the 3-D sum that answered 28
+  instead of 47.
+
+### Fixed
+
 - **A conditional aggregate propagates an error only from a row its criteria selects.**
   Round fourteen measured it, and the rule is selective rather than blanket:
 

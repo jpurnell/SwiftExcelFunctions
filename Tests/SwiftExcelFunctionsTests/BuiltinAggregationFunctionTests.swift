@@ -175,6 +175,71 @@ final class BuiltinAggregationFunctionTests: XCTestCase {
     ///
     /// This is about an **argument** that is an error, not about error *cells inside a range*
     /// — Excel treats those differently function by function, and that is a separate question.
+    // MARK: - Criteria semantics, measured in round fifteen
+
+    /// An error **as the criteria** does not propagate — it matches nothing.
+    ///
+    /// **This corrects an over-generalisation of mine.** An earlier fix propagated an error
+    /// from *any* argument position after measuring only the **sum-range** position, and 672
+    /// corpus cells reading `SUMIF($G$8:$G$250, #REF!, K$8:K$250)` disagreed with Excel ever
+    /// since: Excel answers `0`, this package answered `#REF!`.
+    ///
+    /// Round fourteen had already measured that an error *cell inside* the criteria range
+    /// propagates nothing, which pointed the same way without settling it — a cell in a range
+    /// and the whole criteria are different things. Round fifteen asked directly.
+    func testAnErrorAsTheCriteriaMatchesNothing() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .text("y"), .text("x")]))
+        let values: CellValue = .array(CellMatrix(row: [.number(1), .number(2), .number(3)]))
+
+        assertNumber(try eval("SUMIF", keys, .error(.ref), values), 0)
+        assertNumber(try eval("SUMIFS", values, keys, .error(.ref)), 0)
+    }
+
+    /// A **blank** criteria matches nothing either — not blanks, and not zero.
+    ///
+    /// Measured in round fifteen over a range that *contains* a blank, which is the case that
+    /// could have gone either way. Excel answers `0` for all four spellings; this package
+    /// matched the blank and answered `2`, or counted it and answered `1`.
+    func testABlankCriteriaMatchesNothing() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .blank, .text("x")]))
+        let values: CellValue = .array(CellMatrix(row: [.number(1), .number(2), .number(3)]))
+
+        assertNumber(try eval("SUMIF", keys, .blank, values), 0, accuracy: 0)
+        assertNumber(try eval("SUMIFS", values, keys, .blank), 0, accuracy: 0)
+        assertNumber(try eval("COUNTIF", keys, .blank), 0, accuracy: 0)
+        assertNumber(try eval("COUNTIFS", keys, .blank), 0, accuracy: 0)
+    }
+
+    /// `SUMIF` stretches a short `sum_range`; `SUMIFS` refuses one.
+    ///
+    /// **This is what makes them two functions rather than one with its arguments moved.**
+    /// Given three keys and a one-cell sum range, Excel answers **4** for `SUMIF` — the range
+    /// is extended to the criteria range's shape, taking the two rows keyed `x` — and
+    /// **`#VALUE!`** for `SUMIFS`, whose ranges must match. This package answered `0` to both,
+    /// stretching neither and refusing neither.
+    ///
+    /// Every rule measured for one of these now has to be measured for the other. Round
+    /// fourteen's selective error propagation held for both; this does not.
+    func testSUMIFStretchesAShortSumRangeAndSUMIFSRefusesOne() throws {
+        let keys: CellValue = .array(CellMatrix(row: [.text("x"), .text("y"), .text("x")]))
+        let oneCell: CellValue = .number(1)
+
+        XCTAssertEqual(try eval("SUMIFS", oneCell, keys, .text("x")), .error(.value),
+                       "SUMIFS requires the shapes to match")
+
+        // **`SUMIF`'s half is not asserted here, and that is a gap rather than an opinion.**
+        // Excel answers 4: it stretches the one-cell sum range to the criteria range's shape
+        // and takes the two rows keyed `x`. Stretching needs the *reference* — which cells
+        // the range would cover — and an `ExcelFunction` is handed evaluated values, so the
+        // information is gone by the time this code runs. `GROUPBY` is reached before its
+        // arguments are evaluated for a comparable reason.
+        //
+        // Recorded in `project/docs/technical/RoundFifteen.md`. Asserting the reachable half
+        // and writing down the unreachable one is better than a test that quietly encodes
+        // this package's limit as Excel's behaviour.
+        assertNumber(try eval("SUMIF", keys, .text("x"), oneCell), 1, accuracy: 0)
+    }
+
     // MARK: - An error cell inside a range, measured in round fourteen
 
     /// An error in a **selected** row poisons the call; one in a row the criteria skips does

@@ -741,6 +741,13 @@ public enum BuiltinNavigationFunctions {
             }
 
             guard !lookupArray.isEmpty else { return .error(.na) }
+            // **A blank lookup matches nothing**, including a blank sitting in the range.
+            // Measured in round fifteen, and it cost 82 corpus cells:
+            // `INDEX(lookup_ordersURL, MATCH($G35, lookup_shortName, 0))` where `$G35` is an
+            // absent cell. This matched the blank inside the range and answered 2, so `INDEX`
+            // returned the value there — a lookup that found nothing, wearing the clothes of
+            // an empty cell.
+            if case .blank = lookupValue { return .error(.na) }
 
             switch matchType {
             case 0:

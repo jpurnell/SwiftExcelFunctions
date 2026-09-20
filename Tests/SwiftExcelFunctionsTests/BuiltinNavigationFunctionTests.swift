@@ -62,6 +62,33 @@ final class BuiltinNavigationFunctionTests: XCTestCase {
              "ROWS", "COLUMNS", "HYPERLINK", "GETPIVOTDATA", "CELL"])
     }
 
+    // MARK: - MATCH with a blank lookup, measured in round fifteen
+
+    /// A blank lookup value matches **nothing**, including a blank in the range.
+    ///
+    /// **82 corpus cells turned on this.** `Orders without Shipment Data.xlsx` reads
+    /// `INDEX(lookup_ordersURL, MATCH($G35, lookup_shortName, 0))` where `$G35` is an
+    /// *absent cell*, so the real shape is `MATCH(blank, range, 0)` over a range that itself
+    /// contains a blank. Excel answers `#N/A`. This package matched the blank inside the
+    /// range, answered `2`, and `INDEX` dutifully returned the value there.
+    ///
+    /// A lookup that found nothing, wearing the clothes of an empty cell — the same shape as
+    /// the `VLOOKUP` that returned a neighbour instead of `#N/A`, and as the 3-D sum that
+    /// answered 28 instead of 47. Three of this session's defects were quietly wrong rather
+    /// than loudly broken, and all three needed Excel's own cached value to see.
+    func testABlankLookupMatchesNothing() throws {
+        let withBlank = grid([[.text("a")], [.blank], [.text("c")]])
+        // The blank in the range is not a match for a blank lookup.
+        assertError(try eval("MATCH", .blank, withBlank, .number(0)), .na)
+
+        // The control that pinned the cause: no blank in the range, and this already agreed.
+        let withoutBlank = grid([[.text("a")], [.text("b")], [.text("c")]])
+        assertError(try eval("MATCH", .blank, withoutBlank, .number(0)), .na)
+
+        // And the lookup still works when there is something to find.
+        XCTAssertEqual(try eval("MATCH", .text("c"), withBlank, .number(0)), .number(3))
+    }
+
     // MARK: - VLOOKUP (exact match)
 
     func testVLOOKUPExactMatch() throws {

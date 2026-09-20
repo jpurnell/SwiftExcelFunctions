@@ -156,11 +156,57 @@ public enum BuiltinAggregationFunctions {
     ///
     /// This is about the **argument**, not about error cells *inside* a range: Excel treats
     /// those function by function, and that question is not settled here.
-    private static func propagatedError(_ args: [CellValue]) -> CellValue? {
-        for argument in args {
+    private static func propagatedError(_ args: [CellValue],
+                                        skipping exempt: Set<Int> = []) -> CellValue? {
+        for (index, argument) in args.enumerated() where !exempt.contains(index) {
             if case .error = argument { return argument }
         }
         return nil
+    }
+
+    /// The argument positions holding **criteria** rather than ranges.
+    ///
+    /// **An error propagates from a range and not from a criterion**, measured in round
+    /// fifteen. An earlier fix here propagated from *every* position after measuring only the
+    /// sum-range one, and 672 corpus cells reading `SUMIF($G$8:$G$250, #REF!, K$8:K$250)`
+    /// disagreed with Excel ever since: Excel answers `0`, this answered `#REF!`.
+    ///
+    /// - Parameters:
+    ///   - name: The function being called.
+    ///   - count: How many arguments it was given.
+    /// - Returns: The positions to exempt.
+    private static func criteriaPositions(of name: String, count: Int) -> Set<Int> {
+        switch name {
+        // `f(range, criteria, [other_range])`
+        case "SUMIF", "COUNTIF", "AVERAGEIF": return [1]
+        // `f(range1, criteria1, range2, criteria2, …)`
+        case "COUNTIFS": return Set(stride(from: 1, to: count, by: 2))
+        // `f(aggregate_range, range1, criteria1, …)`
+        case "SUMIFS", "AVERAGEIFS", "MAXIFS", "MINIFS":
+            return Set(stride(from: 2, to: count, by: 2))
+        default: return []
+        }
+    }
+
+    /// Whether a criterion selects nothing at all.
+    ///
+    /// **Measured in round fifteen**, over a range that *contains* a blank — the case that
+    /// could have gone either way. A blank criterion matches neither the blanks nor zero, and
+    /// an error criterion matches nothing rather than propagating. Excel answers `0` to all
+    /// four of `SUMIF`, `SUMIFS`, `COUNTIF` and `COUNTIFS`; this package matched the blank and
+    /// answered `2`, or counted it and answered `1`.
+    ///
+    /// The `.blank` branch of ``criteriaString(from:)`` carried the opposite belief in a
+    /// comment — "matches the empty cells, which is what Excel does" — which was never
+    /// measured and is not what Excel does.
+    ///
+    /// `AVERAGEIF` and `AVERAGEIFS` are **not** included: this was not asked of them, and an
+    /// average over no rows is `#DIV/0!` rather than `0`, so the answer does not carry across.
+    static func criterionSelectsNothing(_ value: CellValue) -> Bool {
+        switch value {
+        case .blank, .error: return true
+        default: return false
+        }
     }
 
     private static func flatten(_ args: [CellValue]) -> [CellValue] {
@@ -388,7 +434,10 @@ public enum BuiltinAggregationFunctions {
     /// where the `range` value matches the criteria.
     static let sumif = ExcelFunction(name: "SUMIF", minArgs: 2, maxArgs: 3) { args in
         catching {
-            if let error = propagatedError(args) { return error }
+            if let error = propagatedError(args, skipping: criteriaPositions(of: "SUMIF", count: args.count)) {
+                return error
+            }
+            if criterionSelectsNothing(args[1]) { return .number(0) }
             let rangeValues = toArray(args[0])
             guard let criteria = criteriaString(from: args[1]) else {
                 return .error(.value)
@@ -437,7 +486,15 @@ public enum BuiltinAggregationFunctions {
     /// criteria_range and criteria string.
     static let sumifs = ExcelFunction(name: "SUMIFS", minArgs: 3, maxArgs: nil) { args in
         catching {
-            if let error = propagatedError(args) { return error }
+            if let error = propagatedError(args, skipping: criteriaPositions(of: "SUMIFS", count: args.count)) {
+                return error
+            }
+            // A criterion selecting nothing makes the whole call zero — measured
+            // in round fifteen for a blank and for an error alike.
+            for position in criteriaPositions(of: "SUMIFS", count: args.count)
+            where args.indices.contains(position) {
+                if criterionSelectsNothing(args[position]) { return .number(0) }
+            }
             guard args.count >= 3 else { return .error(.value) }
             // Remaining args after sum_range must be in pairs
             guard (args.count - 1) % 2 == 0 else { return .error(.value) }
@@ -452,6 +509,12 @@ public enum BuiltinAggregationFunctions {
                 guard let criteria = criteriaString(from: args[idx + 1]) else {
                     return .error(.value)
                 }
+                // **The ranges must match, and `SUMIFS` refuses when they do not.** Measured
+                // in round fifteen: given three keys and a one-cell sum range, Excel answers
+                // `#VALUE!` here and `4` for the `SUMIF` spelling — the clearest proof that
+                // these are two functions rather than one with its arguments moved. This
+                // package answered the same number to both.
+                guard criteriaRange.count == sumValues.count else { return .error(.value) }
                 criteriaPairs.append((criteriaRange, criteria))
                 idx += 2
             }
@@ -483,7 +546,10 @@ public enum BuiltinAggregationFunctions {
     /// `COUNTIF(range, criteria)` -- counts the number of cells matching a criteria.
     static let countif = ExcelFunction(name: "COUNTIF", minArgs: 2, maxArgs: 2) { args in
         catching {
-            if let error = propagatedError(args) { return error }
+            if let error = propagatedError(args, skipping: criteriaPositions(of: "COUNTIF", count: args.count)) {
+                return error
+            }
+            if criterionSelectsNothing(args[1]) { return .number(0) }
             let rangeValues = toArray(args[0])
             guard let criteria = criteriaString(from: args[1]) else {
                 return .error(.value)
@@ -506,7 +572,15 @@ public enum BuiltinAggregationFunctions {
     /// Arguments come in pairs: criteria_range and criteria string.
     static let countifs = ExcelFunction(name: "COUNTIFS", minArgs: 2, maxArgs: nil) { args in
         catching {
-            if let error = propagatedError(args) { return error }
+            if let error = propagatedError(args, skipping: criteriaPositions(of: "COUNTIFS", count: args.count)) {
+                return error
+            }
+            // A criterion selecting nothing makes the whole call zero — measured
+            // in round fifteen for a blank and for an error alike.
+            for position in criteriaPositions(of: "COUNTIFS", count: args.count)
+            where args.indices.contains(position) {
+                if criterionSelectsNothing(args[position]) { return .number(0) }
+            }
             guard args.count >= 2 else { return .error(.value) }
             guard args.count % 2 == 0 else { return .error(.value) }
 
