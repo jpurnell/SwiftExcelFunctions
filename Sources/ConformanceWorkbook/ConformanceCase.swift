@@ -128,7 +128,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen + roundFourteen
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen + roundFourteen + roundFifteen + roundFifteenConditional
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -941,6 +941,218 @@ enum ConformanceCases {
               note: "control: COUNT over the same, which is believed to count around it",
               data: [.text("x"), .text("y"), .text("x"),
                      .number(1), .error(.ref), .number(3)]),
+    ]
+
+    // MARK: - Round fifteen: the long tail a 300-workbook run left behind
+
+    /// Three families that survived every fix so far, each decomposed so an answer says
+    /// *which step* is wrong rather than only that something is.
+    ///
+    /// After six defects fixed and three oracle blind spots closed, a 300-workbook run left
+    /// about 500 findings outside the big buckets. They are not one thing. These rows take
+    /// the three largest families and break each into its parts, because a compound formula
+    /// that disagrees says nothing about where it went wrong — the 3-D reference bug spent
+    /// months inside a `SUM` that looked merely inaccurate.
+    ///
+    /// **`TEXT` with a date format** — 22 cells read `CONCATENATE(TEXT($J$7,"mmm"), "Yr",
+    /// YEAR($F$4), "ACT")` and Excel answers `"MayYr2014ACT"` where this package answers
+    /// `#VALUE!`. Serial 41640 is 1 January 2014, so every code below has a knowable answer.
+    ///
+    /// **`INDEX` over a failed `MATCH`** — 82 cells read
+    /// `INDEX(lookup_ordersURL, MATCH($G35, lookup_shortName, 0))`, Excel answers `#N/A` and
+    /// this package answers *blank*. A blank is the dangerous kind of wrong: it reads as an
+    /// empty cell rather than as a lookup that found nothing. Asked in three pieces —
+    /// the `MATCH` alone, the `INDEX` around it, and an error handed to `INDEX` directly.
+    ///
+    /// **`SUMPRODUCT` over `COLUMN`** — 48 cells count alternating columns with
+    /// `SUMPRODUCT((MOD(COLUMN(C38:GT38),2)=$A$1) * (C38:GT38<>"") * (LEFT(C38:GT38,1)="P"))`
+    /// and the counts differ, 18 against Excel's 12. Asked as `COLUMN` alone, then `MOD` over
+    /// it, then the whole idiom — so a wrong answer names its own step. These need cells, so
+    /// they carry `data`: `H` through `M` are columns 8 to 13.
+    static let roundFifteen: [ConformanceCase] = [
+        // TEXT, date codes. 41640 is Wednesday 1 January 2014.
+        .init(family: "textFormat", formula: "TEXT(41640, \"mmm\")",
+              note: "the code the corpus uses. Expect \"Jan\""),
+        .init(family: "textFormat", formula: "TEXT(41640, \"mmmm\")", note: "full month name"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"yyyy\")", note: "four-digit year"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"yy\")", note: "two-digit year"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"d\")", note: "day, unpadded"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"dd\")", note: "day, padded"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"ddd\")", note: "weekday, short"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"dddd\")", note: "weekday, full"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"mmm-yy\")",
+              note: "a compound code, which is how they actually appear"),
+        .init(family: "textFormat", formula: "TEXT(41640, \"m/d/yyyy\")", note: "a whole date"),
+        .init(family: "textFormat", formula: "CONCATENATE(TEXT(41640, \"mmm\"), \"Yr\", YEAR(41640), \"ACT\")",
+              note: "the corpus's own shape, end to end. Expect \"JanYr2014ACT\""),
+        // And the numeric codes beside them, which may well be fine.
+        .init(family: "textFormat", formula: "TEXT(1234.5, \"0.00\")", note: "fixed decimals"),
+        .init(family: "textFormat", formula: "TEXT(1234.5, \"#,##0\")", note: "thousands"),
+        .init(family: "textFormat", formula: "TEXT(0.256, \"0%\")", note: "a percentage"),
+
+        // INDEX over a failed MATCH, in pieces.
+        .init(family: "indexMatch", formula: "MATCH(\"z\", {\"a\";\"b\";\"c\"}, 0)",
+              note: "the MATCH alone — expect #N/A"),
+        .init(family: "indexMatch", formula: "INDEX({10;20;30}, MATCH(\"z\", {\"a\";\"b\";\"c\"}, 0))",
+              note: "the whole shape. Excel answers #N/A; this package answers blank"),
+        .init(family: "indexMatch", formula: "INDEX({10;20;30}, NA())",
+              note: "an error handed straight to INDEX — does it propagate?"),
+        .init(family: "indexMatch", formula: "ISNA(INDEX({10;20;30}, MATCH(\"z\", {\"a\";\"b\";\"c\"}, 0)))",
+              note: "asked the other way round, so a blank cannot masquerade as an answer"),
+        .init(family: "indexMatch", formula: "INDEX({10;20;30}, MATCH(\"b\", {\"a\";\"b\";\"c\"}, 0))",
+              note: "control: a MATCH that succeeds. Expect 20"),
+
+        // TEXT applied to *text*, which is what the corpus actually does. `$J$7` there is
+        // itself a `TEXT(...)` call caching the string "May", so the failing formula is
+        // `TEXT("May", "mmm")` — a date format over a value that is not a date. Excel passes
+        // it through; this package answers #VALUE!. The numeric rows above all agree, so the
+        // format codes were never the problem.
+        .init(family: "textFormat", formula: "TEXT(\"May\", \"mmm\")",
+              note: "the corpus's real shape. Excel answers \"May\"; we answer #VALUE!"),
+        .init(family: "textFormat", formula: "TEXT(\"hello\", \"0.00\")",
+              note: "text against a numeric code — passed through, or #VALUE!?"),
+        .init(family: "textFormat", formula: "TEXT(\"2014-01-01\", \"mmm\")",
+              note: "text that *looks* like a date — coerced, or passed through?"),
+        .init(family: "textFormat", formula: "LEN(TEXT(\"\", \"mmm\"))",
+              note: "empty text, measured by length so the answer survives the round trip"),
+
+        // MATCH with a *blank* lookup value, which is the corpus's real shape and cannot be
+        // written as an array constant. `Definitions!G35` there is an empty cell, so the
+        // formula is `MATCH(blank, range, 0)`: Excel answers #N/A, and this package answers
+        // something that lets INDEX return a blank — a lookup that found nothing, wearing
+        // the clothes of an empty cell.
+        //
+        // `N` is past the data and never written, so it is genuinely empty.
+        .init(family: "indexMatch", formula: "MATCH($N{r}, $H{r}:$J{r}, 0)",
+              note: "a blank lookup against a range that CONTAINS a blank. Expect #N/A",
+              data: [.text("a"), .blank, .text("c"),
+                     .number(10), .number(20), .number(30)]),
+        .init(family: "indexMatch",
+              formula: "INDEX($K{r}:$M{r}, MATCH($N{r}, $H{r}:$J{r}, 0))",
+              note: "the corpus shape whole — 82 cells of it. Expect #N/A",
+              data: [.text("a"), .blank, .text("c"),
+                     .number(10), .number(20), .number(30)]),
+        .init(family: "indexMatch", formula: "MATCH($N{r}, $H{r}:$J{r}, 0)",
+              note: "control: a blank lookup against a range with no blank in it",
+              data: [.text("a"), .text("b"), .text("c"),
+                     .number(10), .number(20), .number(30)]),
+        .init(family: "indexMatch", formula: "ISNA(MATCH($N{r}, $H{r}:$J{r}, 0))",
+              note: "asked the other way, so a blank cannot masquerade as an answer",
+              data: [.text("a"), .blank, .text("c"),
+                     .number(10), .number(20), .number(30)]),
+
+        // SUMPRODUCT over COLUMN, in pieces. H is column 8, M is column 13.
+        .init(family: "sumproduct", formula: "SUM(COLUMN($H{r}:$M{r}))",
+              note: "COLUMN over a range — expect 8+9+10+11+12+13 = 63",
+              data: [.text("P1"), .text("F1"), .text("P2"),
+                     .text("F2"), .text("P3"), .text("F3")]),
+        .init(family: "sumproduct", formula: "SUM(MOD(COLUMN($H{r}:$M{r}), 2))",
+              note: "MOD over that — expect 0+1+0+1+0+1 = 3",
+              data: [.text("P1"), .text("F1"), .text("P2"),
+                     .text("F2"), .text("P3"), .text("F3")]),
+        .init(family: "sumproduct",
+              formula: "SUMPRODUCT((MOD(COLUMN($H{r}:$M{r}), 2) = 0) * 1)",
+              note: "the comparison broadcast to an array — expect 3",
+              data: [.text("P1"), .text("F1"), .text("P2"),
+                     .text("F2"), .text("P3"), .text("F3")]),
+        .init(family: "sumproduct",
+              formula: "SUMPRODUCT((LEFT($H{r}:$M{r}, 1) = \"P\") * 1)",
+              note: "LEFT broadcast over a range — expect 3",
+              data: [.text("P1"), .text("F1"), .text("P2"),
+                     .text("F2"), .text("P3"), .text("F3")]),
+        .init(family: "sumproduct",
+              formula: "SUMPRODUCT((MOD(COLUMN($H{r}:$M{r}), 2) = 0) * (LEFT($H{r}:$M{r}, 1) = \"P\"))",
+              note: "the corpus's idiom, whole. Even columns holding a P: expect 3",
+              data: [.text("P1"), .text("F1"), .text("P2"),
+                     .text("F2"), .text("P3"), .text("F3")]),
+        .init(family: "sumproduct",
+              formula: "SUMPRODUCT(($H{r}:$M{r} <> \"\") * 1)",
+              note: "the non-empty test, with two cells genuinely empty. Expect 4",
+              data: [.text("P1"), .blank, .text("P2"),
+                     .blank, .text("P3"), .text("F3")]),
+    ]
+
+    // MARK: - Round fifteen, part two: is SUMIF a SUMIFS with the arguments moved?
+
+    /// Where `SUMIF` and `SUMIFS` agree, and where they do not.
+    ///
+    /// **The question is not rhetorical.** `SUMIF(range, criteria, [sum_range])` and
+    /// `SUMIFS(sum_range, criteria_range, criteria)` look like one function wearing two
+    /// argument orders, and this package very nearly implements them that way. If they are
+    /// the same, one implementation can serve both and every rule measured for one holds for
+    /// the other. If they are not, every rule has to be measured twice — and round fourteen
+    /// has already shown these two agreeing on something they need not have.
+    ///
+    /// Three candidates, each asked rather than assumed:
+    ///
+    /// - **A short `sum_range`.** `SUMIF(A1:A5, ">1", B1)` is documented to extend `B1` to
+    ///   the shape of the criteria range. `SUMIFS` is documented to require them equal. If so,
+    ///   one answers a number where the other answers `#VALUE!`, and they are not the same
+    ///   function.
+    /// - **An error as the criteria.** This is **the one that matters now**: 672 corpus cells
+    ///   read `SUMIF($G$8:$G$250, #REF!, K$8:K$250)`, Excel cached `0`, and this package
+    ///   answers `#REF!` — because an earlier fix propagated an error from *any* argument
+    ///   position after measuring only the sum-range position. Round fourteen then measured
+    ///   that an error *cell inside* the criteria range propagates nothing at all, which
+    ///   points the same way without settling it. That generalisation is the one loose
+    ///   inference left in this package, and these rows close it.
+    /// - **A blank criteria.** An empty cell as the criterion: matches blanks, matches zero,
+    ///   or matches nothing?
+    ///
+    /// Layout: `H` `I` `J` are keys, `K` `L` `M` the values, `N` a seventh cell when a case
+    /// needs one.
+    static let roundFifteenConditional: [ConformanceCase] = [
+        // The control, both spellings, same data: if these disagree nothing below can be read.
+        .init(family: "sumifPair", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "control, SUMIF spelling. Expect 4",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+        .init(family: "sumifPair", formula: "SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, \"x\")",
+              note: "control, SUMIFS spelling. Expect 4",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+
+        // A sum_range shorter than the criteria range.
+        .init(family: "sumifPair", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r})",
+              note: "SUMIF with a one-cell sum_range — extended to three, or not?",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+        .init(family: "sumifPair", formula: "SUMIFS($K{r}, $H{r}:$J{r}, \"x\")",
+              note: "SUMIFS the same way — #VALUE! if the shapes must match",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+
+        // An error as the criteria argument. The 672-cell question.
+        .init(family: "sumifPair", formula: "SUMIF($H{r}:$J{r}, #REF!, $K{r}:$M{r})",
+              note: "a literal #REF! as the criteria — the corpus's exact shape. Excel cached 0",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+        .init(family: "sumifPair", formula: "SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, #REF!)",
+              note: "and the same criteria in the SUMIFS spelling",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+        .init(family: "sumifPair", formula: "SUMIF($H{r}:$J{r}, $N{r}, $K{r}:$M{r})",
+              note: "the criteria read from a cell that holds #REF! rather than written in",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3), .error(.ref)]),
+
+        // A blank criteria.
+        .init(family: "sumifPair", formula: "SUMIF($H{r}:$J{r}, $N{r}, $K{r}:$M{r})",
+              note: "a blank criteria — matches blanks, matches zero, or matches nothing?",
+              data: [.text("x"), .blank, .text("x"),
+                     .number(1), .number(2), .number(3)]),
+        .init(family: "sumifPair", formula: "SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, $N{r})",
+              note: "and the SUMIFS spelling of the same",
+              data: [.text("x"), .blank, .text("x"),
+                     .number(1), .number(2), .number(3)]),
+
+        // COUNTIF and COUNTIFS, in case the pairing is a family habit rather than these two.
+        .init(family: "sumifPair", formula: "COUNTIF($H{r}:$J{r}, $N{r})",
+              note: "the same blank-criteria question, counting rather than summing",
+              data: [.text("x"), .blank, .text("x")]),
+        .init(family: "sumifPair", formula: "COUNTIFS($H{r}:$J{r}, $N{r})",
+              note: "and its plural",
+              data: [.text("x"), .blank, .text("x")]),
     ]
 
     // MARK: - Bessel
