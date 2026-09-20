@@ -1,6 +1,7 @@
 # Round fifteen — the tail, and whether SUMIF is a SUMIFS
 
-**Status:** asked, not yet answered. `~/Desktop/excel-limits-r15.xlsx`, 296 cases, 36 new.
+**Status:** answered 2026-09-20. Five of seven findings implemented; two recorded as
+scoped gaps below. Round fifteen reads **agreed 276, differed 2**, from 261 and 17.
 **Written:** 2026-09-20, before the answers, so the predictions are on the record rather than
 reconstructed afterwards.
 
@@ -157,3 +158,86 @@ Rounds nine through fourteen have no document here. Their record is the CHANGELO
 commit messages, which carry the measurements and the reasoning, but there is no single page
 for them the way rounds one to eight have in `ExcelEvaluationLimits.md`. That gap is real and
 this document does not close it.
+
+
+---
+
+# What Excel answered
+
+Written after the round, against the predictions above.
+
+## Confirmed, and implemented
+
+| Question | Excel | was |
+|---|---|---|
+| `TEXT("May","mmm")` | `"May"` | `#VALUE!` |
+| `TEXT("hello","0.00")` | `"hello"` | `#VALUE!` |
+| `TEXT("2014-01-01","mmm")` | `"Jan"` | `#VALUE!` |
+| `MATCH(blank, range-with-blank, 0)` | `#N/A` | `2` |
+| `SUMIF(range, #REF!, sum)` | `0` | `#REF!` |
+| `SUMIF`/`SUMIFS`, blank criterion | `0` | `2` |
+| `COUNTIF`/`COUNTIFS`, blank criterion | `0` | `1` |
+| `SUMIFS` with mismatched ranges | `#VALUE!` | a number |
+
+Both traces held: the `TEXT` failure was about its **argument** and not its format codes, and
+the `INDEX`/`MATCH` failure was a **blank lookup** and not the lookup functions. Neither would
+have been found by asking the obvious reading of the symptom.
+
+**`SUMIF` is not `SUMIFS` with its arguments moved.** Given three keys and a one-cell sum
+range, Excel answers `4` for `SUMIF` — stretching the short range — and `#VALUE!` for
+`SUMIFS`. Every rule measured for one must now be measured for the other.
+
+One unasked-for finding: `TEXT(1234.5,"#,##0")` is `"1,235"` and this package answered
+`"1,234"`, because `NumberFormatter` rounds to even and 1234 is the even neighbour. The two
+agree on every value except an exact half.
+
+## Refuted — and this one mattered
+
+**`COLUMN(range)` returning a scalar is correct.**
+
+| | Excel | ours |
+|---|---:|---:|
+| `SUM(COLUMN($H:$M))` | 8 | 8 |
+| `SUMPRODUCT((MOD(COLUMN($H:$M),2)=0)*1)` | 3 | 1 |
+
+The prediction above — that `COLUMN` over a range should be an array — was **wrong**, and
+acting on it would have broken the case that already agreed. The real rule is that
+**`SUMPRODUCT` evaluates its arguments in array context** and `SUM` does not.
+
+The decomposition is the only reason this was caught. A round asking the whole idiom would
+have shown one disagreement and pointed at the wrong function.
+
+# The two scoped gaps
+
+Neither is a defect to patch; both need a structural change, and both are written down rather
+than approximated.
+
+## `SUMPRODUCT` does not establish array context — 48 cells
+
+`COLUMN` already receives the unevaluated argument trees through `EvaluationContext`, so it
+can see the whole range. What is missing is a way for a *caller* to say it wants array
+evaluation.
+
+The seam is narrow — one site builds `EvaluationContext` — but the flag has to thread through
+`evaluateNode`, and the rules for when it resets are not obvious: `SUMPRODUCT(SUM(COLUMN(…)))`
+must not inherit it. That is a design question about array semantics generally, and doing it
+hastily would encode a guess in the one place hardest to measure later.
+
+## `SUMIF` does not stretch a short `sum_range` — part of 912 cells
+
+Excel extends a one-cell `sum_range` to the criteria range's shape. Stretching needs the
+**reference** — which cells the range would cover — and an `ExcelFunction` is handed evaluated
+values, so the information is gone before the code runs. `GROUPBY` is reached before its
+arguments are evaluated for a comparable reason, and the same treatment would serve here.
+
+# What this leaves
+
+Of the corpus residue this round set out to explain:
+
+| | Cells | Status |
+|---|---:|---|
+| `SUMIF`/`SUMIFS` criteria | 912 | closed |
+| `INDEX`/`MATCH` blank lookup | 82 | closed |
+| `TEXT` on text | 22 | closed |
+| `SUMPRODUCT`/`COLUMN` | 48 | scoped, above |
+| `GETPIVOTDATA` | 3,802 | `PivotTableLookup.md` |

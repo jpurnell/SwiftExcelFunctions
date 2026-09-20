@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 import SwiftExcelCore
 
 /// Text category built-in Excel functions.
@@ -263,17 +266,66 @@ public enum BuiltinTextFunctions {
     /// For unsupported formats, returns `String(number)`.
     static let text = ExcelFunction(name: "TEXT", minArgs: 2, maxArgs: 2) { args in
         catching {
-            let n = try toNumber(args[0])
             let fmt = try toString(args[1])
+            // **Text that is not a number passes through, unformatted.** Measured in round
+            // fifteen, and it cost 22 corpus cells: the failing formula reads
+            // `TEXT($J$7,"mmm")` where `$J$7` is *itself* a `TEXT(...)` call caching the
+            // string "May". So the real shape is `TEXT("May","mmm")` — a date format over a
+            // value that is not a date. Excel hands back "May"; this threw on `toNumber`
+            // before anything else could run.
+            //
+            // The line is drawn by whether the value reads as a number or a date, not by the
+            // format code: "May" passes through and "2014-01-01" becomes "Jan".
+            if case .text(let literal) = args[0] {
+                guard let coerced = numericOrDateValue(literal) else { return .text(literal) }
+                return formatted(coerced, fmt)
+            }
+            let n = try toNumber(args[0])
             // A date code first: it is decided by the letters present, and a number format
             // never contains them. Before this, `TEXT(41583, "ddd")` fell through to the
             // numeric path and returned "41583" — the serial, formatted as what it is
             // rather than as what was asked for. 127 cells in 46 real workbooks did that.
-            if ExcelDateFormat.isDateFormat(fmt), let formatted = ExcelDateFormat.format(serial: n, fmt) {
-                return .text(formatted)
-            }
-            return .text(applyFormat(n, fmt))
+            return formatted(n, fmt)
         }
+    }
+
+    /// One number under one format code.
+    private static func formatted(_ number: Double, _ format: String) -> CellValue {
+        // A date code first: it is decided by the letters present, and a number format never
+        // contains them. Before this, `TEXT(41583, "ddd")` fell through to the numeric path
+        // and returned "41583" — the serial, formatted as what it is rather than as what was
+        // asked for. 127 cells in 46 real workbooks did that.
+        if ExcelDateFormat.isDateFormat(format),
+           let asDate = ExcelDateFormat.format(serial: number, format) {
+            return .text(asDate)
+        }
+        return .text(applyFormat(number, format))
+    }
+
+    /// A text value read as a number, or as a date, or not at all.
+    ///
+    /// `DATEVALUE` already knows the date spellings this package accepts, so the list lives
+    /// there rather than being written twice and drifting apart.
+    private static func numericOrDateValue(_ literal: String) -> Double? {
+        let trimmed = literal.trimmingCharacters(in: .whitespaces)
+        if let number = Double(trimmed) { return number }
+        let read: CellValue
+        do {
+            read = try BuiltinDateTimeFunctions.datevalue.evaluate([.text(trimmed)])
+        } catch let failure {
+            // `DATEVALUE` answers `#VALUE!` for text it cannot read, so a *throw* here is
+            // something else entirely and is said out loud rather than read as "not a date".
+            // Swallowing it would turn a broken date reader into text passing through
+            // unformatted, which looks exactly like the correct answer for "May".
+            #if canImport(os)
+            // Public privacy: a literal from the formula and this package's account of it.
+            Logger(subsystem: "SwiftExcelFunctions", category: "text")
+                .error("DATEVALUE threw on \(trimmed, privacy: .public): \(String(describing: failure), privacy: .public)")
+            #endif
+            return nil
+        }
+        guard case .number(let serial) = read else { return nil }
+        return serial
     }
 
     /// Applies an Excel-style number format to a Double.
@@ -300,6 +352,12 @@ public enum BuiltinTextFunctions {
             formatter.maximumFractionDigits = decimals
             formatter.groupingSeparator = ","
             formatter.decimalSeparator = "."
+            // **Half away from zero, which is Excel's rule and not the default here.**
+            // `NumberFormatter` rounds to even, so `TEXT(1234.5, "#,##0")` came out "1,234"
+            // against Excel's "1,235". The two agree on every value except an exact half —
+            // the one value a test is least likely to pick by accident and a financial model
+            // most likely to contain.
+            formatter.roundingMode = .halfUp
             return formatter.string(from: NSNumber(value: number)) ?? formatNumber(number)
         }
 

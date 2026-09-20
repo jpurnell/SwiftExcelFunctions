@@ -26,6 +26,57 @@ final class TextDateFormatTests: XCTestCase {
         return value
     }
 
+    /// `TEXT` applied to text, measured in round fifteen.
+    private func textOfText(_ value: String, _ format: String) throws -> CellValue {
+        let function = try XCTUnwrap(registry.function(named: "TEXT"))
+        return try function.evaluate([.text(value), .text(format)])
+    }
+
+    // MARK: - Rounding, measured in round fifteen
+
+    /// A thousands format rounds **half away from zero**, not to even.
+    ///
+    /// `TEXT(1234.5, "#,##0")` is `"1,235"` in Excel and was `"1,234"` here, because
+    /// `NumberFormatter` defaults to banker's rounding — and 1234 is the even neighbour. The
+    /// two agree on every value except an exact half, which is the one value a test is least
+    /// likely to pick by accident and a financial model is most likely to contain.
+    func testAThousandsFormatRoundsHalfAwayFromZero() throws {
+        XCTAssertEqual(try text(1234.5, "#,##0"), "1,235")
+        XCTAssertEqual(try text(1235.5, "#,##0"), "1,236",
+                       "the odd neighbour too — banker's rounding would agree here by luck")
+        XCTAssertEqual(try text(-1234.5, "#,##0"), "-1,235", "away from zero, so downward")
+        XCTAssertEqual(try text(1234.4, "#,##0"), "1,234", "and nothing else moves")
+    }
+
+    // MARK: - TEXT applied to something that is not a number
+
+    /// Text that is not a number passes **through**, unformatted.
+    ///
+    /// **22 corpus cells turned on this**, and not on the format codes, which were all
+    /// already right. `Dot Com YTD Performance Report 6 20.xlsx!Exec Summary!J8` reads
+    /// `CONCATENATE(TEXT($J$7,"mmm"), "Yr", YEAR($F$4), "ACT")`, and `$J$7` is *itself* a
+    /// `TEXT(...)` call caching the string `"May"`. So the real shape is `TEXT("May","mmm")`
+    /// — a date format over a value that is not a date. Excel hands back `"May"`; this
+    /// package answered `#VALUE!`, because `toNumber` threw before anything else could run.
+    ///
+    /// Asking the obvious reading of the symptom — `TEXT(41640,"mmm")` — would have agreed
+    /// and taught nothing.
+    func testTextThatIsNotANumberPassesThrough() throws {
+        XCTAssertEqual(try textOfText("May", "mmm"), .text("May"))
+        XCTAssertEqual(try textOfText("hello", "0.00"), .text("hello"),
+                       "a numeric code over text passes it through just the same")
+        XCTAssertEqual(try textOfText("", "mmm"), .text(""), "and empty text stays empty")
+    }
+
+    /// Text that **does** read as a date is coerced and then formatted.
+    ///
+    /// The line is drawn by whether the value can be read, not by the format code: `"May"`
+    /// passes through and `"2014-01-01"` becomes `"Jan"`. Measured in the same round, which
+    /// is the only reason the distinction is here rather than a guess in either direction.
+    func testTextThatReadsAsADateIsFormatted() throws {
+        XCTAssertEqual(try textOfText("2014-01-01", "mmm"), .text("Jan"))
+    }
+
     // MARK: - Measured against Excel
 
     /// Serial-to-weekday pairs taken from Excel's own cached values.

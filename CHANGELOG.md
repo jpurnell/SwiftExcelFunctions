@@ -29,6 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`TEXT` passes non-numeric text through unchanged**, and coerces text that reads as a date.
+  **22 corpus cells**: the failing formula is `TEXT($J$7,"mmm")` where `$J$7` is *itself* a
+  `TEXT(...)` call caching the string `"May"` — so the real shape is `TEXT("May","mmm")`, a
+  date format over a value that is not a date. Excel hands back `"May"`; this package threw on
+  `toNumber` before anything else could run.
+
+  The line is drawn by whether the value reads as a number or a date, not by the format code:
+  `"May"` passes through and `"2014-01-01"` becomes `"Jan"`. The format codes were **all
+  already correct** — asking the obvious reading of the symptom, `TEXT(41640,"mmm")`, would
+  have agreed and taught nothing.
+
+- **A thousands format rounds half away from zero.** `TEXT(1234.5,"#,##0")` is `"1,235"` and
+  was `"1,234"`, because `NumberFormatter` rounds to even and 1234 is the even neighbour. The
+  two agree on every value except an exact half — the one value a test is least likely to pick
+  by accident and a financial model most likely to contain.
+
+### Fixed
+
 - **A criterion that selects nothing gives zero, and an error criterion is one of them.**
   Round fifteen measured what round fourteen could only point at:
 
