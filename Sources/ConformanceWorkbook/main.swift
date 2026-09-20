@@ -158,12 +158,30 @@ enum ConformanceWorkbook {
             sheet.write("!evaluation failed", to: ref)
             return
         }
-        switch answer {
+        switch storedForm(of: answer) {
         case .number(let value): sheet.write(value, to: ref)
         case .text(let value): sheet.write(value, to: ref)
         case .bool(let value): sheet.writeFormula(value ? "TRUE()" : "FALSE()", to: ref)
         case .error(let code): sheet.writeFormula(producing(code), to: ref)
         default: sheet.write(String(describing: answer), to: ref)
+        }
+    }
+
+    /// This package's answer as the workbook's own column can hold it.
+    ///
+    /// **A cell holds one value, and an array is not one.** So a non-scalar answer is stored
+    /// as its description, and `check` has to compare like with like — the stored *text*
+    /// against a live *array* can never agree, and every array-valued row reported `CHANGED`
+    /// for ever, printing an identical "at emit" and "now" beneath itself.
+    ///
+    /// Seven rows of round ten did exactly that, which is seven standing invitations to
+    /// ignore the one signal that says this workbook's stored column has gone stale. The
+    /// mapping lives here, and both the writer and the comparison go through it, so they
+    /// cannot drift apart again.
+    private static func storedForm(of answer: CellValue) -> CellValue {
+        switch answer {
+        case .number, .text, .bool, .error: return answer
+        default: return .text(String(describing: answer))
         }
     }
 
@@ -347,7 +365,7 @@ enum ConformanceWorkbook {
             // Reported whether or not the row agrees: a row that changed since emit is worth
             // seeing even when the change was a fix, because it is the only signal that this
             // workbook's stored column is stale.
-            if let atEmit, let ours, !agree(atEmit, ours) {
+            if let atEmit, let ours, !agree(atEmit, storedForm(of: ours)) {
                 drifted += 1
                 say("CHANGED [\(family)]  \(formula)")
                 say("        at emit: \(describe(atEmit))")

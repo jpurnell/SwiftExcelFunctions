@@ -39,6 +39,46 @@ final class OracleOutcomeTests: XCTestCase {
         return finding.outcome
     }
 
+    /// A workbook exported from Google Sheets is not evidence about Excel.
+    ///
+    /// **`__XLUDF.DUMMYFUNCTION` is the export's own signature.** Sheets writes it, wrapping
+    /// the original formula as a string, for anything Excel cannot express — and the value
+    /// cached beside it is the number *Sheets* computed, not Excel's. Judging ourselves
+    /// against it measures Google.
+    ///
+    /// Two corpus workbooks carried it and carried the consequences three different ways:
+    /// 398 cells where the fallback is the text `"464"` and the cache is the number `464`;
+    /// 895 reading `IF(IFERROR(D4/D20)=0,"",…)`, a one-argument `IFERROR` that is a Sheets
+    /// signature Excel rejects outright; and a `SUM` over cells holding `#N/A` as *text*,
+    /// where the error was flattened to a string on the way out of Sheets. The last of those
+    /// is why the marker condemns the whole workbook rather than the cell it sits in: the
+    /// formula that goes wrong need not be the formula that carries the marker.
+    ///
+    /// It costs the comparable cells in such a file, deliberately. A cache that cannot be
+    /// attributed to Excel is not evidence about Excel in either direction, and `notComparable`
+    /// counts for neither — where a false agreement would be as damaging as a false accusation.
+    func testAGoogleSheetsExportIsNotComparable() throws {
+        let book = Workbook()
+        let sheet = book.addSheet(name: "Model")
+        // An ordinary cell, which in any other workbook would be judged.
+        sheet.write(2.0, to: "B1")
+        sheet.write(3.0, to: "B2")
+        sheet.write(try FormulaParser.parse("B1+B2"), to: "B3", cached: .number(5))
+        // And the export's signature, elsewhere on the sheet.
+        sheet.write(try FormulaParser.parse("IFERROR(__XLUDF.DUMMYFUNCTION(\"importrange()\"), \"464\")"),
+                    to: "C1", cached: .number(464))
+
+        let report = WorkbookOracle.audit(book)
+        let reasons = report.findings.map(\.outcome)
+        XCTAssertFalse(reasons.isEmpty, "the audit judged nothing at all")
+        for outcome in reasons {
+            guard case .notComparable(let reason) = outcome else {
+                return XCTFail("every cell of a Sheets export is notComparable, got \(outcome)")
+            }
+            XCTAssertTrue(reason.lowercased().contains("sheets"), "and says so: \(reason)")
+        }
+    }
+
     /// A name pointing into another workbook is an external reference, wherever it hides.
     ///
     /// **The detector walked the formula and the formula did not say so.** Excel writes an

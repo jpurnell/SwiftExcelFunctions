@@ -29,6 +29,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A workbook exported from Google Sheets is no longer judged as if Excel had written it.**
+  `__XLUDF.DUMMYFUNCTION` is the export's own signature: Sheets wraps the original formula as
+  a string for anything Excel cannot express, and caches beside it the value *Sheets*
+  computed. Excel opens the file, answers `#NAME?`, and leaves the cache alone.
+
+  The marker condemns the **whole workbook**, because the consequences reach past the cells
+  carrying it. One corpus file holds a plain `SUM` over cells whose `#N/A` was flattened to
+  *text* on the way out of Sheets — no marker of its own, and judging it measured the
+  exporter rather than us. That `SUM` was reported here as a library defect before it was
+  traced; it was not one.
+
+  This costs the genuinely comparable cells in such files, deliberately. A cached value that
+  cannot be attributed to Excel is not evidence about Excel in either direction, and a false
+  agreement would be as damaging as a false accusation.
+
+- **`check` reported every array-valued row as `CHANGED`, for ever.** A cell holds one value
+  and an array is not one, so `emit` stores a non-scalar answer as its description — and
+  `check` then compared the stored *text* against a live *array*, which can never agree. The
+  row printed an identical "at emit" and "now" beneath itself, seven times in round ten.
+
+  That is seven standing invitations to ignore the one signal that says a workbook's stored
+  column has gone stale. Both the writer and the comparison now go through one mapping, so
+  they cannot drift apart again. Round eleven's `CHANGED` count falls from 20 to 13, and the
+  13 are real — those answers did change when the date floor moved.
+
 - **The date serial floor was off by one, and there was no ceiling.** Round eleven asked
   Excel where `WEEKDAY`, `EOMONTH`, `EDATE`, `YEAR`, `MONTH` and `DAY` stop accepting a
   serial number, and all six answered the same thing at both ends:

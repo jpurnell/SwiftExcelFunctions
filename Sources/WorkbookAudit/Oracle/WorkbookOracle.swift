@@ -79,6 +79,45 @@ public enum WorkbookOracle {
         return nil
     }
 
+    /// Why a Google Sheets export cannot be judged.
+    static let sheetsExportReason =
+        "Google Sheets export: the cached values are Sheets', not Excel's"
+
+    /// The marker Google Sheets writes on export for a formula Excel cannot express.
+    ///
+    /// It wraps the original Sheets formula as a string — `__XLUDF.DUMMYFUNCTION("query(…)")`
+    /// — and caches beside it the value *Sheets* computed. Excel, opening that file, answers
+    /// `#NAME?` and leaves the cache alone.
+    private static let sheetsExportMarker = "__XLUDF.DUMMYFUNCTION"
+
+    /// Whether this workbook came out of Google Sheets.
+    ///
+    /// **A property of the file, not of the cell**, which is why it is asked once and applied
+    /// to everything. The marker sits only on the formulas Excel could not express, but the
+    /// *consequences* reach further: one corpus workbook holds a plain `SUM` over cells whose
+    /// `#N/A` was flattened to text on the way out of Sheets, and that `SUM` carries no marker
+    /// of its own. Judging it measured the exporter.
+    ///
+    /// So the whole file is set aside, and the comparable cells in it are set aside too. That
+    /// is deliberate: a cached value that cannot be attributed to Excel is not evidence about
+    /// Excel in either direction, and a false agreement would be as damaging here as a false
+    /// accusation — this is a measurement, and its worth is exactly its honesty.
+    ///
+    /// - Parameter workbook: The workbook to examine.
+    /// - Returns: `true` where the export's signature appears anywhere in it.
+    public static func isGoogleSheetsExport(_ workbook: Workbook) -> Bool {
+        for sheet in workbook.sheets {
+            for reference in sheet.cellReferences {
+                guard case .formula(let ast, _)? = sheet.cell(at: reference) else { continue }
+                for node in OracleFinding.nodes(in: ast) {
+                    guard case .function(let name, _) = node else { continue }
+                    if name.hasPrefix(sheetsExportMarker) { return true }
+                }
+            }
+        }
+        return false
+    }
+
     /// The same question, asked of the name table as well as the formula.
     ///
     /// **A formula can reach into another workbook without saying so.**
@@ -415,6 +454,8 @@ public enum WorkbookOracle {
         var report = OracleReport()
         // Read once, for every sheet, before judging anything. See ``WorkbookSnapshot``.
         let snapshot = WorkbookSnapshot(workbook)
+        // Asked once for the whole file, because the answer is a property of the file.
+        let exportedFromSheets = isGoogleSheetsExport(workbook)
         for sheet in workbook.sheets {
             let cells = ExcelCached(snapshot: snapshot, sheet: sheet.name)
             for reference in sheet.cellReferences {
@@ -422,6 +463,12 @@ public enum WorkbookOracle {
                     continue
                 }
                 let cell = CellRef(reference)
+                guard !exportedFromSheets else {
+                    report.record(OracleFinding(
+                        sheet: sheet.name, cell: cell, formula: ast,
+                        outcome: .notComparable(Self.sheetsExportReason)))
+                    continue
+                }
                 let outcome = judge(ast, cached: cached, cells: cells,
                                     names: workbook.namedRanges, sheet: sheet.name, cell: cell)
                 report.record(OracleFinding(sheet: sheet.name, cell: cell,
