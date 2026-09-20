@@ -61,7 +61,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -634,6 +634,109 @@ enum ConformanceCases {
         .init(family: "dateFloor", formula: "YEAR(2958466)", note: "one past the end"),
         .init(family: "dateFloor", formula: "EOMONTH(2958465, 1)",
               note: "a month past the end — overflow, or a date Excel will not name?"),
+    ]
+
+    // MARK: - Round twelve: what the answering Excel knows, and GROUPBY in depth
+
+    /// Which functions the Excel that answered this round actually has.
+    ///
+    /// **Round ten came back `#NAME?` on all ten `GROUPBY` rows and nothing in the workbook
+    /// said why.** Working out that the build simply did not have the function took a session;
+    /// `AppVersion` was no help, because every Excel since 2016 writes `16.0300`. A round that
+    /// cannot say what answered it cannot be read later by anyone, including us.
+    ///
+    /// So each of these names one function and asks for a value small enough to check at a
+    /// glance. A `#NAME?` here is not a disagreement — it is the build telling us what it is,
+    /// and it dates the answering Excel far better than any metadata in the file.
+    ///
+    /// Every spilling result is wrapped in `SUM`, `ROWS` or `COLUMNS`. Round ten learned that:
+    /// a spilled range is awkward to compare cell-for-cell across a workbook round trip, and
+    /// one number in one cell survives it intact.
+    ///
+    /// **`LAMBDA` and `LET` are not asked here, and their absence is deliberate.** Both bind
+    /// parameter names, and a stored one needs those spelled `_xlpm.x` as well as the function
+    /// spelled `_xlfn.LAMBDA`; this emitter handles the function name only. Asking it in this round would have put an unanswerable
+    /// question beside answerable ones and invited the same confusion the first attempt at
+    /// this round produced — where 34 struck formulas read as a build without the functions.
+    /// It wants `_xlpm.` support first, and then a round of its own.
+    static let roundTwelveBuild: [ConformanceCase] = [
+        .init(family: "build", formula: "XLOOKUP(2, {1;2;3}, {\"a\";\"b\";\"c\"})",
+              note: "XLOOKUP — 2021 and 365. Expect \"b\""),
+        .init(family: "build", formula: "SUM(FILTER({1;2;3}, {TRUE;FALSE;TRUE}))",
+              note: "FILTER — the dynamic array release. Expect 4"),
+        .init(family: "build", formula: "ROWS(UNIQUE({1;1;2}))",
+              note: "UNIQUE — same release. Expect 2"),
+        .init(family: "build", formula: "SUM(SEQUENCE(3))",
+              note: "SEQUENCE — same release. Expect 6"),
+        .init(family: "build", formula: "INDEX(SORT({3;1;2}), 1)",
+              note: "SORT — same release. Expect 1"),
+        .init(family: "build", formula: "COLUMNS(TEXTSPLIT(\"a,b\", \",\"))",
+              note: "TEXTSPLIT — 2022 and 365. Expect 2"),
+        .init(family: "build", formula: "SUM(TOCOL({1,2;3,4}))",
+              note: "TOCOL — 2022 and 365. Expect 10"),
+    ]
+
+    /// The `GROUPBY` and `PIVOTBY` arguments round ten could not reach.
+    ///
+    /// Round ten asked the shape questions and got `#NAME?` for every one of them, so none of
+    /// it is settled. These go further than that round did, into the arguments this package
+    /// accepts in its signature — `maxArgs` is 8 for `GROUPBY` and 11 for `PIVOTBY` — but
+    /// implements only the first few of. Where we answer an error, that is this package
+    /// saying so honestly, and the Excel column is the measurement.
+    ///
+    /// Round ten's own ten rows are still asked, from ``roundTen``, and they are the controls
+    /// for this round: if they come back `#NAME?` again then the build has not changed and
+    /// nothing here can be read.
+    static let roundTwelve: [ConformanceCase] = [
+        // total_depth beyond 0 and 1.
+        .init(family: "groupby2", formula: "ROWS(GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 2))",
+              note: "total_depth 2 — do subtotals appear, and how many rows result?"),
+        .init(family: "groupby2", formula: "ROWS(GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, -1))",
+              note: "a negative total_depth — totals above rather than below?"),
+
+        // field_headers: present, absent, and detected.
+        .init(family: "groupby2",
+              formula: "ROWS(GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 1))",
+              note: "field_headers 1 — is the first row consumed as a header?"),
+        .init(family: "groupby2",
+              formula: "ROWS(GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 0))",
+              note: "field_headers 0 — and treated as data when told not to?"),
+        .init(family: "groupby2",
+              formula: "ROWS(GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM))",
+              note: "omitted — the documented default is 'detect'. Does it?"),
+
+        // sort_order selecting a column rather than a direction.
+        .init(family: "groupby2",
+              formula: "INDEX(GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 2), 1, 1)",
+              note: "sort_order 2 — sort by the values column? Which key comes first?"),
+        .init(family: "groupby2",
+              formula: "INDEX(GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -2), 1, 1)",
+              note: "and -2 — the same column, descending?"),
+
+        // filter_array.
+        .init(family: "groupby2",
+              formula: "SUM(GROUPBY({\"a\";\"b\";\"c\"}, {1;2;3}, SUM, 0, 0, 1, {TRUE;FALSE;TRUE}))",
+              note: "filter_array — is the middle row excluded? Expect 4 if so"),
+
+        // Aggregates that are not sums.
+        .init(family: "groupby2", formula: "SUM(GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, COUNT, 0, 0))",
+              note: "COUNT as the aggregate — expect 3 over two groups"),
+        .init(family: "groupby2", formula: "SUM(GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, MAX, 0, 0))",
+              note: "MAX — expect 5"),
+
+        // PIVOTBY's two independent total depths.
+        .init(family: "groupby2",
+              formula: "ROWS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM))",
+              note: "both total depths defaulted — how tall?"),
+        .init(family: "groupby2",
+              formula: "COLUMNS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM))",
+              note: "and how wide?"),
+        .init(family: "groupby2",
+              formula: "ROWS(PIVOTBY({\"a\";\"b\"}, {\"x\";\"y\"}, {1;2}, SUM, 0, 0, 1, 1, 0))",
+              note: "row_total_depth 0, col_total_depth 1 — are they independent?"),
+        .init(family: "groupby2",
+              formula: "SUM(PIVOTBY({\"a\";\"b\";\"a\"}, {\"x\";\"y\";\"x\"}, {1;2;3}, SUM, 0, 0))",
+              note: "a repeated intersection — is 1+3 summed into one cell?"),
     ]
 
     // MARK: - Bessel

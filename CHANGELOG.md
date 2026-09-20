@@ -29,6 +29,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `_xlfn.` prefix was applied to the root of a formula and nowhere else.** Excel stores
+  every post-2007 function with that prefix, and a file spelling one plainly is invalid — so
+  Excel strikes the formula on open and says so in a repair log. `SUM(FILTER(…))` wrote
+  `FILTER` bare however long the prefix list was, and round twelve wrapped most of its
+  questions in `SUM`, `ROWS` or `COLUMNS` precisely so one number would survive the round
+  trip. All 34 of its modern rows were struck.
+
+  The list had also stopped at 2013: no `GROUPBY`, `PIVOTBY`, `XLOOKUP`, `FILTER`, `UNIQUE`,
+  `SEQUENCE`, `SORT`, `TEXTSPLIT`, `TOCOL` or the rest of the dynamic-array release.
+
+  Prefixing now runs over the whole tree. It is done on the tree rather than the text, which
+  was tried and fails for the reason the original comment gave: `FormulaParser` uppercases
+  every name it reads, so `_xlfn.GROUPBY` comes back `_XLFN.GROUPBY`.
+
+  **This had already cost the first conformance round eight of its rows**, and the comment
+  recording that sat directly above the list it was still missing names from.
+
+### Added
+
+- **Round twelve asks what the answering Excel knows.** Seven probes — `XLOOKUP`, `FILTER`,
+  `UNIQUE`, `SEQUENCE`, `SORT`, `TEXTSPLIT`, `TOCOL` — each returning a value small enough to
+  read at a glance. Round eleven came back `#NAME?` on all ten `GROUPBY` rows with nothing in
+  the file to say why, and `AppVersion` is no help because every Excel since 2016 writes
+  `16.0300`.
+
+  They earned their place immediately: all seven answered, bounding the build at 2022 or
+  later, while `GROUPBY` and `PIVOTBY` returned `#NAME?` from a valid file spelled
+  `_xlfn.GROUPBY` that Excel opened without repair. Those shipped in 2024. The earlier reading
+  — that the build lacked them — had rested on a file Excel had silently repaired, and was not
+  evidence of anything.
+
+  The probes also measured a spelling this package had inferred: `FILTER` and `SORT` are
+  stored `_xlfn._xlws.`, and both answered.
+
+  15 further `GROUPBY`/`PIVOTBY` questions ride along, unanswerable until a build that has
+  them opens the file. `LAMBDA` and `LET` are deliberately absent: both bind parameter names
+  needing `_xlpm.` spelling this emitter does not yet do.
+
+### Fixed
+
 - **A workbook exported from Google Sheets is no longer judged as if Excel had written it.**
   `__XLUDF.DUMMYFUNCTION` is the export's own signature: Sheets wraps the original formula as
   a string for anything Excel cannot express, and caches beside it the value *Sheets*

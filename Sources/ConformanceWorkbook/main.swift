@@ -98,7 +98,29 @@ enum ConformanceWorkbook {
         "PERCENTRANK.INC", "POISSON.DIST", "QUARTILE.EXC", "QUARTILE.INC", "T.DIST",
         "T.DIST.2T", "T.DIST.RT", "T.INV", "T.INV.2T", "T.TEST", "WEIBULL.DIST", "Z.TEST",
         "IMSEC", "IMSECH", "IMCSC", "IMCSCH", "IMCOT", "IMTAN",
+        // The dynamic-array release and everything after it. Their absence cost round twelve
+        // all 34 of its modern rows: Excel struck them from the file on open and said so in
+        // a repair log, which is the same lesson the list above was written for.
+        "XLOOKUP", "XMATCH", "UNIQUE", "SEQUENCE", "RANDARRAY", "LET", "LAMBDA",
+        "TEXTSPLIT", "TEXTBEFORE", "TEXTAFTER", "VSTACK", "HSTACK", "TOCOL", "TOROW",
+        "WRAPROWS", "WRAPCOLS", "CHOOSECOLS", "CHOOSEROWS", "TAKE", "DROP", "EXPAND",
+        "GROUPBY", "PIVOTBY", "PERCENTOF", "ARRAYTOTEXT", "VALUETOTEXT", "ISOMITTED",
+        "FILTER", "SORT", "SORTBY",
     ]
+
+    /// The few that are stored `_xlfn._xlws.` rather than `_xlfn.`.
+    ///
+    /// **Inferred, and deliberately visible as such.** These are worksheet-only functions and
+    /// the format spells them with the second prefix; this package has not measured that, and
+    /// a wrong spelling here looks exactly like the bug it is — Excel strikes the formula and
+    /// names it in the repair log. If a row below comes back struck, this set is the first
+    /// place to look.
+    private static let worksheetScoped: Set<String> = ["FILTER", "SORT", "SORTBY"]
+
+    /// How a name is spelled inside the file.
+    private static func storedSpelling(of name: String) -> String {
+        worksheetScoped.contains(name) ? "_xlfn._xlws." + name : "_xlfn." + name
+    }
 
     /// Writes the question for Excel, prefixed where the file format requires it.
     ///
@@ -123,12 +145,61 @@ enum ConformanceWorkbook {
             sheet.write(formula, to: ref)
             return
         }
-        guard case .function(let name, let arguments) = ast,
-              requiringPrefix.contains(name) else {
-            sheet.writeFormula(formula, to: ref)
-            return
+        sheet.write(prefixingCalls(in: ast), to: ref)
+    }
+
+    /// The same formula with every call spelled the way the file format requires.
+    ///
+    /// **The prefix used to be applied to the root of the tree and nowhere else**, so
+    /// `SUM(FILTER(…))` wrote `FILTER` plainly however long the list was. Round twelve wrapped
+    /// most of its questions in `SUM`, `ROWS` or `COLUMNS` — precisely so one number in one
+    /// cell would survive the round trip — and Excel struck all 34 of them from the file for
+    /// it, naming them in a repair log. Thirty-four unanswerable rows read at first as a build
+    /// that did not have the functions.
+    ///
+    /// Done on the tree and not on the text, which was tried: `FormulaParser` uppercases every
+    /// name it reads, so a formula written `_xlfn.GROUPBY(…)` comes back `_XLFN.GROUPBY(…)`.
+    /// Naming the function in the tree keeps the spelling the format documents.
+    ///
+    /// - Parameter ast: The formula as parsed.
+    /// - Returns: The same formula, every prefixed name respelled.
+    private static func prefixingCalls(in ast: FormulaAST) -> FormulaAST {
+        switch ast {
+        // The leaves, which is where the recursion stops.
+        case .cellRef, .cellRange, .sheetRef, .namedRange,
+             .number, .text, .bool, .error, .missing:
+            return ast
+        case .add(let l, let r): return .add(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .subtract(let l, let r):
+            return .subtract(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .multiply(let l, let r):
+            return .multiply(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .divide(let l, let r):
+            return .divide(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .power(let l, let r): return .power(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .negate(let value): return .negate(prefixingCalls(in: value))
+        case .concatenate(let l, let r):
+            return .concatenate(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .equal(let l, let r): return .equal(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .notEqual(let l, let r):
+            return .notEqual(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .greaterThan(let l, let r):
+            return .greaterThan(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .lessThan(let l, let r):
+            return .lessThan(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .greaterOrEqual(let l, let r):
+            return .greaterOrEqual(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .lessOrEqual(let l, let r):
+            return .lessOrEqual(prefixingCalls(in: l), prefixingCalls(in: r))
+        case .function(let name, let arguments):
+            let inner = arguments.map { prefixingCalls(in: $0) }
+            guard requiringPrefix.contains(name) else { return .function(name, inner) }
+            return .function(storedSpelling(of: name), inner)
+        case .call(let callee, let arguments):
+            return .call(prefixingCalls(in: callee), arguments.map { prefixingCalls(in: $0) })
+        case .arrayConstant(let rows):
+            return .arrayConstant(rows.map { row in row.map { prefixingCalls(in: $0) } })
         }
-        sheet.write(FormulaAST.function("_xlfn." + name, arguments), to: ref)
     }
 
     /// Writes this package's answer as a value Excel will not recompute.
