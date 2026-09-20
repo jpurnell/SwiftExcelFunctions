@@ -4,6 +4,68 @@ import SwiftExcelCore
 
 final class BuiltinDateTimeFunctionTests: XCTestCase {
 
+    // MARK: - The serial floor and ceiling, measured in round eleven
+
+    /// Serial 0 is January 0, 1900 — a date that does not exist, and every date function
+    /// takes it.
+    ///
+    /// **Measured, not reasoned.** Round eleven of the conformance workbook put all six
+    /// functions to Excel at serial 0 and read the answers back; the corpus had already
+    /// found the first of them, in 1,664 cells of `Digital Sales Budget 2.0.xlsx` reading
+    /// `MONTH(AFn)` over a cached `0`, with a control in the same column answering January
+    /// 2014 over serial 41640.
+    ///
+    /// The other five were *not* inferred from `MONTH`. That inference is the one this
+    /// project has been wrong about seven times — most recently `GAMMA.DIST` and
+    /// `WEIBULL.DIST`, which face an identical boundary and answer it differently. Each was
+    /// asked. As it happens all six agree, and now that is a fact rather than a hope.
+    func testEveryDateFunctionAcceptsSerialZero() throws {
+        assertNumber(try eval("YEAR", .number(0)), 1900)
+        assertNumber(try eval("MONTH", .number(0)), 1)
+        assertNumber(try eval("DAY", .number(0)), 0)
+        assertNumber(try eval("WEEKDAY", .number(0)), 7)
+        assertNumber(try eval("WEEKDAY", .number(0), .number(2)), 6)
+        assertNumber(try eval("EOMONTH", .number(0), .number(0)), 31)
+        assertNumber(try eval("EDATE", .number(0), .number(0)), 0)
+        assertNumber(try eval("EDATE", .number(0), .number(1)), 31)
+    }
+
+    /// A fraction of that day is still that day.
+    func testAFractionalSerialIsTruncatedRatherThanRefused() throws {
+        assertNumber(try eval("MONTH", .number(0.5)), 1)
+        assertNumber(try eval("DAY", .number(0.5)), 0)
+        assertNumber(try eval("YEAR", .number(0.99)), 1900)
+    }
+
+    /// Below zero there is no date, and Excel says so.
+    ///
+    /// The half of the boundary this package already had right, kept as the control that
+    /// makes the change above meaningful: moving the floor must not remove the floor.
+    func testANegativeSerialIsStillRefused() throws {
+        for name in ["YEAR", "MONTH", "DAY", "WEEKDAY"] {
+            XCTAssertEqual(try eval(name, .number(-1)), .error(.num), "\(name)(-1)")
+        }
+        XCTAssertEqual(try eval("EOMONTH", .number(-1), .number(0)), .error(.num))
+        XCTAssertEqual(try eval("EDATE", .number(-1), .number(0)), .error(.num))
+    }
+
+    /// 9999-12-31 is the last date Excel will name, and one past it is `#NUM!`.
+    ///
+    /// **This package had no ceiling at all.** `YEAR(2958466)` answered 10000 and
+    /// `EOMONTH(2958465, 1)` answered 2958496 — a serial for a date Excel refuses to name.
+    /// Found in the same round as the floor, going the other way: the guard was wrong at
+    /// both ends, and only one end had a corpus behind it.
+    func testTheSerialCeilingIsTheLastDateExcelWillName() throws {
+        // The last valid day, as controls.
+        assertNumber(try eval("YEAR", .number(2958465)), 9999)
+        assertNumber(try eval("MONTH", .number(2958465)), 12)
+        assertNumber(try eval("DAY", .number(2958465)), 31)
+
+        XCTAssertEqual(try eval("YEAR", .number(2958466)), .error(.num), "one day past the end")
+        XCTAssertEqual(try eval("EOMONTH", .number(2958465), .number(1)), .error(.num),
+                       "a month past the end is a date Excel will not name")
+    }
+
     // MARK: - Helpers
 
     private func function(named name: String) -> ExcelFunction {

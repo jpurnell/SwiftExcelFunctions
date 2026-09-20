@@ -29,6 +29,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The date serial floor was off by one, and there was no ceiling.** Round eleven asked
+  Excel where `WEEKDAY`, `EOMONTH`, `EDATE`, `YEAR`, `MONTH` and `DAY` stop accepting a
+  serial number, and all six answered the same thing at both ends:
+
+  | | Excel | This package, before |
+  |---|---|---|
+  | `MONTH(0)` | 1 | `#NUM!` |
+  | `YEAR(0)` | 1900 | `#NUM!` |
+  | `DAY(0)` | 0 | `#NUM!` |
+  | `WEEKDAY(0)` | 7 | `#NUM!` |
+  | `WEEKDAY(0, 2)` | 6 | `#NUM!` |
+  | `EOMONTH(0, 0)` | 31 | `#NUM!` |
+  | `EDATE(0, 0)` | 0 | `#NUM!` |
+  | `YEAR(2958466)` | `#NUM!` | 10000 |
+  | `EOMONTH(2958465, 1)` | `#NUM!` | 2958496 |
+
+  **Serial 0 is January 0, 1900** — a date that does not exist, which Excel names anyway. It
+  is now a special case in `serialToComponents` exactly as the phantom 29 February 1900 is,
+  since counting from the epoch would otherwise answer 31 December 1899.
+
+  **The ceiling is 2,958,465**, 9999-12-31, and there had been none: `YEAR(2958466)` answered
+  a year Excel refuses. `EOMONTH` and `EDATE` now validate their *result* too, because an
+  offset can walk off the end from a date that was itself valid.
+
+  Fractions truncate rather than refuse — `MONTH(0.5)` is `MONTH(0)` — and every negative
+  case already agreed, as did all six at serial 60, the Lotus leap day.
+
+  **The corpus found one of these and the round measured all six.** 1,664 cells of
+  `Digital Sales Budget 2.0.xlsx` read `MONTH(AFn)` over a cached `0`, with a control in the
+  same column answering January 2014 over serial 41640. The other five were not inferred from
+  it: that inference is the one this project has been wrong about seven times, most recently
+  `GAMMA.DIST` and `WEIBULL.DIST`, which face an identical boundary and answer it
+  differently. They agree here — and now that is measured rather than hoped.
+
 - **An external reference reached through a name counted as a disagreement.** Excel writes
   one as `[1]Sheet!A1`, and `WorkbookOracle.externalReference(in:)` looked for a bracketed
   sheet name among the formula's nodes. `VLOOKUP(B157, month_lookup, 2, 0)` has none: the

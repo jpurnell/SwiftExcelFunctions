@@ -41,8 +41,7 @@ public enum BuiltinDateTimeFunctions {
     /// | 3 | Monday | 0–6 |
     public static let weekday = ExcelFunction(name: "WEEKDAY", minArgs: 1, maxArgs: 2) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let type = args.count > 1 ? Int(try toNumber(args[1])) : 1
 
             // Serial 1 is 1900-01-01, a Sunday, so `serial % 7 == 1` is a Sunday.
@@ -64,8 +63,7 @@ public enum BuiltinDateTimeFunctions {
     /// accrual boundary. A negative offset walks backwards.
     public static let eomonth = ExcelFunction(name: "EOMONTH", minArgs: 2, maxArgs: 2) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let offset = Int(try toNumber(args[1]))
             let (year, month, _) = serialToComponents(serial)
 
@@ -73,7 +71,11 @@ public enum BuiltinDateTimeFunctions {
             let targetYear = shifted / 12
             let targetMonth = shifted % 12 + 1
             let lastDay = daysInMonth(year: targetYear, month: targetMonth)
-            return .number(componentsToSerial(year: targetYear, month: targetMonth, day: lastDay))
+            let result: Double = componentsToSerial(
+                year: targetYear, month: targetMonth, day: lastDay)
+            // The offset can walk off the end: `EOMONTH(2958465, 1)` is a month past the
+            // last date Excel will name, and Excel answers #NUM! rather than a serial.
+            return .number(Double(try validSerial(result)))
         }
     }
 
@@ -84,8 +86,7 @@ public enum BuiltinDateTimeFunctions {
     /// rather than rolling into the next month.
     public static let edate = ExcelFunction(name: "EDATE", minArgs: 2, maxArgs: 2) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let offset = Int(try toNumber(args[1]))
             let (year, month, day) = serialToComponents(serial)
 
@@ -93,7 +94,9 @@ public enum BuiltinDateTimeFunctions {
             let targetYear = shifted / 12
             let targetMonth = shifted % 12 + 1
             let clamped = min(day, daysInMonth(year: targetYear, month: targetMonth))
-            return .number(componentsToSerial(year: targetYear, month: targetMonth, day: clamped))
+            let result: Double = componentsToSerial(
+                year: targetYear, month: targetMonth, day: clamped)
+            return .number(Double(try validSerial(result)))
         }
     }
 
@@ -208,6 +211,33 @@ public enum BuiltinDateTimeFunctions {
         return calendar.date(from: components) ?? Date.distantPast
     }()
 
+    // MARK: - The serial range Excel will name a date for
+
+    /// The serial numbers the date functions accept, **measured at both ends**.
+    ///
+    /// Round eleven of the conformance workbook asked `WEEKDAY`, `EOMONTH`, `EDATE`, `YEAR`,
+    /// `MONTH` and `DAY` separately, because one function's boundary says nothing about its
+    /// neighbour's — `GAMMA.DIST` and `WEIBULL.DIST` face the same density boundary and
+    /// answer it differently, which is the seventh time documentation or inference has been
+    /// wrong here. All six agreed, and now that is measured rather than assumed.
+    ///
+    /// **The floor is 0**, not 1: serial 0 is January 0, 1900, a date that does not exist and
+    /// that Excel accepts anyway. The corpus found it first, in 1,664 cells of one workbook.
+    ///
+    /// **The ceiling is 2,958,465** — 9999-12-31, the last date Excel will name. This package
+    /// had no ceiling at all: `YEAR(2958466)` answered 10000, a year Excel refuses.
+    static let serialRange = 0...2958465
+
+    /// An argument read as a serial number, or `#NUM!` if it is not one.
+    ///
+    /// The fraction is truncated rather than refused — `MONTH(0.5)` is `MONTH(0)` — which
+    /// round eleven measured too.
+    static func validSerial(_ value: Double) throws -> Int {
+        let serial = Int(value)
+        guard serialRange.contains(serial) else { throw EvalError.numError }
+        return serial
+    }
+
     // MARK: - Serial number conversion
 
     /// Converts a `Date` to an Excel serial number.
@@ -236,6 +266,13 @@ public enum BuiltinDateTimeFunctions {
     /// - Parameter serial: The Excel serial number.
     /// - Returns: A tuple of (year, month, day).
     static func serialToComponents(_ serial: Int) -> (year: Int, month: Int, day: Int) {
+        // January 0, 1900: not a day, and Excel names it anyway. Measured in round eleven —
+        // YEAR 1900, MONTH 1, DAY 0 — and as much a special case as the phantom leap day
+        // below, since counting from the epoch would answer 31 December 1899.
+        if serial == 0 {
+            return (1900, 1, 0)
+        }
+
         // Handle the phantom Feb 29, 1900
         if serial == 60 {
             return (1900, 2, 29)
@@ -365,8 +402,7 @@ public enum BuiltinDateTimeFunctions {
     /// `YEAR(serial_number)` -- extracts the year from an Excel date serial number.
     static let year = ExcelFunction(name: "YEAR", minArgs: 1, maxArgs: 1) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let (y, _, _) = serialToComponents(serial)
             return .number(Double(y))
         }
@@ -377,8 +413,7 @@ public enum BuiltinDateTimeFunctions {
     /// `MONTH(serial_number)` -- extracts the month (1-12) from an Excel date serial number.
     static let month = ExcelFunction(name: "MONTH", minArgs: 1, maxArgs: 1) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let (_, m, _) = serialToComponents(serial)
             return .number(Double(m))
         }
@@ -389,8 +424,7 @@ public enum BuiltinDateTimeFunctions {
     /// `DAY(serial_number)` -- extracts the day of the month (1-31) from an Excel date serial number.
     static let day = ExcelFunction(name: "DAY", minArgs: 1, maxArgs: 1) { args in
         catching {
-            let serial = Int(try toNumber(args[0]))
-            guard serial >= 1 else { throw EvalError.numError }
+            let serial = try validSerial(try toNumber(args[0]))
             let (_, _, d) = serialToComponents(serial)
             return .number(Double(d))
         }
