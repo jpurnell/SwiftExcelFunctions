@@ -27,6 +27,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads 495 have, 24 out of scope. A classification that encodes a temporary gap rots exactly
   as a fixture does.
 
+### Added
+
+- **A conformance case can carry its own cells.** Every round since the eighth has been built
+  from array constants, which is what lets `check` compare both columns without anyone opening
+  a sheet. `SUMIF` and its family take a **range** — an array constant is `#VALUE!` there — so
+  the question the corpus raised could not be asked at all.
+
+  A case may now carry `data`, written left to right from column `H` on its own row, and its
+  formula writes `{r}` where the row number goes: `SUMIF($H{r}:$J{r}, "x", $K{r}:$M{r})`. Both
+  sides evaluate against the same cells, each case sees only its own, and the six columns the
+  round itself uses are never touched. An error in the data is written as a formula that
+  *raises* it rather than as text about it, which is the whole point when the question is what
+  a range containing one does.
+
+- **Round fourteen asks what an error cell inside a range does.** The corpus found 12,960
+  cells across four workbooks reading `SUMIF($EU$12:$EU$178, $B223, AO$12:AO$178)` where
+  `AO12` holds a literal `#REF!`: Excel answers `#REF!` and this package answers `0`, ignoring
+  error cells the way it ignores text. That is the largest remaining bucket in a 300-workbook
+  run.
+
+  **It is a different question from the one already fixed.** An error passed as an *argument*
+  propagates, measured and implemented earlier. An error *inside a range* is treated function
+  by function — `SUM` propagates, `COUNT` counts around it — and the comment on that earlier
+  fix says in as many words that this was not settled.
+
+  Eleven cases separate the sub-questions a single corpus row cannot: an error in a **matching**
+  row of the sum range against one in a **non-matching** row, an error in the criteria range,
+  the same for `SUMIFS`, `COUNTIF` and `AVERAGEIF`, and plain `SUM` and `COUNT` over the same
+  data as the controls that say what propagating and counting-around look like.
+
 ### Fixed
 
 - **`WEEKDAY` accepts return types 11 through 17.** They start the week on a named day —

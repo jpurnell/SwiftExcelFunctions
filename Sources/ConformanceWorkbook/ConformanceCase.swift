@@ -12,9 +12,56 @@ struct ConformanceCase: Sendable {
     /// Which family this belongs to, so a failure points somewhere.
     let family: String
     /// The formula, without a leading `=`.
+    ///
+    /// **`{r}` stands for this case's own row**, which is how a case that needs cells refers
+    /// to them: `SUMIF($H{r}:$K{r}, ">1", $L{r}:$O{r})` becomes `$H7:$K7` and `$L7:$O7` when
+    /// the case lands on row 7. Every case keeps its data on its own row, so no two collide
+    /// and the sheet stays one row per question.
     let formula: String
     /// Why this case is here — what it would catch.
     let note: String
+    /// Cells this case needs, written left to right from column `H` on its own row.
+    ///
+    /// **Most rounds need none of this.** A formula built from array constants answers itself,
+    /// which is what lets `check` compare both columns without anyone opening a sheet. But
+    /// `SUMIF` and its family take *ranges* — an array constant is a `#VALUE!` there — so the
+    /// question cannot be asked without cells to point at.
+    let data: [CellValue]
+
+    init(family: String, formula: String, note: String, data: [CellValue] = []) {
+        self.family = family
+        self.formula = formula
+        self.note = note
+        self.data = data
+    }
+
+    /// The formula as it is asked on a given row.
+    func formula(onRow row: Int) -> String {
+        formula.replacingOccurrences(of: "{r}", with: String(row))
+    }
+
+    /// Where this case's `data` lives, as an address per value.
+    ///
+    /// Column `H` onward, so the six columns the round itself uses are never touched.
+    func dataCells(onRow row: Int) -> [(reference: String, value: CellValue)] {
+        data.enumerated().compactMap { offset, value in
+            guard let column = ConformanceCase.columnName(at: 7 + offset) else { return nil }
+            return ("\(column)\(row)", value)
+        }
+    }
+
+    /// A spreadsheet column name for a zero-based index — 0 is `A`, 7 is `H`, 26 is `AA`.
+    private static func columnName(at index: Int) -> String? {
+        guard index >= 0, index < 16_384 else { return nil }
+        var remaining = index
+        var name = ""
+        repeat {
+            let letter = Character(UnicodeScalar(65 + remaining % 26) ?? "A")
+            name = String(letter) + name
+            remaining = remaining / 26 - 1
+        } while remaining >= 0
+        return name
+    }
 }
 
 /// Everything this package computes that has never been checked against Excel.
@@ -81,7 +128,7 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen + roundFourteen
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 
@@ -802,6 +849,98 @@ enum ConformanceCases {
         .init(family: "weekday", formula: "WEEKDAY(41640, 10)", note: "10 — just below 11"),
         .init(family: "weekday", formula: "WEEKDAY(41640, 18)", note: "18 — just above 17"),
         .init(family: "weekday", formula: "WEEKDAY(41640, -1)", note: "negative"),
+    ]
+
+    // MARK: - Round fourteen: an error inside a range, which needs cells to ask
+
+    /// What a conditional aggregate does with an error *cell* in one of its ranges.
+    ///
+    /// **The corpus found this and cannot settle it.** 12,960 cells across four workbooks
+    /// read `SUMIF($EU$12:$EU$178, $B223, AO$12:AO$178)` where `AO12` holds a literal `#REF!`.
+    /// Excel answers `#REF!`; this package answers `0`, ignoring error cells the way it
+    /// ignores text. That is 12,288 of the largest remaining bucket in a 300-workbook run.
+    ///
+    /// **This is a different question from the one already fixed.** An error passed as an
+    /// *argument* — `SUMIFS(#REF!, …)` — propagates, measured in an earlier round and
+    /// implemented. An error *inside a range* is treated function by function: `SUM`
+    /// propagates it, `COUNT` counts around it, and nothing here has measured which way the
+    /// conditional aggregates go. The comment on that earlier fix says so in as many words.
+    ///
+    /// Two sub-questions, and only a round can separate them:
+    ///
+    /// - Does an error in the **sum range** propagate when its row does **not** match the
+    ///   criteria? If it does, the error poisons the whole call; if not, only selected rows
+    ///   matter, and the corpus's answer is a coincidence of which rows matched.
+    /// - Does an error in the **criteria range** behave the same way?
+    ///
+    /// **These cases need cells**, which is what `data` on a case is for: `SUMIF` takes a
+    /// range and an array constant is `#VALUE!` there, so this is the first round since the
+    /// eighth that cannot be built from constants alone. Each case keeps its cells on its own
+    /// row, `{r}`, so no two collide.
+    ///
+    /// Layout on each row: `H` `I` `J` are the criteria range, `K` `L` `M` the sum range.
+    static let roundFourteen: [ConformanceCase] = [
+        // The control: no errors anywhere, so a round that goes wrong says so.
+        .init(family: "rangeError", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "control: no error present. Expect 4 — the two rows keyed x",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+
+        // An error in the sum range, in a row the criteria **selects**.
+        .init(family: "rangeError", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "the error sits in a MATCHING row — propagate, or skip it?",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .error(.ref), .number(2), .number(3)]),
+
+        // An error in the sum range, in a row the criteria does **not** select.
+        .init(family: "rangeError", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "the error sits in a NON-matching row — does it still poison the call?",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .error(.ref), .number(3)]),
+
+        // An error in the criteria range.
+        .init(family: "rangeError", formula: "SUMIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "the error is in the CRITERIA range, not the sum range",
+              data: [.text("x"), .error(.ref), .text("x"),
+                     .number(1), .number(2), .number(3)]),
+
+        // The same two questions for SUMIFS, which need not agree with SUMIF.
+        .init(family: "rangeError",
+              formula: "SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, \"x\")",
+              note: "SUMIFS, error in a matching row of the sum range",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .error(.ref), .number(2), .number(3)]),
+        .init(family: "rangeError",
+              formula: "SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, \"x\")",
+              note: "SUMIFS, error in a non-matching row",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .error(.ref), .number(3)]),
+
+        // COUNTIF counts rather than sums, and may well differ.
+        .init(family: "rangeError", formula: "COUNTIF($H{r}:$J{r}, \"x\")",
+              note: "COUNTIF over a criteria range holding an error",
+              data: [.text("x"), .error(.ref), .text("x")]),
+        .init(family: "rangeError", formula: "COUNTIF($K{r}:$M{r}, \">1\")",
+              note: "COUNTIF over a numeric range holding an error",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .error(.ref), .number(3)]),
+
+        // AVERAGEIF, for the same reason MAX and COUNT were asked of GROUPBY.
+        .init(family: "rangeError", formula: "AVERAGEIF($H{r}:$J{r}, \"x\", $K{r}:$M{r})",
+              note: "AVERAGEIF, error in a matching row",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .error(.ref), .number(2), .number(3)]),
+
+        // And plain SUM over the same range, which is believed to propagate — the control
+        // that says what "propagates" looks like in this workbook.
+        .init(family: "rangeError", formula: "SUM($K{r}:$M{r})",
+              note: "control: plain SUM over a range holding an error",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .error(.ref), .number(3)]),
+        .init(family: "rangeError", formula: "COUNT($K{r}:$M{r})",
+              note: "control: COUNT over the same, which is believed to count around it",
+              data: [.text("x"), .text("y"), .text("x"),
+                     .number(1), .error(.ref), .number(3)]),
     ]
 
     // MARK: - Bessel

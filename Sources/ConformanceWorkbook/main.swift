@@ -64,12 +64,19 @@ enum ConformanceWorkbook {
         for (offset, testCase) in ConformanceCases.all.enumerated() {
             let row = firstRow + offset
             sheet.write(testCase.family, to: "\(Column.family)\(row)")
-            // The formula as text, so it is readable without clicking into a cell.
+            // The formula as text, so it is readable without clicking into a cell. The
+            // template rather than the substitution, so `check` can match a row to its case
+            // however the rows have moved since.
             sheet.write(testCase.formula, to: "\(Column.formula)\(row)")
+            // Cells first: the question below points at them.
+            for cell in testCase.dataCells(onRow: row) {
+                write(cell.value, to: cell.reference, in: sheet)
+            }
             // The same string as a formula, for Excel to answer — with the prefix the
             // file format requires for anything newer than Excel 2007.
-            writeQuestion(testCase.formula, to: "\(Column.excel)\(row)", in: sheet)
-            writeOurAnswer(for: testCase, to: "\(Column.ours)\(row)", in: sheet)
+            writeQuestion(testCase.formula(onRow: row), to: "\(Column.excel)\(row)", in: sheet)
+            writeOurAnswer(for: testCase, onRow: row,
+                           to: "\(Column.ours)\(row)", in: sheet)
             sheet.writeFormula(agreementFormula(row: row), to: "\(Column.agree)\(row)")
             sheet.write(testCase.note, to: "\(Column.note)\(row)")
         }
@@ -251,19 +258,21 @@ enum ConformanceWorkbook {
     /// An error is written as a formula that *produces* that error rather than as the text
     /// `"#NUM!"`. A cell holding that text is a string, and `ISERROR` is false for it, so the
     /// agreement column would call every error a disagreement.
-    private static func writeOurAnswer(for testCase: ConformanceCase, to ref: String,
-                                       in sheet: Worksheet) {
-        writeOurAnswer(forFormula: testCase.formula, to: ref, in: sheet)
+    private static func writeOurAnswer(for testCase: ConformanceCase, onRow row: Int,
+                                       to ref: String, in sheet: Worksheet) {
+        writeOurAnswer(forFormula: testCase.formula(onRow: row), to: ref, in: sheet,
+                       cells: CaseCells(testCase, onRow: row))
     }
 
     /// Writes this package's answer to one formula as a value Excel will not recompute.
     private static func writeOurAnswer(forFormula formula: String, to ref: String,
-                                       in sheet: Worksheet) {
+                                       in sheet: Worksheet,
+                                       cells: CellValueProvider = NoCells()) {
         let answer: CellValue
         do {
             answer = try FormulaEvaluator.evaluate(
                 try FormulaParser.parse(formula),
-                cells: NoCells(), names: NoNames())
+                cells: cells, names: NoNames())
         } catch let failure {
             report("could not evaluate \(formula): \(failure)")
             #if canImport(os)
@@ -279,6 +288,22 @@ enum ConformanceWorkbook {
         case .bool(let value): sheet.writeFormula(value ? "TRUE()" : "FALSE()", to: ref)
         case .error(let code): sheet.writeFormula(producing(code), to: ref)
         default: sheet.write(String(describing: answer), to: ref)
+        }
+    }
+
+    /// Writes one value into a cell, as the value it is.
+    ///
+    /// An error goes in as a **formula that raises it**, not as text about it, so the cell is
+    /// genuinely an error to everything that reads it afterwards — which is the whole point
+    /// when the question is what a range containing one does.
+    private static func write(_ value: CellValue, to ref: String, in sheet: Worksheet) {
+        switch value {
+        case .number(let number): sheet.write(number, to: ref)
+        case .text(let text): sheet.write(text, to: ref)
+        case .bool(let flag): sheet.writeFormula(flag ? "TRUE()" : "FALSE()", to: ref)
+        case .error(let code): sheet.writeFormula(producing(code), to: ref)
+        case .blank: break
+        default: sheet.write(String(describing: value), to: ref)
         }
     }
 
@@ -470,7 +495,9 @@ enum ConformanceWorkbook {
 
             let excel = cached(sheet.cell(at: "\(Column.excel)\(row)"))
             let atEmit = cached(sheet.cell(at: "\(Column.ours)\(row)"))
-            let ours = liveAnswer(to: formula)
+            let ours = testCase.map {
+                liveAnswer(to: $0.formula(onRow: row), cells: CaseCells($0, onRow: row))
+            } ?? liveAnswer(to: formula)
 
             guard let excel else {
                 // Excel writes a cached value for every formula it calculates, so an absent
@@ -559,10 +586,11 @@ enum ConformanceWorkbook {
     /// - Parameter formula: The formula as stored in the sheet, without a leading `=`.
     /// - Returns: The answer, or `nil` if it cannot be parsed or evaluated — which is itself
     ///   a disagreement with any answer Excel gave, and reported as one.
-    private static func liveAnswer(to formula: String) -> CellValue? {
+    private static func liveAnswer(to formula: String,
+                                   cells: CellValueProvider = NoCells()) -> CellValue? {
         do {
             return try FormulaEvaluator.evaluate(try FormulaParser.parse(formula),
-                                                 cells: NoCells(), names: NoNames())
+                                                 cells: cells, names: NoNames())
         } catch let failure {
             // Said out loud rather than swallowed. A formula this package can no longer read
             // is a disagreement with whatever Excel answered, and the row below reports it as
@@ -632,6 +660,37 @@ enum ConformanceWorkbook {
         func lastPopulatedCell(inSheet: String) -> CellRef? { nil }
         func values(in range: CellRange) -> [CellValue] { [] }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { [] }
+    }
+
+    /// The cells one case puts on its own row, and nothing else.
+    ///
+    /// **This is what lets a round ask about ranges.** `SUMIF` and its family take a range,
+    /// not an array — `SUMIF({1;2;3}, …)` is `#VALUE!` — so a question about them cannot be
+    /// built from array constants the way every round since the eighth has been. The case
+    /// carries its cells, `emit` writes them beside the question, and both sides evaluate
+    /// against the same ones.
+    ///
+    /// A blank for anything else, which is right: a case sees its own cells and no others,
+    /// so nothing leaks between rows.
+    private struct CaseCells: CellValueProvider {
+        private let cells: [String: CellValue]
+        private let last: CellRef?
+
+        init(_ testCase: ConformanceCase, onRow row: Int) {
+            let placed = testCase.dataCells(onRow: row)
+            cells = Dictionary(placed.map { ($0.reference, $0.value) },
+                               uniquingKeysWith: { first, _ in first })
+            last = placed.last.map { CellRef($0.reference) }
+        }
+
+        func value(at ref: CellRef) -> CellValue? { cells[ref.reference] }
+        func value(at ref: CellRef, inSheet: String) -> CellValue? { cells[ref.reference] }
+        func lastPopulatedCell() -> CellRef? { last }
+        func lastPopulatedCell(inSheet: String) -> CellRef? { last }
+        func values(in range: CellRange) -> [CellValue] {
+            range.cells.map { cells[$0.reference] ?? .blank }
+        }
+        func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
     }
 
     /// No defined names either.
