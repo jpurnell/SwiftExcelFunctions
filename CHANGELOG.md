@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A blank lookup value is `0`, not "matches nothing".** Round sixteen asked Excel directly:
+  `VLOOKUP(blank, {0,"zero";10,"ten"}, 2, …)` answers `"zero"` under exact match and
+  approximate alike.
+
+  The three corpus cells still answer `#N/A` — `Name_Lookup` holds *names* and `0` matches no
+  text — but by this rule rather than by the short-circuit this package shipped first, which
+  refused every blank. That agreed with the corpus and would have disagreed with Excel the
+  moment the keys were numbers. **A rule that is right about the evidence and wrong about the
+  mechanism survives exactly until the next workbook.**
+
+- **Two array criteria pair element by element.** `SUMIFS` refused them, reasoning that Excel
+  broadcasts by orientation and a wrongly shaped rectangle would be a wrong number rather than
+  a visible error. Asked outright, Excel answers **30** for
+  `SUMPRODUCT(SUMIFS(K:M, H:J, {1,2}, H:J, {1,2}))` over `1,2,3` and `10,20,30` — the criteria
+  advance together, `(1,1)` then `(2,2)`. The refusal was right to make and wrong to keep.
+  Criteria of *different* lengths still refuse, which remains unmeasured.
+
+- **Three conformance harness defects**, one of which would have manufactured findings.
+  `CaseCells` keyed by `CellRef.reference`, which renders the `$` markers — so a case writing
+  data to `H317` and asking about `$H317` read a blank; its control row came back `#N/A` when
+  the key was plainly in the table. Both `emit` and `check` computed this package's answer with
+  **no calling cell**, so implicit intersection could not fire and the two columns were not
+  answering the same question — two rows reported as `CHANGED` for a difference that was
+  entirely the harness's. And an array answer was written into the sheet as a Swift enum
+  description.
+
 ### Added
 
 - **Implicit intersection.** A multi-cell range used where a single value is expected is now

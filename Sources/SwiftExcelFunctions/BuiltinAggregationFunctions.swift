@@ -519,12 +519,18 @@ public enum BuiltinAggregationFunctions {
     /// `Definitions!$E$62:$E$64` and `$E$71:$E$73`. Every one answered `#VALUE!`, because a
     /// criterion that was not a single value had no criteria string and the call refused.
     ///
-    /// ## What is deliberately not done
+    /// ## Several of them advance together
     ///
-    /// **Two array criteria refuse.** Excel broadcasts them, and the shape of the result
-    /// depends on each one's orientation — a column against a row gives a rectangle. No corpus
-    /// cell does it, so there is nothing to check an implementation against, and a wrongly
-    /// shaped rectangle is a wrong number rather than a visible error.
+    /// **They pair element by element**, measured in round sixteen:
+    /// `SUMPRODUCT(SUMIFS(K:M, H:J, {1,2}, H:J, {1,2}))` over `1,2,3` and `10,20,30` answers
+    /// **30**, which is `(1,1)` then `(2,2)` — not a rectangle of all four combinations.
+    ///
+    /// This package refused two array criteria before that was asked, reasoning that Excel
+    /// broadcasts by orientation and a wrongly shaped rectangle is a wrong number rather than
+    /// a visible error. The refusal was right to make and wrong to keep.
+    ///
+    /// **Arrays of different lengths still refuse**, which is the part still unmeasured:
+    /// Excel broadcasts by orientation there and nothing has asked it what comes back.
     ///
     /// A **single-element** array is not an array criterion. Nothing becomes plural merely for
     /// having been written as a reference.
@@ -532,27 +538,29 @@ public enum BuiltinAggregationFunctions {
     /// - Parameters:
     ///   - args: The call's arguments.
     ///   - positions: Where this function's criteria sit — see ``criteriaPositions(of:count:)``.
-    ///   - evaluate: The scalar form, given the arguments with one criterion replaced.
+    ///   - evaluate: The scalar form, given the arguments with each criterion replaced.
     /// - Returns: The array of results, `nil` where no criterion is an array, or `#VALUE!`
-    ///   where more than one is.
+    ///   where two of them are different lengths.
     static func spreadOverArrayCriterion(
         _ args: [CellValue], positions: Set<Int>,
         evaluate: ([CellValue]) -> CellValue
     ) -> CellValue? {
-        var found: (position: Int, elements: [CellValue])?
+        var found: [(position: Int, elements: [CellValue])] = []
         for position in positions.sorted() where args.indices.contains(position) {
             guard case .array(let matrix) = args[position], matrix.elements.count > 1 else {
                 continue
             }
-            guard found == nil else { return .error(.value) }
-            found = (position, matrix.elements)
+            guard found.first.map({ $0.elements.count == matrix.elements.count }) ?? true else {
+                return .error(.value)
+            }
+            found.append((position, matrix.elements))
         }
-        guard let found else { return nil }
+        guard let width = found.first?.elements.count else { return nil }
 
         var results: [CellValue] = []
-        for element in found.elements {
+        for index in 0..<width {
             var one = args
-            one[found.position] = element
+            for criterion in found { one[criterion.position] = criterion.elements[index] }
             results.append(evaluate(one))
         }
         // A column, which is the shape a criterion range written down a column has — and the

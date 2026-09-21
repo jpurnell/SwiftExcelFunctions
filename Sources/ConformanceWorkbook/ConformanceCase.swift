@@ -106,6 +106,21 @@ enum ConformanceCases {
         "IMPOWER(\"i\", 2)": "i² is exactly -1. Excel returns -1+1.22464679914735E-16i, "
             + "computing it as exp(log(i)·2); this multiplies instead.",
 
+        // **Implicit intersection reaches a scalar function argument, and this does not.**
+        // Measured in round sixteen: `ABS($H$1:$H$500)` asked from row 320, with -7 in H320,
+        // answers 7. This package answers #VALUE!, because its seam is in the operators only.
+        //
+        // Left open deliberately. Closing it needs every function to say which of its
+        // arguments take a single value and which take a range — `ABS` intersects, `SUM` must
+        // not — a per-argument fact about several hundred functions, and a 300-workbook run
+        // over 4,524,171 comparable cells contains no case that turns on it. Getting that list
+        // wrong in either direction produces a plausible wrong number rather than an error,
+        // which is the trade this whole session has learned to refuse.
+        "IFERROR(ABS($H$1:$H$500), \"VALUE\")":
+            "Excel intersects at a scalar function argument and answers 7; this package "
+            + "intersects at operators only and answers #VALUE!. A recorded gap, not a "
+            + "rounding difference — see the note above.",
+
         // A spilled result caches only its anchor. Excel writes the top-left cell of the
         // spill into the formula cell and the rest into the cells around it, so comparing a
         // cached value against our whole matrix compares a corner to a rectangle. Our anchor

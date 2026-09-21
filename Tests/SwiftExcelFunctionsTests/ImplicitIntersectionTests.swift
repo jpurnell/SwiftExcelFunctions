@@ -119,11 +119,31 @@ final class ImplicitIntersectionTests: XCTestCase {
         XCTAssertEqual(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3"), .number(3))
     }
 
-    /// A range passed **as an argument** is not an operand, and never intersected.
-    func testAPlainRangeArgumentIsUntouched() throws {
+    /// A range passed to a function that **takes ranges** is never intersected.
+    func testARangeArgumentToAnAggregateIsUntouched() throws {
         XCTAssertEqual(try evaluate("SUM(A1:A5)", at: "D3"), .number(15))
         XCTAssertEqual(try evaluate("COUNT(A1:A5)", at: "D9"), .number(5),
                        "even from a row the range does not reach")
+    }
+
+    /// **A known gap, measured in round sixteen and deliberately not closed.**
+    ///
+    /// Excel intersects at a *scalar function argument* as well as at an operator: asked
+    /// `ABS($H$1:$H$500)` from row 320 with `-7` in `H320`, it answers **7**. This package
+    /// answers `#VALUE!`, because the seam is in the operators only.
+    ///
+    /// It is left open on purpose. Closing it needs each function to say which of its
+    /// arguments take a single value and which take a range — `ABS` intersects, `SUM` must
+    /// not — and that is a per-argument fact about several hundred functions, none of which
+    /// the corpus exercises: a 300-workbook run at 4,524,171 comparable cells does not contain
+    /// one case that turns on it. Guessing the list wrong in either direction produces a
+    /// plausible wrong number rather than an error.
+    ///
+    /// This test pins what this package does, and says what Excel does, so the gap is a
+    /// recorded measurement rather than an unexamined difference.
+    func testIntersectionDoesNotReachFunctionArgumentsYet() throws {
+        XCTAssertEqual(try evaluate("ABS(A1:A5)", at: "D3"), .error(.value),
+                       "Excel answers 3 here — see the note. Measured, not agreed")
     }
 
     /// With no calling cell there is nothing to intersect against, so the array survives —

@@ -18,10 +18,17 @@ import SwiftXLSX
 /// sitting in the table's own first column, returned empty, and `&` joined them into something
 /// that looks like a name badge with nobody on it.
 ///
-/// That is the same defect `MATCH` had, measured in round fifteen at a cost of 82 cells. The
-/// rule is applied here **only to exact match**, which is what these cells use and what has
-/// been measured. Approximate match is left alone deliberately — nothing in the corpus
-/// exercises it, and it already answers `#N/A` for its own reason.
+/// ## What round sixteen said, and why the first fix was right for the wrong reason
+///
+/// **A blank lookup value is `0`.** Asked directly — `VLOOKUP(blank, {0,"zero";10,"ten"}, 2, …)`
+/// — Excel answers `"zero"` under **both** exact and approximate match: the blank is coerced
+/// to zero and finds the zero key.
+///
+/// The corpus cells still come out `#N/A`, but for a different reason than this package first
+/// gave: `Name_Lookup`'s first column holds *names*, and `0` matches no text. The original fix
+/// short-circuited every blank to `#N/A`, which agreed with the corpus and disagreed with
+/// Excel the moment the keys were numbers. A rule that is right about the evidence and wrong
+/// about the mechanism survives exactly until the next workbook.
 final class LookupBlankValueTests: XCTestCase {
 
     private struct Book: CellValueProvider {
@@ -75,16 +82,16 @@ final class LookupBlankValueTests: XCTestCase {
         XCTAssertEqual(try evaluate("HLOOKUP(M1,C2:E2,1,0)"), .error(.na))
     }
 
-    /// **Approximate match is not changed by this**, which is what this pins.
+    /// **Measured in round sixteen.** A blank reads as `0` and finds the zero key, under
+    /// approximate match and exact alike.
     ///
-    /// It already answered `#N/A`: a blank is not comparable to a number here, so no key is
-    /// ever taken as the largest one not exceeding it. This test first asserted `"zero"` — a
-    /// guess that Excel reads a blank as `0` against a sorted numeric key — and that guess was
-    /// never measured against Excel *or* against this code. No corpus cell exercises the
-    /// combination, so the behaviour is recorded rather than claimed correct, and the fix
-    /// beside it deliberately leaves this path alone.
-    func testApproximateMatchIsUnchanged() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(M1,G1:H2,2,1)"), .error(.na),
-                       "unmeasured against Excel; pinned so the exact-match fix cannot move it")
+    /// This test first asserted `"zero"` as a guess, then was changed to `#N/A` to record what
+    /// this package did — and the guess was right. Excel answers `"zero"`; recording the
+    /// behaviour was the correct move at the time, and asking was what settled it.
+    func testABlankLookupValueIsZero() throws {
+        XCTAssertEqual(try evaluate("VLOOKUP(M1,G1:H2,2,1)"), .text("zero"),
+                       "approximate: blank is 0, which is the first key")
+        XCTAssertEqual(try evaluate("VLOOKUP(M1,G1:H2,2,0)"), .text("zero"),
+                       "exact: the same, because the coercion is not about the match type")
     }
 }

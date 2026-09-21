@@ -528,7 +528,8 @@ enum ConformanceWorkbook {
             let excel = cached(sheet.cell(at: "\(Column.excel)\(row)"))
             let atEmit = cached(sheet.cell(at: "\(Column.ours)\(row)"))
             let ours = testCase.map {
-                liveAnswer(to: $0.formula(onRow: row), cells: CaseCells($0, onRow: row))
+                liveAnswer(to: $0.formula(onRow: row), cells: CaseCells($0, onRow: row),
+                           at: CellAddress(sheet: "Conformance", ref: "\(Column.excel)\(row)"))
             } ?? liveAnswer(to: formula)
 
             guard let excel else {
@@ -619,10 +620,17 @@ enum ConformanceWorkbook {
     /// - Returns: The answer, or `nil` if it cannot be parsed or evaluated — which is itself
     ///   a disagreement with any answer Excel gave, and reported as one.
     private static func liveAnswer(to formula: String,
-                                   cells: CellValueProvider = NoCells()) -> CellValue? {
+                                   cells: CellValueProvider = NoCells(),
+                                   at callingCell: CellAddress? = nil) -> CellValue? {
         do {
+            // **The same cell `emit` used.** A range used where a single value is expected is
+            // intersected against the formula's own row or column, so asking here without a
+            // position answers a different question than the one Excel was asked — and the
+            // row reports as `CHANGED` for a difference that is entirely this harness's.
             return try FormulaEvaluator.evaluate(try FormulaParser.parse(formula),
-                                                 cells: cells, names: NoNames())
+                                                 cells: cells, names: NoNames(),
+                                                 at: callingCell,
+                                                 inSheet: callingCell?.sheet ?? "")
         } catch let failure {
             // Said out loud rather than swallowed. A formula this package can no longer read
             // is a disagreement with whatever Excel answered, and the row below reports it as

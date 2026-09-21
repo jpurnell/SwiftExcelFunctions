@@ -91,12 +91,36 @@ final class SumifsArrayCriterionTests: XCTestCase {
                        "every division: 140 + 210 + 300")
     }
 
-    /// **Two array criteria are refused**, not guessed at.
+    /// **Two array criteria pair up element by element**, measured in round sixteen.
     ///
-    /// Excel broadcasts them, and which way depends on each one's orientation — a column
-    /// against a row gives a rectangle. No corpus cell does this, so there is nothing to check
-    /// an implementation against, and a wrong rectangle is a wrong number rather than an error.
-    func testTwoArrayCriteriaRefuse() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,E1:E3,B2:B6,E1:E3)"), .error(.value))
+    /// This package refused them, on the reasoning that Excel broadcasts and the shape depends
+    /// on each one's orientation. Asked outright —
+    /// `SUMPRODUCT(SUMIFS(K:M, H:J, {1,2}, H:J, {1,2}))` over `1,2,3` and `10,20,30` — Excel
+    /// answers **30**: the two criteria advance together, giving `(1,1)` then `(2,2)`, and not
+    /// a rectangle of all four combinations, which would have been 30 as well only by
+    /// coincidence of this data.
+    ///
+    /// So they are paired, and a mismatch in length is what is refused now.
+    func testTwoArrayCriteriaPairElementwise() throws {
+        guard case .array(let matrix) =
+                try evaluate("SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E2)") else {
+            return XCTFail("expected one answer per position")
+        }
+        XCTAssertEqual(matrix.elements, [.number(100), .number(10)],
+                       "West with month 1, then East with month 2")
+    }
+
+    /// The corpus-shaped whole: `SUMPRODUCT` totals what the pairing produced.
+    func testSumproductOverTwoArrayCriteria() throws {
+        XCTAssertEqual(
+            try evaluate("SUMPRODUCT(SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E2))"),
+            .number(110))
+    }
+
+    /// **Arrays of different lengths are refused**, which is the part still unmeasured: Excel
+    /// broadcasts by orientation there, and nothing has asked it what shape comes back.
+    func testArrayCriteriaOfDifferentLengthsRefuse() throws {
+        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E3)"),
+                       .error(.value))
     }
 }

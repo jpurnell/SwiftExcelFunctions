@@ -500,21 +500,34 @@ public enum BuiltinNavigationFunctions {
             guard colIndex <= table.columns else { return .error(.ref) }
             guard table.rows > 0 else { return .error(.na) }
 
-            let lookupValue = args[0]
-            // **A blank lookup matches nothing in an exact search**, including a blank sitting
-            // in the table's own first column. Three corpus cells read
-            // `VLOOKUP(template_person, Name_Lookup, 2, 0)` against an unfilled name field and
-            // got the table's empty first row back, which `&` then joined into a lone space.
+            // **A blank lookup value is zero**, measured in round sixteen:
+            // `VLOOKUP(blank, {0,"zero";10,"ten"}, 2, …)` answers `"zero"` under exact match
+            // and approximate alike.
             //
-            // Narrower than the same rule in `MATCH`: only exact match, which is what was
-            // measured. Approximate search is left alone rather than tidied — nothing in the
-            // corpus exercises a blank against a sorted key, and a rule applied where it was
-            // not measured is how a refusal ends up destroying an answer.
-            if !approximate, case .blank = lookupValue { return .error(.na) }
+            // Three corpus cells read `VLOOKUP(template_person, Name_Lookup, 2, 0)` against an
+            // unfilled template field and got the table's own empty first row back, which `&`
+            // joined into a lone space. They still answer `#N/A` — `Name_Lookup` holds *names*
+            // and `0` matches no text — but by this rule rather than by refusing every blank,
+            // which is what this package did first. That agreed with the corpus and disagreed
+            // with Excel the moment the keys were numbers.
+            let lookupValue = blankReadsAsZero(args[0])
             guard let match = firstRow(in: table, matching: lookupValue, approximate: approximate)
             else { return .error(.na) }
             return table[match, colIndex - 1]
         }
+    }
+
+    /// A lookup value, with a blank read as the zero Excel reads it as.
+    ///
+    /// Measured in round sixteen. It is the *value* that is coerced, not the match that is
+    /// refused — so a table of numbers finds its zero key and a table of names still answers
+    /// `#N/A`, which is the corpus's own shape.
+    ///
+    /// - Parameter value: The lookup value as written.
+    /// - Returns: `0` where it is blank, and the value itself otherwise.
+    private static func blankReadsAsZero(_ value: CellValue) -> CellValue {
+        if case .blank = value { return .number(0) }
+        return value
     }
 
     /// The row whose first cell answers the lookup, or `nil`.
@@ -563,10 +576,9 @@ public enum BuiltinNavigationFunctions {
             guard rowIndex >= 1 else { return .error(.value) }
             guard rowIndex <= table.rows else { return .error(.ref) }
             guard table.columns > 0 else { return .error(.na) }
-            // The same rule as `VLOOKUP`, for the same reason and with the same narrowness.
-            if !approximate, case .blank = args[0] { return .error(.na) }
 
-            let lookupValue = args[0]
+            // The same coercion as `VLOOKUP` — see `blankReadsAsZero(_:)`.
+            let lookupValue = blankReadsAsZero(args[0])
             guard let match = firstColumn(in: table, matching: lookupValue,
                                           approximate: approximate)
             else { return .error(.na) }
