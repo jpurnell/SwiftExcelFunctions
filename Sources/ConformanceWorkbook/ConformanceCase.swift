@@ -128,7 +128,139 @@ enum ConformanceCases {
     ]
 
     /// Every case, in the order they are written to the sheet.
-    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen + roundFourteen + roundFifteen + roundFifteenConditional
+    static let all: [ConformanceCase] = compatibility + complex + convert + bessel + roundTwo + roundThree + roundFour + roundFive + roundSix + roundEight + roundNine + roundTen + roundEleven + roundTwelveBuild + roundTwelve + roundThirteen + roundFourteen + roundFifteen + roundFifteenConditional + roundSixteen
+
+    // MARK: - Round sixteen
+
+    /// **Four things this package decided without asking**, and the one corpus cell left over.
+    ///
+    /// A 300-workbook run ends at a single disagreement, and it is not decidable from the file
+    /// it lives in: `SUM('Desktop BF'!NO236, …, #REF!)` caches `#REF!` while the cell it reads
+    /// first caches `#VALUE!`. Both cannot be current — the workbook is an autosave — so the
+    /// evidence contradicts itself and the question has to go to Excel directly.
+    ///
+    /// Every answer here comes back as a **number**, through `ERROR.TYPE`, because an error is
+    /// exactly the thing a round trip is least likely to preserve: `1` is `#NULL!`, `2`
+    /// `#DIV/0!`, `3` `#VALUE!`, `4` `#REF!`, `5` `#NAME?`, `6` `#NUM!`, `7` `#N/A`.
+    ///
+    /// The other three families are generalisations this session shipped on thin evidence:
+    ///
+    /// - **The odd root of a negative base** was implemented from *one* corpus cell —
+    ///   `(-0.0703891251733255)^(1/5)`. The rule around it, that odd reciprocals give a real
+    ///   root and even ones do not, is reasoning and not measurement.
+    /// - **A blank lookup value under approximate match** is recorded in this package's own
+    ///   tests as *unmeasured against Excel*. It was left alone rather than tidied; this asks.
+    /// - **Implicit intersection** shipped today off 11 cells. Where it fires is measured;
+    ///   where it *fails* to intersect, and whether it reaches a scalar function argument as
+    ///   well as an operator, is not.
+    static let roundSixteen: [ConformanceCase] = [
+        // MARK: Which error wins
+        // The corpus cell's shape: a #VALUE! arriving from an argument, against a #REF!
+        // written literally in the formula. Excel cached #REF! for the whole call.
+        .init(family: "errorOrder", formula: "ERROR.TYPE(#REF!)",
+              note: "control: the literal survives the round trip at all. Expect 4"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(1/\"x\")",
+              note: "control: text arithmetic is #VALUE!. Expect 3"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(SUM(1/\"x\", #REF!))",
+              note: "THE question. 3 means first-argument order wins; 4 means #REF! wins"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(SUM(#REF!, 1/\"x\"))",
+              note: "the same two errors, the other way round. Together these say whether "
+                  + "order decides it or the kind of error does"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(1/\"x\" + #REF!)",
+              note: "an operator rather than a call — does SUM have its own rule?"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(#REF! + 1/\"x\")",
+              note: "and reversed"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(SUM(2, #REF!))",
+              note: "control: one error, no competition. Expect 4"),
+        .init(family: "errorOrder", formula: "ERROR.TYPE(SUM(NA(), #REF!))",
+              note: "#N/A against #REF!, since #N/A is the one Excel treats specially "
+                  + "elsewhere. 7 or 4"),
+
+        // MARK: The odd root of a negative base
+        // Implemented from one corpus cell. Everything around it is inference.
+        .init(family: "negativeRoot", formula: "(22.454110930290827/-319)^(1/5)-1",
+              note: "the corpus cell itself, to the digit. Excel cached -1.5881675174209027"),
+        .init(family: "negativeRoot", formula: "IFERROR((-8)^(1/3), \"NUM\")",
+              note: "a cube root of a negative. -2 confirms the rule generalises; "
+                  + "\"NUM\" says the corpus cell was something else"),
+        .init(family: "negativeRoot", formula: "IFERROR((-32)^(1/5), \"NUM\")",
+              note: "a fifth root, the same exponent as the corpus. Expect -2"),
+        .init(family: "negativeRoot", formula: "IFERROR((-4)^(1/2), \"NUM\")",
+              note: "an even root has no real value. Expect \"NUM\""),
+        .init(family: "negativeRoot", formula: "IFERROR((-16)^(1/4), \"NUM\")",
+              note: "and a fourth root. Expect \"NUM\""),
+        .init(family: "negativeRoot", formula: "IFERROR((-8)^(2/3), \"NUM\")",
+              note: "**the boundary.** A real value exists — 4 — but the exponent is not a "
+                  + "reciprocal. This package refuses it; that is a guess"),
+        .init(family: "negativeRoot", formula: "IFERROR((-8)^0.7, \"NUM\")",
+              note: "an exponent that is no root at all. Expect \"NUM\""),
+        .init(family: "negativeRoot", formula: "IFERROR(POWER(-32, 1/5), \"NUM\")",
+              note: "POWER and ^ must agree — this package makes them ask one rule"),
+        .init(family: "negativeRoot", formula: "(-2)^3",
+              note: "control: an integer exponent was never in doubt. Expect -8"),
+        // **These two validate every case above them.** Round-tripping `(-8)^(1/3)` through
+        // the serializer writes `-8^(1/3)`, because Excel's unary minus is documented as
+        // binding *tighter* than `^` — so the parentheses are redundant and are dropped.
+        // If that reading is wrong, Excel is being asked `-(8^(1/3))` instead and every
+        // answer in this family means something else. `-2^2` is the one-character test:
+        // 4 says negation binds tighter and the family is sound, -4 says it does not.
+        .init(family: "negativeRoot", formula: "-2^2",
+              note: "**validates this whole family.** 4 means unary minus binds tighter "
+                  + "than ^, so the dropped parentheses above were redundant. -4 means "
+                  + "every (-8)^(…) case was asked as -(8^(…)) and none of them hold"),
+        .init(family: "negativeRoot", formula: "0-2^2",
+              note: "the contrast: binary subtraction, which is -4 under any reading"),
+
+        // MARK: A blank lookup value
+        // `H` holds nothing at all — the unfilled template field the corpus cells read.
+        .init(family: "blankLookup",
+              formula: "IFERROR(VLOOKUP($H{r}, {0,\"zero\";10,\"ten\"}, 2, TRUE), \"NA\")",
+              note: "**unmeasured until now.** Approximate match against a sorted numeric "
+                  + "key. This package answers #N/A and says in its own tests that it is "
+                  + "guessing", data: [.blank]),
+        .init(family: "blankLookup",
+              formula: "IFERROR(VLOOKUP($H{r}, {0,\"zero\";10,\"ten\"}, 2, FALSE), \"NA\")",
+              note: "exact match, which is the corpus shape. Expect \"NA\"", data: [.blank]),
+        .init(family: "blankLookup",
+              formula: "IFERROR(VLOOKUP($H{r}, {0,\"zero\";10,\"ten\"}, 2, TRUE), \"NA\")",
+              note: "control: the same lookup with a real key. Expect \"ten\"",
+              data: [.number(10)]),
+
+        // MARK: Implicit intersection
+        // `H` through `J` are columns 8 to 10; the formula sits in column F, column 6.
+        .init(family: "intersection", formula: "IFERROR($H$1:$H$500 * 10, \"VALUE\")",
+              note: "a column range crossing this row. Expect 70 — H holds 7 here",
+              data: [.number(7)]),
+        .init(family: "intersection", formula: "IFERROR($H{r}:$J{r} * 10, \"VALUE\")",
+              note: "**a row range that does not reach column F.** This package answers "
+                  + "#VALUE!; Excel may agree or may read it some other way",
+              data: [.number(7), .number(8), .number(9)]),
+        .init(family: "intersection", formula: "IFERROR(ABS($H$1:$H$500), \"VALUE\")",
+              note: "**does intersection reach a function argument, or only an operator?** "
+                  + "7 says it reaches and this package's seam is one step too narrow. "
+                  + "#VALUE! says the seam is right. Anything else means Excel read the "
+                  + "whole column, which other cases also write to", data: [.number(-7)]),
+        .init(family: "intersection", formula: "IFERROR(SUM($H{r}:$J{r}), \"VALUE\")",
+              note: "control: a range as a range is never intersected. Expect 24. Kept to "
+                  + "this row — a `$H$1:$H$500` control would have summed every other "
+                  + "case's data in column H and answered 26",
+              data: [.number(7), .number(8), .number(9)]),
+
+        // MARK: Two array criteria
+        // One array criterion is settled — 81 corpus cells now agree. Two is refused here.
+        .init(family: "arrayCriteria",
+              formula: "SUMPRODUCT(SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, {1,2}))",
+              note: "one array criterion, the settled shape. Expect 30",
+              data: [.number(1), .number(2), .number(3),
+                     .number(10), .number(20), .number(30)]),
+        .init(family: "arrayCriteria",
+              formula: "IFERROR(SUMPRODUCT(SUMIFS($K{r}:$M{r}, $H{r}:$J{r}, {1,2}, "
+                  + "$H{r}:$J{r}, {1,2})), \"VALUE\")",
+              note: "**two of them.** This package refuses rather than guess at the "
+                  + "broadcast shape; this says what Excel does",
+              data: [.number(1), .number(2), .number(3),
+                     .number(10), .number(20), .number(30)]),
+    ]
 
     // MARK: - The five that are not aliases, and spot checks on the ones that are
 

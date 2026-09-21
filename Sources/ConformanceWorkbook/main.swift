@@ -261,18 +261,30 @@ enum ConformanceWorkbook {
     private static func writeOurAnswer(for testCase: ConformanceCase, onRow row: Int,
                                        to ref: String, in sheet: Worksheet) {
         writeOurAnswer(forFormula: testCase.formula(onRow: row), to: ref, in: sheet,
-                       cells: CaseCells(testCase, onRow: row))
+                       cells: CaseCells(testCase, onRow: row),
+                       at: CellAddress(sheet: "Conformance", ref: "\(Column.excel)\(row)"))
     }
 
     /// Writes this package's answer to one formula as a value Excel will not recompute.
+    /// - Parameters:
+    ///   - formula: The question.
+    ///   - ref: Where to write the answer.
+    ///   - sheet: The sheet being built.
+    ///   - cells: The case's own data, if it has any.
+    ///   - at: **The cell Excel will evaluate the question in.** It has to be the same one, or
+    ///     the two sides are not answering the same question: a range used where a single
+    ///     value is expected is intersected against the formula's own row or column, so
+    ///     `$H$1:$H$500 * 10` means something different in `C318` than it does nowhere at all.
     private static func writeOurAnswer(forFormula formula: String, to ref: String,
                                        in sheet: Worksheet,
-                                       cells: CellValueProvider = NoCells()) {
+                                       cells: CellValueProvider = NoCells(),
+                                       at callingCell: CellAddress? = nil) {
         let answer: CellValue
         do {
             answer = try FormulaEvaluator.evaluate(
                 try FormulaParser.parse(formula),
-                cells: cells, names: NoNames())
+                cells: cells, names: NoNames(),
+                at: callingCell, inSheet: callingCell?.sheet ?? "")
         } catch let failure {
             report("could not evaluate \(formula): \(failure)")
             #if canImport(os)
@@ -287,6 +299,12 @@ enum ConformanceWorkbook {
         case .text(let value): sheet.write(value, to: ref)
         case .bool(let value): sheet.writeFormula(value ? "TRUE()" : "FALSE()", to: ref)
         case .error(let code): sheet.writeFormula(producing(code), to: ref)
+        case .array(let matrix):
+            // **An array is a real disagreement, not a value to render.** Excel writes one
+            // cell here, so an array means this package read the question differently — and
+            // saying so in the sheet beats spelling a Swift enum into a spreadsheet, which is
+            // what this line used to do.
+            sheet.write("!array \(matrix.rows)x\(matrix.columns)", to: ref)
         default: sheet.write(String(describing: answer), to: ref)
         }
     }
@@ -692,17 +710,29 @@ enum ConformanceWorkbook {
 
         init(_ testCase: ConformanceCase, onRow row: Int) {
             let placed = testCase.dataCells(onRow: row)
-            cells = Dictionary(placed.map { ($0.reference, $0.value) },
+            cells = Dictionary(placed.map { (Self.key(CellRef($0.reference)), $0.value) },
                                uniquingKeysWith: { first, _ in first })
             last = placed.last.map { CellRef($0.reference) }
         }
 
-        func value(at ref: CellRef) -> CellValue? { cells[ref.reference] }
-        func value(at ref: CellRef, inSheet: String) -> CellValue? { cells[ref.reference] }
+        /// A cell's identity, with the `$` markers left out.
+        ///
+        /// **They are not part of which cell is meant.** `CellRef.reference` renders them, so
+        /// keying by it made `$H317` and `H317` two different cells: a case writing its data
+        /// to `H317` and asking about `$H317` read a blank and answered about nothing.
+        ///
+        /// Found emitting round sixteen, whose *control* row — a lookup whose key really is in
+        /// the table — came back `#N/A`. A control that fails is the cheapest possible warning;
+        /// the same round's real questions would have been answered against empty cells and
+        /// looked like findings.
+        private static func key(_ ref: CellRef) -> String { "\(ref.column):\(ref.row)" }
+
+        func value(at ref: CellRef) -> CellValue? { cells[Self.key(ref)] }
+        func value(at ref: CellRef, inSheet: String) -> CellValue? { cells[Self.key(ref)] }
         func lastPopulatedCell() -> CellRef? { last }
         func lastPopulatedCell(inSheet: String) -> CellRef? { last }
         func values(in range: CellRange) -> [CellValue] {
-            range.cells.map { cells[$0.reference] ?? .blank }
+            range.cells.map { cells[Self.key($0)] ?? .blank }
         }
         func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
     }
