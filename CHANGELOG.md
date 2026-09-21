@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`GETPIVOTDATA` answers field/item pairs.** 3,574 corpus cells used them and every one
+  answered `#REF!`; **2,614 now agree with Excel and the other 960 refuse — nothing differs.**
+  `Dot Com YTD Performance Report 6 20.xlsx` went from 93.76% to 98.90% agreement, and the
+  three Amazon workbooks stay at 100%.
+
+  Each pair names a field and the item wanted of it, and **the axis that field sits on decides
+  what the pair does**: a row field narrows the row, a column field picks the column, and a
+  page field is checked against the filter the table was rendered under — naming an item the
+  filter excluded is `#REF!`, because answering from the rows that *are* there would report one
+  filter's figure under another's name.
+
+  Three things about the rendering make this harder than it sounds, and each was measured:
+
+  - **Labels are sparse.** They are written once and inherited by the rows beneath, so a scan
+    requiring a literal match in every label column finds the first row of each group and
+    nothing else. The scan carries the last label seen in each column, and a label clears every
+    column to its right.
+  - **Subtotals are answers, not noise.** 420 cells at one anchor leave the innermost row field
+    unconstrained, and Excel answers them from the group's subtotal row. But Excel renders a
+    subtotal *only where the group splits* — `LOBMix_noXH` = `VD` has three `BP/IP` items and
+    gets a `VD Total` row; `V` has none and its single data row is its own total. A lookup
+    knowing only the subtotal rule refuses every unsplit group; one knowing only the data-row
+    rule returns one child's figure as the total of three.
+  - **Items are compared by value.** The column items in the corpus fixture are numbers, so
+    `"20"` is not `20`. Names are matched case-insensitively and never trimmed.
+
+  An **omitted item names the blank one**: 204 cells are written `…,"BP/IP",)` with nothing
+  after the comma, and the group they want is the one Excel renders as the literal `(blank)`.
+
+- **`PivotTableLookup`**, which holds that navigation, with the rendering it was read from
+  written into the type.
+
+### Changed
+
+- Requires SwiftXLSX **0.34.0** and SwiftExcelCore **0.18.0**.
+
 - **`GETPIVOTDATA` answers the two-argument grand-total form.** 3,802 corpus cells across four
   workbooks used it — 90% of everything a 300-workbook run still disagreed on — and every one
   of them answered `#REF!`, because this package had never read a pivot table definition.

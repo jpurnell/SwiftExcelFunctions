@@ -880,19 +880,18 @@ public enum BuiltinNavigationFunctions {
     /// the function exists and its name is known, and a caller debugging a sheet needs to
     /// tell those apart.
     ///
-    /// **Field/item pairs are not implemented.** 3,574 corpus cells use them — counted by
-    /// parsing rather than by a regex over the formula text, which had read a call whose
-    /// first argument is `TEXT($B87,"")` as a two-argument one and undercounted them badly.
-    /// They need the row labels matched against item values, hierarchically, with subtotal
-    /// rows to distinguish from data rows. Those refuse, which is honest.
+    /// **Field/item pairs answer too**, which is 3,574 corpus cells in one workbook. Each pair
+    /// names a field and the item wanted of it; the axis that field sits on decides what the
+    /// pair does — a row field narrows the row, a column field picks the column, and a page
+    /// field is checked against the filter the table was rendered under. See
+    /// ``PivotTableLookup`` for the rendering that makes this harder than it sounds: sparse
+    /// labels, subtotal rows that are answers rather than noise, and items that are numbers.
     static let getPivotData = ExcelFunction(
         name: "GETPIVOTDATA", minArgs: 2, maxArgs: nil
     ) { context, args in
         if let error = propagatedError(args) { return error }
-        // Field/item pairs are phase two: they need the row labels matched against item
-        // values, hierarchically in a multi-field pivot and with subtotal rows to tell apart
-        // from data rows. Refusing is honest; picking a row would not be.
-        guard args.count == 2 else { return .error(.ref) }
+        // Pairs come in twos. An odd tail is a field with no item, which names nothing.
+        guard args.count >= 2, args.count % 2 == 0 else { return .error(.ref) }
         guard case .text(let field) = args[0] else { return .error(.ref) }
         guard let anchor = context.referencedCell(at: 1) else { return .error(.ref) }
 
@@ -904,25 +903,72 @@ public enum BuiltinNavigationFunctions {
         }) else {
             return .error(.ref)
         }
-        guard layout.dataFields.contains(field) else { return .error(.ref) }
-        // No grand total row means the two-argument form has nothing to answer with. The
-        // last row is then an ordinary one — in the corpus, a subtotal reading "KEY Total" —
-        // and returning it would be a wrong number reported quietly.
-        guard let totalRow = layout.grandTotalRow else { return .error(.ref) }
+        // By caption or by source field name: the corpus asks for `"Subs"` against a caption
+        // of `"Sum of Subs"`, and Excel answers to either.
+        guard let dataField = layout.dataFieldIndex(named: field) else { return .error(.ref) }
 
-        // The field's column is where its name is written in the header row. Matched by text
-        // because that is the only thing the name and the sheet have in common: the file
-        // gives an ordered list of names, and the sheet gives a row of headers.
+        guard args.count > 2 else {
+            return twoArgumentAnswer(field: field, at: dataField, in: layout, context: context)
+        }
+
+        var pairs: [PivotTableLookup.Pair] = []
+        for index in stride(from: 2, to: args.count, by: 2) {
+            guard case .text(let name) = args[index] else { return .error(.ref) }
+            pairs.append(PivotTableLookup.Pair(field: name, item: args[index + 1]))
+        }
+        guard let cell = PivotTableLookup.cell(forPairs: pairs, dataField: dataField,
+                                               in: layout, cells: context.cells) else {
+            return .error(.ref)
+        }
+        return context.cells.value(at: cell, inSheet: layout.sheet) ?? .blank
+    }
+
+    /// The grand total of one data field — `GETPIVOTDATA` with no pairs.
+    ///
+    /// Two renderings put that number in two different places, and which applies depends on
+    /// where the data field names are written.
+    ///
+    /// **Spread across the columns.** One column per data field, its caption in the header
+    /// row — the Amazon shape, where `O1` reads `Sum of # Minutes Streamed` and the answer is
+    /// `O253`. The caption is matched by text, because that is the only thing the name and the
+    /// rendering have in common: the file gives an ordered list of names and the sheet gives a
+    /// row of headers. The **caption** is what is on the sheet, so a formula asking by source
+    /// name — `"Subs"` — still looks for `"Sum of Subs"`.
+    ///
+    /// **Not in the header row at all**, because a column *field* owns it instead. Then the
+    /// total across every column lives in the grand total column, and there is **none** unless
+    /// the table renders one: `pivotTable8` of the corpus workbook is written
+    /// `colGrandTotals="0"`, so its overall total sits in no cell and the honest answer is
+    /// `#REF!`. Returning the last data column there would report one week's figure as the
+    /// total of twenty-six.
+    ///
+    /// No grand total *row* means there is nothing to answer with either. The last row is then
+    /// an ordinary one — in the corpus, a subtotal reading `"KEY Total"` — and returning it
+    /// would be a wrong number reported quietly.
+    private static func twoArgumentAnswer(field: String, at index: Int,
+                                          in layout: PivotTableLayout,
+                                          context: EvaluationContext) -> CellValue {
+        guard let totalRow = layout.grandTotalRow else { return .error(.ref) }
+        let caption = index < layout.dataFields.count ? layout.dataFields[index] : field
+
         for column in layout.range.start.column...layout.range.end.column {
             let header = CellRef(column: column, row: layout.headerRow)
             guard case .text(let name)? = context.cells.value(at: header, inSheet: layout.sheet),
-                  name == field else {
+                  name == caption else {
                 continue
             }
             let total = CellRef(column: column, row: totalRow)
             return context.cells.value(at: total, inSheet: layout.sheet) ?? .blank
         }
-        return .error(.ref)
+
+        // The caption heads no column, so the data field is selected some other way and the
+        // column is whichever one totals the rest. With the data field names stacked down the
+        // row axis the caption picks a row, which the pair path already knows how to do.
+        guard let cell = PivotTableLookup.cell(forPairs: [], dataField: index,
+                                               in: layout, cells: context.cells) else {
+            return .error(.ref)
+        }
+        return context.cells.value(at: cell, inSheet: layout.sheet) ?? .blank
     }
 
     // MARK: - Asking about a cell
