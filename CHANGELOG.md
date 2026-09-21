@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Implicit intersection.** A multi-cell range used where a single value is expected is now
+  intersected against the formula's own row or column, as Excel does in any formula that was
+  not array-entered. `AND($A10:A44478 > start, …)` written in `I10` means `A10`.
+
+  **11 corpus cells read `0` where Excel has `1`** for want of it. The corpus went from 12
+  findings to 1, and the arithmetic says nothing else moved: `agreed` rose by exactly 11,
+  `agreedOnError` and `notComparable` are unchanged to the cell.
+
+  Two gates, and both are needed:
+
+  - **An array-entered formula does not intersect.** 64 corpus cells write
+    `IF(template_year = Report_Year, Report_Quarter, 0)` with `<f t="array">` and mean the
+    whole column; the same text without the flag means one row. Only **256 of 2,588,513**
+    corpus formulas carry it — rare, and decisive wherever it appears.
+  - **Nor does anything inside a call that asked for arrays.** `SUMPRODUCT` is normally
+    entered and still evaluates arrays, which is the entire reason the idiom exists.
+
+  Where nothing intersects — a formula in row 9 asking about `A1:A5`, or a rectangle spanning
+  both rows and columns — the answer is `#VALUE!`, which is Excel's and not a silent zero.
+
+  This was the riskiest change of the run, because the failure mode would have been *silently
+  wrong numbers* rather than errors: intersection firing inside an array-expecting slot returns
+  a plausible value. The 300-workbook corpus was the arbiter rather than the argument, and it
+  is what licenses this.
+
+### Changed
+
+- Requires SwiftXLSX **0.36.0** and SwiftExcelCore **0.19.0** for
+  `isArrayEntered(at:inSheet:)`.
+
 - **`IF` answers once per element of an array condition.**
   `MATCH(quarter, IF(years = wanted, quarters, 0), 0)` is how a spreadsheet looks something up
   on two keys without a helper column: the `IF` blanks out every row of the wrong year and the

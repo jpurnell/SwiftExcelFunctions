@@ -317,9 +317,14 @@ public enum FormulaEvaluator {
         random: (any RandomSource)? = nil,
         simulation: (any SimulationResultProvider)? = nil
     ) throws -> CellValue {
-        let environment = EvaluationEnvironment(
+        var environment = EvaluationEnvironment(
             cells: cells, names: names, functions: functions, callingCell: callingCell,
             currentSheet: currentSheet, random: random, simulation: simulation)
+        // A property of the cell, not of anything inside the formula, so it is read once.
+        if let callingCell {
+            environment.arrayEntered = cells.isArrayEntered(
+                at: callingCell.cell, inSheet: callingCell.sheet)
+        }
         do {
             return try evaluateNode(ast, in: environment)
         } catch EvaluationError.recursionDepthExceeded {
@@ -448,46 +453,46 @@ public enum FormulaEvaluator {
 
         // MARK: Arithmetic
         case .add(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return correctedIfFinal(
                 try ArrayBroadcast.combine(left, right) { try addValues($0, $1) },
                 left: left, right: right, depth: depth)
 
         case .subtract(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return correctedIfFinal(
                 try ArrayBroadcast.combine(left, right) { try subtractValues($0, $1) },
                 left: left, right: right, depth: depth)
 
         case .multiply(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return try ArrayBroadcast.combine(left, right) { try multiplyValues($0, $1) }
 
         case .divide(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return try ArrayBroadcast.combine(left, right) { try divideValues($0, $1) }
 
         case .power(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return try ArrayBroadcast.combine(left, right) { try powerValues($0, $1) }
 
         case .negate(let expr):
-            let value = try evaluateNode(expr, in: nextDepth)
+            let value = try evaluateOperand(expr, in: nextDepth)
             if case .error = value { return value }
             // A rectangle negates element by element, which is what makes the `--(…)`
             // idiom work: `--(range=x)` is a column of ones and zeros, and it is the
@@ -495,9 +500,9 @@ public enum FormulaEvaluator {
             return try ArrayBroadcast.mapped(value) { try negateValue($0) }
 
         case .concatenate(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 .text(coerceToString($0) + coerceToString($1))
@@ -505,45 +510,45 @@ public enum FormulaEvaluator {
 
         // MARK: Comparison
         case .equal(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 .bool(compareValues($0, $1) == .orderedSame)
             }
 
         case .notEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 .bool(compareValues($0, $1) != .orderedSame)
             }
 
         case .greaterThan(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 .bool(compareValues($0, $1) == .orderedDescending)
             }
 
         case .lessThan(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 .bool(compareValues($0, $1) == .orderedAscending)
             }
 
         case .greaterOrEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 let order = compareValues($0, $1)
@@ -551,9 +556,9 @@ public enum FormulaEvaluator {
             }
 
         case .lessOrEqual(let lhs, let rhs):
-            let left = try evaluateNode(lhs, in: nextDepth)
+            let left = try evaluateOperand(lhs, in: nextDepth)
             if case .error = left { return left }
-            let right = try evaluateNode(rhs, in: nextDepth)
+            let right = try evaluateOperand(rhs, in: nextDepth)
             if case .error = right { return right }
             return ArrayBroadcast.combine(left, right) {
                 let order = compareValues($0, $1)
@@ -1275,6 +1280,108 @@ public enum FormulaEvaluator {
         } catch {
             return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
+    }
+
+    // MARK: - Implicit intersection
+
+    /// Evaluates an operand of a **scalar** operator, intersecting a range against the
+    /// formula's own position first where Excel would.
+    ///
+    /// - Parameters:
+    ///   - ast: The operand.
+    ///   - env: The environment it is evaluated in.
+    /// - Returns: The operand's value.
+    private static func evaluateOperand(
+        _ ast: FormulaAST, in env: EvaluationEnvironment
+    ) throws -> CellValue {
+        guard let narrowed = implicitlyIntersected(ast, in: env) else {
+            return try evaluateNode(ast, in: env)
+        }
+        return try evaluateNode(narrowed, in: env)
+    }
+
+    /// A range operand rewritten to the one cell Excel would read, or `nil` to leave it be.
+    ///
+    /// ## The rule
+    ///
+    /// **Implicit intersection.** In a formula that was not array-entered, a multi-cell range
+    /// used where a single value is expected is intersected against the formula's own row (for
+    /// a range spanning rows) or column. Modern Excel writes it `@`; older files simply mean
+    /// it. `AND($A10:A44478 > start, …)` written in `I10` means `A10`, and 11 corpus cells
+    /// read `0` against Excel's `1` for want of it.
+    ///
+    /// ## The two gates, and why both are needed
+    ///
+    /// - **Array-entered formulas do not intersect.** 64 corpus cells write
+    ///   `IF(template_year = Report_Year, Report_Quarter, 0)` with `<f t="array">` and mean the
+    ///   whole column. The same text without the flag would mean one row.
+    /// - **Nor does anything inside a call that asked for arrays.** `SUMPRODUCT` is normally
+    ///   entered and still evaluates arrays — that is the entire reason the idiom exists — so
+    ///   intersecting inside it would silently return one row's figure as a total.
+    ///
+    /// With no calling cell there is nothing to intersect against and the range stands.
+    ///
+    /// ## Where there is no intersection
+    ///
+    /// `#VALUE!`, which is Excel's answer: a formula in row 9 asking about `A1:A5` is asking
+    /// about nothing. A rectangle spanning both rows and columns is refused the same way
+    /// rather than guessed at.
+    ///
+    /// - Parameters:
+    ///   - ast: The operand.
+    ///   - env: The environment, which carries both gates and the calling cell.
+    /// - Returns: The rewritten operand, `.error(.value)` where nothing intersects, or `nil`
+    ///   where the rule does not apply at all.
+    private static func implicitlyIntersected(
+        _ ast: FormulaAST, in env: EvaluationEnvironment
+    ) -> FormulaAST? {
+        guard !env.arrayEntered, !env.evaluatesArrays,
+              let calling = env.callingCell else { return nil }
+
+        let range: CellRange
+        let sheet: String?
+        switch ast {
+        case .cellRange(let own):
+            range = own
+            sheet = nil
+        case .sheetRef(let reference):
+            // A reference spanning several sheets is a 3-D range and has no single position
+            // to intersect against.
+            guard reference.span == nil else { return nil }
+            range = reference.range
+            sheet = reference.sheetName
+        default:
+            return nil
+        }
+
+        let rows = range.start.row != range.end.row
+        let columns = range.start.column != range.end.column
+        // A one-cell range is already a single value. Excel reads `A2:A2*10` as `20`, not as
+        // a one-element array, and saying so here keeps the two spellings interchangeable.
+        guard rows || columns else {
+            guard let sheet else { return .cellRef(range.start) }
+            return .sheetRef(SheetReference(sheet: sheet,
+                                            range: CellRange(from: range.start,
+                                                             to: range.start)))
+        }
+
+        let cell: CellRef
+        switch (rows, columns) {
+        case (true, false):
+            guard calling.cell.row >= range.start.row,
+                  calling.cell.row <= range.end.row else { return .error(.value) }
+            cell = CellRef(column: range.start.column, row: calling.cell.row)
+        case (false, true):
+            guard calling.cell.column >= range.start.column,
+                  calling.cell.column <= range.end.column else { return .error(.value) }
+            cell = CellRef(column: calling.cell.column, row: range.start.row)
+        default:
+            // A rectangle: Excel has no single cell to choose and neither does this.
+            return .error(.value)
+        }
+
+        guard let sheet else { return .cellRef(cell) }
+        return .sheetRef(SheetReference(sheet: sheet, range: CellRange(from: cell, to: cell)))
     }
 
     private static func powerValues(_ left: CellValue, _ right: CellValue) throws -> CellValue {

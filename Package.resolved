@@ -1,5 +1,5 @@
 {
-  "originHash" : "f57a3e829de36b39a0a6787274cb7d4f68f87b5dff346a0f0c1899b910a47320",
+  "originHash" : "5b2b885b3ca27cdb68f0bd5ec246d774daf66ce9761db749de6f52461e9609a0",
   "pins" : [
     {
       "identity" : "businessmath",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftExcelCore",
       "state" : {
-        "revision" : "5b4b51bd52a06f7e57cc8175e2473c5f2082c610",
-        "version" : "0.18.0"
+        "revision" : "b025284e18e37984b967b47dedc6ab770a7c07d8",
+        "version" : "0.19.0"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftXLSX",
       "state" : {
-        "revision" : "c1cdeda22c3b410a45e225daf6b020afbacdc07b",
-        "version" : "0.35.0"
+        "revision" : "9015f0b0426815270032360c73cf8e6f4a5f05f5",
+        "version" : "0.36.0"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jpurnell/SwiftZIP.git",
       "state" : {
-        "revision" : "a5013c96745a5f298f8e9d7f955c3f78fc74f113",
-        "version" : "0.6.0"
+        "revision" : "f7f4047beedbebfca01879b7f9b77bd0e4d13914",
+        "version" : "0.7.0"
       }
     }
   ],

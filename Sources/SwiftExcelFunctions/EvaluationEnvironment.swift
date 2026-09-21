@@ -48,6 +48,17 @@ struct EvaluationEnvironment {
     /// rather than guessing at a boundary nobody has asked Excel about.
     var evaluatesArrays: Bool = false
 
+    /// Whether the formula being evaluated was **array-entered** — `Ctrl`+`Shift`+`Enter`.
+    ///
+    /// It decides whether a range used where a single value is expected is read as the whole
+    /// range or **implicitly intersected** against the formula's own row or column. Read once
+    /// from the provider when evaluation starts, because it is a property of the cell rather
+    /// than of any node inside it.
+    ///
+    /// Rare and decisive: 256 of 2,588,513 corpus formulas carry the flag, and those 256 mean
+    /// something entirely different from the text alone.
+    var arrayEntered: Bool = false
+
     /// Names bound by an enclosing `LET` or `LAMBDA`, innermost first.
     ///
     /// Keyed by ``key(for:)`` rather than by the spelling, because Excel's names are
@@ -183,6 +194,10 @@ struct EvaluationEnvironment {
             currentSheet: currentSheet, random: random, simulation: simulation,
             depth: depth, bindings: bindings, omitted: omitted)
         next.evaluatesArrays = evaluatesArrays
+        // Carried like `evaluatesArrays`: it is a property of the *cell* being evaluated, so
+        // it holds for every node inside it. Dropping it here meant the flag survived exactly
+        // one level and no formula deeper than a bare reference ever saw it.
+        next.arrayEntered = arrayEntered
         return next
     }
 
