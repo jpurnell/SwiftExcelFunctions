@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.1] - 2026-09-21
+
+**It agrees with Excel.** 300 workbooks, **4,524,171 comparable cells, 99.999978% agreement** —
+1 differed, 0 refused, 0 threw. The one disagreement is a workbook that caches `#REF!` for a
+call while caching `#VALUE!` for the cell that call reads first; both cannot be current, and
+round sixteen confirmed this package's rule by asking Excel directly.
+
+690 functions registered, 1,985 tests, quality gate 45 of 45 at 0/0. Every row of the coverage
+matrix is classified for both the `EXCEL` and `PSI` sources. Requires SwiftExcelCore 0.19.0 and
+SwiftXLSX 0.36.0.
+
+**Why a pre-release identifier.** The API has been stable throughout this work, but nothing has
+yet consumed it as a *client* rather than as a test harness — the simulation GUI is the first
+thing that will. Two consequences worth knowing: SwiftPM range requirements do not match
+pre-release versions, so `from: "1.0.0"` will not resolve this and a consumer must pin it
+exactly; and both dependencies are still 0.x and ship breaking changes at minor versions by
+their own stated policy, so this is a statement about *this* package's surface rather than
+about the stack beneath it.
+
+
 ### Fixed
 
 - **A blank lookup value is `0`, not "matches nothing".** Round sixteen asked Excel directly:
@@ -2730,6 +2750,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...HEAD
+[1.0.0-alpha.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...v1.0.0-alpha.1
 [0.11.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.2...v0.9.3

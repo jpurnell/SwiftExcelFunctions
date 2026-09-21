@@ -4,17 +4,26 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 0.11.0 released. **Every function Microsoft documents is either implemented or
-out of scope with a written reason** — 494 `have`, 25 out of scope, and nothing left
-unreviewed or merely classified. `LAMBDA` shipped whole, including the higher-order six and
-the immediately-invoked form. Seven conformance rounds have settled ten facts about Excel that
-Microsoft documents one of.
+**Status:** 1.0.0-alpha.1. **It agrees with Excel.** Over 300 real workbooks and
+**4,524,171 comparable cells the agreement is 99.999978%** — one disagreement, and it is a
+workbook that contradicts its own cached values rather than a defect here.
+
+**Every function Microsoft documents is either implemented or out of scope with a written
+reason** — 494 `have`, 25 out of scope, nothing left unreviewed. `LAMBDA` shipped whole.
+Sixteen conformance rounds have settled facts about Excel that Microsoft documents one side
+of, most recently that a blank lookup value is `0`, that a negative base under an odd root has
+a real value, and that argument order decides which error propagates.
+
+**Why alpha.** The API has been stable throughout, but nothing has yet consumed it as a
+*client* rather than as a test harness. Note that SwiftPM range requirements do not match
+pre-release versions: `from: "1.0.0"` will not resolve `1.0.0-alpha.1`, so pin it exactly.
 
 - **494** of Microsoft's 519 documented worksheet functions. The other 25 need a live data
   service, a network fetch, or a layer this package deliberately does not have — see
   `project/docs/technical/LookupOutOfScope.md`.
-- **117** of Frontline Risk Solver's `Psi*` functions — **107 of its 113 distribution rows**.
-  147 `PSI` rows remain unreviewed; they need a simulation engine rather than a classification.
+- **Frontline Risk Solver's `Psi*` functions**, with every row of that source now classified
+  too — 189 `have`, 71 out of scope with a reason each. The bucket that "needs a simulation
+  engine rather than a classification" closed on 2026-09-19.
 
 Coverage is tracked in `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`,
 reconciled against the live `FunctionRegistry` rather than maintained by hand. The
@@ -77,7 +86,12 @@ Two suites, deliberately overlapping, because they fail for different reasons:
   Every expected value is quoted from a published worked example or computed from the documented
   formula; none is taken from what this package currently returns.
 - **`ExcelOracleTests`** — every formula we can evaluate, checked against the value Excel itself
-  cached for it in real workbooks. **99.62%** agreement over 155,897 comparable cells.
+  cached for it in real workbooks. **99.999978%** agreement over **4,524,171** comparable cells
+  in 300 workbooks: 1 differed, 0 refused, 0 threw.
+
+  That figure is the project's main instrument, and it has been wrong in this package's favour
+  before. Three oracle blind spots were closed in the run-up to 1.0 — the tool's own accuracy
+  was the binding constraint about as often as the library's was.
 
 Randomness is never taken from the system: a caller supplies a `RandomSource`, and without one
 `RAND()` and every Psi distribution answer `#VALUE!` rather than inventing a draw. The same seed

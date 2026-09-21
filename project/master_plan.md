@@ -76,8 +76,40 @@ where Excel returns negative, and the flip belongs in the translation, not the m
 
 ## Current Status
 
-**0.11.0 — `LAMBDA`, and every Excel category closed.** The unreviewed bucket reached **0**,
-and the function library gained the one construct it had no way to express.
+**1.0.0-alpha.1 — the corpus agrees.** 300 workbooks, **4,524,171 comparable cells,
+99.999978% agreement**, and the single remaining disagreement is a workbook that contradicts
+its own cached values rather than a defect in this package.
+
+- [x] **402 findings → 1**, every one accounted for: shared formulas moving pinned columns
+      (240 cells), `SUMIFS` array criteria (81), `IF` array conditions (64), implicit
+      intersection (11), blank lookup keys (3), the real odd root of a negative base (2)
+- [x] **`GETPIVOTDATA` whole** — 3,802 cells, 90% of everything a run disagreed on at the
+      time. Both phases: the grand-total form and field/item pairs, stacked column items
+      included. The four pivot-carrying workbooks sit at **100.00%** over 19,880 cells
+- [x] **Every coverage row classified for both sources.** The `PSI` bucket closed after
+      `EXCEL` did — 147 unreviewed to zero
+- [x] **`GROUPBY` and `PIVOTBY`**, and the `_xleta.` aggregate spelling they need
+- [x] **Sixteen conformance rounds**, 324 cases. Round sixteen answered the four things this
+      stretch had decided without asking, and reversed two of them
+- [x] **690 functions registered, 1,985 tests, gate 45/45 at 0/0**
+- [x] Requires SwiftExcelCore **0.19.0**, SwiftXLSX **0.36.0**
+
+**The one cell left is evidence about a file, not about this package.**
+`SUM('Desktop BF'!NO236, …, #REF!)` caches `#REF!` while the cell it reads first caches
+`#VALUE!`; both cannot be current in an autosaved workbook. Round sixteen asked Excel directly
+and confirmed this package's rule — argument order decides which error propagates.
+
+**What this release is not.** The API has been stable throughout, but nothing has yet consumed
+it as a *client* rather than as a test harness. The simulation GUI is the first thing that
+will, which is what the pre-release identifier is for. Note that SwiftPM range requirements do
+not match pre-release versions — `from: "1.0.0"` will not resolve `1.0.0-alpha.1` — and that
+both dependencies are still 0.x and ship breaking changes at minor versions by their own
+policy.
+
+### 0.11.0 — `LAMBDA`, and every Excel category closed
+
+The unreviewed bucket reached **0**, and the function library gained the one construct it had
+no way to express.
 
 - [x] **`unreviewed` (EXCEL) = 0** — every row now carries a status. 73 of the last 87 were
       implemented rather than merely classified, and 8 were marked out of scope with reasons
@@ -428,7 +460,8 @@ full-corpus census, which currently traps partway through.
    corpus calls and reachable from no formula at the time, now resolves.
 3. ~~**Bind the Psi distributions**, each with a fixed-seed signature test.~~ **Done.** 111 of
    Frontline's 296 answer, including every distribution the corpus calls.
-4. **Resolve the 266 unreviewed.** In progress. Asked the live registry: **0 of 286 already
+4. ~~**Resolve the 266 unreviewed.**~~ **Done.** `EXCEL` closed 2026-09-17, `PSI` on
+   2026-09-19; every row of the matrix now carries a status. Asked the live registry: **0 of 286 already
    answered**, so the label was honest and none was secretly covered. Twenty math primitives have
    landed since; the plan's expectation that most is *"math, engineering and text — largely
    Foundation, libm and swift-numerics"* held exactly.
@@ -440,7 +473,12 @@ full-corpus census, which currently traps partway through.
 7. **Correctness over coverage.** A function that is registered and wrong scores the same as one
    that is registered and right, so the count is not the measure it looks like.
 8. **Measure before building, and record the number where the decision is.** The habit that has
-   paid most. 118× said lowering was worth writing; the corpus histogram named `NPV` as one rule
+   paid most, and the one whose absence is most expensive. Four times in the 1.0.0-alpha.1
+   stretch a rule was generalised past its measurement: a `SUMIFS` shape guard refused 15 cells
+   Excel answers, criteria error propagation measured at one argument position and applied to
+   all cost 672, a phase split taken from a regex rather than a parser misstated the remaining
+   work fourfold, and a blank-lookup rule agreed with every piece of evidence while being wrong
+   about the mechanism. Each was caught by measuring again; none was caught by thinking harder. 118× said lowering was worth writing; the corpus histogram named `NPV` as one rule
    worth 10 of 13 refusals; 33% said the `consistency` checker must not ship enabled. None of
    those was guessable, and each is recorded beside the thing it decided.
 
@@ -489,6 +527,28 @@ the motivating application rather than an end in itself.
   worth less than one that shows where it was wrong.
 
 ### Next
+
+- ~~**Agreement with the corpus.**~~ **Reached 2026-09-21 at 1.0.0-alpha.1.** 300 workbooks,
+  4,524,171 comparable cells, 99.999978%, one disagreement and it is the workbook's own stale
+  cache. Eleven library defects fixed across this stretch, each measured before and after, and
+  three oracle blind spots closed — the tool's accuracy was the binding constraint about as
+  often as the library's was.
+
+- ~~**`GETPIVOTDATA`.**~~ **Shipped 2026-09-20.** A lookup into a table Excel already rendered
+  onto the sheet, not a recomputation. The pivot cache is opened only for field *names*, never
+  for records. 3,802 cells.
+
+- ~~**The `PSI` bucket.**~~ **Closed 2026-09-19.** 147 unreviewed to zero: 189 have, 71 out of
+  scope with a reason each, 17 bindable, 17 not ours.
+
+- **The simulation GUI.** The first consumer of this package as a client. The evaluator already
+  carries `RandomSource`, `SimulationResultProvider` and every distribution the corpus calls;
+  what is untested is whether the public surface is the right shape for something driving it
+  rather than testing it. That is the question the alpha exists to answer.
+
+- **Implicit intersection at scalar function arguments.** Measured in round sixteen and
+  deliberately left open — see *Known traps*. No corpus cell turns on it, and closing it needs
+  a per-argument fact about several hundred functions.
 
 - ~~**The unreviewed bucket.**~~ **Closed 2026-09-17.** `unreviewed` reached **0** for the
   `EXCEL` source: **473 have, 25 out of scope, 20 bindable, 1 new.** Every one of the ten
@@ -580,6 +640,18 @@ fitting a corpus and being correct.
 
 ## Known traps, recorded before they are hit
 
+**Implicit intersection reaches a scalar function argument, and this package's does not.**
+Measured in round sixteen: `ABS($H$1:$H$500)` asked from row 320, with `-7` in `H320`, answers
+`7` in Excel and `#VALUE!` here, because the seam is in the operators only.
+
+Left open on purpose. Closing it needs every function to declare which of its arguments take a
+single value and which take a range — `ABS` intersects, `SUM` must not — a per-argument fact
+about several hundred functions, and a run over 4,524,171 comparable cells contains no case
+that turns on it. Getting that list wrong in either direction produces a **plausible wrong
+number rather than an error**, which is the trade this project keeps refusing. Recorded as a
+known divergence so no future round reports it as news.
+
+
 **Excel is not always right, and the checker must not treat every disagreement as a defect.**
 Measured, not supposed. `BESSELJ(0, 0)` is exactly 1 by definition; this package returns
 exactly 1 and Excel returns `1.00000000283141`. Across seven Bessel points scipy agrees with
@@ -640,7 +712,15 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-18 — reconciled for 0.11.0. The unreviewed bucket closed. `unreviewed` reached **0** for
+**Last Updated:** 2026-09-21 — reconciled for **1.0.0-alpha.1**. Current Status rewritten
+around corpus agreement (300 workbooks, 4,524,171 comparable cells, 99.999978%, one
+disagreement that is a workbook's own stale cache). `GETPIVOTDATA`, the `PSI` bucket and
+corpus agreement moved out of Roadmap/Next into shipped entries; the simulation GUI and the
+function-argument intersection gap added there. Priority 4 marked done — both coverage sources
+are closed. Priority 8 gained the four measured cases from this stretch where a rule was
+generalised past its evidence, because the habit is only worth recording with its failures
+attached. A trap added for implicit intersection at scalar function arguments: Excel does it,
+this does not, and the reason it is left open is written down. Earlier: reconciled for 0.11.0. The unreviewed bucket closed. `unreviewed` reached **0** for
 `EXCEL`: 473 have, 25 out of scope, 20 bindable. The bar was *classified*, and 73 of the 87
 were implemented anyway, because once the criteria matcher, `CellMatrix` and `LAMBDA` existed
 most were a handful of lines. Recorded beside it: all 87 had **zero corpus usage**, which is a
