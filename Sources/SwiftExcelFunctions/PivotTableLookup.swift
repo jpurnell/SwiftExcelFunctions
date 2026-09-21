@@ -9,32 +9,46 @@ import SwiftExcelCore
 /// caches them there like any other formula result, so this navigates a grid rather than
 /// aggregating anything — `xl/pivotCache/` contributes the field *names* and not one record.
 ///
-/// The grid, from `pivotTable8` of `Dot Com YTD Performance Report 6 20.xlsx`:
+/// ## The two axes are transposes of each other
+///
+/// That is the whole design. Row labels run down the label columns; column items run across
+/// the header rows; both are **sparse**, written once and inherited by everything after them
+/// until they change; and both carry **subtotals** in the same structural position. So one walk
+/// answers for either, told which way to read.
 ///
 /// ```
-/// 135  Scenario | Region  | LOBMix_noXH | BP/IP  | 20  | 21  | 22    ← names + column items
-/// 136  CY       | GBR     | V           |        | 303 | 301 | 256
-/// 137           |         | D           |        |1633 |1233 | 944
-/// 139           |         | VD          | BP     | 487 | 319 | 390
-/// 141           |         |             |(blank) |1406 |1315 |1361
-/// 142           |         | VD Total    |        |2076 |1852 |1989   ← a subtotal
-/// 146           | GBR Total                      |5011 |4130 |4038
-/// 243  Grand Total                               |48095|47039|45282
+///  92                                        | Scenario | Region |
+///  93                                        | CY       |        | CY Total | PY  |     | PY Total
+///  94  Values   | Last21Flag    | Report_Date | GBR     | WNE    |          | GBR | WNE |
+///  95   B1      | L21           | 2014-06-02  | 223     | 85     | 308      | 203 | 70  | 273
+///  96           |               | 2014-06-03  | 245     | 108    | 353      | 213 | 111 | 324
+///  97           | L21 Total     |             | 468     | 193    | 661      | 416 | 181 | 597
+///  98           | (blank)       | 2014-05-19  | 109     | 40     | 149      | 90  | 30  | 120
+/// 102  Total  B1                |             | 577     | 233    | 810      | 506 | 211 | 717
 /// ```
 ///
-/// ## The three things that make it hard
+/// `CY` is written once at `G93` and covers `G` and `H`, exactly as ` B1` is written once at
+/// `D95` and covers everything down to `D102`. `CY Total` totals a column group; `L21 Total`
+/// totals a row group; `Total  B1` totals another, with the word at the other end.
 ///
-/// **Labels are sparse.** `Scenario` and `Region` are written on row 136 and inherited by every
-/// row beneath until they change. A lookup that requires a literal match in every label column
-/// finds row 136 and nothing else — the overwhelming majority of corpus cells are on rows that
-/// write no label at all.
+/// ## What has to be got right
 ///
-/// **Subtotals are answers.** 420 corpus cells at one anchor constrain three of four row
-/// fields, and Excel answers them from row 142, the row labelled `VD Total`. Treating subtotal
-/// rows as "not data" and skipping them would refuse every one.
+/// **A subtotal is an answer.** Leaving a field unconstrained asks for the total across it, and
+/// Excel rendered that total — 420 cells at one anchor leave the innermost row field free.
+/// Excel writes a subtotal **only where the group splits**, though: `LOBMix_noXH` = `VD` has
+/// three `BP/IP` items and gets a `VD Total` row, while `V` has none and its single data row is
+/// its own total. Both rules are needed; either alone is wrong on most of the corpus.
 ///
-/// **Items are not text.** The column items here are numbers, `(blank)` is a real item
-/// rendered as literal text, and a name is matched case-insensitively but never trimmed.
+/// **A constraint need not be a prefix.** 930 cells name `Report_Date` while leaving
+/// `Last21Flag` above it free. That resolves here because the flag *partitions* the dates
+/// rather than subdividing them, so exactly one row carries each date — which is checked
+/// rather than assumed: a gap that leaves two rows matching is refused, because the total
+/// across them is rendered nowhere.
+///
+/// **A subtotal caption is written either way round.** `"L21 Total"` puts the word after the
+/// item and `"Total  B1"` puts it before, and both are in the same table. It is only ever
+/// tested after everything above it has already matched, so it confirms a row rather than
+/// choosing one.
 enum PivotTableLookup {
 
     /// One `field, item` pair from a call.
@@ -49,18 +63,13 @@ enum PivotTableLookup {
     ///   - pairs: The field/item pairs, in the order written. Order does not matter: Excel
     ///     matches by name.
     ///   - dataField: The data field's position in ``PivotTableLayout/dataFields``, which
-    ///     selects a row when the values pseudo-field is on the row axis.
+    ///     constrains a row when the values pseudo-field is on the row axis.
     ///   - layout: The table to look in.
     ///   - cells: Where the rendered values are read from.
     /// - Returns: The cell holding the value, or `nil` to refuse.
     static func cell(forPairs pairs: [Pair], dataField: Int,
                      in layout: PivotTableLayout,
                      cells: any CellValueProvider) -> CellRef? {
-        // A pair naming a page field is a **consistency check**, not a constraint: the filter
-        // was applied before the table was rendered. Naming the item it is set to is
-        // redundant and fine; naming any other item asks for numbers this table does not
-        // contain, and answering from the rows that are here would report one filter's figure
-        // under another's name.
         var remaining: [Pair] = []
         for pair in pairs {
             guard let index = layout.pageFields.firstIndex(where: {
@@ -69,241 +78,230 @@ enum PivotTableLookup {
                 remaining.append(pair)
                 continue
             }
-            guard index < layout.pageFieldRows.count else { return nil }
-            let selection = CellRef(column: layout.range.start.column + 1,
-                                    row: layout.pageFieldRows[index])
-            let applied = cells.value(at: selection, inSheet: layout.sheet) ?? .blank
-            // `(All)` is no filter at all, so it agrees with nothing in particular and
-            // cannot confirm the item asked for.
-            guard matches(applied, pair.item) else { return nil }
+            guard agreesWithFilter(pair, at: index, in: layout, cells: cells) else { return nil }
         }
 
-        guard let column = column(forPairs: remaining, in: layout, cells: cells),
-              let row = row(forPairs: remaining, dataField: dataField,
-                            in: layout, cells: cells) else {
+        // Every remaining pair must name an axis this table actually has. One that names none
+        // is asking about a field the pivot does not group by.
+        for pair in remaining {
+            let onRows = layout.rowFields.contains { $0.matches(pair.field) }
+            let onColumns = layout.columnFields.contains { $0.matches(pair.field) }
+            guard onRows || onColumns else { return nil }
+        }
+
+        guard let column = line(forPairs: remaining, dataField: nil,
+                                on: columnAxis(of: layout), in: layout, cells: cells,
+                                whenUnconstrained: layout.grandTotalColumn),
+              let row = line(forPairs: remaining, dataField: dataField,
+                             on: rowAxis(of: layout), in: layout, cells: cells,
+                             whenUnconstrained: layout.grandTotalRow) else {
             return nil
         }
         return CellRef(column: column, row: row)
     }
 
-    // MARK: - The column
+    // MARK: - The page fields
 
-    /// The data column the column-axis pairs select.
+    /// Whether a pair naming a page field agrees with the filter the table was rendered under.
     ///
-    /// With no column fields there is one data column and no pair can name it. With one, the
-    /// items are written across ``PivotTableLayout/headerRow``.
+    /// A page field is **not** a constraint on the grid: the filter was applied before any of
+    /// these numbers were written. Naming the item it is set to is redundant and harmless;
+    /// naming any other item asks for figures this rendering does not contain, and answering
+    /// from the rows that *are* here would report one filter's number under another's name.
     ///
-    /// **More than one column field is refused**, which is the whole of what this cannot yet
-    /// answer: 960 corpus cells, every one of them on `pivotTable47` at `D92:R247`.
-    ///
-    /// Its items stack down two header rows, the outer one sparse across the columns the way
-    /// row labels are sparse down the rows, with a column subtotal beside them:
-    ///
-    /// ```
-    ///  92                            | Scenario | Region |     |     |     |
-    ///  93                            | CY       |        |     |     |     | CY Total
-    ///  94  Values | Last21Flag | Report_Date | GBR | WNE | FRE | BLT | KEY |
-    ///  95   B1    | L21        | 2014-06-02  | 223 |  85 | 280 | 343 | 187 | 1118
-    /// ```
-    ///
-    /// Answering it needs the same fill-across the rows already get, and two further things
-    /// that pivot also shows: a **gap** in the row prefix (`Last21Flag` is left unconstrained
-    /// by 930 of those cells), and a subtotal caption written `"Total  HSI"` rather than
-    /// `"HSI Total"`. Refusing all three is why this run reports **0 differed** — every cell
-    /// it cannot answer says so.
-    private static func column(forPairs pairs: [Pair], in layout: PivotTableLayout,
-                               cells: any CellValueProvider) -> Int? {
-        let named = pairs.filter { pair in
-            layout.columnFields.contains { $0.matches(pair.field) }
-        }
-        guard layout.columnFields.count <= 1 else { return nil }
-        guard let field = layout.columnFields.first else {
-            // No column axis: the single data column is the first one.
-            return named.isEmpty ? layout.firstDataSheetColumn : nil
-        }
-        guard case .field = field, let pair = named.first, named.count == 1 else {
-            // A column axis nobody named asks for the total across it, which lives in the
-            // grand total column — and `nil` where the table renders none, which is the
-            // common case. Such a table holds its overall total in no cell at all.
-            return named.isEmpty ? layout.grandTotalColumn : nil
-        }
-        for column in layout.dataColumns {
-            let header = CellRef(column: column, row: layout.headerRow)
-            let item = cells.value(at: header, inSheet: layout.sheet) ?? .blank
-            if matches(item, pair.item) { return column }
-        }
-        return nil
+    /// `(All)` is no filter at all, so it confirms no particular item and the pair is refused.
+    private static func agreesWithFilter(_ pair: Pair, at index: Int,
+                                         in layout: PivotTableLayout,
+                                         cells: any CellValueProvider) -> Bool {
+        guard index < layout.pageFieldRows.count else { return false }
+        let selection = CellRef(column: layout.range.start.column + 1,
+                                row: layout.pageFieldRows[index])
+        let applied = cells.value(at: selection, inSheet: layout.sheet) ?? .blank
+        return matches(applied, pair.item)
     }
 
-    // MARK: - The row
+    // MARK: - One axis, read either way
 
-    /// The row the row-axis pairs select.
+    /// One axis of a rendered pivot, described so the same walk reads rows or columns.
     ///
-    /// Row fields are **hierarchical**, outermost first, and a pair constrains the field whose
-    /// label column it names. The constrained fields must form a prefix of that hierarchy: a
-    /// table grouped `Scenario → Region` renders a total for `CY` and one for `CY/GBR`, and
-    /// never one for `GBR` across all scenarios, because that grouping was never computed.
-    /// Asking for the latter is refused rather than answered from a row that means something
-    /// else.
+    /// For the **row** axis a *line* is a row and each field's labels run down a column; for
+    /// the **column** axis a line is a column and each field's items run across a row. Nothing
+    /// else differs, which is why this is one type and not two.
+    private struct Axis {
+        /// The fields on this axis, outermost first.
+        let fields: [PivotAxisField]
+        /// The lines to walk, in rendered order.
+        let lines: ClosedRange<Int>
+        /// The cell holding field `field`'s label on line `line`.
+        let label: (_ field: Int, _ line: Int) -> CellRef
+    }
+
+    private static func rowAxis(of layout: PivotTableLayout) -> Axis {
+        let start = layout.range.start.column
+        return Axis(
+            fields: layout.rowFields,
+            lines: layout.firstDataSheetRow...Swift.max(layout.firstDataSheetRow,
+                                                        layout.range.end.row),
+            label: { field, line in CellRef(column: start + field, row: line) })
+    }
+
+    /// The column axis, whose items stack **down** one header row per field.
     ///
-    /// Where the prefix is shorter than the hierarchy, the answer is that prefix's **subtotal**
-    /// row; where it is the whole hierarchy, it is a data row; where it is empty, the grand
-    /// total.
-    private static func row(forPairs pairs: [Pair], dataField: Int,
-                            in layout: PivotTableLayout,
-                            cells: any CellValueProvider) -> Int? {
-        guard !layout.rowFields.isEmpty else {
-            return pairs.isEmpty ? layout.grandTotalRow : nil
+    /// `firstHeaderRow` is where the outermost field's items are written and each further field
+    /// takes the row below — `pivotTable47` puts `Scenario` on row 93 and `Region` on row 94,
+    /// with data from row 95, which is `firstDataRow` = 3 rows below the top of the range.
+    private static func columnAxis(of layout: PivotTableLayout) -> Axis {
+        let top = layout.range.start.row + layout.firstHeaderRow
+        let first = layout.firstDataSheetColumn
+        return Axis(
+            fields: layout.columnFields,
+            lines: first...Swift.max(first, layout.range.end.column),
+            label: { field, line in CellRef(column: line, row: top + field) })
+    }
+
+    /// The line on one axis that a call's pairs select.
+    ///
+    /// - Parameters:
+    ///   - pairs: Every pair still in play, of which those naming this axis are used.
+    ///   - dataField: The data field's index, where the values pseudo-field is on this axis.
+    ///   - axis: The axis to walk.
+    ///   - layout: The table.
+    ///   - cells: Where the rendered labels are read from.
+    ///   - whenUnconstrained: The line to answer with when nothing constrains this axis —
+    ///     the grand total row or column, and `nil` where the table renders none.
+    /// - Returns: The line, or `nil` to refuse.
+    private static func line(forPairs pairs: [Pair], dataField: Int?, on axis: Axis,
+                             in layout: PivotTableLayout, cells: any CellValueProvider,
+                             whenUnconstrained: Int?) -> Int? {
+        guard !axis.fields.isEmpty else {
+            // No axis: there is one line of data, and no pair may claim to narrow it.
+            let named = pairs.contains { pair in
+                axis.fields.contains { $0.matches(pair.field) }
+            }
+            return named ? nil : axis.lines.lowerBound
         }
 
-        // Match each row field to the pair naming it, keeping the axis's own order. The
-        // values pseudo-field is selected by the data field argument rather than by a pair.
-        var wanted: [CellValue?] = []
-        var used = 0
-        for field in layout.rowFields {
+        var wanted = [CellValue?](repeating: nil, count: axis.fields.count)
+        for (index, field) in axis.fields.enumerated() {
             switch field {
             case .dataFieldNames:
-                guard dataField < layout.dataFields.count else { return nil }
-                wanted.append(.text(layout.dataFields[dataField]))
-                used += 1
+                guard let dataField, dataField < layout.dataFields.count else { return nil }
+                wanted[index] = .text(layout.dataFields[dataField])
             case .field(let name):
-                guard let pair = pairs.first(where: {
-                    $0.field.lowercased() == name.lowercased()
-                }) else {
-                    wanted.append(nil)
-                    continue
-                }
-                wanted.append(pair.item)
-                used += 1
+                wanted[index] = pairs.first { $0.field.lowercased() == name.lowercased() }?.item
             }
         }
-        // Every row-axis pair must have landed on a field; one that did not names a field
-        // this table does not put on the rows.
-        let onRowAxis = pairs.filter { pair in
-            layout.rowFields.contains { $0.matches(pair.field) }
-        }
-        guard used == onRowAxis.count + (layout.rowFields.contains(.dataFieldNames) ? 1 : 0)
-        else {
-            return nil
-        }
-        // Anything not on the row axis, the column axis or the page axis is not in the table.
-        for pair in pairs where !layout.rowFields.contains(where: { $0.matches(pair.field) })
-            && !layout.columnFields.contains(where: { $0.matches(pair.field) }) {
-            return nil
-        }
 
-        // The constrained fields must be a prefix: no gaps, because the grouping that would
-        // answer a gap was never rendered.
-        let depth = wanted.prefix { $0 != nil }.count
-        guard wanted.dropFirst(depth).allSatisfy({ $0 == nil }) else { return nil }
-        guard depth > 0 else { return layout.grandTotalRow }
-
-        return scan(depth: depth, wanted: wanted, in: layout, cells: cells)
+        // Nothing named this axis, so the answer is its total — which a table may not render.
+        guard let target = wanted.lastIndex(where: { $0 != nil }) else {
+            return whenUnconstrained
+        }
+        return walk(to: target, wanted: wanted, on: axis, sheet: layout.sheet, cells: cells)
     }
 
-    /// Walks the rendered rows, carrying labels down, and returns the row totalling to `depth`.
+    /// Walks an axis, carrying labels along it, and returns the one line that answers.
     ///
-    /// The scan keeps the last label seen in each column, which is what makes a sparse
-    /// rendering readable: a row writing nothing in columns 0 and 1 still *has* those values.
-    /// Writing a label also clears every column to its right, because a new group starts there.
+    /// Each line is tested two ways, and they are complementary rather than alternatives:
     ///
-    /// ## Two rows can be the total of a group, and which one depends on the data
+    /// - **As a data line**, where nothing finer than `target` is written on it and every
+    ///   constrained field matches. This is what answers an unsplit group, whose single line
+    ///   is its own total.
+    /// - **As that group's subtotal line**, whose deepest written label is at `target` itself
+    ///   and reads the item's name with `Total` at one end or the other.
     ///
-    /// **Excel renders a subtotal row only where the group actually splits.** In the corpus
-    /// fixture, `LOBMix_noXH` = `VD` has three `BP/IP` items beneath it and gets a `VD Total`
-    /// row; `V`, `D` and `T` have none, and their single data row *is* their total — no
-    /// subtotal row is written for them at all.
-    ///
-    /// ```
-    /// 136  CY | GBR | V        |         | 303   ← asking for (CY, GBR, V) ends here
-    /// 139     |     | VD       | BP      | 487
-    /// 140     |     |          | IP      | 183
-    /// 141     |     |          | (blank) | 1406
-    /// 142     |     | VD Total |         | 2076  ← asking for (CY, GBR, VD) ends here
-    /// ```
-    ///
-    /// So a row answers for a prefix of length `depth` when either:
-    ///
-    /// - **nothing finer is written on it** and its carried labels match the prefix — the
-    ///   group never split, so this row is its own total; or
-    /// - it is the group's **subtotal row**: its last written label is in column `depth - 1`
-    ///   and reads `"<item> Total"`.
-    ///
-    /// A lookup that only knew the second rule would refuse every unsplit group; one that only
-    /// knew the first would return row 139 for `VD` — one `BP/IP` item's figure reported as the
-    /// total of all three.
-    ///
-    /// The `"… Total"` suffix is tested **only after** the prefix above it has already matched,
-    /// so it never decides which group a row belongs to; it only confirms that this row totals
-    /// the group the scan is already standing in. That is what keeps an item genuinely named
-    /// `"VD Total"` from being read as a subtotal of `"VD"`.
-    private static func scan(depth: Int, wanted: [CellValue?], in layout: PivotTableLayout,
-                             cells: any CellValueProvider) -> Int? {
-        let start = layout.range.start.column
-        let fields = layout.rowFields.count
-        var carried = [CellValue?](repeating: nil, count: fields)
-        let lastRow = layout.grandTotalRow.map { $0 - 1 } ?? layout.range.end.row
-        guard layout.firstDataSheetRow <= lastRow else { return nil }
+    /// A line labelled `VD Total` never matches the first test, since that text is not `VD`, so
+    /// the two never claim the same line for the same reason. Where they nonetheless both find
+    /// something, or one finds two, **the answer is refused**: a number that stands for more
+    /// than one grouping is not the one that was asked for.
+    private static func walk(to target: Int, wanted: [CellValue?], on axis: Axis,
+                             sheet: String, cells: any CellValueProvider) -> Int? {
+        let count = axis.fields.count
+        var carried = [CellValue?](repeating: nil, count: count)
+        var found: Int?
 
-        for row in layout.firstDataSheetRow...lastRow {
+        for line in axis.lines {
             var deepest: Int?
-            for offset in 0..<fields {
-                let label = cells.value(at: CellRef(column: start + offset, row: row),
-                                        inSheet: layout.sheet) ?? .blank
+            for field in 0..<count {
+                let label = cells.value(at: axis.label(field, line), inSheet: sheet) ?? .blank
                 guard !isBlank(label) else { continue }
-                carried[offset] = label
-                // A new group here means every finer grouping restarts.
-                for finer in (offset + 1)..<fields { carried[finer] = nil }
-                deepest = offset
+                carried[field] = label
+                // A new group here means every finer grouping starts over.
+                for finer in (field + 1)..<count { carried[finer] = nil }
+                deepest = field
             }
             guard let deepest else { continue }
+            guard matchesAll(carried, wanted, upTo: target) else { continue }
 
-            // The group never split: this row is the whole of it, and so is its total.
-            if deepest < depth, matchesPrefix(carried, wanted, depth: depth) {
-                return row
-            }
-            // The group did split, and this is the row Excel wrote to total it.
-            if depth < fields, deepest == depth - 1,
-               matchesPrefix(carried, wanted, depth: depth - 1),
-               let label = carried[depth - 1], let item = wanted[depth - 1],
-               matchesTotal(label, of: item) {
-                return row
-            }
+            let isData = deepest <= target && matchesOne(carried[target], wanted[target])
+            // **A subtotal needs everything above it named.** It is the total of one specific
+            // outer group — `GBR Total` sits inside `CY` and counts no `PY` — so with a field
+            // above `target` left free it cannot stand for the total across them. A *data*
+            // line has no such trouble: it is one cell of the grid, and a gap above it is
+            // answerable exactly when it still picks out one line, which the walk checks.
+            let named = wanted[0..<target].allSatisfy { $0 != nil }
+            let isTotal = named && deepest == target
+                && matchesTotal(carried[target], of: wanted[target])
+            guard isData || isTotal else { continue }
+            // A second candidate means the question does not pick out one number.
+            guard found == nil else { return nil }
+            found = line
         }
-        return nil
+        return found
     }
 
-    /// Whether the carried labels agree with what was asked for, down to `depth` columns.
-    private static func matchesPrefix(_ carried: [CellValue?], _ wanted: [CellValue?],
-                                      depth: Int) -> Bool {
-        for index in 0..<depth {
-            guard let want = wanted[index] else { continue }
-            guard let have = carried[index], matches(have, want) else { return false }
+    /// Whether every constrained field **above** `target` agrees with what was asked for.
+    private static func matchesAll(_ carried: [CellValue?], _ wanted: [CellValue?],
+                                   upTo target: Int) -> Bool {
+        for index in 0..<target where wanted[index] != nil {
+            guard matchesOne(carried[index], wanted[index]) else { return false }
         }
         return true
     }
 
-    /// Whether a label is the subtotal caption for an item — `"VD"` against `"VD Total"`.
-    ///
-    /// Checked **only after** the prefix above it has already matched, so this never decides
-    /// which group a row belongs to; it only confirms that the row is the total of the group
-    /// the scan is already standing in. The word is Excel's and is localised — it reads
-    /// `"Gesamtergebnis"` in German — so a table whose subtotals are spelled another way
-    /// refuses rather than answering from the wrong row.
-    private static func matchesTotal(_ label: CellValue, of item: CellValue) -> Bool {
-        guard case .text(let rendered) = label else { return false }
-        let wanted = text(of: item)
-        guard rendered.count > wanted.count else { return false }
-        guard rendered.lowercased().hasPrefix(wanted.lowercased()) else { return false }
-        let suffix = rendered.dropFirst(wanted.count)
-        return suffix.trimmingCharacters(in: .whitespaces).lowercased() == "total"
+    private static func matchesOne(_ carried: CellValue?, _ wanted: CellValue?) -> Bool {
+        guard let wanted else { return true }
+        guard let carried else { return false }
+        return matches(carried, wanted)
     }
+
+    /// Whether a label is the subtotal caption for an item.
+    ///
+    /// **Both ends.** `"L21 Total"` and `"Total  B1"` are in the same corpus table: the first
+    /// is how an ordinary field totals a group, the second how the values pseudo-field does,
+    /// and the doubled space in the second is real — the caption it is built from is `" B1"`,
+    /// with a leading space of its own, so nothing here may trim.
+    ///
+    /// Tested **only after** everything above it has already matched, so it never decides which
+    /// group a line belongs to; it confirms that this line totals the group already reached.
+    /// That is what keeps an item genuinely named `"VD Total"` from reading as a total of
+    /// `"VD"`. The word is Excel's and is localised — `"Gesamtergebnis"` in German — so a table
+    /// whose totals are captioned another way refuses rather than answering from a wrong line.
+    private static func matchesTotal(_ label: CellValue?, of item: CellValue?) -> Bool {
+        guard let label, let item, case .text(let rendered) = label else { return false }
+        let wanted = text(of: item)
+        guard !wanted.isEmpty, rendered.count > wanted.count else { return false }
+        let lowered = rendered.lowercased()
+        let target = wanted.lowercased()
+
+        if lowered.hasPrefix(target) {
+            let suffix = rendered.dropFirst(wanted.count)
+            if suffix.trimmingCharacters(in: .whitespaces).lowercased() == Self.totalWord {
+                return true
+            }
+        }
+        guard lowered.hasSuffix(target) else { return false }
+        let prefix = rendered.dropLast(wanted.count)
+        return prefix.trimmingCharacters(in: .whitespaces).lowercased() == Self.totalWord
+    }
+
+    /// The word Excel writes into a subtotal's caption.
+    private static let totalWord = "total"
 
     // MARK: - Comparing items
 
     /// Whether a rendered label is the item a formula asked for.
     ///
-    /// **By value, not by rendering.** The column items in the corpus fixture are numbers, so
+    /// **By value, not by rendering.** The column items in one corpus fixture are numbers, so
     /// `"20"` written as text is not the same thing as `20`; comparing what the cell displays
     /// would match nothing. Text is compared case-insensitively and **never trimmed**, since
     /// the same workbook writes data field captions with a leading space.
@@ -311,13 +309,13 @@ enum PivotTableLookup {
         switch (rendered, wanted) {
         case (.number(let lhs), .number(let rhs)):
             return lhs == rhs
+        case (.bool(let lhs), .bool(let rhs)):
+            return lhs == rhs
         // **An omitted item names the blank one.** 204 corpus cells are written
         // `GETPIVOTDATA("Subs",$C$134,…,"BP/IP",)` — a trailing comma with nothing after it —
         // and the group they want is the one Excel renders as the literal text `(blank)`.
         case (.text(Self.blankItemLabel), .blank):
             return true
-        case (.bool(let lhs), .bool(let rhs)):
-            return lhs == rhs
         default:
             return text(of: rendered).lowercased() == text(of: wanted).lowercased()
         }
@@ -342,7 +340,7 @@ enum PivotTableLookup {
     ///
     /// It is a real group with real numbers beside it, so this text is a *value* and not an
     /// absence — which is why ``isBlank(_:)`` says it is not blank, and why a formula that
-    /// omits an item entirely is asking for exactly this row.
+    /// omits an item entirely is asking for exactly this line.
     private static let blankItemLabel = "(blank)"
 
     /// Whether a cell carries no label.

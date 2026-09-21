@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`GETPIVOTDATA` answers field/item pairs.** 3,574 corpus cells used them and every one
-  answered `#REF!`; **2,614 now agree with Excel and the other 960 refuse — nothing differs.**
-  `Dot Com YTD Performance Report 6 20.xlsx` went from 93.76% to 98.90% agreement, and the
-  three Amazon workbooks stay at 100%.
+  answered `#REF!`. **All 3,574 now agree with Excel**, and the four workbooks that carry
+  pivot tables reach **100.00% agreement across 19,880 comparable cells** — 0 differed,
+  0 refused, 0 threw. `Dot Com YTD Performance Report 6 20.xlsx` went 93.76% → 100%.
 
   Each pair names a field and the item wanted of it, and **the axis that field sits on decides
   what the pair does**: a row field narrows the row, a column field picks the column, and a
@@ -37,6 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   An **omitted item names the blank one**: 204 cells are written `…,"BP/IP",)` with nothing
   after the comma, and the group they want is the one Excel renders as the literal `(blank)`.
+
+  **Stacked column items, and a gap in the constraints**, which was the last 960 cells — all
+  on the one pivot with *two* column fields. Its items run down two header rows with the outer
+  one sparse **across** the columns, exactly as row labels are sparse **down** the rows, and
+  the two renderings turn out to be transposes of each other: one walk now reads either, told
+  which way to go.
+
+  Three further rules came from that table:
+
+  - **A constraint need not be a prefix.** 930 of those cells name `Report_Date` while leaving
+    `Last21Flag` above it free. That resolves because the flag *partitions* the dates rather
+    than subdividing them — measured, 48 distinct dates in one group and none repeated across
+    the split — so exactly one row carries each. Checked rather than assumed: a gap leaving two
+    rows matching is refused, because the total across them is rendered nowhere.
+  - **But a subtotal needs everything above it named.** `GBR Total` sits inside `CY` and counts
+    no `PY`, so it cannot answer for `GBR` across all scenarios. A data row has no such
+    trouble; a subtotal row does. Getting this wrong returned one scenario's figure as both.
+  - **A subtotal caption is written either way round.** `"L21 Total"` puts the word after the
+    item and `"Total  B1"` puts it before — both in the same table, the second being how the
+    values pseudo-field renders. The doubled space is real: the caption is `" B1"`.
+
+  And `rowGrandTotals` being on does not mean **one** grand total row. With the data field
+  names on the row axis Excel writes one per data field, so the last row of that range reads
+  `"Total  HSI"` — a reader taking it for the table's total answers `HSI` to everything.
 
 - **`PivotTableLookup`**, which holds that navigation, with the rendering it was read from
   written into the type.
