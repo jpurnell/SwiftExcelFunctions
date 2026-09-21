@@ -398,6 +398,15 @@ public enum BuiltinAggregationFunctions {
             return ""
         case .formula(_, let cached):
             return cached.flatMap(criteriaString)
+        case .array(let matrix) where matrix.elements.count == 1:
+            // **A one-cell reference is its value.** Nothing becomes plural merely for having
+            // been written as a range, and refusing here turned `SUMIFS(…, months, E1:E1)`
+            // into `#VALUE!` where Excel reads the single month in it.
+            //
+            // More than one element is an *array criterion* and is not a string at all — it
+            // asks the question once per element, which `spreadOverArrayCriterion` does before
+            // any of this is reached.
+            return matrix.elements.first.flatMap(criteriaString)
         default:
             return nil
         }
@@ -434,6 +443,24 @@ public enum BuiltinAggregationFunctions {
     /// where the `range` value matches the criteria.
     static let sumif = ExcelFunction(name: "SUMIF", minArgs: 2, maxArgs: 3) { args in
         catching {
+            // An array criterion asks the question once per element — see
+            // `spreadOverArrayCriterion`. The scalar answer is `sumifOne`.
+            if let spread = spreadOverArrayCriterion(
+                args, positions: criteriaPositions(of: "SUMIF", count: args.count),
+                evaluate: sumifOne) {
+                return spread
+            }
+            return sumifOne(args)
+        }
+    }
+
+    /// `SUMIF` for one criterion value, which is every call that is not spread.
+    ///
+    /// - Parameter args: The call's arguments, the criterion a single value.
+    /// - Returns: The sum, or the error the arguments call for.
+    private static func sumifOne(_ args: [CellValue]) -> CellValue {
+        guard args.count >= 2 else { return .error(.value) }
+
             if let error = propagatedError(args, skipping: criteriaPositions(of: "SUMIF", count: args.count)) {
                 return error
             }
@@ -475,7 +502,62 @@ public enum BuiltinAggregationFunctions {
                 }
             }
             return .number(total)
+    }
+
+    // MARK: - An array criterion
+
+    /// Runs a criteria function once per element of its one array criterion.
+    ///
+    /// ## What Excel does
+    ///
+    /// `SUMPRODUCT(SUMIFS(bounces, division, "West", month, q1_months))` is how a spreadsheet
+    /// sums over several key values without writing the addition out. `q1_months` is a
+    /// three-cell name, so Excel runs the `SUMIFS` three times and hands `SUMPRODUCT` a
+    /// three-element array to total.
+    ///
+    /// **81 corpus cells in one workbook are this shape**, their names resolving to
+    /// `Definitions!$E$62:$E$64` and `$E$71:$E$73`. Every one answered `#VALUE!`, because a
+    /// criterion that was not a single value had no criteria string and the call refused.
+    ///
+    /// ## What is deliberately not done
+    ///
+    /// **Two array criteria refuse.** Excel broadcasts them, and the shape of the result
+    /// depends on each one's orientation — a column against a row gives a rectangle. No corpus
+    /// cell does it, so there is nothing to check an implementation against, and a wrongly
+    /// shaped rectangle is a wrong number rather than a visible error.
+    ///
+    /// A **single-element** array is not an array criterion. Nothing becomes plural merely for
+    /// having been written as a reference.
+    ///
+    /// - Parameters:
+    ///   - args: The call's arguments.
+    ///   - positions: Where this function's criteria sit — see ``criteriaPositions(of:count:)``.
+    ///   - evaluate: The scalar form, given the arguments with one criterion replaced.
+    /// - Returns: The array of results, `nil` where no criterion is an array, or `#VALUE!`
+    ///   where more than one is.
+    static func spreadOverArrayCriterion(
+        _ args: [CellValue], positions: Set<Int>,
+        evaluate: ([CellValue]) -> CellValue
+    ) -> CellValue? {
+        var found: (position: Int, elements: [CellValue])?
+        for position in positions.sorted() where args.indices.contains(position) {
+            guard case .array(let matrix) = args[position], matrix.elements.count > 1 else {
+                continue
+            }
+            guard found == nil else { return .error(.value) }
+            found = (position, matrix.elements)
         }
+        guard let found else { return nil }
+
+        var results: [CellValue] = []
+        for element in found.elements {
+            var one = args
+            one[found.position] = element
+            results.append(evaluate(one))
+        }
+        // A column, which is the shape a criterion range written down a column has — and the
+        // shape every measured corpus name (`Definitions!$E$62:$E$64`) is written in.
+        return .array(CellMatrix(column: results))
     }
 
     // MARK: - SUMIFS
@@ -486,6 +568,23 @@ public enum BuiltinAggregationFunctions {
     /// criteria_range and criteria string.
     static let sumifs = ExcelFunction(name: "SUMIFS", minArgs: 3, maxArgs: nil) { args in
         catching {
+            // An array criterion asks the question once per element — see
+            // `spreadOverArrayCriterion`. The scalar answer is `sumifsOne`.
+            if let spread = spreadOverArrayCriterion(
+                args, positions: criteriaPositions(of: "SUMIFS", count: args.count),
+                evaluate: sumifsOne) {
+                return spread
+            }
+            return sumifsOne(args)
+        }
+    }
+
+    /// `SUMIFS` for one value per criterion, which is every call that is not spread.
+    ///
+    /// - Parameter args: The call's arguments, each criterion a single value.
+    /// - Returns: The sum, or the error the arguments call for.
+    private static func sumifsOne(_ args: [CellValue]) -> CellValue {
+
             if let error = propagatedError(args, skipping: criteriaPositions(of: "SUMIFS", count: args.count)) {
                 return error
             }
@@ -549,7 +648,6 @@ public enum BuiltinAggregationFunctions {
                 }
             }
             return .number(total)
-        }
     }
 
     // MARK: - COUNTIF

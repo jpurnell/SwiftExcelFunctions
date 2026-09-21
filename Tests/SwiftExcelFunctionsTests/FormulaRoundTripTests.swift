@@ -51,12 +51,16 @@ final class FormulaRoundTripTests: XCTestCase {
 
     /// **A whole column expands, and that one is visible to the user.**
     ///
-    /// `$D:$D` means "column D" and says so in the Name Manager. `D1:D1048576` is the same
+    /// `$D:$D` means "column D" and says so in the Name Manager. `$D1:$D1048576` is the same
     /// cells and reads as a mistake. Reconstructing this shape needs the writer to recognise a
     /// full-column span and write the short form — a rule, again, not a second copy of the
     /// text.
+    ///
+    /// **The `$` used to be lost here too**, and that was not cosmetic: the lexer discarded it
+    /// before the parser saw it, so a shared formula moved columns Excel pins. This expectation
+    /// read `D1:D1048576`, and it passed. What remains lost is only the short form.
     func testAWholeColumnExpands() throws {
-        XCTAssertEqual(try roundTrip("Expenditures!$D:$D"), "'Expenditures'!D1:D1048576")
+        XCTAssertEqual(try roundTrip("Expenditures!$D:$D"), "'Expenditures'!$D1:$D1048576")
     }
 
     /// **The fallback the defined-name resolver uses today is not lossy, it is wrong.**

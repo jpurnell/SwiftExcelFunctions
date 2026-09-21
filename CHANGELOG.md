@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`SUMIFS` and `SUMIF` answer once per element of an array criterion.**
+  `SUMPRODUCT(SUMIFS(bounces, division, "West", month, q1_months))` is how a spreadsheet sums
+  over several key values without writing the addition out: `q1_months` is a three-cell name,
+  so Excel runs the `SUMIFS` three times and hands `SUMPRODUCT` an array to total.
+
+  **81 corpus cells in `Traffic and stuff.xlsx` are this shape** — names resolving to
+  `Definitions!$E$62:$E$64` and `$E$71:$E$73` — and every one answered `#VALUE!`, because a
+  criterion that was not a single value had no criteria string and the call refused.
+
+  Two array criteria still refuse: Excel broadcasts them and the result's shape depends on
+  each one's orientation, no corpus cell does it, and a wrongly shaped rectangle would be a
+  wrong number rather than a visible error.
+
+### Fixed
+
+- **A one-cell range was not a usable criterion.** `SUMIFS(…, months, E1:E1)` answered
+  `#VALUE!` where Excel reads the single month in it. Nothing becomes plural merely for having
+  been written as a range.
+
 - **`GETPIVOTDATA` answers field/item pairs.** 3,574 corpus cells used them and every one
   answered `#REF!`. **All 3,574 now agree with Excel**, and the four workbooks that carry
   pivot tables reach **100.00% agreement across 19,880 comparable cells** — 0 differed,
