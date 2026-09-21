@@ -1281,6 +1281,9 @@ public enum FormulaEvaluator {
         do {
             let l = try coerceToNumber(left)
             let r = try coerceToNumber(right)
+            if let root = BuiltinMathFunctions.realOddRoot(of: l, exponent: r) {
+                return .number(root)
+            }
             let result = pow(l, r)
             guard result.isFinite else { return .error(.num) }
             return .number(result)
@@ -1288,6 +1291,7 @@ public enum FormulaEvaluator {
             return eitherIsAFunction(left, right) ? .error(.calc) : .error(.value)
         }
     }
+
 
     /// An arithmetic result, or `#NUM!` where it left the reals.
     ///

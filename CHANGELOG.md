@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element, which is what Excel does. A branch that runs out contributes `#N/A` rather than a
   blank or a repeat.
 
+- **A negative base under an odd root is a real number, not `#NUM!`.**
+  `GoldmanSachs_CMCSAModel_Jul_28_2017.xlsx` computes a five-year CAGR defensively as
+  `IF(ISNUMBER((BC49/AP49)^(1/5)-1), (BC49/AP49)^(1/5)-1, "NM")`. The ratio is
+  `-0.0703891251733255`, and Excel's cached answer is `-1.5881675174209027` — exactly
+  `-(0.0703891251733255 ^ 0.2) - 1`. Excel takes the real fifth root and keeps the sign.
+
+  `pow(-0.07…, 0.2)` in C is `NaN`, so this answered `#NUM!`, `ISNUMBER` said false, and the
+  cell read `"NM"`: a plausible "not meaningful" that was ours and not the model's, and
+  indistinguishable on the sheet from one the analyst meant.
+
+  Only an **odd** root qualifies — `(-4)^0.5` stays `#NUM!` — and the test needs a tolerance,
+  since `1/5` is not exactly representable and `1/0.2` comes back as `4.999999999999999`.
+  `POWER` and `^` ask the same rule, in one place.
+
 - **`SUMIFS` and `SUMIF` answer once per element of an array criterion.**
   `SUMPRODUCT(SUMIFS(bounces, division, "West", month, q1_months))` is how a spreadsheet sums
   over several key values without writing the addition out: `q1_months` is a three-cell name,

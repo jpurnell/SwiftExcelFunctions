@@ -247,11 +247,54 @@ public enum BuiltinMathFunctions {
         catching {
             let base = try toNumber(args[0])
             let exponent = try toNumber(args[1])
+            // `POWER` and `^` are the same operator spelled two ways, so the odd-root rule
+            // lives in one place and both ask it — see `realOddRoot(of:exponent:)`.
+            if let root = realOddRoot(of: base, exponent: exponent) { return .number(root) }
             let result = Foundation.pow(base, exponent)
             guard result.isFinite else { throw EvalError.numError }
             return .number(result)
         }
     }
+
+    /// The real root of a negative base, where an odd root gives one.
+    ///
+    /// **Excel takes it; C does not.** `pow(-0.07, 0.2)` is `NaN`, because there is no
+    /// principal real value — but `-0.07` does have a real fifth root, and Excel returns it.
+    ///
+    /// Measured in `GoldmanSachs_CMCSAModel_Jul_28_2017.xlsx`, whose five-year CAGR is written
+    /// defensively as
+    ///
+    /// ```
+    /// IF(ISNUMBER((BC49/AP49)^(1/5)-1), (BC49/AP49)^(1/5)-1, "NM")
+    /// ```
+    ///
+    /// with `BC49/AP49` = `-0.0703891251733255`. Excel caches `-1.5881675174209027`, which is
+    /// exactly `-(0.0703891251733255 ^ 0.2) - 1`. Answering `#NUM!` made `ISNUMBER` false and
+    /// printed `"NM"` — a "not meaningful" that was this package's and not the model's, and
+    /// indistinguishable on the sheet from one the analyst meant.
+    ///
+    /// Only an **odd** root qualifies: `-4` has no real square root and `(-4)^0.5` stays
+    /// `#NUM!`. The test is that the exponent's reciprocal is an odd integer, and it needs a
+    /// tolerance rather than an equality — `1/5` is not exactly representable in binary, so
+    /// `1 / 0.2` comes back as `4.999999999999999`.
+    ///
+    /// - Parameters:
+    ///   - base: The base, which must be negative for this to apply.
+    ///   - exponent: The exponent, whose reciprocal must be an odd integer.
+    /// - Returns: The real root, or `nil` where the ordinary rule applies.
+    static func realOddRoot(of base: Double, exponent: Double) -> Double? {
+        guard base < 0, exponent != 0, exponent.isFinite else { return nil }
+        let reciprocal = 1 / exponent
+        let rounded = reciprocal.rounded()
+        guard Swift.abs(reciprocal - rounded) < 1e-9, Swift.abs(rounded) < 1e15 else {
+            return nil
+        }
+        guard Int(rounded) % 2 != 0 else { return nil }
+        let magnitude = Foundation.pow(-base, exponent)
+        guard magnitude.isFinite else { return nil }
+        return -magnitude
+    }
+
 
     // MARK: - MOD
 
