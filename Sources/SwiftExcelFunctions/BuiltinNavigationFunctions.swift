@@ -501,6 +501,16 @@ public enum BuiltinNavigationFunctions {
             guard table.rows > 0 else { return .error(.na) }
 
             let lookupValue = args[0]
+            // **A blank lookup matches nothing in an exact search**, including a blank sitting
+            // in the table's own first column. Three corpus cells read
+            // `VLOOKUP(template_person, Name_Lookup, 2, 0)` against an unfilled name field and
+            // got the table's empty first row back, which `&` then joined into a lone space.
+            //
+            // Narrower than the same rule in `MATCH`: only exact match, which is what was
+            // measured. Approximate search is left alone rather than tidied — nothing in the
+            // corpus exercises a blank against a sorted key, and a rule applied where it was
+            // not measured is how a refusal ends up destroying an answer.
+            if !approximate, case .blank = lookupValue { return .error(.na) }
             guard let match = firstRow(in: table, matching: lookupValue, approximate: approximate)
             else { return .error(.na) }
             return table[match, colIndex - 1]
@@ -553,6 +563,8 @@ public enum BuiltinNavigationFunctions {
             guard rowIndex >= 1 else { return .error(.value) }
             guard rowIndex <= table.rows else { return .error(.ref) }
             guard table.columns > 0 else { return .error(.na) }
+            // The same rule as `VLOOKUP`, for the same reason and with the same narrowness.
+            if !approximate, case .blank = args[0] { return .error(.na) }
 
             let lookupValue = args[0]
             guard let match = firstColumn(in: table, matching: lookupValue,

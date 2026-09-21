@@ -87,8 +87,16 @@ enum LazyBranch {
     private static func evaluateIf(
         _ arguments: [FormulaAST], _ evaluate: (FormulaAST) throws -> CellValue
     ) throws -> CellValue {
+        let condition = try evaluate(arguments[0])
+
+        // **An array condition asks the question once per element**, and both branches are
+        // needed — there is no single branch to take. See `acrossTheCondition`.
+        if case .array(let matrix) = condition {
+            return try acrossTheCondition(matrix, arguments, evaluate)
+        }
+
         let decision = try BuiltinLogicFunctions.ifFunc.evaluate(
-            [try evaluate(arguments[0]), .number(1), .number(0)])
+            [condition, .number(1), .number(0)])
 
         guard case .number(let taken) = decision else {
             // Not a condition at all — text, an array, an error. `IF` has already turned that
@@ -100,6 +108,63 @@ enum LazyBranch {
             return arguments.count > 2 ? try evaluate(arguments[2]) : .bool(false)
         }
         return try evaluate(arguments[1])
+    }
+
+    /// `IF` over an array condition: one answer per element, both branches evaluated.
+    ///
+    /// ## Why this is not the lazy path
+    ///
+    /// The whole point of the scalar path is that `IF(A1=0, "", 1/A1)` never divides by zero.
+    /// With an array condition there is no single branch to skip — some rows take one and some
+    /// the other — so Excel evaluates both and picks element by element, and so does this. The
+    /// scalar path above is untouched and stays lazy.
+    ///
+    /// ## The shape
+    ///
+    /// The condition's. Each branch is read at the same position, and a branch that **runs
+    /// out** contributes `#N/A` rather than a blank or a repeat — Excel's answer for an array
+    /// too short for the one beside it, and the honest one: there is no value there.
+    ///
+    /// A branch that is not an array is a single value used for every element, which is how
+    /// the `0` in `IF(years = wanted, quarters, 0)` reaches every row that fails the test.
+    ///
+    /// Each element's answer comes from the builtin, asked with the element's own branches, so
+    /// truthiness is decided in exactly one place — text, blanks and errors included.
+    ///
+    /// - Parameters:
+    ///   - condition: The evaluated condition, whose shape the answer takes.
+    ///   - arguments: The call's unevaluated arguments.
+    ///   - evaluate: Evaluates one argument in the caller's environment.
+    /// - Returns: An array of the condition's shape.
+    private static func acrossTheCondition(
+        _ condition: CellMatrix, _ arguments: [FormulaAST],
+        _ evaluate: (FormulaAST) throws -> CellValue
+    ) throws -> CellValue {
+        let whenTrue = try evaluate(arguments[1])
+        let whenFalse = arguments.count > 2 ? try evaluate(arguments[2]) : CellValue.bool(false)
+
+        var answers: [CellValue] = []
+        answers.reserveCapacity(condition.elements.count)
+        for (index, test) in condition.elements.enumerated() {
+            let taken = element(of: whenTrue, at: index)
+            let untaken = element(of: whenFalse, at: index)
+            answers.append(try BuiltinLogicFunctions.ifFunc.evaluate([test, taken, untaken]))
+        }
+        guard let shaped = CellMatrix(elements: answers, rows: condition.rows,
+                                      columns: condition.columns) else {
+            return .error(.value)
+        }
+        return .array(shaped)
+    }
+
+    /// One element of a branch, or the whole branch when it is a single value.
+    ///
+    /// `#N/A` past the end of a shorter array: Excel's answer where one side of an
+    /// element-wise operation runs out, and not a blank, which would read as a real empty cell.
+    private static func element(of branch: CellValue, at index: Int) -> CellValue {
+        guard case .array(let matrix) = branch else { return branch }
+        guard index < matrix.elements.count else { return .error(.na) }
+        return matrix.elements[index]
     }
 
     /// `IFS(condition, result, …)` — the first true condition's result.

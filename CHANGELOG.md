@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`IF` answers once per element of an array condition.**
+  `MATCH(quarter, IF(years = wanted, quarters, 0), 0)` is how a spreadsheet looks something up
+  on two keys without a helper column: the `IF` blanks out every row of the wrong year and the
+  `MATCH` searches what is left.
+
+  **64 corpus cells across three `Goals Template` workbooks are this shape**, and every one
+  answered `#VALUE!` because the condition was not a single truth value. Excel answers `#N/A`
+  for 63 — the year really is not in the sheet — and a real value for the 64th; both fall out
+  of the same rule, which is why `#N/A` was not a shortcut worth taking.
+
+  The scalar path stays **lazy**: `IF(A1=0,"",1/A1)` still never divides by zero. With an array
+  condition there is no single branch to skip, so both are evaluated and picked element by
+  element, which is what Excel does. A branch that runs out contributes `#N/A` rather than a
+  blank or a repeat.
+
 - **`SUMIFS` and `SUMIF` answer once per element of an array criterion.**
   `SUMPRODUCT(SUMIFS(bounces, division, "West", month, q1_months))` is how a spreadsheet sums
   over several key values without writing the addition out: `q1_months` is a three-cell name,
@@ -23,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrong number rather than a visible error.
 
 ### Fixed
+
+- **A blank lookup value matched the blank inside the table.** Three corpus cells read
+  `VLOOKUP(template_person, Name_Lookup, 2, 0)` against `Template!$M$1` — an unfilled template
+  field — and got the table's own empty first row back, which `&` then joined into a lone
+  space where Excel has `#N/A`.
+
+  The same defect `MATCH` had, measured in round fifteen at 82 cells. Applied **only to exact
+  match**, which is what these cells use: nothing in the corpus exercises a blank against a
+  sorted key, and a rule applied where it was not measured is how a refusal ends up destroying
+  an answer.
 
 - **A one-cell range was not a usable criterion.** `SUMIFS(…, months, E1:E1)` answered
   `#VALUE!` where Excel reads the single month in it. Nothing becomes plural merely for having
