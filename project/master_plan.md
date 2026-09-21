@@ -101,10 +101,13 @@ and confirmed this package's rule — argument order decides which error propaga
 
 **What this release is not.** The API has been stable throughout, but nothing has yet consumed
 it as a *client* rather than as a test harness. The simulation GUI is the first thing that
-will, which is what the pre-release identifier is for. Note that SwiftPM range requirements do
-not match pre-release versions — `from: "1.0.0"` will not resolve `1.0.0-alpha.1` — and that
-both dependencies are still 0.x and ship breaking changes at minor versions by their own
-policy.
+will, which is what the pre-release identifier is for.
+
+Resolving a pre-release is ordinary — a range whose lower bound carries the identifier reaches
+it, which is how this package already resolves BusinessMath `3.0.0-alpha.7` from
+`.upToNextMinor(from: "3.0.0-alpha.3")`. Both dependencies remain 0.x and ship breaking changes
+at minor versions by their own policy, so this version speaks for *this* package's surface and
+not for the stack beneath it.
 
 ### 0.11.0 — `LAMBDA`, and every Excel category closed
 

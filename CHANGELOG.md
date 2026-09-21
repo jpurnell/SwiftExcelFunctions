@@ -20,11 +20,13 @@ SwiftXLSX 0.36.0.
 
 **Why a pre-release identifier.** The API has been stable throughout this work, but nothing has
 yet consumed it as a *client* rather than as a test harness — the simulation GUI is the first
-thing that will. Two consequences worth knowing: SwiftPM range requirements do not match
-pre-release versions, so `from: "1.0.0"` will not resolve this and a consumer must pin it
-exactly; and both dependencies are still 0.x and ship breaking changes at minor versions by
-their own stated policy, so this is a statement about *this* package's surface rather than
-about the stack beneath it.
+thing that will.
+
+Resolving it is ordinary: a range whose lower bound carries the identifier reaches it, which is
+exactly how this package already resolves BusinessMath `3.0.0-alpha.7` from
+`.upToNextMinor(from: "3.0.0-alpha.3")`. A bound without one does not. Both dependencies remain
+0.x and ship breaking changes at minor versions by their own stated policy, so this version is
+a statement about *this* package's surface rather than about the stack beneath it.
 
 
 ### Fixed

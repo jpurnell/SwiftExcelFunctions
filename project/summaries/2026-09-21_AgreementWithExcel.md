@@ -140,8 +140,11 @@ for it.
 
 Two things worth knowing before depending on this:
 
-- **SwiftPM range requirements do not match pre-release versions.** `from: "1.0.0"` will not
-  resolve `1.0.0-alpha.1`; a consumer must pin it exactly.
+- **Resolving a pre-release is ordinary**, and I said otherwise at first. A range whose lower
+  bound carries the identifier reaches it — this package already resolves BusinessMath
+  `3.0.0-alpha.7` from `.upToNextMinor(from: "3.0.0-alpha.3")`. A bound without one does not.
+  I wrote the blanket claim into four documents before checking the one sitting in this
+  package's own manifest.
 - **The dependencies are still 0.x** — SwiftExcelCore 0.19.0 and SwiftXLSX 0.36.0 — and both
   ship breaking changes in minor versions by their own stated policy. A 1.0 on top of that is
   a statement about *this* package's surface, not about the stack beneath it.

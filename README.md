@@ -15,8 +15,9 @@ of, most recently that a blank lookup value is `0`, that a negative base under a
 a real value, and that argument order decides which error propagates.
 
 **Why alpha.** The API has been stable throughout, but nothing has yet consumed it as a
-*client* rather than as a test harness. Note that SwiftPM range requirements do not match
-pre-release versions: `from: "1.0.0"` will not resolve `1.0.0-alpha.1`, so pin it exactly.
+*client* rather than as a test harness. A consumer resolves a pre-release the way this package
+resolves BusinessMath — a range whose own lower bound carries the identifier, or an exact pin.
+A bound without one will not reach it.
 
 - **494** of Microsoft's 519 documented worksheet functions. The other 25 need a live data
   service, a network fetch, or a layer this package deliberately does not have — see
