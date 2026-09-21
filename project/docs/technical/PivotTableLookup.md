@@ -1,9 +1,9 @@
 # GETPIVOTDATA — a lookup into a rendered table, not a recomputation
 
-**Status:** phase one shipped. 3,802 cells across four corpus workbooks, 77% of everything
-a 300-workbook run still disagrees on; **228 of them now agree** and 3,574 remain.
+**Status:** **done.** All 3,802 cells agree. The four corpus workbooks carrying pivot tables
+reach **100.00% agreement across 19,880 comparable cells** — 0 differed, 0 refused, 0 threw.
 **Written:** 2026-09-20, from evidence in `Amazon Reporting thru 05-15-18.xlsx`.
-**Revised:** 2026-09-20, after measuring the phase split properly — see below.
+**Revised:** 2026-09-20, after measuring the phase split properly, then again on finishing.
 
 ---
 
@@ -289,7 +289,49 @@ grows — and it is **one workbook**. 3,574 cells behind a single file is a larg
 narrow base, and a capability built to satisfy one file needs independent evidence before it
 is believed, exactly as every other fix here did.
 
-## What must be measured before writing it
+## What it took in the end, and what the plan had wrong
+
+Phase two shipped in two rounds. The count of what each round cleared:
+
+| | cells | |
+|---|---:|---|
+| phase one — two-argument grand total | 228 | three Amazon workbooks |
+| round one — field/item pairs | 2,614 | sparse labels, subtotals, page fields, the blank item |
+| round two — stacked column items | 960 | the one pivot with two column fields |
+| **remaining** | **0** | |
+
+**Every substantive claim this document made before writing the code was wrong in some way,
+and the file corrected each one.** Worth listing, because the pattern is the point:
+
+| the plan said | the file said |
+|---|---|
+| pairs match **row labels** | whichever axis the field is on — 38 of 50 pivots have a column axis, 40 have page fields |
+| `xl/pivotCache/` is **never** opened | definitions are needed for the field *names*; records still never |
+| the data field is matched by **caption** | by caption **or** source name — the corpus asks for `"Subs"` against `"Sum of Subs"` |
+| subtotal rows must be **distinguished from data rows and skipped** | they are *answers*; 420 cells want exactly them |
+| the split is **1,800 / 2,002** | 228 / 3,574, and the regex that produced it could not parse a nested call |
+
+Three more that no amount of reasoning would have produced:
+
+- **A subtotal is rendered only where a group splits.** `VD` has three `BP/IP` children and
+  gets a `VD Total` row; `V` has none and its single data row is its own total.
+- **A subtotal caption is written either way round** — `"L21 Total"` and `"Total  B1"`, both in
+  one table — and the doubled space in the second is a leading space in the caption itself.
+- **`rowGrandTotals` being on does not mean one grand total row.** With the data field names on
+  the row axis Excel writes one per data field, so the last row reads `"Total  HSI"`.
+
+The rule that fell out: **a constraint may skip a level, but a subtotal may not.** A data row
+is one cell of the grid, so a gap above it is answerable whenever it still picks out one line —
+930 cells leave `Last21Flag` free and resolve because the flag partitions the dates rather than
+subdividing them, which was checked rather than assumed. A subtotal row is the total of one
+specific outer group: `GBR Total` sits inside `CY` and counts no `PY`, so it can never stand
+for `GBR` across all scenarios. An existing test caught that by starting to **pass** when it
+should have kept refusing.
+
+## What was measured before writing it
+
+### The original list of open questions
+
 
 **Where the grand total row is.** It was found above by the label `"Grand Total"` in the
 row-label column. That works perfectly on this corpus and **would fail on the first German
