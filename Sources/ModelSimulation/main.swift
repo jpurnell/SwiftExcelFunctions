@@ -90,6 +90,17 @@ struct ModelSimulation {
         guard survey.isSimulable else {
             report("nothing in the model varies"); exit(1)
         }
+        // What a GUI would list: every uncertain cell, its distribution, its parameters.
+        for input in survey.uncertain {
+            let shown = input.call.parameters.map { FormulaSerializer.serialize($0) }
+            say("  input \(input.inputIndex): \(input.address.reference)  "
+                + "\(input.call.function)(\(shown.joined(separator: ", ")))"
+                + (input.call.label.map { "  \"\($0)\"" } ?? "")
+                + (input.call.unhandledProperties.isEmpty ? ""
+                   : "  UNHANDLED: \(input.call.unhandledProperties.joined(separator: ", "))"))
+        }
+        say("  outputs: \(survey.outputs.map(\.reference).sorted().joined(separator: ", "))")
+
         let run = try InterpretedRun.run(
             survey: survey, over: sheet, names: NoNames(),
             trials: trials, seed: seed)
