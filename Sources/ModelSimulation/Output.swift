@@ -21,3 +21,26 @@ func report(_ message: String) {
         .error("\(message, privacy: .public)")
     #endif
 }
+
+/// Counts progress callbacks, which arrive from whichever task finished a batch.
+///
+/// A `@Sendable` callback cannot capture a mutable variable, and this is the smallest thing
+/// that can be told "one more" from several threads. A GUI would hold its progress value the
+/// same way — or on the main actor, which is simpler still.
+// Justification: the only state is one Int and every access to it is inside `lock`.
+final class Ticker: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ticks = 0
+
+    func tick() {
+        lock.lock()
+        ticks += 1
+        lock.unlock()
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return ticks
+    }
+}

@@ -33,7 +33,7 @@ import SwiftXLSX
 @main
 struct ModelSimulation {
 
-    static func main() throws {
+    static func main() async throws {
         let arguments = CommandLine.arguments
         guard arguments.count >= 3 else {
             report("usage: <in.xlsx> <out.xlsx> [trials] [seed] [priceMean priceSigma]")
@@ -101,9 +101,28 @@ struct ModelSimulation {
         }
         say("  outputs: \(survey.outputs.map(\.reference).sorted().joined(separator: ", "))")
 
-        let run = try InterpretedRun.run(
-            survey: survey, over: sheet, names: NoNames(),
+        let addresses = sheet.populatedCells().map { CellAddress(sheet: "", cell: $0) }
+        let graph = DependencyGraph(cells: addresses, provider: sheet)
+        let engine = InterpretedRun(
+            survey: survey, evaluationOrder: graph.evaluationOrder.map(\.cell),
             trials: trials, seed: seed)
+
+        let started = Date()
+        // A UI moves a bar here. A CLI counts the callbacks, which is enough to show the
+        // reporting is incremental rather than one jump at the end.
+        let ticks = Ticker()
+        // Optional 8th argument: lanes, so the scaling can be measured rather than assumed.
+        let lanes = arguments.count > 7 ? Int(arguments[7]) : nil
+        let run = try await engine.runConcurrently(
+            over: sheet, names: NoNames(), concurrency: lanes,
+            onProgress: { _ in ticks.tick() })
+        let elapsed = Date().timeIntervalSince(started)
+        // Guarded because a run fast enough to measure as zero would divide by it.
+        let rate = elapsed > 0 ? Double(trials) / elapsed : 0
+        say("  \(trials) trials in \(ModelSimulation.format(elapsed))s, "
+            + "\(ticks.count) progress reports "
+            + "(\(ModelSimulation.format(rate)) trials/s, "
+            + "\(lanes ?? ProcessInfo.processInfo.activeProcessorCount) lanes)")
 
         guard let npv = run.results(for: CellRef(Edits.expectedNPV)),
               let ratio = run.results(for: CellRef(Edits.ratio)) else {

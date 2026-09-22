@@ -9,13 +9,23 @@ import SwiftExcelFunctions
 /// that pair and nothing else — the smallest provider a simulation can run over.
 struct CellSheet: CellValueProvider, PopulatedCellProvider {
 
-    private(set) var cells: [String: CellValue]
+    private(set) var cells: [Int: CellValue]
 
-    init(cells: [String: CellValue] = [:]) { self.cells = cells }
+    init(cells: [Int: CellValue] = [:]) { self.cells = cells }
 
-    /// Keyed by position, not by spelling: `$C$4` and `C4` are the same cell, and a
-    /// dictionary keyed by the written form treats them as two.
-    private static func key(_ ref: CellRef) -> String { "\(ref.column):\(ref.row)" }
+    /// Keyed by position as **one integer**, not by spelling and not by a string.
+    ///
+    /// `$C$4` and `C4` are the same cell, so the `$` markers cannot be part of the key. The
+    /// obvious fix — key by `"\(column):\(row)"` — is the one this file shipped first, and
+    /// it is a documented mistake: `WorkbookSnapshot` in the oracle carries a note saying
+    /// keying by a string "meant building that string on every read… the profile was almost
+    /// entirely `_BinaryIntegerToASCII`". A simulation reads far harder than the oracle does —
+    /// 200,000 trials over 30 formula cells is six million reads — and it made the same
+    /// mistake anyway.
+    ///
+    /// Excel's grid is 16,384 columns, so a column fits in 14 bits and the two pack into one
+    /// `Int` with no arithmetic worth measuring.
+    private static func key(_ ref: CellRef) -> Int { ref.row << 15 | ref.column }
 
     subscript(ref: String) -> CellValue? {
         get { cells[Self.key(CellRef(ref))] }
@@ -35,15 +45,9 @@ struct CellSheet: CellValueProvider, PopulatedCellProvider {
     }
     func values(in range: CellRange, inSheet: String) -> [CellValue] { values(in: range) }
 
-    /// Every cell this sheet holds, rebuilt from the position keys.
+    /// Every cell this sheet holds, unpacked from the position keys.
     func populatedCells() -> [CellRef] {
-        cells.keys.compactMap { key in
-            let parts = key.split(separator: ":")
-            guard parts.count == 2, let column = Int(parts[0]), let row = Int(parts[1]) else {
-                return nil
-            }
-            return CellRef(column: column, row: row)
-        }
+        cells.keys.map { CellRef(column: $0 & 0x7FFF, row: $0 >> 15) }
     }
 }
 

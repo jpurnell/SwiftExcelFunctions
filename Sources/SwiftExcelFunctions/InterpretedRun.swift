@@ -107,11 +107,14 @@ public struct SimulationRun: Sendable, SimulationResultProvider {
 /// before that cell has been computed and reports the result as a simulation.
 public struct InterpretedRun: Sendable {
 
-    private let survey: ModelSurvey
-    private let evaluationOrder: [CellRef]
-    private let trials: Int
-    private let seed: UInt64
-    private let registry: FunctionRegistry
+    // `internal` rather than `private`: the concurrent form in `ParallelRun.swift` is the
+    // same run by another schedule and needs the same five things. Still not public — a
+    // caller configures a run through `init`, not by reading it back.
+    let survey: ModelSurvey
+    let evaluationOrder: [CellRef]
+    let trials: Int
+    let seed: UInt64
+    let registry: FunctionRegistry
 
     /// - Parameters:
     ///   - survey: what the recognizer found — the draws and the outputs.

@@ -81,6 +81,9 @@ struct Report {
           5th – 95th        \(ModelSimulation.format(ratio.percentiles.p5))× – \(ModelSimulation.format(ratio.percentiles.p95))×
           P(clears 5×)      \(percent(probabilityOfClearingHurdle))
 
+        Convergence of the ratio (95% interval on the mean)
+          ±\(ModelSimulation.format(Convergence(ratio).halfWidth))×  over \(trials) trials\(Convergence(ratio).hasSettled(within: 0.01) ? "   settled to 1%" : "")
+
         What only a distribution shows
           P(plant idle)     \(percent(probabilityIdle))   price below cost, so it makes nothing
           P(over capacity)  \(percent(probabilityOverCapacity))   and the model never checks C12
