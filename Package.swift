@@ -138,6 +138,15 @@ let package = Package(
         // census and the oracle are — and because a validator nobody outside this repo
         // can run is a library, not a tool.
         .executableTarget(
+            name: "ModelSimulation",
+            dependencies: [
+                "SwiftExcelFunctions",
+                .product(name: "SwiftExcelCore", package: "SwiftExcelCore"),
+                .product(name: "SwiftXLSX", package: "SwiftXLSX")
+            ],
+            path: "Sources/ModelSimulation"
+        ),
+        .executableTarget(
             name: "XlsxAudit",
             dependencies: [
                 "WorkbookAudit",
