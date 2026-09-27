@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.2] - 2026-09-27
+
+### Added
+
+- **`ParallelRun` — running a simulation the way a user interface needs it run.**
+  `runConcurrently(over:names:overrides:concurrency:onProgress:)` is async, reports progress and
+  honours cancellation, checked once per trial so a stop takes milliseconds. Each trial derives
+  its generator from the seed and its own index, so the answer cannot depend on how the work was
+  divided — a stronger guarantee than a single shared stream, and a test pins the mean identical
+  across 1, 3 and 8 lanes.
+
+- **`DistributionOverride`** — change a distribution's parameters without touching the workbook.
+  It edits the existing AST rather than rebuilding the call from a `DistributionCall`, because
+  rebuilding drops any property the recognizer could not model: a `PsiTruncate` would vanish and
+  the distribution would still compute, returning a number wrong in a way nothing reports. A
+  test asserts a `PsiTruncate` survives an edit.
+
+- **`Convergence`** — whether more trials have stopped changing the answer, computed as
+  `1.96σ/√n` rather than borrowed from a confidence interval of the distribution itself. The
+  first version used the latter and reported a band that *grew* with more trials, which is the
+  spread of the thing being measured and not the precision of the measurement.
+
+- **`ModelSurveyor`** — the uncertain inputs of a workbook as a table: cell, distribution,
+  parameters, `PsiName` label, and any property the recognizer could not model. A user interface
+  needs no new API to populate an inputs pane.
+
 ### Changed
 
 - Requires SwiftXLSX **0.37.1**, which stops a read-modify-write destroying the workbook it
