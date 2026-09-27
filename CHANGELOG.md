@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires SwiftXLSX **0.37.0**, which stops a read-modify-write destroying the workbook it
+  read. Opening somebody's file and saving it used to drop 57% of its parts — every chart,
+  theme, pivot cache and external link; it now drops none, and editing one cell costs a few
+  bytes of one sheet rather than the whole part.
+
+  Nothing here changes. Every `save(to:)` call site in this package composes its workbook in
+  code, and a composed workbook saves exactly as it always has — the new behaviour follows
+  provenance, so only a workbook that was *read* saves surgically.
+
 ## [1.0.0-alpha.1] - 2026-09-21
 
 **It agrees with Excel.** 300 workbooks, **4,524,171 comparable cells, 99.999978% agreement** —
