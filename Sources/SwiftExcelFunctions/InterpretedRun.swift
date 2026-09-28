@@ -15,6 +15,17 @@ import BusinessMath
 public enum TrialRunError: Error, Sendable, Equatable {
 
     /// The model has no uncertain cell, so there is nothing to vary.
+    ///
+    /// **No longer thrown by ``InterpretedRun/run(over:names:)`` or
+    /// ``InterpretedRun/runConcurrently(over:names:overrides:concurrency:onProgress:)``.** A
+    /// model with nothing uncertain in it is a model that evaluates to the same answer every
+    /// trial, which is well defined and is the first thing a careful caller asks for: *does
+    /// this reproduce the numbers the workbook already has?* Refusing it meant the only way to
+    /// discover the evaluator disagreed with Excel was to vary an assumption first and then
+    /// wonder which of the two had moved the answer.
+    ///
+    /// Kept in the enum because callers switch over it, and because a caller that wants the
+    /// old rule can still ask ``ModelSurvey/isSimulable`` and raise this itself.
     case notSimulable
 
     /// Nothing to collect: the model declares no outputs and the caller named none.
@@ -152,7 +163,6 @@ public struct InterpretedRun: Sendable {
         names: any NameResolver
     ) throws -> SimulationRun {
         guard trials > 0 else { throw TrialRunError.invalidTrialCount(trials) }
-        guard survey.isSimulable else { throw TrialRunError.notSimulable }
         guard !survey.outputs.isEmpty else { throw TrialRunError.noOutputsToCollect }
         try validateOrder(against: cells)
 

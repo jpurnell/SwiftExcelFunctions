@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.3] - 2026-09-27
+
+### Changed
+
+- **A model with nothing uncertain in it now runs**, instead of being refused as
+  `TrialRunError.notSimulable`. `InterpretedRun.run(over:names:)` and
+  `runConcurrently(…)` no longer check `survey.isSimulable`.
+
+  A survey with no distribution is a model that evaluates to the same answer every trial,
+  which is well defined — and is the first thing a careful caller asks for: *does this
+  evaluator reproduce the numbers the workbook already holds?* Refusing meant the only way to
+  discover it did not was to vary an assumption first and then wonder which of the two had
+  moved the answer. A distribution around a wrong number is a confident wrong answer.
+
+  `.noOutputsToCollect` is unaffected: a run with nothing to collect is still refused, because
+  there would be nothing to report.
+
+  `TrialRunError.notSimulable` stays in the enum. Callers switch over it, and one that wants
+  the old rule can ask `ModelSurvey.isSimulable` and raise it itself.
+
 ## [1.0.0-alpha.2] - 2026-09-27
 
 ### Added

@@ -232,7 +232,6 @@ extension InterpretedRun {
         onProgress: (@Sendable (SimulationProgress) -> Void)? = nil
     ) async throws -> SimulationRun {
         guard trials > 0 else { throw TrialRunError.invalidTrialCount(trials) }
-        guard survey.isSimulable else { throw TrialRunError.notSimulable }
         guard !survey.outputs.isEmpty else { throw TrialRunError.noOutputsToCollect }
 
         let formulas = try plan(over: cells, overrides: overrides)

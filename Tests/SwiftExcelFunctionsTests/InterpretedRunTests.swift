@@ -212,11 +212,31 @@ final class InterpretedRunTests: XCTestCase {
         }
     }
 
-    /// And nothing to vary is the other one.
-    func testAModelWithNoDrawsIsNotSimulable() throws {
+    /// **A model with nothing to vary runs**, and gives the same answer every trial.
+    ///
+    /// This asserted the opposite until 2026-09-27: a survey with no uncertain cell was
+    /// refused as `.notSimulable`. That is true of a *simulation* and it is the wrong place to
+    /// enforce it, because it withholds the check a careful caller makes first — does this
+    /// evaluator reproduce the numbers the workbook already holds? Refusing meant the only way
+    /// to find out it did not was to vary an assumption and then wonder which of the two had
+    /// moved the answer. A distribution around a wrong number is a confident wrong answer.
+    ///
+    /// The error case is kept, because callers switch over it and one that wants the old rule
+    /// can ask ``ModelSurvey/isSimulable`` and raise it itself.
+    func testAModelWithNoDrawsRunsAndIsConstant() throws {
+        let sheet = try Sheet(formulas: ["B1": "2*3+PsiOutput()"], constants: ["A1": 3])
+        let run = try run(sheet, [CellRef("B1")], trials: 5)
+
+        let results = try XCTUnwrap(run.results(for: CellRef("B1")))
+        XCTAssertEqual(results.values.count, 5, "every trial still reports")
+        XCTAssertEqual(Set(results.values), [6], "and every trial gives the same answer")
+    }
+
+    /// Nothing to collect is still a refusal, with or without a draw.
+    func testAConstantModelStillNeedsAnOutput() throws {
         let sheet = try Sheet(formulas: ["B1": "1+1"], constants: ["A1": 3])
         XCTAssertThrowsError(try run(sheet, [CellRef("B1")])) { error in
-            XCTAssertEqual(error as? TrialRunError, .notSimulable)
+            XCTAssertEqual(error as? TrialRunError, .noOutputsToCollect)
         }
     }
 
