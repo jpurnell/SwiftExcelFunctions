@@ -549,9 +549,15 @@ the motivating application rather than an end in itself.
   what is untested is whether the public surface is the right shape for something driving it
   rather than testing it. That is the question the alpha exists to answer.
 
-- **Implicit intersection at scalar function arguments.** Measured in round sixteen and
+- **Implicit intersection at scalar function arguments.** ~~Measured in round sixteen and
   deliberately left open — see *Known traps*. No corpus cell turns on it, and closing it needs
-  a per-argument fact about several hundred functions.
+  a per-argument fact about several hundred functions.~~ **Closed for the lookup family at
+  1.0.0-alpha.4 (2026-09-28); open for everything else.** The corpus reasoning held and the
+  corpus was not the world: the first workbook opened by the app this alpha exists to feed
+  writes twelve `VLOOKUP($C$6:$C$8, Data!$J$4:$N$7, 2)`, one per parameter, and read zero
+  throughout without them. `VLOOKUP`, `HLOOKUP`, `LOOKUP` and `MATCH` intersect argument 0 —
+  the one argument Excel documents as a single value in every form, so not a guess. The rest
+  of the surface stays as *Known traps* describes it, for the reason given there.
 
 - ~~**The unreviewed bucket.**~~ **Closed 2026-09-17.** `unreviewed` reached **0** for the
   `EXCEL` source: **473 have, 25 out of scope, 20 bindable, 1 new.** Every one of the ten
@@ -654,6 +660,20 @@ that turns on it. Getting that list wrong in either direction produces a **plaus
 number rather than an error**, which is the trade this project keeps refusing. Recorded as a
 known divergence so no future round reports it as news.
 
+**Narrowed at 1.0.0-alpha.4 (2026-09-28), and the reasoning above is why it was narrowed
+rather than closed.** The clause that failed was not *"guessing the list is dangerous"* — that
+still holds — but *"no case turns on it"*, which described the corpus and was read as
+describing the world. A real workbook turned on it at the first attempt, and the whole model
+read zero. So `VLOOKUP`, `HLOOKUP`, `LOOKUP` and `MATCH` now intersect argument 0, which Excel
+documents as a single value in every form and is therefore known rather than guessed; their
+other arguments are ranges and are deliberately untouched, since a table narrowed to one row
+is precisely the plausible wrong number this trap is about. `ABS(A1:A5)` is still `#VALUE!`
+here and `3` in Excel, and is still pinned by a test.
+
+The lesson worth keeping is about the evidence, not the rule: *no corpus cell exercises it* is
+a statement about the corpus. This one was 300 workbooks of teaching material and employer
+models, and it did not contain the idiom that the very first workbook a user opened did.
+
 
 **Excel is not always right, and the checker must not treat every disagreement as a defect.**
 Measured, not supposed. `BESSELJ(0, 0)` is exactly 1 by definition; this package returns
@@ -715,7 +735,7 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-21 — reconciled for **1.0.0-alpha.1**. Current Status rewritten
+**Last Updated:** 2026-09-28 — reconciled for **1.0.0-alpha.4**: the function-argument intersection gap moved from Roadmap/Known-traps to partly shipped (the lookup family only, with the reasoning for stopping there), and the note that both run engines evaluated with no calling cell — which had switched implicit intersection off for every simulation. Earlier: 2026-09-21 — reconciled for **1.0.0-alpha.1**. Current Status rewritten
 around corpus agreement (300 workbooks, 4,524,171 comparable cells, 99.999978%, one
 disagreement that is a workbook's own stale cache). `GETPIVOTDATA`, the `PSI` bucket and
 corpus agreement moved out of Roadmap/Next into shipped entries; the simulation GUI and the

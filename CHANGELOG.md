@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.4] - 2026-09-28
+
+### Fixed
+
+- **Implicit intersection now reaches the lookup family's lookup value.**
+  `VLOOKUP($C$6:$C$8, Data!$J$4:$N$7, 2)` written in row 6 means `C6`, as Excel reads it.
+  This package answered `#N/A`. `VLOOKUP`, `HLOOKUP`, `LOOKUP` and `MATCH` now intersect
+  their first argument through the same `implicitlyIntersected` rule the scalar operators
+  use, so both gates — not array-entered, and not inside a call that asked for arrays —
+  hold for arguments too and cannot drift apart from the operator seam.
+
+  `ImplicitIntersectionTests` recorded this gap at round sixteen and left it open on the
+  grounds that closing it needs a per-argument fact about several hundred functions, and
+  that *"a 300-workbook run at 4,524,171 comparable cells does not contain one case that
+  turns on it."* That was true of the corpus and false of the world: a shelf-space
+  optimisation writes twelve of these, one per parameter, and every figure in the model
+  read zero without them. So the list is closed where it is **known** — Excel documents
+  that argument as a single value in every form — and the rest of the gap stays open and
+  stays recorded, with `ABS(A1:A5)` still pinned as a measured difference.
+
+  The other arguments are deliberately untouched. A table narrowed to one row is exactly
+  the plausible-wrong-number this list exists to avoid, which is why it names the argument
+  index rather than the function.
+
+- **A simulation evaluates each cell as the cell it is.** `InterpretedRun` and `ParallelRun`
+  passed `at: nil` to the evaluator, and the intersection rule says what that costs: *"with
+  no calling cell there is nothing to intersect against and the range stands."* Implicit
+  intersection — implemented and tested throughout the package — was therefore switched off
+  for the whole of every simulation, so a formula that evaluated correctly on its own
+  stopped doing so the moment it was run, with nothing to say why. Both engines now pass
+  the cell being evaluated, and a test pins the two engines to the same answer.
+
 ## [1.0.0-alpha.3] - 2026-09-27
 
 ### Changed
@@ -2814,6 +2846,9 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...HEAD
+[1.0.0-alpha.4]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.3...v1.0.0-alpha.4
+[1.0.0-alpha.3]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.2...v1.0.0-alpha.3
+[1.0.0-alpha.2]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.1...v1.0.0-alpha.2
 [1.0.0-alpha.1]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...v1.0.0-alpha.1
 [0.11.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.9.3...v0.10.0

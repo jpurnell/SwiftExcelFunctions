@@ -319,7 +319,14 @@ extension InterpretedRun {
             for formula in formulas {
                 let value = try FormulaEvaluator.evaluate(
                     formula.ast, cells: trial, names: names, functions: registry,
-                    at: nil, inSheet: "", random: random)
+                    // **The cell being evaluated, not `nil`.** Implicit intersection is
+                    // measured against the formula's own position, and the evaluator says so:
+                    // with no calling cell there is nothing to intersect against and the range
+                    // stands. Passing `nil` here switched that rule off for the whole of every
+                    // simulation, so `VLOOKUP(A1:A3, …)` answered in a run what it would never
+                    // answer on its own. The sheet is empty for the same reason it is empty in
+                    // `inSheet` beside it: the run works in one sheet and names it nowhere.
+                    at: CellAddress(sheet: "", cell: formula.ref), inSheet: "", random: random)
                 trial.overrides[formula.ref.positionKey] = value
             }
             for output in outputs {

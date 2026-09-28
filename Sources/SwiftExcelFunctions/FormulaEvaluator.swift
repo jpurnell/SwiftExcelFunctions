@@ -610,7 +610,8 @@ public enum FormulaEvaluator {
             // would cover. An `ExcelFunction` is handed evaluated values, so by the time one
             // runs a one-cell `sum_range` is a single number with no address, and the shape
             // it should have grown to is unrecoverable.
-            let args = FormulaEvaluator.stretchingSumRange(fn.name, args)
+            let args = FormulaEvaluator.intersectingScalarArguments(
+                fn.name, FormulaEvaluator.stretchingSumRange(fn.name, args), in: inCall)
 
             // A branching call chooses among its arguments instead of consuming them, so it
             // has to be reached before any of them are evaluated. See `LazyBranch`, and note
@@ -807,6 +808,53 @@ public enum FormulaEvaluator {
                 return try inContext(context, evaluatedArgs)
             }
             return try fn.evaluate(evaluatedArgs)
+        }
+    }
+
+    /// Which arguments take a **single value**, for the functions where that is known.
+    ///
+    /// Excel intersects a multi-cell range at every scalar argument, not only at a scalar
+    /// operator. Doing that in general needs every function to declare which of its arguments
+    /// take one value and which take a range — a per-argument fact about several hundred
+    /// functions, where guessing wrong in either direction produces a plausible wrong number
+    /// rather than an error. So this is a list of what is known rather than an attempt at all
+    /// of it, and the remainder stays recorded as a measured gap.
+    ///
+    /// **The lookup family is on it because a real workbook turned on it.** Twelve cells of
+    /// `VLOOKUP($C$6:$C$8, Data!$J$4:$N$7, 2)`, one per parameter of a shelf-space model, each
+    /// meaning the row it is written in: Excel answers `3297.86` and this package answered
+    /// `#N/A`, taking every figure downstream to zero. Their first argument is a single value
+    /// in every form Excel documents, so it is not a guess.
+    ///
+    /// The *other* arguments are ranges and must be left alone — a table narrowed to one row
+    /// is the wrong-number failure this list exists to avoid, which is why the index is named
+    /// rather than the function.
+    private static let scalarArguments: [String: Set<Int>] = [
+        "VLOOKUP": [0],
+        "HLOOKUP": [0],
+        "LOOKUP": [0],
+        "MATCH": [0],
+    ]
+
+    /// A call's arguments, with the scalar ones intersected against the formula's position.
+    ///
+    /// Reuses ``implicitlyIntersected(_:in:)`` rather than restating its rule, so the two
+    /// gates that hold for operators — not array-entered, and not inside a call that asked for
+    /// arrays — hold here too and cannot drift apart from it.
+    ///
+    /// - Parameters:
+    ///   - name: The function being called.
+    ///   - arguments: Its unevaluated arguments.
+    ///   - env: The environment, which carries the gates and the calling cell.
+    /// - Returns: The arguments, with any scalar one narrowed where the rule applies.
+    static func intersectingScalarArguments(
+        _ name: String, _ arguments: [FormulaAST], in env: EvaluationEnvironment
+    ) -> [FormulaAST] {
+        guard let scalar = scalarArguments[name] else { return arguments }
+        return arguments.enumerated().map { index, argument in
+            guard scalar.contains(index),
+                  let narrowed = implicitlyIntersected(argument, in: env) else { return argument }
+            return narrowed
         }
     }
 

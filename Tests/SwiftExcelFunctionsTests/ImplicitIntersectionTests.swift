@@ -126,22 +126,82 @@ final class ImplicitIntersectionTests: XCTestCase {
                        "even from a row the range does not reach")
     }
 
-    /// **A known gap, measured in round sixteen and deliberately not closed.**
+    // MARK: - Scalar function arguments
+
+    /// **`VLOOKUP($C$6:$C$8, …)` — the idiom this was closed for.**
     ///
-    /// Excel intersects at a *scalar function argument* as well as at an operator: asked
+    /// Round sixteen left function arguments out of the intersection seam and recorded why:
+    /// closing it needs each function to say which arguments take one value and which take a
+    /// range, and a 300-workbook run at 4,524,171 comparable cells contained no case that
+    /// turned on it. That was true of the corpus and false of the world. A shelf-space
+    /// optimisation written this way — twelve cells of
+    /// `VLOOKUP($C$6:$C$8, Data!$J$4:$N$7, 2)`, one per parameter, each meaning the row it sits
+    /// in — answered `#N/A` here and `3297.86` in Excel, and took the entire model to zero.
+    ///
+    /// The list is therefore closed **where it is known**, not guessed at wholesale: the lookup
+    /// family, whose first argument is a single value in every form Excel documents. The rest
+    /// of the gap stays open and stays recorded, below.
+    func testTheLookupValueOfVlookupIntersects() throws {
+        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3"), .number(30),
+                       "row 3: looks up 3, and B3 is 30")
+        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D1"), .number(10),
+                       "row 1: looks up 1")
+    }
+
+    /// The **table** is a range and must never be intersected, which is the half of this that
+    /// a wrong guess would break: from row 9 the table still spans every row it always did.
+    func testTheTableOfVlookupIsNotIntersected() throws {
+        XCTAssertEqual(try evaluate("VLOOKUP(3,A1:B5,2)", at: "D9"), .number(30))
+    }
+
+    /// `MATCH` takes its lookup value the same way, and its array the same way as the table.
+    func testTheLookupValueOfMatchIntersects() throws {
+        XCTAssertEqual(try evaluate("MATCH(A1:A5,A1:A5,0)", at: "D3"), .number(3),
+                       "looks up 3, which is the third row")
+        XCTAssertEqual(try evaluate("MATCH(4,A1:A5,0)", at: "D9"), .number(4),
+                       "the array is untouched from a row outside it")
+    }
+
+    /// `HLOOKUP` intersects against the **column**, because its lookup value is normally
+    /// written as a row.
+    func testTheLookupValueOfHlookupIntersects() throws {
+        XCTAssertEqual(try evaluate("HLOOKUP(A1:B1,A1:B5,2)", at: "B7"), .number(20),
+                       "column B of row 1 is 10, and row 2 beneath it is 20")
+    }
+
+    /// A lookup value that intersects with nothing is `#VALUE!`, as it is for an operator.
+    func testALookupValueThatMissesIsAValueError() throws {
+        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D9"), .error(.value))
+    }
+
+    /// **Both gates still hold.** An array-entered formula means the whole range, and nothing
+    /// inside a call that asked for arrays intersects — the argument seam reuses the operator
+    /// seam's rule rather than restating it, so it cannot drift from it.
+    func testTheGatesStillHoldForArguments() throws {
+        XCTAssertEqual(
+            try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3", arrayEntered: ["D3"]),
+            .error(.na),
+            "array-entered: the lookup value stays a column and matches nothing")
+        XCTAssertEqual(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3"), .number(3),
+                       "and an array context is still an array context")
+    }
+
+    /// **The rest of the gap, still open and still measured.**
+    ///
+    /// Excel intersects at every scalar argument, not only the lookup family's: asked
     /// `ABS($H$1:$H$500)` from row 320 with `-7` in `H320`, it answers **7**. This package
-    /// answers `#VALUE!`, because the seam is in the operators only.
+    /// answers `#VALUE!`.
     ///
-    /// It is left open on purpose. Closing it needs each function to say which of its
-    /// arguments take a single value and which take a range — `ABS` intersects, `SUM` must
-    /// not — and that is a per-argument fact about several hundred functions, none of which
-    /// the corpus exercises: a 300-workbook run at 4,524,171 comparable cells does not contain
-    /// one case that turns on it. Guessing the list wrong in either direction produces a
-    /// plausible wrong number rather than an error.
+    /// Left open for the reason round sixteen gave, which the lookup family does not
+    /// undermine: knowing which of several hundred functions take a single value in which
+    /// argument is a per-argument fact, and guessing it wrong in either direction produces a
+    /// plausible wrong number rather than an error. What changed is that one family stopped
+    /// being a guess — a real workbook showed what it costs, and Excel documents that
+    /// argument as a single value in every form.
     ///
-    /// This test pins what this package does, and says what Excel does, so the gap is a
+    /// This test pins what this package does, and says what Excel does, so the remainder is a
     /// recorded measurement rather than an unexamined difference.
-    func testIntersectionDoesNotReachFunctionArgumentsYet() throws {
+    func testIntersectionStillDoesNotReachEveryFunctionArgument() throws {
         XCTAssertEqual(try evaluate("ABS(A1:A5)", at: "D3"), .error(.value),
                        "Excel answers 3 here — see the note. Measured, not agreed")
     }
