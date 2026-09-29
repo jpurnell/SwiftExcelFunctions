@@ -1,0 +1,562 @@
+[
+  {
+    "contentHash" : "68f31b0a4876c362c0203d59a1232cc2c38481190f64a079fb159f862d259bcc",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinSpreadsheetStatistics.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "823025da32234e71fe9a22ead5a58c55f9fefd78054a48b9c0a3a6dae42a04eb",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinSpreadsheetStatistics.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "47822acbf0883958ed5a6aac34bb343ff31772c16691b00931d42bc35787ed94",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinSpreadsheetStatistics.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "e007220b60a4985ca197ee0a931ce21fade8b2894520c2c81d3607a03a56da8d",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinSpreadsheetStatistics.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "0911e1662c619a68565a61543a2801493a785fdad58f9294db277f36eb7d5e4b",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinBondFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "16e2401aa6694520b564897a1033b0a275a6fd3cadd6fdd43d571aff6f4f5186",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/ETSArguments.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "e505d31fa0e47a4cebd44ea51587427bb0a025d96bd19bfd7844a10199f61715",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/ETSArguments.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "995bc7767d930bec48ebe08bf0d66f10fe8083e0e91bd737d755f7df7635a0e5",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinWeekFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "32a3a9f2c2fea21d5ba7b9c56b92b8a14835cea5dbb05abe85be34be5cfb6c4e",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinRiskSolverDistributions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "6b935d2982d44af2ad46f77973bc1eb38c1fb2edf9f2284dd26f05cebeeaee99",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinWorkingDayFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "c302545fce9a9869578fedaac9405161ccc2077673d24f9ffad66772d5663f77",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDiscountSecurities.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "a0ea203d88dd540e5ba59abffcc24257969e257fbdcf6ffbcb969048c78f76f5",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/ExcelDateFormat.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "4711cd50009988983d54a8fd74e40da01e1f3c187384f667549e3d5c4de648bb",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/ExcelDateFormat.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "b511be9a0d49fca70fb9bac3f3f86ecd65bf823d3c86145659002ce1cddd3577",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatsFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "3331f0232d3873585af110d3543c04e251a2e5015754f04dd497506c8033fab8",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/RandomSourceGenerator.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "75bef7ff30d2801e7a8770b34872bba66cddfac340b0fb55fa84eb2f67d60b44",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/RandomSourceGenerator.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "7392a4e4ace90ea00563a4360ce25fd1c201fc84eead783b86176db736bf395a",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinGammaAndModes.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "77c9663eb09faf77ee039ab86ee3f076223e5566669322053055fa81f1b127ae",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinBahtText.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "44b0dd00e71d01b047218135e44d7cf20d2a10cc3f887c81e79d8635105177c0",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinBahtText.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "8236172b800d2678c667139474b4b4389fdab52e72e6ce3cab548bc4985c61b8",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalQuantiles.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "09942a48338edd507c9430a153aa6bdd6844e54b842c0e4501143dd76dd137d0",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalQuantiles.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "40e8fb4918ba2d06d961be8e740e53d6bad50b40d1b40a6b444367308680cce5",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalQuantiles.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "698c82ca7a13570519d23e3d6356633a6e63ad9c57b2a264ecbfb0eb04b097af",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "777db0ca663c41dd6803e208c485b97da30e6dfdbb9e4b30c9187bdc09e5beea",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "44738728515c8e2092a659e89cea99436a22defd394a21cd5d222e9376acb0bb",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "7bd498a6cd2cee287da7bad67d48fba380709903a3cc44792d8f64abc5dd7df1",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "a305adb3feb0fe7e433889f61d51a83e55601018a40879d3e50e0b812a0b18e9",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "38f6bad3e3c6f3e112a32211e4e141d72c9776fd38eac95d6fb7b43ca8d1f468",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "0c09fc2096cc541cb82f5c3f8917206a633037ffb22cf144fe7891b2083948e5",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinMathFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "4b51871117fa92ea7bde0ec0467246d63ec857b3f0815ca7ded70ecdfb966cda",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinRiskSolverRunStatistics.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "d93a39b60364833c20efb1ceab3401bde576ed4b00106548789d8db701e10334",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextPrimitives.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "06a0d6934a6799d2a30472e38e3636861fff548e5daded03afb36a7d27106713",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextPrimitives.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "04e631766613aa900da4035dcb42501ff918020949666108f7016fba61076689",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextPrimitives.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "ab9e9914979cf4085a47a7c275cbaf0fbaeb7105a97d0348692a279b4f37f5ea",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextPrimitives.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "8cd099c01f37b42cf0053e7eaa677817316701c6c9d4f6e299d6bb6871a8dddb",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextPrimitives.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "57d38f58819345c6fc67a606b0771048bf48cb88e5f9fd05288fc7a75d34215a",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "d4403d15df0e33c0dd4b73475748af3a9ba7680baf2a4d28b4d78718db952403",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "1cb1f6576971df7901dd9f4ec7752770936ba4de2ad425d56e4146e5a59c52f0",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "2bd5a74a55a27851613bbca8e00a12283f04c37ba666adb946e73333a6962335",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "6597481b9a8695f9c1fd151fc3113b01ea12f1c790b8fafd13fe02d9ad581079",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "7e289640efb6b255f448701aa07c473a2b2defc88f7d0c058208e1f1802915ec",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinTextFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "70b5eed2b56816a1be25d2b6b48039b81424c63c4f08f37f6a1acce1fdb2e26c",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalInverses.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "79a7a939871ce7cd0dfe65bd1a5ebafde9f0ea6c060ea0d510814ce90285f7a0",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/ExcelSolverReader.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "69bd237eb683b652d9e503ae17245a426be27d2482b0760335f9985e15edc31f",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "e943ecea7871d0ca47c5010e958ec0a4099bdf8bcef214f6e69182f56f89dd0d",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "de40ba83f26dbe7be2168284279048d0059af6a07b5b492f8719d6f023c20092",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "459d7c65da8a6103b58f22708f1cd2eaba2cf52d9ee991e63ebe04181a5fde88",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "1a831e6858af0997afcc1e1c827b54c5cd05e0b28ffe1a3623f60e54301854a0",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "6a1be36525496e4766311071e5df8eceb7773483f53c07ae661afc533e12b06a",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "653edbefff66aee9c438de227521be932edf0ea00a82bfad068ae6801ca09f9f",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "66ba3173796d005347c33dde8ba448072903db0b2562645111cdcf9c023207b3",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "2016e1395e860b06672a918f7a0cafe7567bdbd1a286116900a47e071f88cbb2",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "4d54339a50cecd54eafadbbd12166a43a0846f17fcfab9f9a2386502d9e5198b",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "b1b4095b54f19309abd693e743d1d42e04ea1e3cf391d2f10c68dd480ee17b77",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinDateTimeFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "73f6c2e800e1a2328afe2e38b74843a67ad0ff9abbcc2446bc6f6a759d89a235",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinRiskSolverTheoretical.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "5b84f23da9024ce8588ad82c90a3c374839fda4222e17e88469dd262b07ff542",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/FormulaEvaluator.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "a0d30fc075dd7460ff9613842e7fbbc4aa0a7018292e5392a831d909c1fa760c",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalDistributions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "bbc27c337d70db0e567e2834419e5b2b082505faab99a84eb8a27b6cb0669c05",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalDistributions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "d5233701189669cdade5ba7233fca71943a9236fb5994b399b9fcea9848b7aa3",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalDistributions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "6a5f88d6df4fadaeab0247252f8da192e61c92fea1790399cd14da35266c363c",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinForecastETS.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "1a5479eea76b79b46edc88d8b908f4c114507a5bc24ee95ecce6526805971e60",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "bac239e7f310a8b54b7a0f4d9fbed41eff6be934c92effa07787d5d0a1d31553",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "12d9480c5a14da5d1bad5cd5026334adb132ac839cc0bcd4652501c750c854e3",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "f90b2998c77f5191ebc3dacc216b0db4f9fbde60e789decac388225663fe4ac8",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "c62e338e3d49528504984ac70cde8d1ffe7271bd94091eede73837d3ec5869d8",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "d354eaa6cf7c96b2d1993ccf870cbdeb3a368d5ddd09e409ffb9a4ebd506adf2",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "97d5632002a956386a1665ea993aad4247dacbb20d2e88a5304b99efb1d5e088",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "34509dc7e5ff622680a06bc19c9e2b55e432a17a5e9948b4eb53821c19a0cf32",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "0e1066b719c74c6c2d6ec608d5d1483b08269b69fbb6513a18645559c3214993",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "8f832288f24f537280c9df4427123580c5be59e2a365b05251840bb742971b52",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "8f1098feb61c6f77c800c1be52c4539c101ae50f9976187b193cab296769d9fd",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "23ad014a41267371d000db907831fade6e1ff4ff47ead10c391fedd51568c870",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "a742f6c20bb2262a1f40bf5f80f9a1a49db34245da8aa68d55db5f0c7cb36aed",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "9e64dffec401ef974ea9f4a529b004cbbf84bfae6b77d6a64fe4467a5267a1b6",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "849557fd1fcf5875b7b0119e46e4a61e731e0f4d246978782408db0a5d10b6c8",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinNavigationFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "4b6ad92e2f9ebcc19f4da96c571cfb253410adf87afd5c1874cb6f0a9cdc99c6",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalTests.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "49be8b6b699cea039d89f8cb43ad61d28a8383983a59afa8732ccbc1009b2009",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalTests.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "13dc0549a6bdac2e9a10e3105a55254a3069977eb9ea18b1d533b3b3baed6d13",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinStatisticalTests.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "2f1d4fa4e2f225df7791b9e2553112bb3c9b496799dffef983e328bf4d834d05",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinFinancialFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  },
+  {
+    "contentHash" : "569aad13deedc7e8fd42954bb3caab687c1207de69a26f4724adb14152153778",
+    "expiresAt" : "2027-03-28T02:27:11Z",
+    "filePath" : "\/Users\/jpurnell\/Dropbox\/Computer\/Development\/Swift\/SwiftExcelFunctions\/Sources\/SwiftExcelFunctions\/BuiltinFinancialFunctions.swift",
+    "recordedAt" : "2026-09-29T02:27:11Z",
+    "ruleId" : "fallback.int-conversion-unguarded"
+  }
+]
