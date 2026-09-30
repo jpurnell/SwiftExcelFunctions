@@ -66,10 +66,15 @@ final class RunCallingCellTests: XCTestCase {
         let survey = ModelSurveyor().survey(cells)
         let order = DependencyGraph(
             cells: cells.populatedCells().map { CellAddress(sheet: "Sheet1", cell: $0) },
-            provider: cells).evaluationOrder.map(\.cell)
-        let engine = InterpretedRun(survey: survey, evaluationOrder: order, trials: 4, seed: 1)
+            provider: cells).evaluationOrder
+        // `inSheet:` because the order is built with a sheet name and the survey of a
+        // single-sheet provider is not. Both sides resolve against it; leaving it out is how
+        // the outputs and the overrides end up keyed under different names.
+        let engine = InterpretedRun(survey: survey, evaluationOrder: order, trials: 4, seed: 1,
+                                    inSheet: "Sheet1")
         let run = try await engine.runConcurrently(over: cells, names: NoNames())
-        let results = try XCTUnwrap(run.results(for: CellRef("D2")))
+        let results = try XCTUnwrap(
+            run.results(for: CellAddress(sheet: "Sheet1", ref: "D2")))
         XCTAssertEqual(results.values, [20, 20, 20, 20])
     }
 }

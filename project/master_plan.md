@@ -735,7 +735,14 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-28 — reconciled for **1.0.0-alpha.4**: the function-argument intersection gap moved from Roadmap/Known-traps to partly shipped (the lookup family only, with the reasoning for stopping there), and the note that both run engines evaluated with no calling cell — which had switched implicit intersection off for every simulation. Earlier: 2026-09-21 — reconciled for **1.0.0-alpha.1**. Current Status rewritten
+**Last Updated:** 2026-09-29 — reconciled for **1.0.0-alpha.5**: a simulation spans sheets.
+Every address a run works with carries its sheet, which is a breaking change to `ModelSurvey`,
+`SimulationRun`, `DistributionOverride` and both engines — the alpha exists to settle that
+surface. Recorded with it: the per-trial overlay had been keyed by position alone, so an
+override for `Model!B4` would have been served to a formula asking for `Pricing!B4` without
+erroring, and order validation had never followed a reference onto another sheet. Both were
+unreachable only while a run could not leave its sheet. Earlier: 2026-09-28 — reconciled for
+**1.0.0-alpha.4**: the function-argument intersection gap moved from Roadmap/Known-traps to partly shipped (the lookup family only, with the reasoning for stopping there), and the note that both run engines evaluated with no calling cell — which had switched implicit intersection off for every simulation. Earlier: 2026-09-21 — reconciled for **1.0.0-alpha.1**. Current Status rewritten
 around corpus agreement (300 workbooks, 4,524,171 comparable cells, 99.999978%, one
 disagreement that is a workbook's own stale cache). `GETPIVOTDATA`, the `PSI` bucket and
 corpus agreement moved out of Roadmap/Next into shipped entries; the simulation GUI and the

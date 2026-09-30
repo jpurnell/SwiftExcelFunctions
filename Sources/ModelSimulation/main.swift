@@ -1,6 +1,11 @@
 import Foundation
 import SwiftExcelCore
 import SwiftExcelFunctions
+
+/// An address as a person reads it: `B4` within one sheet, `Data!B4` across them.
+func located(_ address: CellAddress) -> String {
+    address.sheet.isEmpty ? address.cell.reference : "\(address.sheet)!\(address.cell.reference)"
+}
 import SwiftXLSX
 
 /// Turns a static Superchem model into a simulated one, runs it, and writes both back.
@@ -93,18 +98,18 @@ struct ModelSimulation {
         // What a GUI would list: every uncertain cell, its distribution, its parameters.
         for input in survey.uncertain {
             let shown = input.call.parameters.map { FormulaSerializer.serialize($0) }
-            say("  input \(input.inputIndex): \(input.address.reference)  "
+            say("  input \(input.inputIndex): \(located(input.address))  "
                 + "\(input.call.function)(\(shown.joined(separator: ", ")))"
                 + (input.call.label.map { "  \"\($0)\"" } ?? "")
                 + (input.call.unhandledProperties.isEmpty ? ""
                    : "  UNHANDLED: \(input.call.unhandledProperties.joined(separator: ", "))"))
         }
-        say("  outputs: \(survey.outputs.map(\.reference).sorted().joined(separator: ", "))")
+        say("  outputs: \(survey.outputs.map(located).sorted().joined(separator: ", "))")
 
-        let addresses = sheet.populatedCells().map { CellAddress(sheet: "", cell: $0) }
+        let addresses = sheet.populatedAddresses()
         let graph = DependencyGraph(cells: addresses, provider: sheet)
         let engine = InterpretedRun(
-            survey: survey, evaluationOrder: graph.evaluationOrder.map(\.cell),
+            survey: survey, evaluationOrder: graph.evaluationOrder,
             trials: trials, seed: seed)
 
         let started = Date()

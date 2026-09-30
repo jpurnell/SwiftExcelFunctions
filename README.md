@@ -4,7 +4,7 @@ Part of the SwiftExcel package family. See `project/master_plan.md` for scope an
 `BusinessMathExcel/project/plans/proposals/PROPOSAL_swift_excel_architecture.md` for why the
 family is split the way it is.
 
-**Status:** 1.0.0-alpha.4. **It agrees with Excel.** Over 300 real workbooks and
+**Status:** 1.0.0-alpha.5. **It agrees with Excel.** Over 300 real workbooks and
 **4,524,171 comparable cells the agreement is 99.999978%** — one disagreement, and it is a
 workbook that contradicts its own cached values rather than a defect here.
 

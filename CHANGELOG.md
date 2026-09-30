@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.5] - 2026-09-29
+
+### Changed
+
+- **A simulation spans sheets.** Every address a run works with now carries its sheet:
+  `UncertainCell.address`, `ModelSurvey.outputs` and `unhandledProperties`,
+  `InterpretedRun.evaluationOrder`, `DistributionOverride.cell`, `SimulationRun.outputs`
+  and `results(for:)` are all `CellAddress` rather than `CellRef`. **This is a breaking
+  change**, and settling the public surface before 1.0 is what the alpha is for; a
+  parallel address-based API would have doubled it permanently.
+
+  A model is not one sheet. A financial template takes its pricing from a separate tab so
+  the template can stay standard while the pricing changes; a case model reads its
+  parameters from a regression on a data sheet. In both, the cell worth treating as
+  uncertain is on a different sheet from the number it moves, and a run that could not
+  name a sheet could not reach it.
+
+  `PopulatedCellProvider` gains `populatedAddresses()`, defaulted to the unnamed sheet, so
+  a single-sheet provider needs no change. `InterpretedRun.init` gains `inSheet:` — the
+  sheet an unnamed address means — because a single-sheet provider's survey and its
+  evaluation order are built separately and both have to agree about the name. When only
+  one of them had it filled in, every output was looked up under a name nothing was stored
+  under and the run came back empty.
+
+  `results(for: CellRef)` remains, for a statistic that named a cell without a sheet. It
+  answers only when exactly one sheet holds that cell; answering with one of several would
+  be picking a sheet at random and reporting it as a result.
+
+### Fixed
+
+- **The per-trial overlay was keyed by position alone**, so an override computed for
+  `Model!B4` would have been handed to a formula asking for `Pricing!B4`. Nothing would
+  have errored: the run would have completed and reported a model that never existed. It
+  was unreachable only for as long as a run could not leave its sheet, which is no longer
+  true. Keyed by sheet and cell now, with the sheet folded — Excel resolves a sheet name
+  without regard to case, so `Data!B2` and `data!B2` are one cell and must be one key.
+
+  The folding is confined to the key. Handing a folded name back to a provider makes it
+  look for `model` in a workbook holding `Model`, find nothing, and read every constant on
+  that sheet as blank — which is exactly what the parallel engine did until the original
+  spelling was kept for everything but the lookup.
+
+- **An unqualified reference means the sheet of the formula containing it**, and the
+  overlay now moves with the cell being evaluated rather than holding one sheet for the
+  whole run. Held constant, every formula on the second sheet read the first sheet's cells.
+  The fall-through to the base provider goes the same way: `value(at:)` cannot say which
+  sheet it means, so a provider holding a workbook has to guess, and a guess of "the first
+  sheet" answers a constant on the template with a cell from the pricing tab.
+
+- **Order validation follows a reference onto another sheet.** `referencedCells` looked at
+  `.cellRef` and `.cellRange` and skipped `.sheetRef` entirely, so a cross-sheet precedent
+  evaluated after its dependent would not have been caught — and a wrong order does not
+  fail, it reads a stale value and reports it as a simulation.
+
 ## [1.0.0-alpha.4] - 2026-09-28
 
 ### Fixed
@@ -2846,6 +2900,7 @@ Risk Solver's 295 PSI functions: 50 bindable, 13 role declarations rather than f
 See `project/plans/proposals/Excel conformance/excel_function_coverage_matrix.tsv`.
 
 [Unreleased]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v0.11.0...HEAD
+[1.0.0-alpha.5]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.4...v1.0.0-alpha.5
 [1.0.0-alpha.4]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.3...v1.0.0-alpha.4
 [1.0.0-alpha.3]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.2...v1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/jpurnell/SwiftExcelFunctions/compare/v1.0.0-alpha.1...v1.0.0-alpha.2

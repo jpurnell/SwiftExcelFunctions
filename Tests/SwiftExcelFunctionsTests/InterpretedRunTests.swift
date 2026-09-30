@@ -69,8 +69,10 @@ final class InterpretedRunTests: XCTestCase {
         _ sheet: Sheet, _ order: [CellRef], trials: Int = 500, seed: UInt64 = 42
     ) throws -> SimulationRun {
         let survey = ModelSurveyor().survey(sheet)
+        // These are one-sheet models, and an unnamed sheet is what that means.
         return try InterpretedRun(
-            survey: survey, evaluationOrder: order, trials: trials, seed: seed
+            survey: survey, evaluationOrder: order.map { CellAddress(sheet: "", cell: $0) },
+            trials: trials, seed: seed
         ).run(over: sheet, names: NoNames())
     }
 
@@ -190,7 +192,8 @@ final class InterpretedRunTests: XCTestCase {
             try run(sheet, ["B2", "B1", "B3"].map { CellRef($0) })
         ) { error in
             XCTAssertEqual(error as? TrialRunError,
-                           .orderViolatesDependency(cell: CellRef("B2"), precedent: CellRef("B1")))
+                           .orderViolatesDependency(cell: CellAddress(sheet: "", ref: "B2"),
+                                                    precedent: CellAddress(sheet: "", ref: "B1")))
         }
     }
 

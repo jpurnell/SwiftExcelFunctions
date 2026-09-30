@@ -45,7 +45,7 @@ final class ParallelRunTests: XCTestCase {
         let graph = DependencyGraph(
             cells: model.populatedCells().map { CellAddress(sheet: "", cell: $0) },
             provider: model)
-        return InterpretedRun(survey: survey, evaluationOrder: graph.evaluationOrder.map(\.cell),
+        return InterpretedRun(survey: survey, evaluationOrder: graph.evaluationOrder,
                               trials: trials, seed: seed)
     }
 
@@ -58,7 +58,7 @@ final class ParallelRunTests: XCTestCase {
             .runConcurrently(over: model, names: NoNames())
         let wide = try await engine(model, trials: 4000).runConcurrently(
             over: model, names: NoNames(),
-            overrides: [DistributionOverride(cell: CellRef("A1"), parameter: 1, value: 20)])
+            overrides: [DistributionOverride(cell: CellAddress(sheet: "", ref: "A1"), parameter: 1, value: 20)])
 
         let tightSD = try XCTUnwrap(tight.results(for: CellRef("A2"))).statistics.stdDev
         let wideSD = try XCTUnwrap(wide.results(for: CellRef("A2"))).statistics.stdDev
@@ -74,7 +74,7 @@ final class ParallelRunTests: XCTestCase {
         let model = try model()
         let run = try await engine(model, trials: 8000).runConcurrently(
             over: model, names: NoNames(),
-            overrides: [DistributionOverride(cell: CellRef("A1"), parameter: 0, value: 100)])
+            overrides: [DistributionOverride(cell: CellAddress(sheet: "", ref: "A1"), parameter: 0, value: 100)])
         let mean = try XCTUnwrap(run.results(for: CellRef("A2"))).statistics.mean
         XCTAssertEqual(mean, 200, accuracy: 2, "mean 100, doubled")
     }

@@ -8,7 +8,12 @@ public struct UncertainCell: Sendable, Equatable {
     ///
     /// Not unique across a survey: a formula may hold several draws, and each is its own
     /// ``UncertainCell`` at the same address.
-    public let address: CellRef
+    ///
+    /// **Sheet and cell**, since a model is not one sheet. A financial template reads its
+    /// pricing from a separate tab, and the cell worth drawing from lives there rather than
+    /// in the template — so an address that could not say which sheet could not describe the
+    /// model at all.
+    public let address: CellAddress
 
     /// The distribution call itself, parameters already separated from properties.
     public let call: DistributionCall
@@ -22,7 +27,7 @@ public struct UncertainCell: Sendable, Equatable {
     ///   - address: the cell whose formula contains the call.
     ///   - call: the recognised distribution call.
     ///   - inputIndex: its position in the sampler's input vector.
-    public init(address: CellRef, call: DistributionCall, inputIndex: Int) {
+    public init(address: CellAddress, call: DistributionCall, inputIndex: Int) {
         self.address = address
         self.call = call
         self.inputIndex = inputIndex
@@ -53,14 +58,14 @@ public struct ModelSurvey: Sendable, Equatable {
     /// The marker is not required, and treating it as required rejects real models: one
     /// workbook here carries 126 Psi calls and **no `PsiOutput()` anywhere**, declaring
     /// its outputs entirely through `PsiMean` and `PsiPercentile`.
-    public let outputs: [CellRef]
+    public let outputs: [CellAddress]
 
     /// Property functions the recognizer met and does not model, by the cell holding them.
     ///
     /// Empty is the healthy case. A non-empty entry means this survey describes a model
     /// that cannot yet be simulated *faithfully*, which is different from one that cannot
     /// be simulated at all.
-    public let unhandledProperties: [CellRef: [String]]
+    public let unhandledProperties: [CellAddress: [String]]
 
     /// The number of uniforms one trial consumes.
     public var inputCount: Int { uncertain.count }
@@ -96,8 +101,8 @@ public struct ModelSurvey: Sendable, Equatable {
     ///   - unhandledProperties: property functions met but not modelled, by cell.
     public init(
         uncertain: [UncertainCell],
-        outputs: [CellRef],
-        unhandledProperties: [CellRef: [String]]
+        outputs: [CellAddress],
+        unhandledProperties: [CellAddress: [String]]
     ) {
         self.uncertain = uncertain
         self.outputs = outputs
@@ -124,6 +129,24 @@ public protocol PopulatedCellProvider {
     /// Every address this provider holds a value for. Order does not matter; the
     /// surveyor sorts into reading order regardless.
     func populatedCells() -> [CellRef]
+
+    /// The same, said with sheets, for a provider that holds more than one.
+    ///
+    /// A model is not always one sheet: a financial template reads its pricing from a
+    /// separate tab, and a survey that could only see one sheet could not find the draw.
+    /// Providers holding a single sheet need not implement this — the default answers with
+    /// an empty sheet name, which every consumer reads as *the sheet being run*.
+    func populatedAddresses() -> [CellAddress]
+}
+
+extension PopulatedCellProvider {
+
+    /// One sheet, unnamed. The empty name is not a placeholder to be filled in later: the
+    /// evaluator already reads an empty sheet as the current one, so a single-sheet provider
+    /// keeps behaving exactly as it did.
+    public func populatedAddresses() -> [CellAddress] {
+        populatedCells().map { CellAddress(sheet: "", cell: $0) }
+    }
 }
 
 /// Applies ``PsiRecognizer`` across a whole sheet and assigns input indices.
@@ -166,27 +189,41 @@ public struct ModelSurveyor: Sendable {
     /// - Returns: the draws, the outputs, and anything unmodelled.
     public func survey(_ cells: any CellValueProvider) -> ModelSurvey {
         var uncertain: [UncertainCell] = []
-        var outputs: [CellRef] = []
-        var unhandled: [CellRef: [String]] = [:]
-        var namedByStatistic: Set<CellRef> = []
+        var outputs: [CellAddress] = []
+        var unhandled: [CellAddress: [String]] = [:]
+        var namedByStatistic: Set<CellAddress> = []
         var nextIndex = 0
 
-        for ref in Self.populatedRefs(of: cells) {
-            guard let ast = cells.value(at: ref)?.formulaAST else { continue }
+        for address in Self.populatedAddresses(of: cells) {
+            guard let ast = cells.value(at: address.cell,
+                                        inSheet: address.sheet)?.formulaAST else { continue }
 
             let found = recognizer.recognize(ast)
-            if found.isOutput { outputs.append(ref) }
+            if found.isOutput { outputs.append(address) }
 
-            // A cell this formula asks a statistic about is an output, wherever it lives.
+            // A cell this formula asks a statistic about is an output, wherever it lives —
+            // and `wherever` now includes another sheet. An unqualified subject means the
+            // sheet the asking formula is on, which is what an unqualified reference means
+            // everywhere else.
             for subject in found.statisticSubjects {
-                if case .cellRef(let subjectRef) = subject { namedByStatistic.insert(subjectRef) }
+                switch subject {
+                case .cellRef(let subjectRef):
+                    namedByStatistic.insert(
+                        CellAddress(sheet: address.sheet, cell: subjectRef))
+                case .sheetRef(let reference):
+                    namedByStatistic.insert(
+                        CellAddress(sheet: reference.sheetName, cell: reference.range.start))
+                default:
+                    continue
+                }
             }
 
             for call in found.distributions {
-                uncertain.append(UncertainCell(address: ref, call: call, inputIndex: nextIndex))
+                uncertain.append(
+                    UncertainCell(address: address, call: call, inputIndex: nextIndex))
                 nextIndex += 1
                 if !call.unhandledProperties.isEmpty {
-                    unhandled[ref, default: []].append(contentsOf: call.unhandledProperties)
+                    unhandled[address, default: []].append(contentsOf: call.unhandledProperties)
                 }
             }
         }
@@ -194,11 +231,16 @@ public struct ModelSurveyor: Sendable {
         // Statistic-named cells join the marked ones, deduplicated and in reading order so
         // the list stays stable between runs.
         let marked = Set(outputs)
-        let combined = (outputs + namedByStatistic.subtracting(marked)
-            .sorted { ($0.row, $0.column) < ($1.row, $1.column) })
+        let combined = (outputs + namedByStatistic.subtracting(marked).sorted(by: Self.reading))
 
         return ModelSurvey(
             uncertain: uncertain, outputs: combined, unhandledProperties: unhandled)
+    }
+
+    /// Reading order across a workbook: by sheet, then row, then column.
+    static func reading(_ left: CellAddress, _ right: CellAddress) -> Bool {
+        (left.sheet, left.cell.row, left.cell.column)
+            < (right.sheet, right.cell.row, right.cell.column)
     }
 
     /// The cells to consider, in reading order — row, then column.
@@ -211,22 +253,25 @@ public struct ModelSurveyor: Sendable {
     ///
     /// Reading order rather than any other stable order, so that the person looking at
     /// the sheet and the person reading the input vector see the same sequence.
-    private static func populatedRefs(of cells: any CellValueProvider) -> [CellRef] {
+    static func populatedAddresses(of cells: any CellValueProvider) -> [CellAddress] {
         if let enumerable = cells as? PopulatedCellProvider {
-            return enumerable.populatedCells().sorted { ($0.row, $0.column) < ($1.row, $1.column) }
+            return enumerable.populatedAddresses().sorted(by: reading)
         }
 
         // The fallback, and it is genuinely expensive: rows × columns lookups regardless
-        // of how few cells are populated. See ``PopulatedCellProvider``.
+        // of how few cells are populated. See ``PopulatedCellProvider``. It can only see one
+        // sheet, because a bare `CellValueProvider` cannot be asked which sheets it has.
         guard let last = cells.lastPopulatedCell() else { return [] }
 
-        var refs: [CellRef] = []
+        var addresses: [CellAddress] = []
         for row in 1...max(last.row, 1) {
             for column in 1...max(last.column, 1) {
                 let ref = CellRef(column: column, row: row)
-                if cells.value(at: ref) != nil { refs.append(ref) }
+                if cells.value(at: ref) != nil {
+                    addresses.append(CellAddress(sheet: "", cell: ref))
+                }
             }
         }
-        return refs
+        return addresses
     }
 }

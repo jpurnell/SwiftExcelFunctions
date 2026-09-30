@@ -76,12 +76,17 @@ final class EndToEndSimulationTests: XCTestCase {
         }
     }
 
-    /// The order for one sheet, from the real graph, narrowed to that sheet.
-    private func order(for sheet: Worksheet, in workbook: Workbook) -> [CellRef] {
+    /// One sheet's order, from the real graph, addressed the way a survey of that one sheet
+    /// addresses it.
+    ///
+    /// The graph spans the workbook and the provider under test does not, so the sheet name is
+    /// dropped rather than carried: an empty name is what a single-sheet survey produces, and
+    /// the two have to agree or every output goes uncollected.
+    private func order(for sheet: Worksheet, in workbook: Workbook) -> [CellAddress] {
         DependencyGraph(workbook: workbook)
             .evaluationOrder
             .filter { $0.sheet == sheet.name }
-            .map(\.cell)
+            .map { CellAddress(sheet: "", cell: $0.cell) }
     }
 
     // MARK: - The whole path
@@ -161,11 +166,12 @@ final class EndToEndSimulationTests: XCTestCase {
                 guard survey.isSimulable else { continue }
 
                 for output in survey.outputs {
-                    let failures = lowerer.audit(output: output, survey: survey, cells: cells)
+                    let failures = lowerer.audit(
+                        output: output.cell, survey: survey, cells: cells)
                     if failures.isEmpty {
                         lowered += 1
                         if let model = try? lowerer.lower(
-                            output: output, survey: survey, cells: cells) {
+                            output: output.cell, survey: survey, cells: cells) {
                             instructions.append(model.instructionCount)
                         }
                         continue
@@ -237,9 +243,9 @@ final class EndToEndSimulationTests: XCTestCase {
                         .run(over: cells, names: NoNames())
                 else { continue }
 
-                for (ref, results) in first.outputs {
-                    XCTAssertEqual(results.values, second.outputs[ref]?.values,
-                                   "\(sheet.name)!\(ref.reference) did not reproduce")
+                for (address, results) in first.outputs {
+                    XCTAssertEqual(results.values, second.outputs[address]?.values,
+                                   "\(sheet.name)!\(address.cell.reference) did not reproduce")
                 }
                 checked += 1
             }

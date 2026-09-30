@@ -26,7 +26,10 @@ import BusinessMath
 public struct DistributionOverride: Sendable, Equatable {
 
     /// The cell whose distribution is being changed.
-    public let cell: CellRef
+    /// **Sheet and cell.** A draw can live on a different tab from the model that reads it —
+    /// pricing on one sheet, the template on another — so an override that could not say which
+    /// sheet could not reach it.
+    public let cell: CellAddress
 
     /// Which positional parameter, counting from zero and **ignoring properties**.
     ///
@@ -43,7 +46,7 @@ public struct DistributionOverride: Sendable, Equatable {
     ///   - cell: The cell whose distribution is being changed.
     ///   - parameter: Which positional parameter, counting from zero, properties ignored.
     ///   - value: What to put there.
-    public init(cell: CellRef, parameter: Int, value: Double) {
+    public init(cell: CellAddress, parameter: Int, value: Double) {
         self.cell = cell
         self.parameter = parameter
         self.value = value
@@ -234,8 +237,14 @@ extension InterpretedRun {
         guard trials > 0 else { throw TrialRunError.invalidTrialCount(trials) }
         guard !survey.outputs.isEmpty else { throw TrialRunError.noOutputsToCollect }
 
+        // Resolved once, here: the lanes are `@Sendable` closures and cannot reach back into
+        // `self` for the home sheet, and a key computed one way in the lane and another way
+        // out here is how a run collects nothing at all.
+        let home = homeSheet
+        // The addresses keep their **original spelling**: they are what the evaluator and the
+        // provider are asked with. Keys are folded inside the lane, where they are used.
         let formulas = try plan(over: cells, overrides: overrides)
-        let outputs = survey.outputs
+        let outputs = survey.outputs.map(resolved)
         let registry = self.registry
         let seed = self.seed
         let total = trials
@@ -253,10 +262,12 @@ extension InterpretedRun {
         // negligible. Independent of `lanes` now that `lanes` actually bounds the work.
         let batch = max(1, min(2_000, total / 64))
 
-        var collected: [CellRef: [Double]] = [:]
+        var collected: [CellAddress: [Double]] = [:]
         for output in outputs { collected[output] = [] }
 
-        try await withThrowingTaskGroup(of: (count: Int, values: [CellRef: [Double]]).self) { group in
+        try await withThrowingTaskGroup(
+            of: (count: Int, values: [CellAddress: [Double]]).self
+        ) { group in
             var started = 0
             var done = 0
 
@@ -269,7 +280,8 @@ extension InterpretedRun {
                 group.addTask {
                     (count, try Self.lane(
                         first: first, count: count, seed: seed, formulas: formulas,
-                        base: cells, names: names, outputs: outputs, registry: registry))
+                        base: cells, names: names, outputs: outputs, homeSheet: home,
+                        registry: registry))
                 }
                 return true
             }
@@ -291,8 +303,10 @@ extension InterpretedRun {
             }
         }
 
-        var results: [CellRef: SimulationResults] = [:]
-        for (ref, values) in collected { results[ref] = SimulationResults(values: values) }
+        var results: [CellAddress: SimulationResults] = [:]
+        for (address, values) in collected {
+            results[address] = SimulationResults(values: values)
+        }
         return SimulationRun(outputs: results, trials: total, seed: seed)
     }
 
@@ -302,11 +316,11 @@ extension InterpretedRun {
     /// is plainly independent of the others.
     private static func lane(
         first: Int, count: Int, seed: UInt64,
-        formulas: [(ref: CellRef, ast: FormulaAST)],
+        formulas: [(address: CellAddress, ast: FormulaAST)],
         base: any CellValueProvider, names: any NameResolver,
-        outputs: [CellRef], registry: FunctionRegistry
-    ) throws -> [CellRef: [Double]] {
-        var collected: [CellRef: [Double]] = [:]
+        outputs: [CellAddress], homeSheet: String, registry: FunctionRegistry
+    ) throws -> [CellAddress: [Double]] {
+        var collected: [CellAddress: [Double]] = [:]
         for output in outputs { collected[output] = [] }
 
         for offset in 0..<count {
@@ -315,8 +329,12 @@ extension InterpretedRun {
             try Task.checkCancellation()
 
             let random = SeededRandomSource(SplitMix64(seed: Self.streamSeed(seed, first + offset)))
-            var trial = MutableCells(base: base)
+            var trial = MutableCells(base: base, homeSheet: homeSheet)
             for formula in formulas {
+                // Per cell, for the reason given in `InterpretedRun`: an unqualified reference
+                // means the sheet of the formula containing it.
+                trial.homeSheet = formula.address.sheet.isEmpty
+                    ? homeSheet : formula.address.sheet
                 let value = try FormulaEvaluator.evaluate(
                     formula.ast, cells: trial, names: names, functions: registry,
                     // **The cell being evaluated, not `nil`.** Implicit intersection is
@@ -324,13 +342,13 @@ extension InterpretedRun {
                     // with no calling cell there is nothing to intersect against and the range
                     // stands. Passing `nil` here switched that rule off for the whole of every
                     // simulation, so `VLOOKUP(A1:A3, …)` answered in a run what it would never
-                    // answer on its own. The sheet is empty for the same reason it is empty in
-                    // `inSheet` beside it: the run works in one sheet and names it nowhere.
-                    at: CellAddress(sheet: "", cell: formula.ref), inSheet: "", random: random)
-                trial.overrides[formula.ref.positionKey] = value
+                    // answer on its own. `inSheet` beside it is what makes an unqualified
+                    // reference in this formula mean this formula's own sheet.
+                    at: formula.address, inSheet: formula.address.sheet, random: random)
+                trial.overrides[InterpretedRun.key(formula.address, home: homeSheet)] = value
             }
             for output in outputs {
-                if case .number(let number) = trial.overrides[output.positionKey] ?? .blank {
+                if case .number(let number) = trial.overrides[output] ?? .blank {
                     collected[output, default: []].append(number)
                 }
             }
@@ -353,16 +371,17 @@ extension InterpretedRun {
     /// simply work nobody asked for.
     private func plan(
         over cells: any CellValueProvider, overrides: [DistributionOverride]
-    ) throws -> [(ref: CellRef, ast: FormulaAST)] {
-        var byCell: [CellRef: [Int: Double]] = [:]
+    ) throws -> [(address: CellAddress, ast: FormulaAST)] {
+        var byCell: [CellAddress: [Int: Double]] = [:]
         for override in overrides {
-            byCell[override.cell, default: [:]][override.parameter] = override.value
+            byCell[override.cell.normalised, default: [:]][override.parameter] = override.value
         }
-        var planned: [(ref: CellRef, ast: FormulaAST)] = []
-        for ref in evaluationOrder {
-            guard let ast = cells.value(at: ref)?.formulaAST else { continue }
-            let edits = byCell[ref] ?? byCell[ref.positionKey] ?? [:]
-            planned.append((ref, DistributionOverride.applied(to: ast, overrides: edits)))
+        var planned: [(address: CellAddress, ast: FormulaAST)] = []
+        for address in evaluationOrder {
+            guard let ast = cells.value(at: address.cell,
+                                        inSheet: address.sheet)?.formulaAST else { continue }
+            let edits = byCell[address.normalised] ?? [:]
+            planned.append((address, DistributionOverride.applied(to: ast, overrides: edits)))
         }
         return planned
     }

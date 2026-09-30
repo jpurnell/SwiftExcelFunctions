@@ -181,7 +181,7 @@ final class LowererTests: XCTestCase {
                 "B5": "SUM(B3:B4)+B4+PsiOutput()"
             ])
         let model = survey(sheet)
-        let order = ["B1", "B2", "B3", "B4", "B5"].map { CellRef($0) }
+        let order = ["B1", "B2", "B3", "B4", "B5"].map { CellAddress(sheet: "", ref: $0) }
 
         let interpreted = try InterpretedRun(
             survey: model, evaluationOrder: order, trials: 1_000, seed: 42

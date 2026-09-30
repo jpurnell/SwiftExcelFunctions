@@ -56,7 +56,7 @@ final class ModelSurveyTests: XCTestCase {
         ]))
 
         XCTAssertEqual(survey.uncertain.count, 2)
-        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
         XCTAssertTrue(survey.isSimulable)
     }
 
@@ -94,7 +94,7 @@ final class ModelSurveyTests: XCTestCase {
         ]))
         XCTAssertEqual(survey.uncertain.count, 2)
         XCTAssertEqual(Set(survey.uncertain.map(\.inputIndex)), [0, 1])
-        XCTAssertEqual(Set(survey.uncertain.map(\.address)), [CellRef("B1")])
+        XCTAssertEqual(Set(survey.uncertain.map(\.address)), [CellAddress(sheet: "", ref: "B1")])
     }
 
     /// A survey run twice on the same sheet must assign the same indices, or a seeded
@@ -121,7 +121,7 @@ final class ModelSurveyTests: XCTestCase {
             "A1": "PsiUniform(0, 1)",
             "B1": "PsiPoisson(4)"
         ]))
-        XCTAssertEqual(survey.uncertain.map(\.address), [CellRef("A1"), CellRef("B1"), CellRef("B2")])
+        XCTAssertEqual(survey.uncertain.map(\.address), [CellAddress(sheet: "", ref: "A1"), CellAddress(sheet: "", ref: "B1"), CellAddress(sheet: "", ref: "B2")])
     }
 
     // MARK: - Refusing to simulate what it cannot
@@ -132,7 +132,7 @@ final class ModelSurveyTests: XCTestCase {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(100, 10, PsiCorrIndep(1))"
         ]))
-        XCTAssertEqual(survey.unhandledProperties[CellRef("B1")], ["PSICORRINDEP"])
+        XCTAssertEqual(survey.unhandledProperties[CellAddress(sheet: "", ref: "B1")], ["PSICORRINDEP"])
         XCTAssertFalse(survey.isFullyModelled)
     }
 
@@ -148,7 +148,7 @@ final class ModelSurveyTests: XCTestCase {
     func testOutputWithoutUncertaintyIsNotSimulable() throws {
         let survey = surveyor.survey(try Sheet(["B4": "SUM(A1:A3)+PsiOutput()"]))
         XCTAssertFalse(survey.isSimulable)
-        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
     }
 
     /// **A cell asked about is an output.**
@@ -164,7 +164,7 @@ final class ModelSurveyTests: XCTestCase {
         ]))
         XCTAssertTrue(survey.isSimulable)
         XCTAssertTrue(survey.declaresItsOwnOutputs)
-        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
     }
 
     /// A marker and a statistic naming the same cell is one output, not two.
@@ -174,6 +174,6 @@ final class ModelSurveyTests: XCTestCase {
             "B4": "B1+PsiOutput()",
             "D1": "PsiMean(B4)"
         ]))
-        XCTAssertEqual(survey.outputs, [CellRef("B4")])
+        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
     }
 }

@@ -252,8 +252,11 @@ public struct Lowerer: Sendable {
         "ABS", "SQRT", "LN", "EXP", "IF", "NPV", "AND", "OR", "NOT"
     ]
 
+    /// The lowerer works within one sheet, so an unqualified reference is matched on cell
+    /// alone. A draw on another sheet is not lowered — it falls back to the interpreter,
+    /// which is where a model that spans tabs belongs until this does too.
     private func isUncertain(_ ref: CellRef, in survey: ModelSurvey) -> Bool {
-        survey.uncertain.contains { $0.address.positionKey == ref.positionKey }
+        survey.uncertain.contains { $0.address.cell.positionKey == ref.positionKey }
     }
 }
 
@@ -370,7 +373,7 @@ extension Lowerer {
         case .cellRef(let ref):
             // An uncertain cell is an input: the sampler fills it, the bytecode reads it.
             if let index = survey.uncertain.first(
-                where: { $0.address.positionKey == ref.positionKey })?.inputIndex {
+                where: { $0.address.cell.positionKey == ref.positionKey })?.inputIndex {
                 return .expression(builder[index])
             }
             return build(cell: ref, survey: survey, cells: cells,

@@ -162,6 +162,11 @@ public struct SpreadsheetFunction: Sendable {
     ///
     /// - Parameter x: One value per entry of ``inputs``.
     /// - Returns: The outputs, or why they could not be produced.
+    /// This adapter's overlay key for a cell: the unnamed sheet it has always worked in.
+    private static func key(_ ref: CellRef) -> CellAddress {
+        CellAddress(sheet: "", cell: ref).normalised
+    }
+
     private func evaluate(_ x: [Double]) -> Swift.Result<[Double], SpreadsheetFunctionError> {
         guard x.count == inputs.count else {
             return .failure(.wrongInputCount(expected: inputs.count, got: x.count))
@@ -169,14 +174,18 @@ public struct SpreadsheetFunction: Sendable {
 
         // A fresh overlay per call. The sheet underneath is never written to, which is what
         // lets an optimizer call this concurrently and out of order.
+        // One sheet, deliberately. An optimizer names decision variables and an objective by
+        // cell, and this adapter has never spanned tabs; the overlay is keyed by address now,
+        // so the empty sheet name — which every consumer reads as *the sheet being run* —
+        // is what keeps that unchanged.
         var pass = MutableCells(base: cells)
         for (ref, value) in zip(inputs, x) {
-            pass.overrides[ref.positionKey] = .number(value)
+            pass.overrides[Self.key(ref)] = .number(value)
         }
         for ref in evaluationOrder {
             guard let ast = cells.value(at: ref)?.formulaAST else { continue }
             do {
-                pass.overrides[ref.positionKey] = try FormulaEvaluator.evaluate(
+                pass.overrides[Self.key(ref)] = try FormulaEvaluator.evaluate(
                     ast, cells: pass, names: names, functions: registry,
                     at: nil, inSheet: "")
             } catch let failure {
@@ -201,7 +210,7 @@ public struct SpreadsheetFunction: Sendable {
         var results: [Double] = []
         results.reserveCapacity(outputs.count)
         for ref in outputs {
-            let value = pass.overrides[ref.positionKey] ?? cells.value(at: ref) ?? .blank
+            let value = pass.overrides[Self.key(ref)] ?? cells.value(at: ref) ?? .blank
             guard case .number(let number) = value else {
                 // Not silently zero. An objective that reads `#DIV/0!` as 0 is the
                 // plausible wrong answer an optimizer will happily march towards.
