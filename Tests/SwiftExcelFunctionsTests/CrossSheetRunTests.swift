@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -20,7 +21,7 @@ import SwiftXLSX
 /// was least visible: it was keyed by position alone, so an override computed for `Model!B4`
 /// would have been handed to a formula asking for `Pricing!B4`. Nothing would have errored.
 /// The run would have completed and reported a model that never existed.
-final class CrossSheetRunTests: XCTestCase {
+@Suite struct CrossSheetRunTests {
 
     /// Pricing on one sheet, a template on another that multiplies it by a volume.
     ///
@@ -89,36 +90,35 @@ final class CrossSheetRunTests: XCTestCase {
     // MARK: - Finding it
 
     /// The survey sees the draw on the sheet it is actually on.
-    func testTheSurveyFindsADrawOnAnotherSheet() throws {
+    @Test func theSurveyFindsADrawOnAnotherSheet() throws {
         let survey = ModelSurveyor().survey(Book(workbook: workbook()))
 
-        let draw = try XCTUnwrap(survey.uncertain.first)
-        XCTAssertEqual(draw.address.sheet, "Pricing")
-        XCTAssertEqual(draw.address.cell.reference, "B2")
-        XCTAssertEqual(draw.call.function, "PSINORMAL")
+        let draw = try #require(survey.uncertain.first)
+        #expect(draw.address.sheet == "Pricing")
+        #expect(draw.address.cell.reference == "B2")
+        #expect(draw.call.function == "PSINORMAL")
 
-        XCTAssertEqual(survey.outputs.map(\.sheet), ["Model"])
-        XCTAssertEqual(survey.outputs.map(\.cell.reference), ["B4"])
+        #expect(survey.outputs.map(\.sheet) == ["Model"])
+        #expect(survey.outputs.map(\.cell.reference) == ["B4"])
     }
 
     // MARK: - Running it
 
     /// **The whole point.** A price drawn on `Pricing` moves an answer on `Model`.
-    func testADrawOnOneSheetMovesAnAnswerOnAnother() throws {
+    @Test func aDrawOnOneSheetMovesAnAnswerOnAnother() throws {
         let cells = Book(workbook: workbook())
         let run = try InterpretedRun.run(
             survey: ModelSurveyor().survey(cells), over: cells, names: NoNames(),
             trials: 4_000, seed: 7)
 
-        let revenue = try XCTUnwrap(
-            run.results(for: CellAddress(sheet: "Model", ref: "B4")))
-        XCTAssertEqual(revenue.values.count, 4_000, "every trial produced a number")
-        XCTAssertEqual(revenue.statistics.mean, 5_000, accuracy: 120, "50 × 100, on average")
-        XCTAssertEqual(revenue.statistics.stdDev, 1_000, accuracy: 120, "and 10 × 100 of spread")
+        let revenue = try #require(run.results(for: CellAddress(sheet: "Model", ref: "B4")))
+        #expect(revenue.values.count == 4_000, "every trial produced a number")
+        #expect(abs(revenue.statistics.mean - 5_000) <= 120, "50 × 100, on average")
+        #expect(abs(revenue.statistics.stdDev - 1_000) <= 120, "and 10 × 100 of spread")
     }
 
     /// The parallel engine agrees, because it is the same evaluator on another schedule.
-    func testTheParallelEngineAgreesAcrossSheets() async throws {
+    @Test func theParallelEngineAgreesAcrossSheets() async throws {
         let cells = Book(workbook: workbook())
         let survey = ModelSurveyor().survey(cells)
         let graph = DependencyGraph(cells: cells.populatedAddresses(), provider: cells)
@@ -126,14 +126,13 @@ final class CrossSheetRunTests: XCTestCase {
             survey: survey, evaluationOrder: graph.evaluationOrder, trials: 2_000, seed: 7)
 
         let run = try await engine.runConcurrently(over: cells, names: NoNames())
-        let revenue = try XCTUnwrap(
-            run.results(for: CellAddress(sheet: "Model", ref: "B4")))
-        XCTAssertEqual(revenue.statistics.mean, 5_000, accuracy: 170)
+        let revenue = try #require(run.results(for: CellAddress(sheet: "Model", ref: "B4")))
+        #expect(abs(revenue.statistics.mean - 5_000) <= 170)
     }
 
     /// **An override reaches a draw on another sheet.** It could not, while an override named
     /// only a cell: `Pricing!B2` and `Model!B2` were one key.
-    func testAnOverrideReachesTheOtherSheet() async throws {
+    @Test func anOverrideReachesTheOtherSheet() async throws {
         let cells = Book(workbook: workbook())
         let survey = ModelSurveyor().survey(cells)
         let graph = DependencyGraph(cells: cells.populatedAddresses(), provider: cells)
@@ -145,27 +144,25 @@ final class CrossSheetRunTests: XCTestCase {
             overrides: [DistributionOverride(
                 cell: CellAddress(sheet: "Pricing", ref: "B2"), parameter: 0, value: 80)])
 
-        let revenue = try XCTUnwrap(
-            run.results(for: CellAddress(sheet: "Model", ref: "B4")))
-        XCTAssertEqual(revenue.statistics.mean, 8_000, accuracy: 170, "the mean moved to 80")
+        let revenue = try #require(run.results(for: CellAddress(sheet: "Model", ref: "B4")))
+        #expect(abs(revenue.statistics.mean - 8_000) <= 170, "the mean moved to 80")
     }
 
     /// **The same address on two sheets is two cells**, which the overlay has to agree with.
     ///
     /// `Model!B2` is computed and `Pricing!B2` is drawn. Keyed by position alone, one of them
     /// would have shadowed the other and the run would have reported it without complaint.
-    func testTwoSheetsSharingAnAddressStaySeparate() throws {
+    @Test func twoSheetsSharingAnAddressStaySeparate() throws {
         let cells = Book(workbook: workbook())
         let run = try InterpretedRun.run(
             survey: ModelSurveyor().survey(cells), over: cells, names: NoNames(),
             trials: 500, seed: 7)
 
-        let revenue = try XCTUnwrap(
-            run.results(for: CellAddress(sheet: "Model", ref: "B4")))
+        let revenue = try #require(run.results(for: CellAddress(sheet: "Model", ref: "B4")))
         // If `Model!B2` had been shadowed by the draw at `Pricing!B2`, this would still look
         // plausible — the tell is the volume, which only multiplies in when `Model!B2` is read
         // as itself rather than as the other sheet's cell.
-        XCTAssertEqual(revenue.statistics.mean, 5_000, accuracy: 350)
-        XCTAssertGreaterThan(revenue.statistics.stdDev, 500, "and it genuinely varies")
+        #expect(abs(revenue.statistics.mean - 5_000) <= 350)
+        #expect(revenue.statistics.stdDev > 500, "and it genuinely varies")
     }
 }

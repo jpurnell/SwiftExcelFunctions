@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -8,7 +9,7 @@ import SwiftExcelCore
 /// put values into designated cells, recompute the sheet in dependency order, read
 /// designated cells back. Simulation drives it with random draws; optimization drives it
 /// with candidate solutions; the loop between them is the same.
-final class SpreadsheetFunctionTests: XCTestCase {
+@Suite struct SpreadsheetFunctionTests {
 
     /// `A1` and `A2` are constants; `B1 = A1 * 2`; `B2 = B1 + A2`.
     private struct Sheet: CellValueProvider, PopulatedCellProvider {
@@ -53,39 +54,29 @@ final class SpreadsheetFunctionTests: XCTestCase {
             names: NamedRangeCollection())
     }
 
-    private func expect(
-        _ actual: [Double], _ expected: [Double], line: UInt = #line
-    ) {
-        guard actual.count == expected.count else {
-            return XCTFail("expected \(expected.count) values, got \(actual.count)", line: line)
-        }
-        for (a, e) in zip(actual, expected) {
-            XCTAssertEqual(a, e, accuracy: 1e-12, line: line)
-        }
-    }
 
     // MARK: - Reading the sheet as a function
 
-    func testEvaluatesThroughTheDependencyChain() throws {
+    @Test func evaluatesThroughTheDependencyChain() throws {
         let f = try makeFunction()
         // B1 = 3*2 = 6, B2 = 6 + 4 = 10
-        expect(try f.callAsFunction([3, 4]), [10])
+        #expect(try f.callAsFunction([3, 4]).isElementwiseClose(to: [10], within: 1e-12))
     }
 
     /// **It is a function**: the same input gives the same output, and an earlier call
     /// leaves nothing behind. The loop writes into a fresh overlay each time rather than
     /// mutating the sheet, which is what makes it safe to hand to an optimizer that will
     /// call it thousands of times in any order.
-    func testRepeatedCallsDoNotAccumulateState() throws {
+    @Test func repeatedCallsDoNotAccumulateState() throws {
         let f = try makeFunction()
-        expect(try f.callAsFunction([1, 1]), [3])
-        expect(try f.callAsFunction([5, 0]), [10])
-        expect(try f.callAsFunction([1, 1]), [3])
+        #expect(try f.callAsFunction([1, 1]).isElementwiseClose(to: [3], within: 1e-12))
+        #expect(try f.callAsFunction([5, 0]).isElementwiseClose(to: [10], within: 1e-12))
+        #expect(try f.callAsFunction([1, 1]).isElementwiseClose(to: [3], within: 1e-12))
     }
 
-    func testSeveralOutputs() throws {
+    @Test func severalOutputs() throws {
         let f = try makeFunction(outputs: ["B1", "B2"])
-        expect(try f.callAsFunction([3, 4]), [6, 10])
+        #expect(try f.callAsFunction([3, 4]).isElementwiseClose(to: [6, 10], within: 1e-12))
     }
 
     // MARK: - Refusals
@@ -93,41 +84,40 @@ final class SpreadsheetFunctionTests: XCTestCase {
     /// **A variable cell must be a constant.** Excel's Solver says the same: a decision
     /// variable that holds a formula would have its value overwritten and the formula
     /// silently ignored, which is a wrong answer rather than an error.
-    func testAFormulaCellCannotBeAnInput() throws {
-        XCTAssertThrowsError(try makeFunction(inputs: ["B1"])) { error in
-            XCTAssertEqual(error as? SpreadsheetFunctionError, SpreadsheetFunctionError.inputIsNotAConstant(CellRef("B1")))
+    @Test func aFormulaCellCannotBeAnInput() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try makeFunction(inputs: ["B1"]) }) {
+            #expect((error as? SpreadsheetFunctionError) == SpreadsheetFunctionError.inputIsNotAConstant(CellRef("B1")))
         }
     }
 
-    func testWrongArgumentCountIsRefused() throws {
+    @Test func wrongArgumentCountIsRefused() throws {
         let f = try makeFunction()
-        XCTAssertThrowsError(try f.callAsFunction([1.0])) { error in
-            XCTAssertEqual(error as? SpreadsheetFunctionError, SpreadsheetFunctionError.wrongInputCount(expected: 2, got: 1))
+        if let error = #expect(throws: (any Error).self, performing: { try f.callAsFunction([1.0]) }) {
+            #expect((error as? SpreadsheetFunctionError) == SpreadsheetFunctionError.wrongInputCount(expected: 2, got: 1))
         }
     }
 
     /// An output that evaluates to an error is not silently zero. Averaging a `#DIV/0!` as
     /// zero is the plausible-wrong-number this project exists to avoid.
-    func testAnErrorOutputIsReported() throws {
+    @Test func anErrorOutputIsReported() throws {
         var sheet = Sheet()
         sheet.stored[CellRef("B2").positionKey] = .formula(.divide(.cellRef(CellRef("B1")), .number(0)), cached: nil)
         let f = try SpreadsheetFunction(
             inputs: [CellRef("A1")], outputs: [CellRef("B2")],
             cells: sheet, names: NamedRangeCollection())
-        XCTAssertThrowsError(try f.callAsFunction([1.0])) { error in
-            XCTAssertEqual(error as? SpreadsheetFunctionError,
-                           SpreadsheetFunctionError.outputNotNumeric(CellRef("B2"),
+        if let error = #expect(throws: (any Error).self, performing: { try f.callAsFunction([1.0]) }) {
+            #expect((error as? SpreadsheetFunctionError) == SpreadsheetFunctionError.outputNotNumeric(CellRef("B2"),
                                                                      CellValue.error(.div0)))
         }
     }
 
     /// A circular sheet has no evaluation order, and that is refused at construction —
     /// before an optimizer has spent a thousand calls discovering it.
-    func testACycleIsRefusedAtConstruction() throws {
+    @Test func aCycleIsRefusedAtConstruction() throws {
         var sheet = Sheet()
         sheet.stored[CellRef("B1").positionKey] = .formula(.cellRef(CellRef("B2")), cached: nil)
-        XCTAssertThrowsError(try SpreadsheetFunction(
+        #expect(throws: (any Error).self) { try SpreadsheetFunction(
             inputs: [CellRef("A1")], outputs: [CellRef("B2")],
-            cells: sheet, names: NamedRangeCollection()))
+            cells: sheet, names: NamedRangeCollection()) }
     }
 }

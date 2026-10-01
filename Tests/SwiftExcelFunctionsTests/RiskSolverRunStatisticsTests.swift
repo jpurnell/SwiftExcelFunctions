@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -16,7 +17,7 @@ import BusinessMath
 ///
 /// Where a convention was chosen rather than derived, the test says which one and why the
 /// alternative is plausible. That is the part a later measurement can contradict.
-final class RiskSolverRunStatisticsTests: XCTestCase {
+@Suite struct RiskSolverRunStatisticsTests {
 
     private struct NoCells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -50,7 +51,7 @@ final class RiskSolverRunStatisticsTests: XCTestCase {
     private func number(_ formula: String, values: [Double]? = nil) throws -> Double {
         let answer = try evaluate(formula, values: values)
         guard case .number(let d) = answer else {
-            XCTFail("\(formula) gave \(answer), expected a number")
+            Issue.record("\(formula) gave \(answer), expected a number")
             return .nan
         }
         return d
@@ -59,7 +60,7 @@ final class RiskSolverRunStatisticsTests: XCTestCase {
     // MARK: - Before a run
 
     /// Every one of these answers `#N/A` with no simulation, like the seven beside them.
-    func testEveryStatisticWithoutARunIsNotAvailable() throws {
+    @Test func everyStatisticWithoutARunIsNotAvailable() throws {
         for formula in ["PsiVariance(B4)", "PsiSkewness(B4)", "PsiKurtosis(B4)",
                         "PsiRange(B4)", "PsiCount(B4)", "PsiAbsDev(B4)", "PsiCoeffVar(B4)",
                         "PsiStdErr(B4)", "PsiSemiVar(B4)", "PsiSemiDev(B4)",
@@ -67,22 +68,22 @@ final class RiskSolverRunStatisticsTests: XCTestCase {
                         "PsiFrequency(B4, 1, 10)", "PsiExpGain(B4, 50)", "PsiExpLoss(B4, 50)"] {
             let answer = try FormulaEvaluator.evaluate(
                 try FormulaParser.parse(formula), cells: NoCells(), names: NoNames())
-            XCTAssertEqual(answer, .error(.na), formula)
+            #expect(answer == .error(.na), "\(formula)")
         }
     }
 
     // MARK: - Moments
 
     /// The sample variance of 1…100 is `n(n+1)/12 = 841.666…`.
-    func testVarianceAndRange() throws {
-        XCTAssertEqual(try number("PsiVariance(B4)"), 100 * 101 / 12.0, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiRange(B4)"), 99)
-        XCTAssertEqual(try number("PsiCount(B4)"), 100)
+    @Test func varianceAndRange() throws {
+        #expect(try abs(number("PsiVariance(B4)") - (100 * 101 / 12.0)) <= 1e-9)
+        #expect(try number("PsiRange(B4)").isEqual(to: 99))
+        #expect(try number("PsiCount(B4)").isEqual(to: 100))
     }
 
     /// A symmetric run has zero skewness, whatever its spread.
-    func testSkewnessOfASymmetricRunIsZero() throws {
-        XCTAssertEqual(try number("PsiSkewness(B4)"), 0, accuracy: 1e-9)
+    @Test func skewnessOfASymmetricRunIsZero() throws {
+        #expect(try abs(number("PsiSkewness(B4)") - 0) <= 1e-9)
     }
 
     /// **`PsiKurtosis` is not excess kurtosis.**
@@ -91,29 +92,29 @@ final class RiskSolverRunStatisticsTests: XCTestCase {
     /// differ by exactly 3, so an implementation that picked the other convention returns a
     /// number that looks perfectly reasonable. This pins the choice rather than assuming it
     /// is obvious.
-    func testKurtosisIsNotExcessKurtosis() throws {
+    @Test func kurtosisIsNotExcessKurtosis() throws {
         let excess: Double = kurtosis(Self.oneToHundred, .sample)
-        XCTAssertEqual(try number("PsiKurtosis(B4)"), excess + 3, accuracy: 1e-9)
+        #expect(try abs(number("PsiKurtosis(B4)") - (excess + 3)) <= 1e-9)
         // A uniform run is platykurtic: excess is negative, so the reported figure is below 3.
-        XCTAssertLessThan(try number("PsiKurtosis(B4)"), 3)
+        #expect(try number("PsiKurtosis(B4)") < 3)
     }
 
     // MARK: - Spread
 
     /// The mean absolute deviation of 1…100 about 50.5 is exactly 25.
-    func testAbsoluteDeviation() throws {
-        XCTAssertEqual(try number("PsiAbsDev(B4)"), 25, accuracy: 1e-9)
+    @Test func absoluteDeviation() throws {
+        #expect(try abs(number("PsiAbsDev(B4)") - 25) <= 1e-9)
     }
 
-    func testCoefficientOfVariationAndStandardError() throws {
+    @Test func coefficientOfVariationAndStandardError() throws {
         let sd = (100 * 101 / 12.0).squareRoot()
-        XCTAssertEqual(try number("PsiCoeffVar(B4)"), sd / 50.5, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiStdErr(B4)"), sd / 10, accuracy: 1e-9)
+        #expect(try abs(number("PsiCoeffVar(B4)") - (sd / 50.5)) <= 1e-9)
+        #expect(try abs(number("PsiStdErr(B4)") - (sd / 10)) <= 1e-9)
     }
 
     /// A mean of zero has no coefficient of variation — refused, not an infinity.
-    func testCoefficientOfVariationAtAZeroMean() throws {
-        XCTAssertEqual(try evaluate("PsiCoeffVar(B4)", values: [-1, 0, 1]), .error(.div0))
+    @Test func coefficientOfVariationAtAZeroMean() throws {
+        #expect(try evaluate("PsiCoeffVar(B4)", values: [-1, 0, 1]) == .error(.div0))
     }
 
     // MARK: - Downside
@@ -124,68 +125,65 @@ final class RiskSolverRunStatisticsTests: XCTestCase {
     /// four trials that is `300/4 = 75`; over the three that fell short it would be 100. The
     /// two answer different questions and differ by the shortfall rate, which is not a
     /// rounding — so the choice is asserted rather than left to be inferred.
-    func testSemiVarianceAveragesOverEveryTrial() throws {
-        XCTAssertEqual(try number("PsiSemiVar2(B4, 10)", values: [0, 0, 0, 10]), 75,
-                       accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiSemiDev2(B4, 10)", values: [0, 0, 0, 10]),
-                       75.0.squareRoot(), accuracy: 1e-9)
+    @Test func semiVarianceAveragesOverEveryTrial() throws {
+        #expect(try abs(number("PsiSemiVar2(B4, 10)", values: [0, 0, 0, 10]) - 75) <= 1e-9)
+        #expect(try abs(number("PsiSemiDev2(B4, 10)", values: [0, 0, 0, 10]) - 75.0.squareRoot()) <= 1e-9)
     }
 
     /// Nothing below the target is zero downside, not an error.
-    func testNoShortfallIsZero() throws {
-        XCTAssertEqual(try number("PsiSemiVar2(B4, 0)", values: [1, 2, 3]), 0, accuracy: 1e-12)
+    @Test func noShortfallIsZero() throws {
+        #expect(try abs(number("PsiSemiVar2(B4, 0)", values: [1, 2, 3]) - 0) <= 1e-12)
     }
 
     /// Without its target, the two-argument form refuses rather than falling back to the mean.
     ///
     /// A silent fallback would answer `PsiSemiVar`'s question under `PsiSemiVar2`'s name.
-    func testTheTargetFormRequiresItsTarget() throws {
-        XCTAssertEqual(try evaluate("PsiSemiVar2(B4)"), .error(.value))
-        XCTAssertEqual(try evaluate("PsiSemiDev2(B4)"), .error(.value))
+    @Test func theTargetFormRequiresItsTarget() throws {
+        #expect(try evaluate("PsiSemiVar2(B4)") == .error(.value))
+        #expect(try evaluate("PsiSemiDev2(B4)") == .error(.value))
     }
 
     /// Below the mean, half of a symmetric run falls short.
-    func testSemiVarianceAboutTheMean() throws {
+    @Test func semiVarianceAboutTheMean() throws {
         let full = try number("PsiSemiVar(B4)")
-        XCTAssertGreaterThan(full, 0)
+        #expect(full > 0)
         // Symmetric, so the downside carries half the total squared deviation.
-        XCTAssertEqual(full, 100 * 101 / 12.0 * 99 / 100 / 2, accuracy: 1)
+        #expect(abs(full - (100 * 101 / 12.0 * 99 / 100 / 2)) <= 1)
     }
 
     // MARK: - Reaching into the run
 
     /// One-based, and a trial past the end is refused rather than clamped.
-    func testTrialsAreOneBasedAndBounded() throws {
-        XCTAssertEqual(try number("PsiData(B4, 1)"), 1)
-        XCTAssertEqual(try number("PsiData(B4, 100)"), 100)
-        XCTAssertEqual(try evaluate("PsiData(B4, 0)"), .error(.num))
-        XCTAssertEqual(try evaluate("PsiData(B4, 101)"), .error(.num))
+    @Test func trialsAreOneBasedAndBounded() throws {
+        #expect(try number("PsiData(B4, 1)").isEqual(to: 1))
+        #expect(try number("PsiData(B4, 100)").isEqual(to: 100))
+        #expect(try evaluate("PsiData(B4, 0)") == .error(.num))
+        #expect(try evaluate("PsiData(B4, 101)") == .error(.num))
     }
 
     /// A proportion, not a count — and both ends inclusive.
-    func testFrequencyIsAProportion() throws {
-        XCTAssertEqual(try number("PsiFrequency(B4, 1, 10)"), 0.10, accuracy: 1e-12)
-        XCTAssertEqual(try number("PsiFrequency(B4, 1, 100)"), 1, accuracy: 1e-12)
-        XCTAssertEqual(try number("PsiFrequency(B4, 101, 200)"), 0, accuracy: 1e-12)
-        XCTAssertEqual(try evaluate("PsiFrequency(B4, 10, 1)"), .error(.num),
-                       "a lower bound above the upper is not an empty interval")
+    @Test func frequencyIsAProportion() throws {
+        #expect(try abs(number("PsiFrequency(B4, 1, 10)") - 0.10) <= 1e-12)
+        #expect(try abs(number("PsiFrequency(B4, 1, 100)") - 1) <= 1e-12)
+        #expect(try abs(number("PsiFrequency(B4, 101, 200)") - 0) <= 1e-12)
+        #expect(try evaluate("PsiFrequency(B4, 10, 1)") == .error(.num), "a lower bound above the upper is not an empty interval")
     }
 
     // MARK: - Gain and loss
 
     /// Averaged over every trial, and a loss is reported as a positive magnitude.
-    func testExpectedGainAndLoss() throws {
+    @Test func expectedGainAndLoss() throws {
         // 1…100 against 100: only trial 100 clears it, by 0. Expected gain is 0.
-        XCTAssertEqual(try number("PsiExpGain(B4, 100)"), 0, accuracy: 1e-12)
+        #expect(try abs(number("PsiExpGain(B4, 100)") - 0) <= 1e-12)
         // Against 0: every trial clears it, by its own value. Mean 50.5.
-        XCTAssertEqual(try number("PsiExpGain(B4, 0)"), 50.5, accuracy: 1e-9)
+        #expect(try abs(number("PsiExpGain(B4, 0)") - 50.5) <= 1e-9)
         // Against 101: every trial falls short, by 101 − value. Mean 50.5.
-        XCTAssertEqual(try number("PsiExpLoss(B4, 101)"), 50.5, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiExpLoss(B4, 0)"), 0, accuracy: 1e-12)
+        #expect(try abs(number("PsiExpLoss(B4, 101)") - 50.5) <= 1e-9)
+        #expect(try abs(number("PsiExpLoss(B4, 0)") - 0) <= 1e-12)
     }
 
     /// A loss is a magnitude: positive, never negative.
-    func testALossIsPositive() throws {
-        XCTAssertGreaterThan(try number("PsiExpLoss(B4, 50)"), 0)
+    @Test func aLossIsPositive() throws {
+        #expect(try number("PsiExpLoss(B4, 50)") > 0)
     }
 }

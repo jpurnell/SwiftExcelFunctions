@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -17,7 +18,7 @@ import BusinessMath
 /// computed differently on purpose** — the unshifted rate counts trials, the shifted rate
 /// assumes a normal that has drifted. For a symmetric output the two nearly agree, which is
 /// exactly why a test has to pin which is which.
-final class RiskSolverSixSigmaTests: XCTestCase {
+@Suite struct RiskSolverSixSigmaTests {
 
     private struct Sheet: CellValueProvider {
         let formulas: [String: FormulaAST]
@@ -63,7 +64,7 @@ final class RiskSolverSixSigmaTests: XCTestCase {
                         values: [Double]? = nil) throws -> Double {
         let answer = try evaluate(formula, spec: spec, values: values)
         guard case .number(let d) = answer else {
-            XCTFail("\(formula) gave \(answer)"); return .nan
+            Issue.record("\(formula) gave \(answer)"); return .nan
         }
         return d
     }
@@ -75,70 +76,61 @@ final class RiskSolverSixSigmaTests: XCTestCase {
     // MARK: - The ratios
 
     /// `Cp` is the allowed spread over the actual spread, and ignores centring.
-    func testCapability() throws {
+    @Test func capability() throws {
         let sigma = deviation()
-        XCTAssertEqual(try number("PsiSigmaCp(B4)"), 10 / (6 * sigma), accuracy: 1e-9)
+        #expect(try abs(number("PsiSigmaCp(B4)") - (10 / (6 * sigma))) <= 1e-9)
     }
 
     /// `Cpk` takes the nearer limit; centred, the two sides agree and it is half of `Cp`… no:
     /// centred, `Cpk` equals `Cp`, which is the identity worth asserting.
-    func testCapabilityIndexEqualsCapabilityWhenCentred() throws {
-        XCTAssertEqual(try number("PsiSigmaCpk(B4)"), try number("PsiSigmaCp(B4)"),
-                       accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiSigmaCpkUpper(B4)"),
-                       try number("PsiSigmaCpkLower(B4)"), accuracy: 1e-9)
+    @Test func capabilityIndexEqualsCapabilityWhenCentred() throws {
+        #expect(try abs(number("PsiSigmaCpk(B4)") - number("PsiSigmaCp(B4)")) <= 1e-9)
+        #expect(try abs(number("PsiSigmaCpkUpper(B4)") - number("PsiSigmaCpkLower(B4)")) <= 1e-9)
     }
 
     /// **Off centre, `Cp` is unchanged and `Cpk` falls.** The pair's entire purpose.
-    func testCapabilityIgnoresCentringAndTheIndexDoesNot() throws {
+    @Test func capabilityIgnoresCentringAndTheIndexDoesNot() throws {
         let offset = Self.centred.map { $0 + 2 }   // centred on 102, limits still 95…105
-        XCTAssertEqual(try number("PsiSigmaCp(B4)", values: offset),
-                       try number("PsiSigmaCp(B4)"), accuracy: 1e-9)
-        XCTAssertLessThan(try number("PsiSigmaCpk(B4)", values: offset),
-                          try number("PsiSigmaCpk(B4)"))
+        #expect(try abs(number("PsiSigmaCp(B4)", values: offset) - number("PsiSigmaCp(B4)")) <= 1e-9)
+        #expect(try number("PsiSigmaCpk(B4)", values: offset) < number("PsiSigmaCpk(B4)"))
         // And the nearer limit is now the upper one.
-        XCTAssertLessThan(try number("PsiSigmaCpkUpper(B4)", values: offset),
-                          try number("PsiSigmaCpkLower(B4)", values: offset))
+        #expect(try number("PsiSigmaCpkUpper(B4)", values: offset) < number("PsiSigmaCpkLower(B4)", values: offset))
     }
 
     /// `k` is signed, so it says which way the process is off centre.
-    func testCentringIsSigned() throws {
-        XCTAssertEqual(try number("PsiSigmaK(B4)"), 0, accuracy: 1e-9)
-        XCTAssertGreaterThan(try number("PsiSigmaK(B4)", values: Self.centred.map { $0 + 2 }), 0)
-        XCTAssertLessThan(try number("PsiSigmaK(B4)", values: Self.centred.map { $0 - 2 }), 0)
+    @Test func centringIsSigned() throws {
+        #expect(try abs(number("PsiSigmaK(B4)") - 0) <= 1e-9)
+        #expect(try number("PsiSigmaK(B4)", values: Self.centred.map { $0 + 2 }) > 0)
+        #expect(try number("PsiSigmaK(B4)", values: Self.centred.map { $0 - 2 }) < 0)
     }
 
     /// `Cpm` charges for being off **target**, which is not the same as off centre.
     ///
     /// With the target at the midpoint the two agree; move the target and `Cpm` falls while
     /// `Cp` does not notice.
-    func testCpmChargesForMissingTheTarget() throws {
-        XCTAssertEqual(try number("PsiSigmaCpm(B4)"), try number("PsiSigmaCp(B4)"),
-                       accuracy: 1e-9)
+    @Test func cpmChargesForMissingTheTarget() throws {
+        #expect(try abs(number("PsiSigmaCpm(B4)") - number("PsiSigmaCp(B4)")) <= 1e-9)
         let offTarget = try number("PsiSigmaCpm(B4)", spec: "PsiSixSigma(95, 105, 103)")
-        XCTAssertLessThan(offTarget, try number("PsiSigmaCp(B4)"))
+        #expect(try offTarget < number("PsiSigmaCp(B4)"))
     }
 
     /// An omitted target is the midpoint, not zero.
     ///
     /// Defaulting to zero would report every centred process as wildly off target, and the
     /// number it produced would be small and plausible rather than obviously wrong.
-    func testAnOmittedTargetIsTheMidpoint() throws {
-        XCTAssertEqual(try number("PsiSigmaCpm(B4)", spec: "PsiSixSigma(95, 105)"),
-                       try number("PsiSigmaCpm(B4)", spec: "PsiSixSigma(95, 105, 100)"),
-                       accuracy: 1e-12)
+    @Test func anOmittedTargetIsTheMidpoint() throws {
+        #expect(try abs(number("PsiSigmaCpm(B4)", spec: "PsiSixSigma(95, 105)") - number("PsiSigmaCpm(B4)", spec: "PsiSixSigma(95, 105, 100)")) <= 1e-12)
     }
 
     // MARK: - Z scores
 
-    func testZScoresAndTheirMinimum() throws {
+    @Test func zScoresAndTheirMinimum() throws {
         let sigma = deviation()
-        XCTAssertEqual(try number("PsiSigmaZUpper(B4)"), 5 / sigma, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiSigmaZLower(B4)"), 5 / sigma, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiSigmaZMin(B4)"), 5 / sigma, accuracy: 1e-9)
+        #expect(try abs(number("PsiSigmaZUpper(B4)") - (5 / sigma)) <= 1e-9)
+        #expect(try abs(number("PsiSigmaZLower(B4)") - (5 / sigma)) <= 1e-9)
+        #expect(try abs(number("PsiSigmaZMin(B4)") - (5 / sigma)) <= 1e-9)
         // The sigma level is the short-term figure: Zmin with no 1.5 folded in.
-        XCTAssertEqual(try number("PsiSigmaSigmaLevel(B4)"),
-                       try number("PsiSigmaZMin(B4)"), accuracy: 1e-12)
+        #expect(try abs(number("PsiSigmaSigmaLevel(B4)") - number("PsiSigmaZMin(B4)")) <= 1e-12)
     }
 
     // MARK: - Defects, counted and assumed
@@ -147,68 +139,66 @@ final class RiskSolverSixSigmaTests: XCTestCase {
     ///
     /// The run spans 97…103 inside limits of 95…105, so nothing is defective and the rate is
     /// exactly zero — which a normal approximation would not have said.
-    func testTheUnshiftedDefectRateIsCounted() throws {
-        XCTAssertEqual(try number("PsiSigmaDefectPPM(B4)"), 0, accuracy: 1e-12)
-        XCTAssertEqual(try number("PsiSigmaYield(B4)"), 1, accuracy: 1e-12)
+    @Test func theUnshiftedDefectRateIsCounted() throws {
+        #expect(try abs(number("PsiSigmaDefectPPM(B4)") - 0) <= 1e-12)
+        #expect(try abs(number("PsiSigmaYield(B4)") - 1) <= 1e-12)
 
         // Widen the run past the limits and exactly a tenth of it is outside.
         let ten = Array(repeating: 100.0, count: 9) + [200.0]
-        XCTAssertEqual(try number("PsiSigmaDefectPPM(B4)", values: ten), 100_000, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiSigmaYield(B4)", values: ten), 0.9, accuracy: 1e-12)
+        #expect(try abs(number("PsiSigmaDefectPPM(B4)", values: ten) - 100_000) <= 1e-6)
+        #expect(try abs(number("PsiSigmaYield(B4)", values: ten) - 0.9) <= 1e-12)
     }
 
     /// **The shifted rate assumes a normal that has drifted**, so it is positive where the
     /// counted rate is zero. That divergence is the point, not a discrepancy.
-    func testTheShiftedRateIsNormalTheoryAndDiffers() throws {
-        XCTAssertEqual(try number("PsiSigmaDefectPPM(B4)"), 0, accuracy: 1e-12)
-        XCTAssertGreaterThan(try number("PsiSigmaDefectShiftPPM(B4)"), 0)
+    @Test func theShiftedRateIsNormalTheoryAndDiffers() throws {
+        #expect(try abs(number("PsiSigmaDefectPPM(B4)") - 0) <= 1e-12)
+        #expect(try number("PsiSigmaDefectShiftPPM(B4)") > 0)
     }
 
     /// The drift is applied toward each limit in turn, so it hurts one side and helps the
     /// other. Taking it as helping both would report a process as better than either view.
-    func testTheDriftHurtsOneSideAndHelpsTheOther() throws {
+    @Test func theDriftHurtsOneSideAndHelpsTheOther() throws {
         let upper = try number("PsiSigmaProbDefectShiftUpper(B4)")
         let lower = try number("PsiSigmaProbDefectShiftLower(B4)")
-        XCTAssertGreaterThan(upper, lower, "a positive drift moves toward the upper limit")
-        XCTAssertEqual(try number("PsiSigmaProbDefectShift(B4)"), upper + lower, accuracy: 1e-12)
+        #expect(upper > lower, "a positive drift moves toward the upper limit")
+        #expect(try abs(number("PsiSigmaProbDefectShift(B4)") - (upper + lower)) <= 1e-12)
         // And PPM is the same number times a million.
-        XCTAssertEqual(try number("PsiSigmaDefectShiftPPMUpper(B4)"), upper * 1e6,
-                       accuracy: 1e-6)
+        #expect(try abs(number("PsiSigmaDefectShiftPPMUpper(B4)") - (upper * 1e6)) <= 1e-6)
     }
 
     /// A larger assumed drift can only make the long-term picture worse.
-    func testALargerDriftIsWorse() throws {
+    @Test func aLargerDriftIsWorse() throws {
         let gentle = try number("PsiSigmaDefectShiftPPM(B4)", spec: "PsiSixSigma(95,105,100,0.5)")
         let harsh = try number("PsiSigmaDefectShiftPPM(B4)", spec: "PsiSixSigma(95,105,100,2.5)")
-        XCTAssertGreaterThan(harsh, gentle)
+        #expect(harsh > gentle)
     }
 
     // MARK: - Bounds, and what is missing
 
-    func testTheBoundsAreReadBack() throws {
-        XCTAssertEqual(try number("PsiSigmaLowerBound(B4)"), 95)
-        XCTAssertEqual(try number("PsiSigmaUpperBound(B4)"), 105)
+    @Test func theBoundsAreReadBack() throws {
+        #expect(try number("PsiSigmaLowerBound(B4)").isEqual(to: 95))
+        #expect(try number("PsiSigmaUpperBound(B4)").isEqual(to: 105))
     }
 
     /// A cell with no `PsiSixSigma` is `#N/A`: the model has not said what the limits are.
-    func testWithoutASpecification() throws {
+    @Test func withoutASpecification() throws {
         let sheet = Sheet(formulas: ["B4": try FormulaParser.parse("1 + PsiOutput()")])
         let answer = try FormulaEvaluator.evaluate(
             try FormulaParser.parse("PsiSigmaCp(B4)"), cells: sheet, names: NoNames(),
             simulation: Run(values: Self.centred))
-        XCTAssertEqual(answer, .error(.na))
+        #expect(answer == .error(.na))
     }
 
     /// Without a run at all, `#N/A` as every other statistic answers.
-    func testWithoutARun() throws {
+    @Test func withoutARun() throws {
         let sheet = Sheet(formulas: ["B4": try FormulaParser.parse("1 + PsiSixSigma(95, 105)")])
-        XCTAssertEqual(try FormulaEvaluator.evaluate(
-            try FormulaParser.parse("PsiSigmaCp(B4)"), cells: sheet, names: NoNames()),
-                       .error(.na))
+        #expect(try FormulaEvaluator.evaluate(
+            try FormulaParser.parse("PsiSigmaCp(B4)"), cells: sheet, names: NoNames()) == .error(.na))
     }
 
     /// A run with no spread is a constant, and a constant has no capability.
-    func testAConstantRunIsRefused() throws {
-        XCTAssertEqual(try evaluate("PsiSigmaCp(B4)", values: [100, 100, 100]), .error(.num))
+    @Test func aConstantRunIsRefused() throws {
+        #expect(try evaluate("PsiSigmaCp(B4)", values: [100, 100, 100]) == .error(.num))
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -21,7 +22,7 @@ import SwiftXLSX
 /// read another way here. `testEveryDistributionFamilyIsReachable` is the check on that
 /// claim: the `*Alt` percentile-parameterised forms have no closed-form object that a table
 /// could have held, and they work anyway.
-final class RiskSolverTheoreticalTests: XCTestCase {
+@Suite struct RiskSolverTheoreticalTests {
 
     /// A sheet where `B4` holds a formula, given as text.
     private struct Sheet: CellValueProvider {
@@ -48,7 +49,7 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     private func number(_ formula: String, drawing: String) throws -> Double {
         let answer = try evaluate(formula, drawing: drawing)
         guard case .number(let d) = answer else {
-            XCTFail("\(formula) over \(drawing) gave \(answer)")
+            Issue.record("\(formula) over \(drawing) gave \(answer)")
             return .nan
         }
         return d
@@ -57,13 +58,13 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     // MARK: - Moments against closed forms
 
     /// `PsiNormal(10, 2)`: mean 10, variance 4, standard deviation 2, skewness 0.
-    func testTheNormalsMoments() throws {
+    @Test func theNormalsMoments() throws {
         let draw = "PsiNormal(10, 2)"
-        XCTAssertEqual(try number("PsiTheoMean(B4)", drawing: draw), 10, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoStdDev(B4)", drawing: draw), 2, accuracy: 1e-3)
-        XCTAssertEqual(try number("PsiTheoVariance(B4)", drawing: draw), 4, accuracy: 1e-2)
-        XCTAssertEqual(try number("PsiTheoSkewness(B4)", drawing: draw), 0, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoMedian(B4)", drawing: draw), 10, accuracy: 1e-9)
+        #expect(try abs(number("PsiTheoMean(B4)", drawing: draw) - 10) <= 1e-6)
+        #expect(try abs(number("PsiTheoStdDev(B4)", drawing: draw) - 2) <= 1e-3)
+        #expect(try abs(number("PsiTheoVariance(B4)", drawing: draw) - 4) <= 1e-2)
+        #expect(try abs(number("PsiTheoSkewness(B4)", drawing: draw) - 0) <= 1e-6)
+        #expect(try abs(number("PsiTheoMedian(B4)", drawing: draw) - 10) <= 1e-9)
     }
 
     /// **Kurtosis is not excess kurtosis**: a normal reports 3, matching `PsiKurtosis`.
@@ -71,31 +72,31 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     /// The grid understates a tail, so this sits a little under 3 rather than on it — which is
     /// the documented limit of the midpoint rule doing the integrating, not a wrong constant.
     /// Asserted near 3 and nowhere near 0, which is what distinguishes the two conventions.
-    func testKurtosisUsesTheNonExcessConvention() throws {
+    @Test func kurtosisUsesTheNonExcessConvention() throws {
         let value = try number("PsiTheoKurtosis(B4)", drawing: "PsiNormal(10, 2)")
-        XCTAssertEqual(value, 3, accuracy: 0.2)
-        XCTAssertGreaterThan(value, 2, "0 would mean the excess convention had been used")
+        #expect(abs(value - 3) <= 0.2)
+        #expect(value > 2, "0 would mean the excess convention had been used")
     }
 
     /// A uniform on `[0, 6]`: mean 3, variance 3, and bounds that are exact.
-    func testTheUniformsMomentsAndBounds() throws {
+    @Test func theUniformsMomentsAndBounds() throws {
         let draw = "PsiUniform(0, 6)"
-        XCTAssertEqual(try number("PsiTheoMean(B4)", drawing: draw), 3, accuracy: 1e-9)
-        XCTAssertEqual(try number("PsiTheoVariance(B4)", drawing: draw), 3, accuracy: 1e-3)
+        #expect(try abs(number("PsiTheoMean(B4)", drawing: draw) - 3) <= 1e-9)
+        #expect(try abs(number("PsiTheoVariance(B4)", drawing: draw) - 3) <= 1e-3)
         // Bounded support, so the extremes are the real ones rather than a far quantile.
-        XCTAssertEqual(try number("PsiTheoMin(B4)", drawing: draw), 0, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoMax(B4)", drawing: draw), 6, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoRange(B4)", drawing: draw), 6, accuracy: 1e-6)
+        #expect(try abs(number("PsiTheoMin(B4)", drawing: draw) - 0) <= 1e-6)
+        #expect(try abs(number("PsiTheoMax(B4)", drawing: draw) - 6) <= 1e-6)
+        #expect(try abs(number("PsiTheoRange(B4)", drawing: draw) - 6) <= 1e-6)
     }
 
     /// A triangular is skewed, and the sign of the skewness says which way.
-    func testSkewnessHasTheRightSign() throws {
+    @Test func skewnessHasTheRightSign() throws {
         // Mode at 1 on [0, 10]: the long tail is to the right.
-        XCTAssertGreaterThan(try number("PsiTheoSkewness(B4)",
-                                        drawing: "PsiTriangular(0, 1, 10)"), 0)
+        #expect(try number("PsiTheoSkewness(B4)",
+                                        drawing: "PsiTriangular(0, 1, 10)") > 0)
         // Mode at 9: the long tail is to the left.
-        XCTAssertLessThan(try number("PsiTheoSkewness(B4)",
-                                     drawing: "PsiTriangular(0, 9, 10)"), 0)
+        #expect(try number("PsiTheoSkewness(B4)",
+                                     drawing: "PsiTriangular(0, 9, 10)") < 0)
     }
 
     // MARK: - Percentiles and their mirrors
@@ -104,28 +105,27 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     ///
     /// The pair is the easiest thing here to get backwards, and for a symmetric distribution
     /// a swapped pair is a sign error rather than an obvious failure.
-    func testThePercentilePairReadsFromOppositeEnds() throws {
+    @Test func thePercentilePairReadsFromOppositeEnds() throws {
         let draw = "PsiNormal(10, 2)"
         let low = try number("PsiTheoPercentile(B4, 0.05)", drawing: draw)
         let high = try number("PsiTheoPercentileD(B4, 0.05)", drawing: draw)
-        XCTAssertLessThan(low, 10)
-        XCTAssertGreaterThan(high, 10)
+        #expect(low < 10)
+        #expect(high > 10)
         // Symmetric about the mean, so the two are equidistant.
-        XCTAssertEqual(10 - low, high - 10, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoPercentile(B4, 0.5)", drawing: draw), 10,
-                       accuracy: 1e-9)
+        #expect(abs((10 - low) - (high - 10)) <= 1e-6)
+        #expect(try abs(number("PsiTheoPercentile(B4, 0.5)", drawing: draw) - 10) <= 1e-9)
     }
 
     /// `XtoP` and `XtoQ` are complements, and `PtoX` inverts `XtoP`.
-    func testTheProbabilityPairsAreComplements() throws {
+    @Test func theProbabilityPairsAreComplements() throws {
         let draw = "PsiUniform(0, 10)"
-        XCTAssertEqual(try number("PsiTheoXtoP(B4, 2.5)", drawing: draw), 0.25, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoXtoQ(B4, 2.5)", drawing: draw), 0.75, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoTarget(B4, 2.5)", drawing: draw), 0.25, accuracy: 1e-6)
-        XCTAssertEqual(try number("PsiTheoTargetD(B4, 2.5)", drawing: draw), 0.75, accuracy: 1e-6)
+        #expect(try abs(number("PsiTheoXtoP(B4, 2.5)", drawing: draw) - 0.25) <= 1e-6)
+        #expect(try abs(number("PsiTheoXtoQ(B4, 2.5)", drawing: draw) - 0.75) <= 1e-6)
+        #expect(try abs(number("PsiTheoTarget(B4, 2.5)", drawing: draw) - 0.25) <= 1e-6)
+        #expect(try abs(number("PsiTheoTargetD(B4, 2.5)", drawing: draw) - 0.75) <= 1e-6)
         // The round trip, which is what ties the two directions together.
         let x = try number("PsiTheoPtoX(B4, 0.3)", drawing: draw)
-        XCTAssertEqual(try number("PsiTheoXtoP(B4, \(x))", drawing: draw), 0.3, accuracy: 1e-6)
+        #expect(try abs(number("PsiTheoXtoP(B4, \(x))", drawing: draw) - 0.3) <= 1e-6)
     }
 
     // MARK: - Reaching every family
@@ -135,19 +135,18 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     /// `PsiNormalAlt` is parameterised by percentiles rather than by moments, so nothing a
     /// registry could hold describes it — it is solved for at call time. It works here because
     /// these statistics read the sampler's own path rather than a second description.
-    func testEveryDistributionFamilyIsReachable() throws {
+    @Test func everyDistributionFamilyIsReachable() throws {
         for draw in ["PsiNormal(10, 2)", "PsiUniform(0, 6)", "PsiTriangular(0, 5, 10)",
                      "PsiLogNormal(10, 2)", "PsiExponential(3)",
                      "PsiNormalAlt(0.1, 5, 0.9, 15)"] {
             let mean = try number("PsiTheoMean(B4)", drawing: draw)
-            XCTAssertTrue(mean.isFinite, "\(draw) gave \(mean)")
+            #expect(mean.isFinite, "\(draw) gave \(mean)")
         }
     }
 
     /// Written in place, with no cell to look up.
-    func testTheDistributionMayBeWrittenInPlace() throws {
-        XCTAssertEqual(try number("PsiTheoMean(PsiUniform(0, 6))", drawing: "PsiNormal(0,1)"),
-                       3, accuracy: 1e-9)
+    @Test func theDistributionMayBeWrittenInPlace() throws {
+        #expect(try abs(number("PsiTheoMean(PsiUniform(0, 6))", drawing: "PsiNormal(0,1)") - 3) <= 1e-9)
     }
 
     // MARK: - No subject
@@ -157,19 +156,16 @@ final class RiskSolverTheoreticalTests: XCTestCase {
     /// `#N/A` is what a *run* statistic says before a simulation: the question is well-formed
     /// and the answer is not available yet. A theoretical statistic about a constant is a
     /// different thing — there is no subject, and no simulation would ever supply one.
-    func testACellThatDrawsNothingIsRefused() throws {
-        XCTAssertEqual(try evaluate("PsiTheoMean(C9)", drawing: "PsiNormal(10, 2)"),
-                       .error(.value), "an empty cell draws nothing")
-        XCTAssertEqual(try evaluate("PsiTheoMean(42)", drawing: "PsiNormal(10, 2)"),
-                       .error(.value), "a number is not a subject")
+    @Test func aCellThatDrawsNothingIsRefused() throws {
+        #expect(try evaluate("PsiTheoMean(C9)", drawing: "PsiNormal(10, 2)") == .error(.value), "an empty cell draws nothing")
+        #expect(try evaluate("PsiTheoMean(42)", drawing: "PsiNormal(10, 2)") == .error(.value), "a number is not a subject")
     }
 
     /// A probability outside (0, 1) has no quantile.
-    func testProbabilitiesOutsideTheOpenIntervalAreRefused() throws {
+    @Test func probabilitiesOutsideTheOpenIntervalAreRefused() throws {
         for formula in ["PsiTheoPercentile(B4, 0)", "PsiTheoPercentile(B4, 1)",
                         "PsiTheoPercentile(B4, -0.1)", "PsiTheoPercentileD(B4, 1)"] {
-            XCTAssertEqual(try evaluate(formula, drawing: "PsiNormal(10, 2)"),
-                           .error(.num), formula)
+            #expect(try evaluate(formula, drawing: "PsiNormal(10, 2)") == .error(.num), "\(formula)")
         }
     }
 }

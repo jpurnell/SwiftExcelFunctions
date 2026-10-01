@@ -1,11 +1,12 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
 
 /// The three things a user interface needs from a run: editable parameters, progress it can
 /// show, and a stop button — plus the guarantee that none of it changes the answer.
-final class ParallelRunTests: XCTestCase {
+@Suite struct ParallelRunTests {
 
     /// A model with one uncertain input and one output.
     private struct Model: CellValueProvider, PopulatedCellProvider {
@@ -52,7 +53,7 @@ final class ParallelRunTests: XCTestCase {
     // MARK: - Parameters
 
     /// Editing σ changes the spread, and does not touch the workbook.
-    func testAnOverrideChangesTheDistribution() async throws {
+    @Test func anOverrideChangesTheDistribution() async throws {
         let model = try model()
         let tight = try await engine(model, trials: 4000)
             .runConcurrently(over: model, names: NoNames())
@@ -60,23 +61,23 @@ final class ParallelRunTests: XCTestCase {
             over: model, names: NoNames(),
             overrides: [DistributionOverride(cell: CellAddress(sheet: "", ref: "A1"), parameter: 1, value: 20)])
 
-        let tightSD = try XCTUnwrap(tight.results(for: CellRef("A2"))).statistics.stdDev
-        let wideSD = try XCTUnwrap(wide.results(for: CellRef("A2"))).statistics.stdDev
-        XCTAssertGreaterThan(wideSD, tightSD * 5, "σ 2 → 20 is ten times the spread")
+        let tightSD = try #require(tight.results(for: CellRef("A2"))).statistics.stdDev
+        let wideSD = try #require(wide.results(for: CellRef("A2"))).statistics.stdDev
+        #expect(wideSD > (tightSD * 5), "σ 2 → 20 is ten times the spread")
 
         // The model is unchanged: the same cells, the same formula text.
-        guard case .formula(let ast, _)? = model["A1"] else { return XCTFail("no formula") }
-        XCTAssertEqual(FormulaSerializer.serialize(ast), "PSINORMAL(10,2)")
+        guard case .formula(let ast, _)? = model["A1"] else { Issue.record("no formula"); return }
+        #expect(FormulaSerializer.serialize(ast) == "PSINORMAL(10,2)")
     }
 
     /// Overriding the mean moves the answer by exactly what was asked.
-    func testAnOverrideMovesTheMean() async throws {
+    @Test func anOverrideMovesTheMean() async throws {
         let model = try model()
         let run = try await engine(model, trials: 8000).runConcurrently(
             over: model, names: NoNames(),
             overrides: [DistributionOverride(cell: CellAddress(sheet: "", ref: "A1"), parameter: 0, value: 100)])
-        let mean = try XCTUnwrap(run.results(for: CellRef("A2"))).statistics.mean
-        XCTAssertEqual(mean, 200, accuracy: 2, "mean 100, doubled")
+        let mean = try #require(run.results(for: CellRef("A2"))).statistics.mean
+        #expect(abs(mean - 200) <= 2, "mean 100, doubled")
     }
 
     /// **A property is not a parameter**, and overriding index 0 must not land on one.
@@ -84,37 +85,36 @@ final class ParallelRunTests: XCTestCase {
     /// `PsiNormal(10, 2, PsiName("x"))` has one property among its arguments. Counting it as
     /// positional would shift every parameter after it, and the distribution would still
     /// compute — which is the failure this whole design is arranged to avoid.
-    func testAnOverrideCountsPastProperties() throws {
+    @Test func anOverrideCountsPastProperties() throws {
         let ast = try FormulaParser.parse(#"PsiNormal(PsiName("x"), 10, 2)"#)
         let edited = DistributionOverride.applied(to: ast, overrides: [0: 99])
         let text = FormulaSerializer.serialize(edited)
-        XCTAssertTrue(text.contains("99"), "the first *parameter* moved")
-        XCTAssertTrue(text.uppercased().contains("PSINAME"), "and the property survived")
-        XCTAssertFalse(text.contains("PSINAME(99"), "the property was not overwritten")
+        #expect(text.contains("99"), "the first *parameter* moved")
+        #expect(text.uppercased().contains("PSINAME"), "and the property survived")
+        #expect(!text.contains("PSINAME(99"), "the property was not overwritten")
     }
 
     /// An unmodelled property survives an edit, because the tree is edited rather than rebuilt.
-    func testAnOverridePreservesAnUnhandledProperty() throws {
+    @Test func anOverridePreservesAnUnhandledProperty() throws {
         let ast = try FormulaParser.parse("PsiNormal(10, 2, PsiTruncate(5, 15))")
         let edited = DistributionOverride.applied(to: ast, overrides: [1: 3])
         let text = FormulaSerializer.serialize(edited).uppercased()
-        XCTAssertTrue(text.contains("PSITRUNCATE(5,15)"),
-                      "rebuilding from DistributionCall would have dropped this")
-        XCTAssertTrue(text.contains("PSINORMAL(10,3"))
+        #expect(text.contains("PSITRUNCATE(5,15)"), "rebuilding from DistributionCall would have dropped this")
+        #expect(text.contains("PSINORMAL(10,3"))
     }
 
     // MARK: - Progress
 
-    func testProgressReachesTheTotalAndIsIncremental() async throws {
+    @Test func progressReachesTheTotalAndIsIncremental() async throws {
         let model = try model()
         let seen = Reports()
         _ = try await engine(model, trials: 5000).runConcurrently(
             over: model, names: NoNames(), concurrency: 4,
             onProgress: { seen.record($0.completed) })
         let counts = seen.all
-        XCTAssertGreaterThan(counts.count, 1, "one report at the end is not progress")
-        XCTAssertEqual(counts.last, 5000, "and it finishes at the total")
-        XCTAssertEqual(counts, counts.sorted(), "never goes backwards")
+        #expect(counts.count > 1, "one report at the end is not progress")
+        #expect(counts.last == 5000, "and it finishes at the total")
+        #expect(counts == counts.sorted(), "never goes backwards")
     }
 
     /// Thread-safe collection for a `@Sendable` callback.
@@ -128,17 +128,14 @@ final class ParallelRunTests: XCTestCase {
 
     // MARK: - Cancellation
 
-    func testCancellationStopsTheRun() async throws {
+    @Test func cancellationStopsTheRun() async throws {
         let model = try model()
         let engine = engine(model, trials: 5_000_000)
         let task = Task { try await engine.runConcurrently(over: model, names: NoNames()) }
         try await Task.sleep(nanoseconds: 40_000_000)
         task.cancel()
-        do {
-            _ = try await task.value
-            XCTFail("a cancelled run should not return a result")
-        } catch is CancellationError {
-            // The expected path.
+        await #expect(throws: CancellationError.self, "a cancelled run should not return a result") {
+            try await task.value
         }
     }
 
@@ -149,38 +146,38 @@ final class ParallelRunTests: XCTestCase {
     /// Each trial derives its generator from the seed and its own index, so the result cannot
     /// depend on how the work was divided. A run whose answer moves with the machine it ran
     /// on is not reproducible, and the seed would be decoration.
-    func testTheAnswerIsIndependentOfConcurrency() async throws {
+    @Test func theAnswerIsIndependentOfConcurrency() async throws {
         let model = try model()
         var means: [Double] = []
         for lanes in [1, 3, 8] {
             let run = try await engine(model, trials: 3000)
                 .runConcurrently(over: model, names: NoNames(), concurrency: lanes)
-            means.append(try XCTUnwrap(run.results(for: CellRef("A2"))).statistics.mean)
+            means.append(try #require(run.results(for: CellRef("A2"))).statistics.mean)
         }
-        XCTAssertEqual(means[0], means[1], accuracy: 1e-12)
-        XCTAssertEqual(means[1], means[2], accuracy: 1e-12)
+        #expect(abs(means[0] - means[1]) <= 1e-12)
+        #expect(abs(means[1] - means[2]) <= 1e-12)
     }
 
     // MARK: - Convergence
 
-    func testConvergenceNarrowsWithTrials() async throws {
+    @Test func convergenceNarrowsWithTrials() async throws {
         let model = try model()
         var widths: [Double] = []
         for trials in [500, 50_000] {
             let run = try await engine(model, trials: trials)
                 .runConcurrently(over: model, names: NoNames())
-            let results = try XCTUnwrap(run.results(for: CellRef("A2")))
+            let results = try #require(run.results(for: CellRef("A2")))
             widths.append(Convergence(results).halfWidth)
         }
-        XCTAssertLessThan(widths[1], widths[0] / 5, "100× the trials, ~10× the precision")
+        #expect(widths[1] < (widths[0] / 5), "100× the trials, ~10× the precision")
     }
 
-    func testConvergenceReportsWhenItHasSettled() async throws {
+    @Test func convergenceReportsWhenItHasSettled() async throws {
         let model = try model()
         let run = try await engine(model, trials: 40_000)
             .runConcurrently(over: model, names: NoNames())
-        let convergence = Convergence(try XCTUnwrap(run.results(for: CellRef("A2"))))
-        XCTAssertTrue(convergence.hasSettled(within: 0.02), "±2% of a mean of 20")
-        XCTAssertFalse(convergence.hasSettled(within: 1e-9), "and not to nine decimals")
+        let convergence = Convergence(try #require(run.results(for: CellRef("A2"))))
+        #expect(convergence.hasSettled(within: 0.02), "±2% of a mean of 20")
+        #expect(!convergence.hasSettled(within: 1e-9), "and not to nine decimals")
     }
 }

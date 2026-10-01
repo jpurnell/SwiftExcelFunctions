@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -49,7 +50,7 @@ private struct MockNames: NameResolver {
 
 // MARK: - FormulaEvaluatorTests
 
-final class FormulaEvaluatorTests: XCTestCase {
+@Suite struct FormulaEvaluatorTests {
 
     // MARK: - Helpers
 
@@ -68,76 +69,63 @@ final class FormulaEvaluatorTests: XCTestCase {
         )
     }
 
-    private func assertNumber(
-        _ result: CellValue,
-        _ expected: Double,
-        accuracy: Double = 1e-10,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .number(let value) = result else {
-            XCTFail("Expected .number(\(expected)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(value, expected, accuracy: accuracy, file: file, line: line)
-    }
 
     // MARK: - Literal Evaluation
 
-    func testNumberLiteral() throws {
+    @Test func numberLiteral() throws {
         let result = try eval(.number(42.5))
-        XCTAssertEqual(result, .number(42.5))
+        #expect(result == .number(42.5))
     }
 
-    func testTextLiteral() throws {
+    @Test func textLiteral() throws {
         let result = try eval(.text("hello"))
-        XCTAssertEqual(result, .text("hello"))
+        #expect(result == .text("hello"))
     }
 
-    func testBoolTrueLiteral() throws {
+    @Test func boolTrueLiteral() throws {
         let result = try eval(.bool(true))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testBoolFalseLiteral() throws {
+    @Test func boolFalseLiteral() throws {
         let result = try eval(.bool(false))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testErrorLiteral() throws {
+    @Test func errorLiteral() throws {
         let result = try eval(.error(.value))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
-    func testErrorDiv0Literal() throws {
+    @Test func errorDiv0Literal() throws {
         let result = try eval(.error(.div0))
-        XCTAssertEqual(result, .error(.div0))
+        #expect(result == .error(.div0))
     }
 
     // MARK: - Cell Reference Lookup
 
-    func testCellRefFound() throws {
+    @Test func cellRefFound() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(99)
         let result = try eval(.cellRef(CellRef("A1")), cells: cells)
-        XCTAssertEqual(result, .number(99))
+        #expect(result == .number(99))
     }
 
-    func testCellRefNotFoundReturnsBlank() throws {
+    @Test func cellRefNotFoundReturnsBlank() throws {
         let result = try eval(.cellRef(CellRef("Z99")))
-        XCTAssertEqual(result, .blank)
+        #expect(result == .blank)
     }
 
-    func testCellRefReturnsText() throws {
+    @Test func cellRefReturnsText() throws {
         var cells = MockCells()
         cells.data["B2"] = .text("world")
         let result = try eval(.cellRef(CellRef("B2")), cells: cells)
-        XCTAssertEqual(result, .text("world"))
+        #expect(result == .text("world"))
     }
 
     // MARK: - Cell Range
 
-    func testCellRangeReturnsArray() throws {
+    @Test func cellRangeReturnsArray() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(1)
         cells.data["A2"] = .number(2)
@@ -146,7 +134,7 @@ final class FormulaEvaluatorTests: XCTestCase {
         let range = CellRange(from: "A1", to: "A3")
         let result = try eval(.cellRange(range), cells: cells)
 
-        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2), .number(3)])))
+        #expect(result == .array(CellMatrix(column: [.number(1), .number(2), .number(3)])))
     }
 
     /// An empty cell inside a range is a blank in its own place.
@@ -154,7 +142,7 @@ final class FormulaEvaluatorTests: XCTestCase {
     /// This test previously asserted the opposite — that the gap closed up — and
     /// that was the defect: `INDEX(A1:A3, 3)` then reached past the end of its
     /// own range and answered with whatever had shuffled into third place.
-    func testCellRangeKeepsEmptyCellsInPlace() throws {
+    @Test func cellRangeKeepsEmptyCellsInPlace() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(1)
         // A2 is empty
@@ -163,30 +151,30 @@ final class FormulaEvaluatorTests: XCTestCase {
         let range = CellRange(from: "A1", to: "A3")
         let result = try eval(.cellRange(range), cells: cells)
 
-        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .blank, .number(3)])))
+        #expect(result == .array(CellMatrix(column: [.number(1), .blank, .number(3)])))
     }
 
     // MARK: - Sheet Reference Lookup
 
-    func testSheetRefSingleCell() throws {
+    @Test func sheetRefSingleCell() throws {
         var cells = MockCells()
         cells.sheetData["Sheet2"] = ["A1": .number(42)]
 
         let sheetRef = SheetReference(sheet: "Sheet2", cell: CellRef("A1"))
         let result = try eval(.sheetRef(sheetRef), cells: cells)
-        XCTAssertEqual(result, .number(42))
+        #expect(result == .number(42))
     }
 
-    func testSheetRefSingleCellNotFoundReturnsBlank() throws {
+    @Test func sheetRefSingleCellNotFoundReturnsBlank() throws {
         var cells = MockCells()
         cells.sheetData["Sheet2"] = [:]
 
         let sheetRef = SheetReference(sheet: "Sheet2", cell: CellRef("A1"))
         let result = try eval(.sheetRef(sheetRef), cells: cells)
-        XCTAssertEqual(result, .blank)
+        #expect(result == .blank)
     }
 
-    func testSheetRefRange() throws {
+    @Test func sheetRefRange() throws {
         var cells = MockCells()
         cells.sheetData["Sheet2"] = ["A1": .number(10), "A2": .number(20)]
 
@@ -194,294 +182,294 @@ final class FormulaEvaluatorTests: XCTestCase {
         let sheetRef = SheetReference(sheet: "Sheet2", range: range)
         let result = try eval(.sheetRef(sheetRef), cells: cells)
 
-        XCTAssertEqual(result, .array(CellMatrix(column: [.number(10), .number(20)])))
+        #expect(result == .array(CellMatrix(column: [.number(10), .number(20)])))
     }
 
     // MARK: - Arithmetic: Add
 
-    func testAddTwoNumbers() throws {
+    @Test func addTwoNumbers() throws {
         let result = try eval(.add(.number(2), .number(3)))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testAddNegativeNumbers() throws {
+    @Test func addNegativeNumbers() throws {
         let result = try eval(.add(.number(-1), .number(-2)))
-        assertNumber(result, -3)
+        #expect(result.isNumber(-3))
     }
 
-    func testAddDecimalNumbers() throws {
+    @Test func addDecimalNumbers() throws {
         let result = try eval(.add(.number(1.5), .number(2.5)))
-        assertNumber(result, 4.0)
+        #expect(result.isNumber(4.0))
     }
 
     // MARK: - Arithmetic: Subtract
 
-    func testSubtractTwoNumbers() throws {
+    @Test func subtractTwoNumbers() throws {
         let result = try eval(.subtract(.number(10), .number(3)))
-        assertNumber(result, 7)
+        #expect(result.isNumber(7))
     }
 
-    func testSubtractResultNegative() throws {
+    @Test func subtractResultNegative() throws {
         let result = try eval(.subtract(.number(3), .number(10)))
-        assertNumber(result, -7)
+        #expect(result.isNumber(-7))
     }
 
     // MARK: - Arithmetic: Multiply
 
-    func testMultiplyTwoNumbers() throws {
+    @Test func multiplyTwoNumbers() throws {
         let result = try eval(.multiply(.number(4), .number(5)))
-        assertNumber(result, 20)
+        #expect(result.isNumber(20))
     }
 
-    func testMultiplyByZero() throws {
+    @Test func multiplyByZero() throws {
         let result = try eval(.multiply(.number(100), .number(0)))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - Arithmetic: Divide
 
-    func testDivideTwoNumbers() throws {
+    @Test func divideTwoNumbers() throws {
         let result = try eval(.divide(.number(10), .number(2)))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testDivideByZeroReturnsDiv0Error() throws {
+    @Test func divideByZeroReturnsDiv0Error() throws {
         let result = try eval(.divide(.number(10), .number(0)))
-        XCTAssertEqual(result, .error(.div0))
+        #expect(result == .error(.div0))
     }
 
-    func testDivideDecimal() throws {
+    @Test func divideDecimal() throws {
         let result = try eval(.divide(.number(7), .number(2)))
-        assertNumber(result, 3.5)
+        #expect(result.isNumber(3.5))
     }
 
     // MARK: - Arithmetic: Power
 
-    func testPowerBasic() throws {
+    @Test func powerBasic() throws {
         let result = try eval(.power(.number(2), .number(3)))
-        assertNumber(result, 8)
+        #expect(result.isNumber(8))
     }
 
-    func testPowerZeroExponent() throws {
+    @Test func powerZeroExponent() throws {
         let result = try eval(.power(.number(5), .number(0)))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testPowerFractional() throws {
+    @Test func powerFractional() throws {
         let result = try eval(.power(.number(9), .number(0.5)))
-        assertNumber(result, 3, accuracy: 1e-10)
+        #expect(result.isNumber(3, within: 1e-10))
     }
 
     // MARK: - Arithmetic: Negate
 
-    func testNegatePositive() throws {
+    @Test func negatePositive() throws {
         let result = try eval(.negate(.number(5)))
-        assertNumber(result, -5)
+        #expect(result.isNumber(-5))
     }
 
-    func testNegateNegative() throws {
+    @Test func negateNegative() throws {
         let result = try eval(.negate(.number(-3)))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testNegateZero() throws {
+    @Test func negateZero() throws {
         let result = try eval(.negate(.number(0)))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - String Concatenation
 
-    func testConcatenateStrings() throws {
+    @Test func concatenateStrings() throws {
         let result = try eval(.concatenate(.text("hello"), .text(" world")))
-        XCTAssertEqual(result, .text("hello world"))
+        #expect(result == .text("hello world"))
     }
 
-    func testConcatenateNumberAndString() throws {
+    @Test func concatenateNumberAndString() throws {
         let result = try eval(.concatenate(.number(5), .text(" items")))
-        XCTAssertEqual(result, .text("5 items"))
+        #expect(result == .text("5 items"))
     }
 
-    func testConcatenateStringAndBool() throws {
+    @Test func concatenateStringAndBool() throws {
         let result = try eval(.concatenate(.text("is: "), .bool(true)))
-        XCTAssertEqual(result, .text("is: TRUE"))
+        #expect(result == .text("is: TRUE"))
     }
 
-    func testConcatenateBlankAndText() throws {
+    @Test func concatenateBlankAndText() throws {
         let result = try eval(.concatenate(.text("prefix"), .cellRef(CellRef("Z99"))))
-        XCTAssertEqual(result, .text("prefix"))
+        #expect(result == .text("prefix"))
     }
 
     // MARK: - Comparison Operators
 
-    func testEqualTrue() throws {
+    @Test func equalTrue() throws {
         let result = try eval(.equal(.number(5), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testEqualFalse() throws {
+    @Test func equalFalse() throws {
         let result = try eval(.equal(.number(5), .number(6)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testNotEqualTrue() throws {
+    @Test func notEqualTrue() throws {
         let result = try eval(.notEqual(.number(5), .number(6)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testNotEqualFalse() throws {
+    @Test func notEqualFalse() throws {
         let result = try eval(.notEqual(.number(5), .number(5)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testGreaterThanTrue() throws {
+    @Test func greaterThanTrue() throws {
         let result = try eval(.greaterThan(.number(10), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testGreaterThanFalse() throws {
+    @Test func greaterThanFalse() throws {
         let result = try eval(.greaterThan(.number(3), .number(5)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testLessThanTrue() throws {
+    @Test func lessThanTrue() throws {
         let result = try eval(.lessThan(.number(3), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testLessThanFalse() throws {
+    @Test func lessThanFalse() throws {
         let result = try eval(.lessThan(.number(10), .number(5)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testGreaterOrEqualWhenGreater() throws {
+    @Test func greaterOrEqualWhenGreater() throws {
         let result = try eval(.greaterOrEqual(.number(10), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testGreaterOrEqualWhenEqual() throws {
+    @Test func greaterOrEqualWhenEqual() throws {
         let result = try eval(.greaterOrEqual(.number(5), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testGreaterOrEqualFalse() throws {
+    @Test func greaterOrEqualFalse() throws {
         let result = try eval(.greaterOrEqual(.number(3), .number(5)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testLessOrEqualWhenLess() throws {
+    @Test func lessOrEqualWhenLess() throws {
         let result = try eval(.lessOrEqual(.number(3), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testLessOrEqualWhenEqual() throws {
+    @Test func lessOrEqualWhenEqual() throws {
         let result = try eval(.lessOrEqual(.number(5), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testLessOrEqualFalse() throws {
+    @Test func lessOrEqualFalse() throws {
         let result = try eval(.lessOrEqual(.number(10), .number(5)))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testCompareStrings() throws {
+    @Test func compareStrings() throws {
         let result = try eval(.equal(.text("abc"), .text("ABC")))
-        XCTAssertEqual(result, .bool(true)) // case-insensitive
+        #expect(result == .bool(true)) // case-insensitive
     }
 
-    func testCompareStringsDifferent() throws {
+    @Test func compareStringsDifferent() throws {
         let result = try eval(.lessThan(.text("apple"), .text("banana")))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
     // MARK: - Type Coercion in Arithmetic
 
-    func testTextToNumberCoercion() throws {
+    @Test func textToNumberCoercion() throws {
         // "5" + 3 = 8
         let result = try eval(.add(.text("5"), .number(3)))
-        assertNumber(result, 8)
+        #expect(result.isNumber(8))
     }
 
-    func testBoolTrueToNumberCoercion() throws {
+    @Test func boolTrueToNumberCoercion() throws {
         // TRUE + 1 = 2
         let result = try eval(.add(.bool(true), .number(1)))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testBoolFalseToNumberCoercion() throws {
+    @Test func boolFalseToNumberCoercion() throws {
         // FALSE + 1 = 1
         let result = try eval(.add(.bool(false), .number(1)))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testBlankToNumberCoercion() throws {
+    @Test func blankToNumberCoercion() throws {
         // blank + 5 = 5 (blank coerces to 0)
         let cells = MockCells()
         // Z99 is empty, so cellRef returns .blank
         let result = try eval(.add(.cellRef(CellRef("Z99")), .number(5)), cells: cells)
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testNonNumericTextReturnsValueError() throws {
+    @Test func nonNumericTextReturnsValueError() throws {
         // "hello" + 1 = #VALUE!
         let result = try eval(.add(.text("hello"), .number(1)))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
     // MARK: - Error Propagation
 
-    func testErrorPropagationInAdd() throws {
+    @Test func errorPropagationInAdd() throws {
         let result = try eval(.add(.error(.value), .number(5)))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
-    func testErrorPropagationInAddRight() throws {
+    @Test func errorPropagationInAddRight() throws {
         let result = try eval(.add(.number(5), .error(.ref)))
-        XCTAssertEqual(result, .error(.ref))
+        #expect(result == .error(.ref))
     }
 
-    func testErrorPropagationInSubtract() throws {
+    @Test func errorPropagationInSubtract() throws {
         let result = try eval(.subtract(.error(.na), .number(1)))
-        XCTAssertEqual(result, .error(.na))
+        #expect(result == .error(.na))
     }
 
-    func testErrorPropagationInMultiply() throws {
+    @Test func errorPropagationInMultiply() throws {
         let result = try eval(.multiply(.number(2), .error(.num)))
-        XCTAssertEqual(result, .error(.num))
+        #expect(result == .error(.num))
     }
 
-    func testErrorPropagationInDivide() throws {
+    @Test func errorPropagationInDivide() throws {
         let result = try eval(.divide(.error(.null), .number(1)))
-        XCTAssertEqual(result, .error(.null))
+        #expect(result == .error(.null))
     }
 
-    func testErrorPropagationInNegate() throws {
+    @Test func errorPropagationInNegate() throws {
         let result = try eval(.negate(.error(.value)))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
-    func testErrorPropagationInConcatenate() throws {
+    @Test func errorPropagationInConcatenate() throws {
         let result = try eval(.concatenate(.error(.div0), .text("x")))
-        XCTAssertEqual(result, .error(.div0))
+        #expect(result == .error(.div0))
     }
 
-    func testErrorPropagationInConcatenateRight() throws {
+    @Test func errorPropagationInConcatenateRight() throws {
         let result = try eval(.concatenate(.text("x"), .error(.ref)))
-        XCTAssertEqual(result, .error(.ref))
+        #expect(result == .error(.ref))
     }
 
-    func testErrorPropagationInComparison() throws {
+    @Test func errorPropagationInComparison() throws {
         let result = try eval(.equal(.error(.value), .number(5)))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
-    func testErrorPropagationInComparisonRight() throws {
+    @Test func errorPropagationInComparisonRight() throws {
         let result = try eval(.greaterThan(.number(5), .error(.na)))
-        XCTAssertEqual(result, .error(.na))
+        #expect(result == .error(.na))
     }
 
     // MARK: - Named Range Resolution
 
-    func testNamedRangeResolvesToCell() throws {
+    @Test func namedRangeResolvesToCell() throws {
         var cells = MockCells()
         cells.data["B5"] = .number(100)
 
@@ -489,10 +477,10 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["myrange"] = .cell(CellRef("B5"))
 
         let result = try eval(.namedRange("myrange"), cells: cells, names: names)
-        XCTAssertEqual(result, .number(100))
+        #expect(result == .number(100))
     }
 
-    func testNamedRangeResolvesToRange() throws {
+    @Test func namedRangeResolvesToRange() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(1)
         cells.data["A2"] = .number(2)
@@ -501,23 +489,23 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["data"] = .range(CellRange(from: "A1", to: "A2"))
 
         let result = try eval(.namedRange("data"), cells: cells, names: names)
-        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2)])))
+        #expect(result == .array(CellMatrix(column: [.number(1), .number(2)])))
     }
 
-    func testNamedRangeResolvesToFormula() throws {
+    @Test func namedRangeResolvesToFormula() throws {
         var names = MockNames()
         names.targets["formula"] = .formula(.add(.number(10), .number(20)))
 
         let result = try eval(.namedRange("formula"), names: names)
-        assertNumber(result, 30)
+        #expect(result.isNumber(30))
     }
 
-    func testNamedRangeNotFoundReturnsNameError() throws {
+    @Test func namedRangeNotFoundReturnsNameError() throws {
         let result = try eval(.namedRange("doesnotexist"))
-        XCTAssertEqual(result, .error(.name))
+        #expect(result == .error(.name))
     }
 
-    func testNamedRangeResolvesToSheetCell() throws {
+    @Test func namedRangeResolvesToSheetCell() throws {
         var cells = MockCells()
         cells.sheetData["Sheet2"] = ["C3": .number(77)]
 
@@ -526,10 +514,10 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["crossref"] = .sheetCell(sheetRef)
 
         let result = try eval(.namedRange("crossref"), cells: cells, names: names)
-        XCTAssertEqual(result, .number(77))
+        #expect(result == .number(77))
     }
 
-    func testNamedRangeResolvesToSheetRange() throws {
+    @Test func namedRangeResolvesToSheetRange() throws {
         var cells = MockCells()
         cells.sheetData["Sheet2"] = ["A1": .number(1), "A2": .number(2)]
 
@@ -541,12 +529,12 @@ final class FormulaEvaluatorTests: XCTestCase {
         names.targets["sheetrange"] = .sheetRange(sheetRef)
 
         let result = try eval(.namedRange("sheetrange"), cells: cells, names: names)
-        XCTAssertEqual(result, .array(CellMatrix(column: [.number(1), .number(2)])))
+        #expect(result == .array(CellMatrix(column: [.number(1), .number(2)])))
     }
 
     // MARK: - Function Dispatch
 
-    func testFunctionCallWithRegisteredFunction() throws {
+    @Test func functionCallWithRegisteredFunction() throws {
         var registry = FunctionRegistry()
         registry.register(ExcelFunction(
             name: "DOUBLE",
@@ -559,10 +547,10 @@ final class FormulaEvaluatorTests: XCTestCase {
         ))
 
         let result = try eval(.function("DOUBLE", [.number(21)]), functions: registry)
-        assertNumber(result, 42)
+        #expect(result.isNumber(42))
     }
 
-    func testFunctionCallEvaluatesArguments() throws {
+    @Test func functionCallEvaluatesArguments() throws {
         var registry = FunctionRegistry()
         registry.register(ExcelFunction(
             name: "IDENTITY",
@@ -576,7 +564,7 @@ final class FormulaEvaluatorTests: XCTestCase {
             .function("IDENTITY", [.add(.number(1), .number(2))]),
             functions: registry
         )
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
     /// An unknown name is `#NAME?`, and `#NAME?` is a **value**.
@@ -593,21 +581,20 @@ final class FormulaEvaluatorTests: XCTestCase {
     /// The same shape is recorded in the `PSI` work: an unregistered `PsiTruncate` failed the
     /// enclosing `PsiNormal` call rather than yielding an error the caller could see. That was
     /// treated by registering the name; this is the behaviour underneath it.
-    func testUnknownFunctionIsANameErrorRatherThanAThrow() throws {
-        XCTAssertEqual(try eval(.function("NOTAFUNCTION", [.number(1)])), .error(.name),
-                       "Excel's answer for a name it does not know")
+    @Test func unknownFunctionIsANameErrorRatherThanAThrow() throws {
+        #expect(try eval(.function("NOTAFUNCTION", [.number(1)])) == .error(.name), "Excel's answer for a name it does not know")
     }
 
     /// And because it is a value, the wrapper the exporter wrote does its job.
-    func testAnUnknownFunctionCanBeCaughtByIFERROR() throws {
+    @Test func anUnknownFunctionCanBeCaughtByIFERROR() throws {
         let formula = FormulaAST.function("IFERROR", [
             .function("__XLUDF.DUMMYFUNCTION", [.text("ARRAY_CONSTRAIN(…)")]),
             .text("the fallback the exporter recorded"),
         ])
-        XCTAssertEqual(try eval(formula), .text("the fallback the exporter recorded"))
+        #expect(try eval(formula) == .text("the fallback the exporter recorded"))
     }
 
-    func testFunctionArgumentCountMismatch() throws {
+    @Test func functionArgumentCountMismatch() throws {
         var registry = FunctionRegistry()
         registry.register(ExcelFunction(
             name: "ONEARG",
@@ -616,31 +603,29 @@ final class FormulaEvaluatorTests: XCTestCase {
             evaluate: { _ in .number(0) }
         ))
 
-        XCTAssertThrowsError(
-            try eval(.function("ONEARG", [.number(1), .number(2)]), functions: registry)
-        ) { error in
+        if let error = #expect(throws: (any Error).self, performing: { try eval(.function("ONEARG", [.number(1), .number(2)]), functions: registry) }) {
             guard let evalError = error as? FormulaEvaluator.EvaluationError else {
-                XCTFail("Expected EvaluationError, got \(error)")
+                Issue.record("Expected EvaluationError, got \(error)")
                 return
             }
             if case .argumentCount(let fn, let expected, let got) = evalError {
-                XCTAssertEqual(fn, "ONEARG")
-                XCTAssertEqual(expected, 1...1)
-                XCTAssertEqual(got, 2)
+                #expect(fn == "ONEARG")
+                #expect(expected == 1...1)
+                #expect(got == 2)
             } else {
-                XCTFail("Expected argumentCount, got \(evalError)")
+                Issue.record("Expected argumentCount, got \(evalError)")
             }
         }
     }
 
-    func testBuiltinFunctionABS() throws {
+    @Test func builtinFunctionABS() throws {
         let result = try eval(.function("ABS", [.number(-7)]))
-        assertNumber(result, 7)
+        #expect(result.isNumber(7))
     }
 
-    func testBuiltinFunctionPI() throws {
+    @Test func builtinFunctionPI() throws {
         let result = try eval(.function("PI", []))
-        assertNumber(result, Double.pi, accuracy: 1e-14)
+        #expect(result.isNumber(Double.pi, within: 1e-14))
     }
 
     // MARK: - Depth Limit
@@ -656,29 +641,31 @@ final class FormulaEvaluatorTests: XCTestCase {
     ///
     /// The bounds now live in `EvaluationDepthTests`. What remains here is the reversal, kept
     /// rather than deleted so the change is visible where the old claim was made.
-    func testAStackOfNegationsIsNotTooDeep() throws {
+    @Test func aStackOfNegationsIsNotTooDeep() async throws {
         var ast: FormulaAST = .number(1)
         for _ in 0..<257 {
             ast = .negate(ast)
         }
-        assertNumber(try eval(ast), -1, accuracy: 1e-12)
+        let stack = ast
+        #expect(try await (onMeasuredStack { try eval(stack) }).isNumber(-1, within: 1e-12))
     }
 
-    func testDeepNestingBelowLimitSucceeds() throws {
+    @Test func deepNestingBelowLimitSucceeds() async throws {
         // 100 levels of nesting should succeed
         var ast: FormulaAST = .number(42)
         for _ in 0..<100 {
             ast = .negate(ast)
         }
 
-        let result = try eval(ast)
+        let stack = ast
+        let result = try await onMeasuredStack { try eval(stack) }
         // 100 negations (even count) = positive
-        assertNumber(result, 42)
+        #expect(result.isNumber(42))
     }
 
     // MARK: - Complex Expressions
 
-    func testNestedArithmetic() throws {
+    @Test func nestedArithmetic() throws {
         // (2 + 3) * (10 - 4) = 5 * 6 = 30
         let result = try eval(
             .multiply(
@@ -686,10 +673,10 @@ final class FormulaEvaluatorTests: XCTestCase {
                 .subtract(.number(10), .number(4))
             )
         )
-        assertNumber(result, 30)
+        #expect(result.isNumber(30))
     }
 
-    func testCellRefInArithmetic() throws {
+    @Test func cellRefInArithmetic() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(10)
         cells.data["B1"] = .number(20)
@@ -698,10 +685,10 @@ final class FormulaEvaluatorTests: XCTestCase {
             .add(.cellRef(CellRef("A1")), .cellRef(CellRef("B1"))),
             cells: cells
         )
-        assertNumber(result, 30)
+        #expect(result.isNumber(30))
     }
 
-    func testDivisionByZeroFromCellRef() throws {
+    @Test func divisionByZeroFromCellRef() throws {
         var cells = MockCells()
         cells.data["A1"] = .number(10)
         cells.data["B1"] = .number(0)
@@ -710,49 +697,49 @@ final class FormulaEvaluatorTests: XCTestCase {
             .divide(.cellRef(CellRef("A1")), .cellRef(CellRef("B1"))),
             cells: cells
         )
-        XCTAssertEqual(result, .error(.div0))
+        #expect(result == .error(.div0))
     }
 
     // MARK: - Coercion in String Concatenation
 
-    func testConcatenateBoolFalse() throws {
+    @Test func concatenateBoolFalse() throws {
         let result = try eval(.concatenate(.text("val: "), .bool(false)))
-        XCTAssertEqual(result, .text("val: FALSE"))
+        #expect(result == .text("val: FALSE"))
     }
 
-    func testConcatenateDecimalNumber() throws {
+    @Test func concatenateDecimalNumber() throws {
         let result = try eval(.concatenate(.text("$"), .number(3.50)))
-        XCTAssertEqual(result, .text("$3.5"))
+        #expect(result == .text("$3.5"))
     }
 
     // MARK: - Comparison with Blanks
 
-    func testBlankEqualsZero() throws {
+    @Test func blankEqualsZero() throws {
         // In Excel, blank == 0 is TRUE
         let result = try eval(.equal(.cellRef(CellRef("Z99")), .number(0)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
     // MARK: - EvaluationError Equatable
 
-    func testEvaluationErrorEquatable() {
+    @Test func evaluationErrorEquatable() {
         let err1 = FormulaEvaluator.EvaluationError.unknownFunction("FOO")
         let err2 = FormulaEvaluator.EvaluationError.unknownFunction("FOO")
-        XCTAssertEqual(err1, err2)
+        #expect(err1 == err2)
 
         let err3 = FormulaEvaluator.EvaluationError.unknownFunction("BAR")
-        XCTAssertNotEqual(err1, err3)
+        #expect(err1 != err3)
     }
 
-    func testEvaluationErrorSendable() {
+    @Test func evaluationErrorSendable() {
         // Compile-time check: EvaluationError must be Sendable
         let error: any Sendable = FormulaEvaluator.EvaluationError.circularReference
-        XCTAssertNotNil(error)
+        #expect(error is FormulaEvaluator.EvaluationError)
     }
 
     // MARK: - Function with Variadic Args
 
-    func testVariadicFunction() throws {
+    @Test func variadicFunction() throws {
         var registry = FunctionRegistry()
         registry.register(ExcelFunction(
             name: "SUM_TEST",
@@ -773,67 +760,67 @@ final class FormulaEvaluatorTests: XCTestCase {
             .function("SUM_TEST", [.number(1), .number(2), .number(3), .number(4)]),
             functions: registry
         )
-        assertNumber(result, 10)
+        #expect(result.isNumber(10))
     }
 
     // MARK: - Case-Insensitive Function Lookup
 
-    func testFunctionLookupCaseInsensitive() throws {
+    @Test func functionLookupCaseInsensitive() throws {
         // "abs" should find "ABS"
         let result = try eval(.function("abs", [.number(-5)]))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
     // MARK: - Named Range Case Insensitive
 
-    func testNamedRangeCaseInsensitive() throws {
+    @Test func namedRangeCaseInsensitive() throws {
         var names = MockNames()
         names.targets["myrange"] = .formula(.number(42))
 
         let result = try eval(.namedRange("MYRANGE"), names: names)
-        assertNumber(result, 42)
+        #expect(result.isNumber(42))
     }
 
     // MARK: - Power edge cases
 
-    func testPowerNegativeBase() throws {
+    @Test func powerNegativeBase() throws {
         // (-2)^3 = -8
         let result = try eval(.power(.number(-2), .number(3)))
-        assertNumber(result, -8)
+        #expect(result.isNumber(-8))
     }
 
     // MARK: - Negate with coercion
 
-    func testNegateTextNumber() throws {
+    @Test func negateTextNumber() throws {
         // -"5" = -5 (text coerced to number)
         let result = try eval(.negate(.text("5")))
-        assertNumber(result, -5)
+        #expect(result.isNumber(-5))
     }
 
-    func testNegateNonNumericTextReturnsError() throws {
+    @Test func negateNonNumericTextReturnsError() throws {
         let result = try eval(.negate(.text("abc")))
-        XCTAssertEqual(result, .error(.value))
+        #expect(result == .error(.value))
     }
 
-    func testNegateBool() throws {
+    @Test func negateBool() throws {
         // -TRUE = -1
         let result = try eval(.negate(.bool(true)))
-        assertNumber(result, -1)
+        #expect(result.isNumber(-1))
     }
 
     // MARK: - Blank in comparisons
 
-    func testBlankLessThanPositiveNumber() throws {
+    @Test func blankLessThanPositiveNumber() throws {
         // blank (=0) < 5 -> true
         let result = try eval(.lessThan(.cellRef(CellRef("Z99")), .number(5)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
     // MARK: - Mixed type comparison
 
-    func testCompareNumberAndBool() throws {
+    @Test func compareNumberAndBool() throws {
         // In Excel, numbers < booleans in type ordering
         let result = try eval(.lessThan(.number(1000), .bool(false)))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 }

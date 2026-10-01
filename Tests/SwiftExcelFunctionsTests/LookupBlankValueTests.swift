@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -29,7 +30,7 @@ import SwiftXLSX
 /// short-circuited every blank to `#N/A`, which agreed with the corpus and disagreed with
 /// Excel the moment the keys were numbers. A rule that is right about the evidence and wrong
 /// about the mechanism survives exactly until the next workbook.
-final class LookupBlankValueTests: XCTestCase {
+@Suite struct LookupBlankValueTests {
 
     private struct Book: CellValueProvider {
         static let cells: [String: CellValue] = [
@@ -61,25 +62,24 @@ final class LookupBlankValueTests: XCTestCase {
     }
 
     /// **The corpus cell.** `M1` is empty, so both lookups are `#N/A` and so is the join.
-    func testTheUnfilledTemplateFieldIsNotFound() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(M1,C2:E4,2,0)"), .error(.na))
-        XCTAssertEqual(try evaluate("VLOOKUP(M1,C2:E4,2,0)&\" \"&VLOOKUP(M1,C2:E4,3,0)"),
-                       .error(.na), "and the concatenation carries the error, not a space")
+    @Test func theUnfilledTemplateFieldIsNotFound() throws {
+        #expect(try evaluate("VLOOKUP(M1,C2:E4,2,0)") == .error(.na))
+        #expect(try evaluate("VLOOKUP(M1,C2:E4,2,0)&\" \"&VLOOKUP(M1,C2:E4,3,0)") == .error(.na), "and the concatenation carries the error, not a space")
     }
 
     /// It must not match the blank the table itself carries in `C2`.
-    func testItDoesNotMatchABlankInsideTheTable() throws {
-        XCTAssertNotEqual(try evaluate("VLOOKUP(M1,C2:E4,2,0)"), .text("nobody"))
+    @Test func itDoesNotMatchABlankInsideTheTable() throws {
+        #expect(try evaluate("VLOOKUP(M1,C2:E4,2,0)") != .text("nobody"))
     }
 
     /// A real key still resolves, which is the whole point of not refusing more broadly.
-    func testARealKeyStillResolves() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(\"Viola\",C2:E4,3,0)"), .text("Davis"))
+    @Test func aRealKeyStillResolves() throws {
+        #expect(try evaluate("VLOOKUP(\"Viola\",C2:E4,3,0)") == .text("Davis"))
     }
 
     /// `HLOOKUP` has the same shape and the same answer.
-    func testHlookupAgrees() throws {
-        XCTAssertEqual(try evaluate("HLOOKUP(M1,C2:E2,1,0)"), .error(.na))
+    @Test func hlookupAgrees() throws {
+        #expect(try evaluate("HLOOKUP(M1,C2:E2,1,0)") == .error(.na))
     }
 
     /// **Measured in round sixteen.** A blank reads as `0` and finds the zero key, under
@@ -88,10 +88,8 @@ final class LookupBlankValueTests: XCTestCase {
     /// This test first asserted `"zero"` as a guess, then was changed to `#N/A` to record what
     /// this package did — and the guess was right. Excel answers `"zero"`; recording the
     /// behaviour was the correct move at the time, and asking was what settled it.
-    func testABlankLookupValueIsZero() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(M1,G1:H2,2,1)"), .text("zero"),
-                       "approximate: blank is 0, which is the first key")
-        XCTAssertEqual(try evaluate("VLOOKUP(M1,G1:H2,2,0)"), .text("zero"),
-                       "exact: the same, because the coercion is not about the match type")
+    @Test func aBlankLookupValueIsZero() throws {
+        #expect(try evaluate("VLOOKUP(M1,G1:H2,2,1)") == .text("zero"), "approximate: blank is 0, which is the first key")
+        #expect(try evaluate("VLOOKUP(M1,G1:H2,2,0)") == .text("zero"), "exact: the same, because the coercion is not about the match type")
     }
 }

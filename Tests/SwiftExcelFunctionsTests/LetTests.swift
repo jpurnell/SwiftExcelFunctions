@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -12,7 +13,7 @@ import SwiftExcelCore
 /// arguments evaluated before it is called and the calculation references names that do not
 /// exist until `LET` creates them. So the evaluator reaches it before evaluation, as it does
 /// the branching forms.
-final class LetTests: XCTestCase {
+@Suite struct LetTests {
 
     private struct Cells: CellValueProvider {
         var data: [String: CellValue] = [:]
@@ -42,12 +43,12 @@ final class LetTests: XCTestCase {
     // MARK: - The basics
 
     /// `LET(a, 2, a*3)` → 6.
-    func testOneBinding() throws {
+    @Test func oneBinding() throws {
         let ast = FormulaAST.function("LET", [
             name("a"), .number(2),
             .multiply(name("a"), .number(3)),
         ])
-        XCTAssertEqual(try eval(ast), .number(6))
+        #expect(try eval(ast) == .number(6))
     }
 
     /// Excel writes the `_xlpm.` prefix on every declared name and on every use of it.
@@ -55,22 +56,22 @@ final class LetTests: XCTestCase {
     /// Binding is by the spelling the form declares, whatever that spelling is — which makes
     /// the prefix travel through without needing to be understood. Depending on it would be
     /// the mistake: a file from LibreOffice or a hand-built fixture may not write it.
-    func testTheParameterPrefixIsJustPartOfTheName() throws {
+    @Test func theParameterPrefixIsJustPartOfTheName() throws {
         let ast = FormulaAST.function("_xlfn.LET", [
             name("_xlpm.a"), .number(2),
             .multiply(name("_xlpm.a"), .number(3)),
         ])
-        XCTAssertEqual(try eval(ast), .number(6))
+        #expect(try eval(ast) == .number(6))
     }
 
     /// Several names, and a later value may use an earlier name.
-    func testBindingsAreVisibleToLaterBindings() throws {
+    @Test func bindingsAreVisibleToLaterBindings() throws {
         let ast = FormulaAST.function("LET", [
             name("a"), .number(2),
             name("b"), .multiply(name("a"), .number(5)),
             .add(name("a"), name("b")),
         ])
-        XCTAssertEqual(try eval(ast), .number(12))
+        #expect(try eval(ast) == .number(12))
     }
 
     /// A name is not visible to the value it is being bound to.
@@ -78,87 +79,87 @@ final class LetTests: XCTestCase {
     /// `LET(a, a+1, a)` asks for `a` before there is one. Excel answers `#NAME?`, and the
     /// alternative — seeing the binding under construction — is how a self-reference becomes
     /// an infinite loop instead of an error.
-    func testANameCannotSeeItself() throws {
+    @Test func aNameCannotSeeItself() throws {
         let ast = FormulaAST.function("LET", [
             name("a"), .add(name("a"), .number(1)),
             name("a"),
         ])
-        XCTAssertEqual(try eval(ast), .error(.name))
+        #expect(try eval(ast) == .error(.name))
     }
 
     // MARK: - Scope
 
     /// A binding shadows a workbook name, and only inside.
-    func testABindingShadowsAWorkbookName() throws {
+    @Test func aBindingShadowsAWorkbookName() throws {
         let names = Names(targets: ["rate": .cell(CellRef("A1"))])
         let cells = Cells(data: ["A1": .number(100)])
 
-        XCTAssertEqual(try eval(name("rate"), cells: cells, names: names), .number(100))
+        #expect(try eval(name("rate"), cells: cells, names: names) == .number(100))
 
         let shadowed = FormulaAST.function("LET", [name("rate"), .number(7), name("rate")])
-        XCTAssertEqual(try eval(shadowed, cells: cells, names: names), .number(7))
+        #expect(try eval(shadowed, cells: cells, names: names) == .number(7))
     }
 
     /// Outside the `LET`, the workbook name is itself again.
-    func testTheBindingDoesNotEscape() throws {
+    @Test func theBindingDoesNotEscape() throws {
         let names = Names(targets: ["rate": .cell(CellRef("A1"))])
         let cells = Cells(data: ["A1": .number(100)])
 
         let ast = FormulaAST.add(
             .function("LET", [name("rate"), .number(7), name("rate")]),
             name("rate"))
-        XCTAssertEqual(try eval(ast, cells: cells, names: names), .number(107))
+        #expect(try eval(ast, cells: cells, names: names) == .number(107))
     }
 
     /// An inner `LET` shadows an outer one, and the outer binding survives it.
-    func testNestedLetShadowsAndRestores() throws {
+    @Test func nestedLetShadowsAndRestores() throws {
         let ast = FormulaAST.function("LET", [
             name("a"), .number(1),
             .add(
                 .function("LET", [name("a"), .number(10), name("a")]),
                 name("a")),
         ])
-        XCTAssertEqual(try eval(ast), .number(11))
+        #expect(try eval(ast) == .number(11))
     }
 
     /// A name still resolves to the workbook when no binding covers it.
-    func testUnboundNamesStillReachTheWorkbook() throws {
+    @Test func unboundNamesStillReachTheWorkbook() throws {
         let names = Names(targets: ["rate": .cell(CellRef("A1"))])
         let cells = Cells(data: ["A1": .number(100)])
 
         let ast = FormulaAST.function("LET", [
             name("a"), .number(2), .multiply(name("a"), name("rate")),
         ])
-        XCTAssertEqual(try eval(ast, cells: cells, names: names), .number(200))
+        #expect(try eval(ast, cells: cells, names: names) == .number(200))
     }
 
     // MARK: - Malformed
 
     /// `LET` takes name/value pairs and then a calculation, so the count is always odd.
-    func testAnEvenArgumentCountIsRefused() throws {
+    @Test func anEvenArgumentCountIsRefused() throws {
         let ast = FormulaAST.function("LET", [name("a"), .number(2), name("b"), .number(3)])
-        XCTAssertEqual(try eval(ast), .error(.value))
+        #expect(try eval(ast) == .error(.value))
     }
 
     /// Fewer than three arguments is not a `LET` at all.
-    func testTooFewArgumentsIsAnArityError() {
-        XCTAssertThrowsError(try eval(.function("LET", [name("a"), .number(1)])))
+    @Test func tooFewArgumentsIsAnArityError() {
+        #expect(throws: (any Error).self) { try eval(.function("LET", [name("a"), .number(1)])) }
     }
 
     /// The thing being named has to be a name.
-    func testANonNameInTheNamePositionIsRefused() throws {
+    @Test func aNonNameInTheNamePositionIsRefused() throws {
         let ast = FormulaAST.function("LET", [.number(1), .number(2), .number(3)])
-        XCTAssertEqual(try eval(ast), .error(.value))
+        #expect(try eval(ast) == .error(.value))
     }
 
     /// A binding holds whatever a cell holds, arrays included.
-    func testABindingCanHoldARange() throws {
+    @Test func aBindingCanHoldARange() throws {
         let cells = Cells(data: ["A1": .number(1), "A2": .number(2), "A3": .number(3)])
         let ast = FormulaAST.function("LET", [
             name("xs"), .cellRange(CellRange(from: "A1", to: "A3")),
             .function("SUM", [name("xs")]),
         ])
-        XCTAssertEqual(try eval(ast, cells: cells), .number(6))
+        #expect(try eval(ast, cells: cells) == .number(6))
     }
 
     /// A bound value is computed once, not once per mention.
@@ -166,7 +167,7 @@ final class LetTests: XCTestCase {
     /// This is most of the reason `LET` exists — an author writes it to stop repeating an
     /// expensive subexpression — and evaluating the value at each use would be a `LET` that
     /// costs more than not using it.
-    func testABoundValueIsEvaluatedOnce() throws {
+    @Test func aBoundValueIsEvaluatedOnce() throws {
         // Justification: reached only from one synchronous evaluation, on one thread.
         final class Tally: @unchecked Sendable {
             private(set) var count = 0
@@ -183,8 +184,8 @@ final class LetTests: XCTestCase {
             name("a"), .function("TALLY", []),
             .add(name("a"), .add(name("a"), name("a"))),
         ])
-        XCTAssertEqual(try FormulaEvaluator.evaluate(
-            ast, cells: Cells(), names: Names(), functions: registry), .number(6))
-        XCTAssertEqual(tally.count, 1, "three mentions, one evaluation")
+        #expect(try FormulaEvaluator.evaluate(
+            ast, cells: Cells(), names: Names(), functions: registry) == .number(6))
+        #expect(tally.count == 1, "three mentions, one evaluation")
     }
 }

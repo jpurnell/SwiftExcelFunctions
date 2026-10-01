@@ -1,7 +1,8 @@
 import Foundation
 import SwiftExcelCore
 import SwiftXLSX
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// Where `serialize(parse(x))` is `x`, and where it is not.
@@ -20,17 +21,17 @@ import XCTest
 /// | function-name case | `_xlfn.LAMBDA` → `_XLFN.LAMBDA` | cosmetic; Excel accepts both |
 /// | whole-column expansion | `$D:$D` → `D1:D1048576` | **visible** — the Name Manager shows the expansion |
 /// | the text-node fallback | `.text("42")` → `"42"` | **wrong** — a number becomes a string |
-final class FormulaRoundTripTests: XCTestCase {
+@Suite struct FormulaRoundTripTests {
 
     private func roundTrip(_ text: String) throws -> String {
         FormulaSerializer.serialize(try FormulaParser.parse(text))
     }
 
     /// The shapes that survive a round trip exactly, and may therefore be reconstructed.
-    func testWhatIsExact() throws {
+    @Test func whatIsExact() throws {
         for text in ["42", "0.0825", "#REF!", "\"a label\"", "SUM(A1:A10)*2",
                      "'2018 - Sorted by Area'!$J$2:$J$333"] {
-            XCTAssertEqual(try roundTrip(text), text, text)
+            #expect(try roundTrip(text) == text, "\(text)")
         }
     }
 
@@ -38,15 +39,14 @@ final class FormulaRoundTripTests: XCTestCase {
     ///
     /// Fixable with a rule rather than with stored state — quote only where Excel would — and
     /// the rule is checkable against the corpus's 161,901 names.
-    func testSheetNamesAreAlwaysQuoted() throws {
-        XCTAssertEqual(try roundTrip("Definitions!$B$53"), "'Definitions'!$B$53")
-        XCTAssertEqual(try roundTrip("Definitions!$B$19:$C$51"), "'Definitions'!$B$19:$C$51")
+    @Test func sheetNamesAreAlwaysQuoted() throws {
+        #expect(try roundTrip("Definitions!$B$53") == "'Definitions'!$B$53")
+        #expect(try roundTrip("Definitions!$B$19:$C$51") == "'Definitions'!$B$19:$C$51")
     }
 
     /// A function name comes back upper-cased and its spacing normalised.
-    func testFunctionNamesAreUppercased() throws {
-        XCTAssertEqual(try roundTrip("_xlfn.LAMBDA(_xlpm.x, _xlpm.x+1)"),
-                       "_XLFN.LAMBDA(_xlpm.x,_xlpm.x+1)")
+    @Test func functionNamesAreUppercased() throws {
+        #expect(try roundTrip("_xlfn.LAMBDA(_xlpm.x, _xlpm.x+1)") == "_XLFN.LAMBDA(_xlpm.x,_xlpm.x+1)")
     }
 
     /// **A whole column expands, and that one is visible to the user.**
@@ -59,8 +59,8 @@ final class FormulaRoundTripTests: XCTestCase {
     /// **The `$` used to be lost here too**, and that was not cosmetic: the lexer discarded it
     /// before the parser saw it, so a shared formula moved columns Excel pins. This expectation
     /// read `D1:D1048576`, and it passed. What remains lost is only the short form.
-    func testAWholeColumnExpands() throws {
-        XCTAssertEqual(try roundTrip("Expenditures!$D:$D"), "'Expenditures'!$D1:$D1048576")
+    @Test func aWholeColumnExpands() throws {
+        #expect(try roundTrip("Expenditures!$D:$D") == "'Expenditures'!$D1:$D1048576")
     }
 
     /// **The fallback the defined-name resolver uses today is not lossy, it is wrong.**
@@ -69,9 +69,8 @@ final class FormulaRoundTripTests: XCTestCase {
     /// a text constant. Serialising that adds quotes, so a reference becomes a caption and a
     /// number becomes a string. This is why the proposal adds `.unparsed`, whose round trip is
     /// the identity function and needs no rule at all.
-    func testTheTextNodeFallbackCorrupts() {
-        XCTAssertEqual(FormulaSerializer.serialize(.text("Expenditures!$D:$D")),
-                       "\"Expenditures!$D:$D\"")
-        XCTAssertEqual(FormulaSerializer.serialize(.text("42")), "\"42\"")
+    @Test func theTextNodeFallbackCorrupts() {
+        #expect(FormulaSerializer.serialize(.text("Expenditures!$D:$D")) == ("\"Expenditures!$D:$D\""))
+        #expect(FormulaSerializer.serialize(.text("42")) == "\"42\"")
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -17,7 +18,7 @@ import SwiftExcelCore
 ///
 /// The criteria range is the part of these functions worth testing hardest: its *shape*
 /// carries the logic, columns are `AND`, rows are `OR`, and a blank cell is not a condition.
-final class DatabaseFunctionTests: XCTestCase {
+@Suite struct DatabaseFunctionTests {
 
     private struct Cells: CellValueProvider {
         var data: [String: CellValue] = [:]
@@ -77,176 +78,144 @@ final class DatabaseFunctionTests: XCTestCase {
     // MARK: - One condition
 
     /// Microsoft's own: the height of the one apple tree between 10 and 16 feet.
-    func testDgetFindsTheSingleMatch() throws {
+    @Test func dgetFindsTheSingleMatch() throws {
         let cells = sheet(criteria: [
             [.text("Tree"), .text("Height"), .text("Height")],
             [.text("Apple"), .text(">10"), .text("<16")],
         ])
-        XCTAssertEqual(
-            try call("DGET", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 2, columns: "C"), cells: cells),
-            .number(10))
+        #expect(try call("DGET", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 2, columns: "C"), cells: cells) == .number(10))
     }
 
     /// `DGET` refuses ambiguity rather than answering with the first of several.
-    func testDgetRefusesMoreThanOneMatch() throws {
+    @Test func dgetRefusesMoreThanOneMatch() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
-        XCTAssertEqual(
-            try call("DGET", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .error(.num))
+        #expect(try call("DGET", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .error(.num))
     }
 
-    func testDgetWithNoMatch() throws {
+    @Test func dgetWithNoMatch() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Plum")]])
-        XCTAssertEqual(
-            try call("DGET", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .error(.value))
+        #expect(try call("DGET", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .error(.value))
     }
 
     // MARK: - The aggregates
 
-    func testTheAggregatesOverTheAppleTrees() throws {
+    @Test func theAggregatesOverTheAppleTrees() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
         let criteria = criteriaRange(rows: 2, columns: "A")
 
         // Apples yield 14, 10 and 6; their profits are 105, 75 and 45.
-        XCTAssertEqual(try call("DSUM", field: .text("Profit"), criteria: criteria, cells: cells),
-                       .number(225))
-        XCTAssertEqual(try call("DCOUNT", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(3))
-        XCTAssertEqual(try call("DMAX", field: .text("Profit"), criteria: criteria, cells: cells),
-                       .number(105))
-        XCTAssertEqual(try call("DMIN", field: .text("Profit"), criteria: criteria, cells: cells),
-                       .number(45))
-        XCTAssertEqual(try call("DAVERAGE", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(10))
-        XCTAssertEqual(try call("DPRODUCT", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(840))
+        #expect(try call("DSUM", field: .text("Profit"), criteria: criteria, cells: cells) == .number(225))
+        #expect(try call("DCOUNT", field: .text("Yield"), criteria: criteria, cells: cells) == .number(3))
+        #expect(try call("DMAX", field: .text("Profit"), criteria: criteria, cells: cells) == .number(105))
+        #expect(try call("DMIN", field: .text("Profit"), criteria: criteria, cells: cells) == .number(45))
+        #expect(try call("DAVERAGE", field: .text("Yield"), criteria: criteria, cells: cells) == .number(10))
+        #expect(try call("DPRODUCT", field: .text("Yield"), criteria: criteria, cells: cells) == .number(840))
     }
 
     /// `DSTDEV` and `DVAR` are the *sample* forms; the `P` pair are the population ones.
-    func testTheSpreadStatistics() throws {
+    @Test func theSpreadStatistics() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
         let criteria = criteriaRange(rows: 2, columns: "A")
 
         // Yields 14, 10, 6: mean 10, deviations 4, 0, -4.
-        XCTAssertEqual(try call("DVAR", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(16), "32 over n-1 = 2")
-        XCTAssertEqual(try call("DVARP", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(32.0 / 3.0), "32 over n = 3")
+        #expect(try call("DVAR", field: .text("Yield"), criteria: criteria, cells: cells) == .number(16), "32 over n-1 = 2")
+        #expect(try call("DVARP", field: .text("Yield"), criteria: criteria, cells: cells) == .number(32.0 / 3.0), "32 over n = 3")
         guard case .number(let sample) = try call(
             "DSTDEV", field: .text("Yield"), criteria: criteria, cells: cells) else {
-            return XCTFail("expected a number")
+            Issue.record("expected a number"); return
         }
-        XCTAssertEqual(sample, 4, accuracy: 1e-12)
+        #expect(abs(sample - 4) <= 1e-12)
     }
 
     /// `DCOUNTA` counts cells that are not blank, where `DCOUNT` counts numbers.
-    func testDcountAndDcountAAreDifferentQuestions() throws {
+    @Test func dcountAndDcountAAreDifferentQuestions() throws {
         var cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
         // One apple's yield replaced by text: still present, no longer a number.
         cells.data["D5"] = .text("n/a")
         let criteria = criteriaRange(rows: 2, columns: "A")
 
-        XCTAssertEqual(try call("DCOUNT", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(2))
-        XCTAssertEqual(try call("DCOUNTA", field: .text("Yield"), criteria: criteria, cells: cells),
-                       .number(3))
+        #expect(try call("DCOUNT", field: .text("Yield"), criteria: criteria, cells: cells) == .number(2))
+        #expect(try call("DCOUNTA", field: .text("Yield"), criteria: criteria, cells: cells) == .number(3))
     }
 
     // MARK: - The criteria range's shape
 
     /// Two conditions in one row are `AND`.
-    func testColumnsAreAnd() throws {
+    @Test func columnsAreAnd() throws {
         let cells = sheet(criteria: [
             [.text("Tree"), .text("Height")],
             [.text("Apple"), .text(">10")],
         ])
         // Apples over 10 feet: 18 and 14, yielding 14 and 10.
-        XCTAssertEqual(
-            try call("DSUM", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 2, columns: "B"), cells: cells),
-            .number(24))
+        #expect(try call("DSUM", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 2, columns: "B"), cells: cells) == .number(24))
     }
 
     /// Two criteria rows are `OR`.
-    func testRowsAreOr() throws {
+    @Test func rowsAreOr() throws {
         let cells = sheet(criteria: [
             [.text("Tree")],
             [.text("Apple")],
             [.text("Pear")],
         ])
         // Every tree but the cherry: yields 14, 10, 10, 8, 6.
-        XCTAssertEqual(
-            try call("DSUM", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 3, columns: "A"), cells: cells),
-            .number(48))
+        #expect(try call("DSUM", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 3, columns: "A"), cells: cells) == .number(48))
     }
 
     /// **A blank cell states no condition**, so an empty criteria row matches everything.
     ///
     /// Correct, and the behaviour that catches people out: a criteria range with a spare
     /// blank row under it selects the entire table.
-    func testABlankCriteriaRowMatchesEverything() throws {
+    @Test func aBlankCriteriaRowMatchesEverything() throws {
         let cells = sheet(criteria: [
             [.text("Tree")],
             [.text("Apple")],
             [.blank],
         ])
         // Every yield: 14 + 10 + 9 + 10 + 8 + 6.
-        XCTAssertEqual(
-            try call("DSUM", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 3, columns: "A"), cells: cells),
-            .number(57))
+        #expect(try call("DSUM", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 3, columns: "A"), cells: cells) == .number(57))
     }
 
     /// A criteria column the database does not have selects nothing.
-    func testAnUnknownCriteriaColumnMatchesNothing() throws {
+    @Test func anUnknownCriteriaColumnMatchesNothing() throws {
         let cells = sheet(criteria: [[.text("Colour")], [.text("Red")]])
-        XCTAssertEqual(
-            try call("DSUM", field: .text("Yield"),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .number(0))
+        #expect(try call("DSUM", field: .text("Yield"),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .number(0))
     }
 
     // MARK: - The field argument
 
     /// A field may be named or numbered, and both must mean the same column.
-    func testTheFieldMayBeAPosition() throws {
+    @Test func theFieldMayBeAPosition() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
         let criteria = criteriaRange(rows: 2, columns: "A")
-        XCTAssertEqual(try call("DSUM", field: .number(4), criteria: criteria, cells: cells),
-                       try call("DSUM", field: .text("Yield"), criteria: criteria, cells: cells))
+        #expect(try call("DSUM", field: .number(4), criteria: criteria, cells: cells) == call("DSUM", field: .text("Yield"), criteria: criteria, cells: cells))
     }
 
-    func testAFieldNameIsMatchedWithoutCase() throws {
+    @Test func aFieldNameIsMatchedWithoutCase() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
         let criteria = criteriaRange(rows: 2, columns: "A")
-        XCTAssertEqual(try call("DSUM", field: .text("yield"), criteria: criteria, cells: cells),
-                       .number(30))
+        #expect(try call("DSUM", field: .text("yield"), criteria: criteria, cells: cells) == .number(30))
     }
 
-    func testAnUnknownFieldIsRefused() throws {
+    @Test func anUnknownFieldIsRefused() throws {
         let cells = sheet(criteria: [[.text("Tree")], [.text("Apple")]])
-        XCTAssertEqual(
-            try call("DSUM", field: .text("Colour"),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .error(.value))
-        XCTAssertEqual(
-            try call("DSUM", field: .number(99),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .error(.value))
+        #expect(try call("DSUM", field: .text("Colour"),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .error(.value))
+        #expect(try call("DSUM", field: .number(99),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .error(.value))
     }
 
     /// The criteria vocabulary is the one `SUMIF` uses, so comparisons work the same way.
-    func testTheCriteriaVocabularyIsShared() throws {
+    @Test func theCriteriaVocabularyIsShared() throws {
         let cells = sheet(criteria: [[.text("Profit")], [.text(">=100")]])
         // Two records at 105.
-        XCTAssertEqual(
-            try call("DCOUNT", field: .text("Profit"),
-                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells),
-            .number(2))
+        #expect(try call("DCOUNT", field: .text("Profit"),
+                     criteria: criteriaRange(rows: 2, columns: "A"), cells: cells) == .number(2))
     }
 }

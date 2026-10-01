@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinStatsFunctionTests: XCTestCase {
+@Suite struct BuiltinStatsFunctionTests {
 
     // MARK: - Helpers
 
@@ -19,334 +20,307 @@ final class BuiltinStatsFunctionTests: XCTestCase {
         try function(named: name).evaluate(args)
     }
 
-    /// Assert a CellValue equals a number within accuracy.
-    private func assertNumber(
-        _ result: CellValue,
-        _ expected: Double,
-        accuracy: Double = 1e-10,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .number(let value) = result else {
-            XCTFail("Expected .number(\(expected)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(value, expected, accuracy: accuracy, file: file, line: line)
-    }
 
-    /// Assert a CellValue is a specific Excel error.
-    private func assertError(
-        _ result: CellValue,
-        _ expectedError: ExcelError,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .error(let err) = result else {
-            XCTFail("Expected .error(\(expectedError)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(err, expectedError, file: file, line: line)
-    }
 
     // MARK: - Registration count
 
-    func testAllContainsThirteenFunctions() {
-        XCTAssertEqual(BuiltinStatsFunctions.all.count, 13)
+    @Test func allContainsThirteenFunctions() {
+        #expect(BuiltinStatsFunctions.all.count == 13)
     }
 
     // MARK: - AVERAGE
 
-    func testAVERAGEBasic() throws {
+    @Test func averageBasic() throws {
         let result = try eval("AVERAGE", .number(10), .number(20), .number(30))
-        assertNumber(result, 20)
+        #expect(result.isNumber(20))
     }
 
-    func testAVERAGESingleValue() throws {
+    @Test func averageSingleValue() throws {
         let result = try eval("AVERAGE", .number(42))
-        assertNumber(result, 42)
+        #expect(result.isNumber(42))
     }
 
-    func testAVERAGEIgnoresBlanks() throws {
+    @Test func averageIgnoresBlanks() throws {
         let result = try eval("AVERAGE", .number(10), .blank, .number(20))
-        assertNumber(result, 15)
+        #expect(result.isNumber(15))
     }
 
-    func testAVERAGEIgnoresText() throws {
+    @Test func averageIgnoresText() throws {
         let result = try eval("AVERAGE", .number(10), .text("hello"), .number(30))
-        assertNumber(result, 20)
+        #expect(result.isNumber(20))
     }
 
-    func testAVERAGENoNumbersReturnsDiv0() throws {
+    @Test func averageNoNumbersReturnsDiv0() throws {
         let result = try eval("AVERAGE", .blank, .text("abc"))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
-    func testAVERAGEWithArray() throws {
+    @Test func averageWithArray() throws {
         let result = try eval("AVERAGE",
                               .array(CellMatrix(row: [.number(10), .number(20), .number(30)])))
-        assertNumber(result, 20)
+        #expect(result.isNumber(20))
     }
 
-    func testAVERAGEErrorPropagation() throws {
+    @Test func averageErrorPropagation() throws {
         let result = try eval("AVERAGE", .number(1), .error(.ref))
-        assertError(result, .ref)
+        #expect(result == .error(.ref))
     }
 
     // MARK: - STDEV (sample)
 
-    func testSTDEVBasic() throws {
+    @Test func stdevBasic() throws {
         // Data: [2, 4, 4, 4, 5, 5, 7, 9], mean=5
         // sum_sq_dev=32, sample var=32/7, sample stdev=sqrt(32/7) ~ 2.138
         let expected = (32.0 / 7.0).squareRoot()
         let result = try eval("STDEV",
                               .number(2), .number(4), .number(4), .number(4),
                               .number(5), .number(5), .number(7), .number(9))
-        assertNumber(result, expected, accuracy: 1e-10)
+        #expect(result.isNumber(expected, within: 1e-10))
     }
 
-    func testSTDEVNeedsAtLeastTwoValues() throws {
+    @Test func stdevNeedsAtLeastTwoValues() throws {
         let result = try eval("STDEV", .number(5))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
-    func testSTDEVWithArray() throws {
+    @Test func stdevWithArray() throws {
         let expected = (32.0 / 7.0).squareRoot()
         let result = try eval("STDEV",
                               .array(CellMatrix(row: [.number(2), .number(4), .number(4), .number(4),
                                       .number(5), .number(5), .number(7), .number(9)])))
-        assertNumber(result, expected, accuracy: 1e-10)
+        #expect(result.isNumber(expected, within: 1e-10))
     }
 
-    func testSTDEVErrorPropagation() throws {
+    @Test func stdevErrorPropagation() throws {
         let result = try eval("STDEV", .number(1), .error(.value), .number(3))
-        assertError(result, .value)
+        #expect(result == .error(.value))
     }
 
     // MARK: - STDEVP (population)
 
-    func testSTDEVPBasic() throws {
+    @Test func stdevpBasic() throws {
         // Data: [2, 4, 4, 4, 5, 5, 7, 9], mean=5
         // sum_sq_dev=32, pop var=32/8=4, pop stdev=sqrt(4)=2
         let result = try eval("STDEVP",
                               .number(2), .number(4), .number(4), .number(4),
                               .number(5), .number(5), .number(7), .number(9))
-        assertNumber(result, 2.0, accuracy: 1e-10)
+        #expect(result.isNumber(2.0, within: 1e-10))
     }
 
-    func testSTDEVPSingleValue() throws {
+    @Test func stdevpSingleValue() throws {
         // Population stdev of a single value is 0
         let result = try eval("STDEVP", .number(42))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testSTDEVPNoNumbersReturnsDiv0() throws {
+    @Test func stdevpNoNumbersReturnsDiv0() throws {
         let result = try eval("STDEVP", .blank, .text("abc"))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
     // MARK: - MEDIAN
 
-    func testMEDIANOddCount() throws {
+    @Test func medianOddCount() throws {
         // [1, 3, 5] -> median = 3
         let result = try eval("MEDIAN", .number(1), .number(3), .number(5))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testMEDIANEvenCount() throws {
+    @Test func medianEvenCount() throws {
         // [1, 2, 3, 4] -> median = (2+3)/2 = 2.5
         let result = try eval("MEDIAN", .number(1), .number(2), .number(3), .number(4))
-        assertNumber(result, 2.5)
+        #expect(result.isNumber(2.5))
     }
 
-    func testMEDIANUnsortedInput() throws {
+    @Test func medianUnsortedInput() throws {
         // [5, 1, 3] -> sorted [1, 3, 5] -> median = 3
         let result = try eval("MEDIAN", .number(5), .number(1), .number(3))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testMEDIANSingleValue() throws {
+    @Test func medianSingleValue() throws {
         let result = try eval("MEDIAN", .number(7))
-        assertNumber(result, 7)
+        #expect(result.isNumber(7))
     }
 
-    func testMEDIANNoNumbersReturnsNum() throws {
+    @Test func medianNoNumbersReturnsNum() throws {
         let result = try eval("MEDIAN", .blank, .text("abc"))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testMEDIANWithArray() throws {
+    @Test func medianWithArray() throws {
         let result = try eval("MEDIAN",
                               .array(CellMatrix(row: [.number(5), .number(1), .number(3)])))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testMEDIANErrorPropagation() throws {
+    @Test func medianErrorPropagation() throws {
         let result = try eval("MEDIAN", .number(1), .error(.na), .number(3))
-        assertError(result, .na)
+        #expect(result == .error(.na))
     }
 
     // MARK: - MIN
 
-    func testMINBasic() throws {
+    @Test func minBasic() throws {
         let result = try eval("MIN", .number(5), .number(2), .number(8))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMINIgnoresBlanks() throws {
+    @Test func minIgnoresBlanks() throws {
         let result = try eval("MIN", .number(5), .blank, .number(2))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMINIgnoresText() throws {
+    @Test func minIgnoresText() throws {
         let result = try eval("MIN", .number(5), .text("hello"), .number(2))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMINWithArray() throws {
+    @Test func minWithArray() throws {
         let result = try eval("MIN",
                               .array(CellMatrix(row: [.number(5), .number(2), .number(8)])))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMINNoNumbersReturnsZero() throws {
+    @Test func minNoNumbersReturnsZero() throws {
         // Excel MIN with no numeric args returns 0
         let result = try eval("MIN", .blank, .text("abc"))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testMINNegativeNumbers() throws {
+    @Test func minNegativeNumbers() throws {
         let result = try eval("MIN", .number(-5), .number(-2), .number(-8))
-        assertNumber(result, -8)
+        #expect(result.isNumber(-8))
     }
 
-    func testMINErrorPropagation() throws {
+    @Test func minErrorPropagation() throws {
         let result = try eval("MIN", .number(1), .error(.div0))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
     // MARK: - MAX
 
-    func testMAXBasic() throws {
+    @Test func maxBasic() throws {
         let result = try eval("MAX", .number(5), .number(2), .number(8))
-        assertNumber(result, 8)
+        #expect(result.isNumber(8))
     }
 
-    func testMAXIgnoresBlanks() throws {
+    @Test func maxIgnoresBlanks() throws {
         let result = try eval("MAX", .number(5), .blank, .number(8))
-        assertNumber(result, 8)
+        #expect(result.isNumber(8))
     }
 
-    func testMAXWithArray() throws {
+    @Test func maxWithArray() throws {
         let result = try eval("MAX",
                               .array(CellMatrix(row: [.number(5), .number(2), .number(8)])))
-        assertNumber(result, 8)
+        #expect(result.isNumber(8))
     }
 
-    func testMAXNoNumbersReturnsZero() throws {
+    @Test func maxNoNumbersReturnsZero() throws {
         let result = try eval("MAX", .blank, .text("abc"))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testMAXErrorPropagation() throws {
+    @Test func maxErrorPropagation() throws {
         let result = try eval("MAX", .number(1), .error(.num))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
     // MARK: - COUNT
 
-    func testCOUNTBasic() throws {
+    @Test func countBasic() throws {
         let result = try eval("COUNT", .number(1), .number(2), .number(3))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testCOUNTIgnoresText() throws {
+    @Test func countIgnoresText() throws {
         let result = try eval("COUNT", .number(1), .text("hello"), .number(3))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTIgnoresBlanks() throws {
+    @Test func countIgnoresBlanks() throws {
         let result = try eval("COUNT", .number(1), .blank, .number(3))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTIgnoresErrors() throws {
+    @Test func countIgnoresErrors() throws {
         let result = try eval("COUNT", .number(1), .error(.value), .number(3))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTIncludesBoolAsNumber() throws {
+    @Test func countIncludesBoolAsNumber() throws {
         // In Excel, COUNT counts booleans when passed directly (not from range)
         // But we follow the spec: only .number and .date count
         let result = try eval("COUNT", .number(1), .bool(true), .number(3))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTWithArray() throws {
+    @Test func countWithArray() throws {
         let result = try eval("COUNT",
                               .array(CellMatrix(row: [.number(1), .text("hi"), .number(3), .blank])))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTNoNumbers() throws {
+    @Test func countNoNumbers() throws {
         let result = try eval("COUNT", .blank, .text("abc"))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - COUNTA
 
-    func testCOUNTABasic() throws {
+    @Test func countaBasic() throws {
         let result = try eval("COUNTA", .number(1), .text("hello"), .bool(true))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testCOUNTAIgnoresBlanks() throws {
+    @Test func countaIgnoresBlanks() throws {
         let result = try eval("COUNTA", .number(1), .blank, .text("hi"))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTACountsErrors() throws {
+    @Test func countaCountsErrors() throws {
         let result = try eval("COUNTA", .error(.value), .number(1))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testCOUNTAAllBlanks() throws {
+    @Test func countaAllBlanks() throws {
         let result = try eval("COUNTA", .blank, .blank)
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testCOUNTAWithArray() throws {
+    @Test func countaWithArray() throws {
         let result = try eval("COUNTA",
                               .array(CellMatrix(row: [.number(1), .blank, .text("hi"), .error(.na)])))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
     // MARK: - PERCENTILE
 
-    func testPERCENTILEMin() throws {
+    @Test func percentileMin() throws {
         // k=0 returns the minimum
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(0))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testPERCENTILEMax() throws {
+    @Test func percentileMax() throws {
         // k=1 returns the maximum
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(1))
-        assertNumber(result, 4)
+        #expect(result.isNumber(4))
     }
 
-    func testPERCENTILEMedian() throws {
+    @Test func percentileMedian() throws {
         // k=0.5 returns the median
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(2), .number(3), .number(4)])),
                               .number(0.5))
-        assertNumber(result, 2.5)
+        #expect(result.isNumber(2.5))
     }
 
-    func testPERCENTILEInterpolation() throws {
+    @Test func percentileInterpolation() throws {
         // Data: [1, 3, 5, 7], k=0.25
         // rank = 0.25 * (4-1) = 0.75
         // intPart = 0, fracPart = 0.75
@@ -354,269 +328,269 @@ final class BuiltinStatsFunctionTests: XCTestCase {
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(3), .number(5), .number(7)])),
                               .number(0.25))
-        assertNumber(result, 2.5)
+        #expect(result.isNumber(2.5))
     }
 
-    func testPERCENTILEKOutOfRange() throws {
+    @Test func percentilekOutOfRange() throws {
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(1.5))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testPERCENTILEKNegative() throws {
+    @Test func percentilekNegative() throws {
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(-0.1))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testPERCENTILEEmptyArray() throws {
+    @Test func percentileEmptyArray() throws {
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.blank, .text("abc")])),
                               .number(0.5))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testPERCENTILEErrorPropagation() throws {
+    @Test func percentileErrorPropagation() throws {
         let result = try eval("PERCENTILE",
                               .array(CellMatrix(row: [.number(1), .error(.ref)])),
                               .number(0.5))
-        assertError(result, .ref)
+        #expect(result == .error(.ref))
     }
 
     // MARK: - LARGE
 
-    func testLARGEFirst() throws {
+    @Test func largeFirst() throws {
         // k=1 returns the largest
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(1))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testLARGESecond() throws {
+    @Test func largeSecond() throws {
         // k=2 returns the second largest
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(2))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testLARGELast() throws {
+    @Test func largeLast() throws {
         // k=n returns the smallest
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(4))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testLARGEKOutOfRange() throws {
+    @Test func largekOutOfRange() throws {
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(3))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testLARGEKZero() throws {
+    @Test func largekZero() throws {
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(0))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testLARGEErrorPropagation() throws {
+    @Test func largeErrorPropagation() throws {
         let result = try eval("LARGE",
                               .array(CellMatrix(row: [.number(1), .error(.div0)])),
                               .number(1))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
     // MARK: - SMALL
 
-    func testSMALLFirst() throws {
+    @Test func smallFirst() throws {
         // k=1 returns the smallest
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(1))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testSMALLSecond() throws {
+    @Test func smallSecond() throws {
         // k=2 returns the second smallest
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(2))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testSMALLLast() throws {
+    @Test func smallLast() throws {
         // k=n returns the largest
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.number(3), .number(1), .number(5), .number(2)])),
                               .number(4))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testSMALLKOutOfRange() throws {
+    @Test func smallkOutOfRange() throws {
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(3))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testSMALLKZero() throws {
+    @Test func smallkZero() throws {
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.number(1), .number(2)])),
                               .number(0))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testSMALLErrorPropagation() throws {
+    @Test func smallErrorPropagation() throws {
         let result = try eval("SMALL",
                               .array(CellMatrix(row: [.error(.na), .number(2)])),
                               .number(1))
-        assertError(result, .na)
+        #expect(result == .error(.na))
     }
 
     // MARK: - VAR (sample variance)
 
-    func testVARBasic() throws {
+    @Test func varBasic() throws {
         // [2, 4, 4, 4, 5, 5, 7, 9], mean=5, sum_sq_dev=32, sample var=32/7
         let expected = 32.0 / 7.0
         let result = try eval("VAR",
                               .number(2), .number(4), .number(4), .number(4),
                               .number(5), .number(5), .number(7), .number(9))
-        assertNumber(result, expected, accuracy: 1e-10)
+        #expect(result.isNumber(expected, within: 1e-10))
     }
 
-    func testVARNeedsAtLeastTwoValues() throws {
+    @Test func varNeedsAtLeastTwoValues() throws {
         let result = try eval("VAR", .number(5))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
-    func testVARWithArray() throws {
+    @Test func varWithArray() throws {
         let expected = 32.0 / 7.0
         let result = try eval("VAR",
                               .array(CellMatrix(row: [.number(2), .number(4), .number(4), .number(4),
                                       .number(5), .number(5), .number(7), .number(9)])))
-        assertNumber(result, expected, accuracy: 1e-10)
+        #expect(result.isNumber(expected, within: 1e-10))
     }
 
-    func testVARErrorPropagation() throws {
+    @Test func varErrorPropagation() throws {
         let result = try eval("VAR", .number(1), .error(.null), .number(3))
-        assertError(result, .null)
+        #expect(result == .error(.null))
     }
 
     // MARK: - VARP (population variance)
 
-    func testVARPBasic() throws {
+    @Test func varpBasic() throws {
         // [2, 4, 4, 4, 5, 5, 7, 9], mean=5, sum_sq_dev=32, pop var=32/8=4
         let result = try eval("VARP",
                               .number(2), .number(4), .number(4), .number(4),
                               .number(5), .number(5), .number(7), .number(9))
-        assertNumber(result, 4.0, accuracy: 1e-10)
+        #expect(result.isNumber(4.0, within: 1e-10))
     }
 
-    func testVARPSingleValue() throws {
+    @Test func varpSingleValue() throws {
         // Population variance of a single value is 0
         let result = try eval("VARP", .number(42))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testVARPNoNumbersReturnsDiv0() throws {
+    @Test func varpNoNumbersReturnsDiv0() throws {
         let result = try eval("VARP", .blank, .text("abc"))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
-    func testVARPErrorPropagation() throws {
+    @Test func varpErrorPropagation() throws {
         let result = try eval("VARP", .number(1), .error(.name), .number(3))
-        assertError(result, .name)
+        #expect(result == .error(.name))
     }
 
     // MARK: - Array flattening
 
-    func testAVERAGENestedArrays() throws {
+    @Test func averageNestedArrays() throws {
         // Nested arrays should be flattened
         let result = try eval("AVERAGE",
                               .array(CellMatrix(row: [
                                   .number(10),
                                   .array(CellMatrix(row: [.number(20), .number(30)])),
                               ])))
-        assertNumber(result, 20)
+        #expect(result.isNumber(20))
     }
 
-    func testMINMixedArrayAndScalar() throws {
+    @Test func minMixedArrayAndScalar() throws {
         let result = try eval("MIN",
                               .number(5), .array(CellMatrix(row: [.number(3), .number(7)])))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testMAXMixedArrayAndScalar() throws {
+    @Test func maxMixedArrayAndScalar() throws {
         let result = try eval("MAX",
                               .number(5), .array(CellMatrix(row: [.number(3), .number(7)])))
-        assertNumber(result, 7)
+        #expect(result.isNumber(7))
     }
 
     // MARK: - ExcelFunction metadata
 
-    func testAVERAGEMetadata() {
+    @Test func averageMetadata() {
         let fn = function(named: "AVERAGE")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
-    func testSTDEVMetadata() {
+    @Test func stdevMetadata() {
         let fn = function(named: "STDEV")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
-    func testPERCENTILEMetadata() {
+    @Test func percentileMetadata() {
         let fn = function(named: "PERCENTILE")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 2)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 2)
     }
 
-    func testLARGEMetadata() {
+    @Test func largeMetadata() {
         let fn = function(named: "LARGE")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 2)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 2)
     }
 
-    func testSMALLMetadata() {
+    @Test func smallMetadata() {
         let fn = function(named: "SMALL")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 2)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 2)
     }
 
-    func testCOUNTMetadata() {
+    @Test func countMetadata() {
         let fn = function(named: "COUNT")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
-    func testCOUNTAMetadata() {
+    @Test func countaMetadata() {
         let fn = function(named: "COUNTA")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
     // MARK: - Bool handling in direct arguments
 
-    func testAVERAGEBoolDirectly() throws {
+    @Test func averageBoolDirectly() throws {
         // Bools passed directly as arguments are treated as 1/0
         let result = try eval("AVERAGE", .bool(true), .bool(false))
-        assertNumber(result, 0.5)
+        #expect(result.isNumber(0.5))
     }
 
-    func testMINBoolDirectly() throws {
+    @Test func minBoolDirectly() throws {
         let result = try eval("MIN", .number(5), .bool(true))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testMAXBoolDirectly() throws {
+    @Test func maxBoolDirectly() throws {
         let result = try eval("MAX", .number(0), .bool(true))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookAudit
 import SwiftExcelCore
 import SwiftXLSX
@@ -11,7 +12,7 @@ import SwiftXLSX
 /// row 3 are the *same* formula and only a genuine difference stands out.
 ///
 /// This is the checker that catches real financial-model errors, and it evaluates nothing.
-final class ConsistencyCheckerTests: XCTestCase {
+@Suite struct ConsistencyCheckerTests {
 
     private func book(_ formulas: [String: String], constants: [String: Double] = [:]) -> Workbook {
         let workbook = Workbook()
@@ -27,9 +28,9 @@ final class ConsistencyCheckerTests: XCTestCase {
 
     /// It is not on by default, and that is a decision the census made rather than a
     /// doubt about the logic. See ``WorkbookAuditor/experimental``.
-    func testItIsNotEnabledByDefaultYet() {
-        XCTAssertFalse(WorkbookAuditor.standard.contains { type(of: $0).name == "consistency" })
-        XCTAssertTrue(WorkbookAuditor.experimental.contains { type(of: $0).name == "consistency" })
+    @Test func itIsNotEnabledByDefaultYet() {
+        #expect(!(WorkbookAuditor.standard.contains { type(of: $0).name == "consistency" }))
+        #expect(WorkbookAuditor.experimental.contains { type(of: $0).name == "consistency" })
     }
 
     /// **The defect it found in a real model, kept as a fixture.**
@@ -41,32 +42,28 @@ final class ConsistencyCheckerTests: XCTestCase {
     ///
     /// This is the evidence that the checker is worth tuning rather than dropping, so it
     /// lives in the suite rather than in a commit message.
-    func testTheRealDefectItFoundStaysFound() {
+    @Test func theRealDefectItFoundStaysFound() {
         let findings = findings(book([
             "B19": "B17*B18*B13", "C19": "C17*C18*C13", "D19": "D17*D18*D13",
             "E19": "E17*E18*D13", "F19": "F17*F18*F13"
         ]))
-        XCTAssertEqual(findings.map(\.address.cell), [CellRef("E19")])
+        #expect(findings.map(\.address.cell) == [CellRef("E19")])
     }
 
     // MARK: - The shape signature
 
     /// Two formulas one row apart, referring one row apart, are the same shape.
-    func testRelativeReferencesNormaliseToTheSameShape() throws {
+    @Test func relativeReferencesNormaliseToTheSameShape() throws {
         let a = try FormulaParser.parse("B2*C2")
         let b = try FormulaParser.parse("B3*C3")
-        XCTAssertEqual(
-            ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")),
-            ConsistencyChecker.shapeSignature(of: b, at: CellRef("D3")))
+        #expect(ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")) == ConsistencyChecker.shapeSignature(of: b, at: CellRef("D3")))
     }
 
     /// A genuinely different formula has a different shape, however similar it looks.
-    func testADifferentOperatorIsADifferentShape() throws {
+    @Test func aDifferentOperatorIsADifferentShape() throws {
         let a = try FormulaParser.parse("B2*C2")
         let b = try FormulaParser.parse("B2+C2")
-        XCTAssertNotEqual(
-            ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")),
-            ConsistencyChecker.shapeSignature(of: b, at: CellRef("D2")))
+        #expect(ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")) != ConsistencyChecker.shapeSignature(of: b, at: CellRef("D2")))
     }
 
     /// A pinned reference is a different intent from one that moves, and stays different.
@@ -74,72 +71,70 @@ final class ConsistencyCheckerTests: XCTestCase {
     /// `$B$1` deliberately anchored is not the same formula as `B1` that happened not to
     /// move, and collapsing them would hide the copy that lost its anchor — which is one
     /// of the defects this checker exists to find.
-    func testAnAbsoluteReferenceIsADifferentShapeFromARelativeOne() throws {
+    @Test func anAbsoluteReferenceIsADifferentShapeFromARelativeOne() throws {
         let a = try FormulaParser.parse("$B$1*C2")
         let b = try FormulaParser.parse("B1*C2")
-        XCTAssertNotEqual(
-            ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")),
-            ConsistencyChecker.shapeSignature(of: b, at: CellRef("D2")))
+        #expect(ConsistencyChecker.shapeSignature(of: a, at: CellRef("D2")) != ConsistencyChecker.shapeSignature(of: b, at: CellRef("D2")))
     }
 
     // MARK: - Finding the odd one out
 
     /// The defect, planted: five cells copied across, one hand-edited.
-    func testTheOddCellInARowIsFound() {
+    @Test func theOddCellInARowIsFound() throws {
         let findings = findings(book([
             "B5": "B4*2", "C5": "C4*2", "D5": "D4*3", "E5": "E4*2", "F5": "F4*2"
         ]))
 
-        XCTAssertEqual(findings.count, 1)
-        XCTAssertEqual(findings.first?.checker, "consistency")
-        XCTAssertEqual(findings.first?.address.cell, CellRef("D5"))
-        XCTAssertGreaterThanOrEqual(findings.first?.related.count ?? 0, 3,
-                                    "the finding must name the run it broke")
+        #expect(findings.count == 1)
+        #expect(findings.first?.checker == "consistency")
+        #expect(findings.first?.address.cell == CellRef("D5"))
+        let finding = try #require(findings.first)
+        #expect(finding.related.count >= 3, "the finding must name the run it broke")
     }
 
     /// The same defect down a column.
-    func testTheOddCellInAColumnIsFound() {
+    @Test func theOddCellInAColumnIsFound() {
         let findings = findings(book([
             "B2": "A2*2", "B3": "A3*2", "B4": "A4*2", "B5": "A5+2", "B6": "A6*2"
         ]))
-        XCTAssertEqual(findings.first?.address.cell, CellRef("B5"))
+        #expect(findings.first?.address.cell == CellRef("B5"))
     }
 
     // MARK: - Not crying wolf
 
     /// A run where every cell agrees is not a finding.
-    func testAConsistentRowIsClean() {
-        XCTAssertEqual(findings(book([
+    @Test func aConsistentRowIsClean() {
+        #expect(findings(book([
             "B5": "B4*2", "C5": "C4*2", "D5": "D4*2", "E5": "E4*2"
-        ])), [])
+        ])) == [])
     }
 
     /// **Two against two is not an odd one out.** Half a row differing from the other half
     /// is a model with two sections, not a mistake — and reporting it would be the noise
     /// that gets a checker switched off.
-    func testAnEvenSplitIsNotReported() {
-        XCTAssertEqual(findings(book([
+    @Test func anEvenSplitIsNotReported() {
+        #expect(findings(book([
             "B5": "B4*2", "C5": "C4*2", "D5": "D4*3", "E5": "E4*3"
-        ])), [])
+        ])) == [])
     }
 
     /// A run too short to have a majority says nothing.
-    func testATwoCellRunIsNotEnoughToJudge() {
-        XCTAssertEqual(findings(book(["B5": "B4*2", "C5": "C4*3"])), [])
+    @Test func aTwoCellRunIsNotEnoughToJudge() {
+        #expect(findings(book(["B5": "B4*2", "C5": "C4*3"])) == [])
     }
 
     /// Cells that are not adjacent are not a run. A formula at B5 and another at Z5 are
     /// unrelated however similar they look.
-    func testNonAdjacentCellsAreNotARun() {
-        XCTAssertEqual(findings(book([
+    @Test func nonAdjacentCellsAreNotARun() {
+        #expect(findings(book([
             "B5": "B4*2", "C5": "C4*2", "D5": "D4*2", "Z5": "Z4*3"
-        ])), [])
+        ])) == [])
     }
 
     /// Constants are not formulas and never take part.
-    func testConstantsAreNotComparedAgainstFormulas() {
-        XCTAssertEqual(findings(book(
+    @Test func constantsAreNotComparedAgainstFormulas() {
+        #expect(findings(book(
             ["B5": "B4*2", "C5": "C4*2", "D5": "D4*2"],
-            constants: ["E5": 99])), [])
+            constants: ["E5": 99])) == [])
     }
 }

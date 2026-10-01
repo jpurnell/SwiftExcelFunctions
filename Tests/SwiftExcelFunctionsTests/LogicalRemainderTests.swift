@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -8,7 +9,7 @@ import SwiftExcelCore
 /// what is left, and two of them were named in `LazyBranch` as belonging there and not
 /// existing yet: *"`IFS` and `SWITCH` belong here and are not implemented at all yet; when
 /// they arrive they arrive lazy."* They arrive lazy.
-final class LogicalRemainderTests: XCTestCase {
+@Suite struct LogicalRemainderTests {
 
     private struct Cells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -42,75 +43,68 @@ final class LogicalRemainderTests: XCTestCase {
 
     // MARK: - IFS
 
-    func testIfsTakesTheFirstTrueCondition() throws {
+    @Test func ifsTakesTheFirstTrueCondition() throws {
         let ast = FormulaAST.function("IFS", [
             .bool(false), .text("no"),
             .bool(true), .text("yes"),
             .bool(true), .text("also yes"),
         ])
-        XCTAssertEqual(try eval(ast), .text("yes"))
+        #expect(try eval(ast) == .text("yes"))
     }
 
     /// No condition true is `#N/A`, which is Excel's answer and not `#VALUE!`.
-    func testIfsWithNoMatchIsNotAvailable() throws {
-        XCTAssertEqual(
-            try eval(.function("IFS", [.bool(false), .number(1), .bool(false), .number(2)])),
-            .error(.na))
+    @Test func ifsWithNoMatchIsNotAvailable() throws {
+        #expect(try eval(.function("IFS", [.bool(false), .number(1), .bool(false), .number(2)])) == .error(.na))
     }
 
     /// Only the matching result is evaluated, and only up to the matching condition.
-    func testIfsIsLazy() throws {
+    @Test func ifsIsLazy() throws {
         let tally = Tally()
         let ast = FormulaAST.function("IFS", [
             .bool(true), .number(5),
             .function("TALLY", []), .function("TALLY", []),
         ])
-        XCTAssertEqual(try eval(ast, tally), .number(5))
-        XCTAssertEqual(tally.count, 0, "neither the later condition nor its result")
+        #expect(try eval(ast, tally) == .number(5))
+        #expect(tally.count == 0, "neither the later condition nor its result")
     }
 
     /// An error in a condition is the answer.
-    func testIfsPropagatesAnErrorInACondition() throws {
-        XCTAssertEqual(
-            try eval(.function("IFS", [.divide(.number(1), .number(0)), .number(1)])),
-            .error(.div0))
+    @Test func ifsPropagatesAnErrorInACondition() throws {
+        #expect(try eval(.function("IFS", [.divide(.number(1), .number(0)), .number(1)])) == .error(.div0))
     }
 
     /// Conditions and results come in pairs.
-    func testIfsNeedsPairs() throws {
-        XCTAssertEqual(try eval(.function("IFS", [.bool(true), .number(1), .bool(true)])),
-                       .error(.value))
+    @Test func ifsNeedsPairs() throws {
+        #expect(try eval(.function("IFS", [.bool(true), .number(1), .bool(true)])) == .error(.value))
     }
 
     // MARK: - SWITCH
 
-    func testSwitchMatchesAValue() throws {
+    @Test func switchMatchesAValue() throws {
         let ast = FormulaAST.function("SWITCH", [
             .number(2),
             .number(1), .text("one"),
             .number(2), .text("two"),
         ])
-        XCTAssertEqual(try eval(ast), .text("two"))
+        #expect(try eval(ast) == .text("two"))
     }
 
     /// A trailing odd argument is the default.
-    func testSwitchUsesItsDefault() throws {
+    @Test func switchUsesItsDefault() throws {
         let ast = FormulaAST.function("SWITCH", [
             .number(9),
             .number(1), .text("one"),
             .text("none of them"),
         ])
-        XCTAssertEqual(try eval(ast), .text("none of them"))
+        #expect(try eval(ast) == .text("none of them"))
     }
 
     /// With no default and no match, `#N/A`.
-    func testSwitchWithNoMatchAndNoDefault() throws {
-        XCTAssertEqual(
-            try eval(.function("SWITCH", [.number(9), .number(1), .text("one")])),
-            .error(.na))
+    @Test func switchWithNoMatchAndNoDefault() throws {
+        #expect(try eval(.function("SWITCH", [.number(9), .number(1), .text("one")])) == .error(.na))
     }
 
-    func testSwitchIsLazy() throws {
+    @Test func switchIsLazy() throws {
         let tally = Tally()
         let ast = FormulaAST.function("SWITCH", [
             .number(1),
@@ -118,35 +112,34 @@ final class LogicalRemainderTests: XCTestCase {
             .number(2), .function("TALLY", []),
             .function("TALLY", []),
         ])
-        XCTAssertEqual(try eval(ast, tally), .number(42))
-        XCTAssertEqual(tally.count, 0)
+        #expect(try eval(ast, tally) == .number(42))
+        #expect(tally.count == 0)
     }
 
     /// Text matching is case-insensitive, as comparison is everywhere in Excel.
-    func testSwitchMatchesTextWithoutCase() throws {
+    @Test func switchMatchesTextWithoutCase() throws {
         let ast = FormulaAST.function("SWITCH", [
             .text("Red"), .text("RED"), .number(1), .number(0),
         ])
-        XCTAssertEqual(try eval(ast), .number(1))
+        #expect(try eval(ast) == .number(1))
     }
 
     // MARK: - XOR
 
-    func testXorIsTrueForAnOddNumberOfTruths() throws {
-        XCTAssertEqual(try eval(.function("XOR", [.bool(true), .bool(false)])), .bool(true))
-        XCTAssertEqual(try eval(.function("XOR", [.bool(true), .bool(true)])), .bool(false))
-        XCTAssertEqual(
-            try eval(.function("XOR", [.bool(true), .bool(true), .bool(true)])), .bool(true))
-        XCTAssertEqual(try eval(.function("XOR", [.bool(false), .bool(false)])), .bool(false))
+    @Test func xorIsTrueForAnOddNumberOfTruths() throws {
+        #expect(try eval(.function("XOR", [.bool(true), .bool(false)])) == .bool(true))
+        #expect(try eval(.function("XOR", [.bool(true), .bool(true)])) == .bool(false))
+        #expect(try eval(.function("XOR", [.bool(true), .bool(true), .bool(true)])) == .bool(true))
+        #expect(try eval(.function("XOR", [.bool(false), .bool(false)])) == .bool(false))
     }
 
     /// Numbers count as truthy, and zero does not.
-    func testXorCoercesLikeItsSiblings() throws {
-        XCTAssertEqual(try eval(.function("XOR", [.number(1), .number(0)])), .bool(true))
-        XCTAssertEqual(try eval(.function("XOR", [.number(3), .number(7)])), .bool(false))
+    @Test func xorCoercesLikeItsSiblings() throws {
+        #expect(try eval(.function("XOR", [.number(1), .number(0)])) == .bool(true))
+        #expect(try eval(.function("XOR", [.number(3), .number(7)])) == .bool(false))
     }
 
-    func testXorPropagatesAnError() throws {
-        XCTAssertEqual(try eval(.function("XOR", [.bool(true), .error(.na)])), .error(.na))
+    @Test func xorPropagatesAnError() throws {
+        #expect(try eval(.function("XOR", [.bool(true), .error(.na)])) == .error(.na))
     }
 }

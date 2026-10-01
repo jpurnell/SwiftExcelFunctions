@@ -1,5 +1,6 @@
 import Foundation
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookContainer
 
 /// What a file *is*, before anything tries to parse it as a workbook.
@@ -10,7 +11,7 @@ import XCTest
 /// was actually damaged. "This workbook is password-protected" and "this file is damaged"
 /// ask completely different things of whoever reads the report, and the difference is
 /// visible in the first eight bytes.
-final class ContainerKindTests: XCTestCase {
+@Suite struct ContainerKindTests {
 
     private func bytes(_ values: [UInt8], padTo count: Int = 16) -> Data {
         var data = Data(values)
@@ -18,54 +19,51 @@ final class ContainerKindTests: XCTestCase {
         return data
     }
 
-    func testAZipIsAWorkbookContainer() {
+    @Test func aZipIsAWorkbookContainer() {
         // "PK\u{3}\u{4}" — the local file header every .xlsx starts with.
-        XCTAssertEqual(ContainerKind(of: bytes([0x50, 0x4B, 0x03, 0x04])), .zip)
+        #expect(ContainerKind(of: bytes([0x50, 0x4B, 0x03, 0x04])) == .zip)
     }
 
-    func testAnEmptyArchiveIsStillAZip() {
+    @Test func anEmptyArchiveIsStillAZip() {
         // A ZIP with no entries starts at the end-of-central-directory record. It is a
         // workbook that will fail for its own reasons, not a file of unknown type.
-        XCTAssertEqual(ContainerKind(of: bytes([0x50, 0x4B, 0x05, 0x06])), .zip)
+        #expect(ContainerKind(of: bytes([0x50, 0x4B, 0x05, 0x06])) == .zip)
     }
 
-    func testACompoundFileIsAnEncryptedWorkbook() {
+    @Test func aCompoundFileIsAnEncryptedWorkbook() {
         // The OLE2/CFB signature. An ECMA-376 encrypted .xlsx is a compound file whose
         // streams hold the encrypted package — not a ZIP at all, which is exactly why a
         // ZIP reader reports damage.
-        XCTAssertEqual(ContainerKind(of: bytes([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])),
-                       .compoundFile)
+        #expect(ContainerKind(of: bytes([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])) == .compoundFile)
     }
 
-    func testPlainTextIsNotAWorkbookAtAll() {
+    @Test func plainTextIsNotAWorkbookAtAll() {
         // Observed: a 719-byte memo saved with an .xlsx extension.
         let memo = Data("Hypothesis: Trailers will increase viewer interest".utf8)
-        XCTAssertEqual(ContainerKind(of: memo), .unrecognised)
+        #expect(ContainerKind(of: memo) == .unrecognised)
     }
 
-    func testGenuinelyCorruptBytesAreUnrecognised() {
+    @Test func genuinelyCorruptBytesAreUnrecognised() {
         // Observed: 2.4MB of high-entropy data with no ZIP header anywhere in it.
-        XCTAssertEqual(ContainerKind(of: bytes([0x45, 0xE7, 0x1E, 0x8A, 0xF7, 0x9D, 0x7E, 0xBA])),
-                       .unrecognised)
+        #expect(ContainerKind(of: bytes([0x45, 0xE7, 0x1E, 0x8A, 0xF7, 0x9D, 0x7E, 0xBA])) == .unrecognised)
     }
 
-    func testAFileTooShortToHaveASignatureIsUnrecognised() {
+    @Test func aFileTooShortToHaveASignatureIsUnrecognised() {
         // Guarding the prefix read: a two-byte file must not index past its own end.
-        XCTAssertEqual(ContainerKind(of: Data([0x50, 0x4B])), .unrecognised)
-        XCTAssertEqual(ContainerKind(of: Data()), .unrecognised)
+        #expect(ContainerKind(of: Data([0x50, 0x4B])) == .unrecognised)
+        #expect(ContainerKind(of: Data()) == .unrecognised)
     }
 
-    func testAZipSignatureMustBeAtTheStart() {
+    @Test func aZipSignatureMustBeAtTheStart() {
         // A ZIP header found later in the file does not make the file a ZIP; it makes it
         // something with a ZIP inside it, which is not a workbook a reader can open.
-        XCTAssertEqual(ContainerKind(of: bytes([0x00, 0x00, 0x50, 0x4B, 0x03, 0x04])),
-                       .unrecognised)
+        #expect(ContainerKind(of: bytes([0x00, 0x00, 0x50, 0x4B, 0x03, 0x04])) == .unrecognised)
     }
 
     /// The kind has to say whether it is worth asking for a password.
-    func testOnlyACompoundFileInvitesAPassword() {
-        XCTAssertTrue(ContainerKind.compoundFile.mayBeEncrypted)
-        XCTAssertFalse(ContainerKind.zip.mayBeEncrypted)
-        XCTAssertFalse(ContainerKind.unrecognised.mayBeEncrypted)
+    @Test func onlyACompoundFileInvitesAPassword() {
+        #expect(ContainerKind.compoundFile.mayBeEncrypted)
+        #expect(!ContainerKind.zip.mayBeEncrypted)
+        #expect(!ContainerKind.unrecognised.mayBeEncrypted)
     }
 }

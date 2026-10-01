@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -23,70 +24,68 @@ import SwiftExcelCore
 ///
 /// The remaining cases below extend those rules rather than re-testing them, and are not
 /// separately measured.
-final class BahtTextTests: XCTestCase {
+@Suite struct BahtTextTests {
 
     private func fn() throws -> ExcelFunction {
-        try XCTUnwrap(FunctionRegistry.builtin.function(named: "BAHTTEXT"),
-                      "BAHTTEXT is not registered")
+        try #require(FunctionRegistry.builtin.function(named: "BAHTTEXT"), "BAHTTEXT is not registered")
     }
 
-    private func baht(_ value: Double, line: UInt = #line) throws -> String {
+    private func baht(_ value: Double, sourceLocation: SourceLocation = #_sourceLocation) throws -> String {
         let result = try fn().evaluate([.number(value)])
         guard case .text(let text) = result else {
-            XCTFail("BAHTTEXT(\(value)) returned \(result)", line: line)
-            throw XCTSkip("not text")
+            Issue.record("BAHTTEXT(\(value)) returned \(result)")
+            throw TestFailure("not text")
         }
         return text
     }
 
     // MARK: - The plain cases
 
-    func testZero() throws {
-        XCTAssertEqual(try baht(0), "ศูนย์บาทถ้วน")
+    @Test func zero() throws {
+        #expect(try baht(0) == "ศูนย์บาทถ้วน")
     }
 
-    func testOne() throws {
-        XCTAssertEqual(try baht(1), "หนึ่งบาทถ้วน")
+    @Test func one() throws {
+        #expect(try baht(1) == "หนึ่งบาทถ้วน")
     }
 
-    func testHundred() throws {
-        XCTAssertEqual(try baht(100), "หนึ่งร้อยบาทถ้วน")
+    @Test func hundred() throws {
+        #expect(try baht(100) == "หนึ่งร้อยบาทถ้วน")
     }
 
     // MARK: - The four irregular rules
 
     /// A units `1` following a higher digit is **เอ็ด**, not หนึ่ง.
-    func testUnitsOneAfterATenIsEt() throws {
-        XCTAssertEqual(try baht(11), "สิบเอ็ดบาทถ้วน")
+    @Test func unitsOneAfterATenIsEt() throws {
+        #expect(try baht(11) == "สิบเอ็ดบาทถ้วน")
     }
 
     /// A tens `1` is bare **สิบ** — there is no หนึ่ง in front of it.
-    func testTensOneHasNoLeadingOne() throws {
-        XCTAssertEqual(try baht(10), "สิบบาทถ้วน")
+    @Test func tensOneHasNoLeadingOne() throws {
+        #expect(try baht(10) == "สิบบาทถ้วน")
     }
 
     /// A tens `2` is **ยี่สิบ**, not สองสิบ.
-    func testTensTwoIsIrregular() throws {
-        XCTAssertEqual(try baht(20), "ยี่สิบบาทถ้วน")
+    @Test func tensTwoIsIrregular() throws {
+        #expect(try baht(20) == "ยี่สิบบาทถ้วน")
     }
 
     /// Both irregulars at once.
-    func testTwentyOneCombinesBothIrregulars() throws {
-        XCTAssertEqual(try baht(21), "ยี่สิบเอ็ดบาทถ้วน")
+    @Test func twentyOneCombinesBothIrregulars() throws {
+        #expect(try baht(21) == "ยี่สิบเอ็ดบาทถ้วน")
     }
 
     // MARK: - Satang
 
     /// **ถ้วน replaces the satang clause rather than joining it**, so a whole amount never
     /// says "zero satang".
-    func testWholeAmountsSayExactly() throws {
-        XCTAssertTrue(try baht(5).hasSuffix("ถ้วน"))
-        XCTAssertFalse(try baht(5).contains("สตางค์"))
+    @Test func wholeAmountsSayExactly() throws {
+        #expect(try baht(5).hasSuffix("ถ้วน"))
+        #expect(try !baht(5).contains("สตางค์"))
     }
 
-    func testSatangAreSpelledOut() throws {
-        XCTAssertEqual(try baht(1234.56),
-                       "หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์")
+    @Test func satangAreSpelledOut() throws {
+        #expect(try baht(1234.56) == "หนึ่งพันสองร้อยสามสิบสี่บาทห้าสิบหกสตางค์")
     }
 
     /// Rounding is to the satang, before any spelling happens — a third of a satang has no
@@ -99,39 +98,39 @@ final class BahtTextTests: XCTestCase {
     /// than the code — it encoded an assumption about decimal rounding that binary
     /// arithmetic does not honour. These two values are unambiguous either side of the
     /// boundary.
-    func testRoundsToTheSatang() throws {
-        XCTAssertEqual(try baht(1.0049), "หนึ่งบาทถ้วน")
-        XCTAssertEqual(try baht(1.0051), "หนึ่งบาทหนึ่งสตางค์")
+    @Test func roundsToTheSatang() throws {
+        #expect(try baht(1.0049) == "หนึ่งบาทถ้วน")
+        #expect(try baht(1.0051) == "หนึ่งบาทหนึ่งสตางค์")
     }
 
     // MARK: - Sign
 
-    func testNegativeTakesLop() throws {
-        XCTAssertEqual(try baht(-5), "ลบห้าบาทถ้วน")
+    @Test func negativeTakesLop() throws {
+        #expect(try baht(-5) == "ลบห้าบาทถ้วน")
     }
 
     // MARK: - Structure at scale
 
     /// Thai counts in millions rather than naming a place above แสน, so a seven-digit value
     /// must contain ล้าน. A structural assertion, not a spelling one.
-    func testMillionsUseLan() throws {
-        XCTAssertTrue(try baht(2_000_000).contains("ล้าน"))
+    @Test func millionsUseLan() throws {
+        #expect(try baht(2_000_000).contains("ล้าน"))
     }
 
     /// Every answer is baht, whatever else it says.
-    func testEveryAnswerNamesTheCurrency() throws {
+    @Test func everyAnswerNamesTheCurrency() throws {
         for value in [0.0, 1, 19, 20, 999, 1_000_000, -3.25] {
-            XCTAssertTrue(try baht(value).contains("บาท"), "\(value)")
+            #expect(try baht(value).contains("บาท"), "\(value)")
         }
     }
 
     // MARK: - Arguments
 
-    func testErrorPropagates() throws {
-        XCTAssertEqual(try fn().evaluate([.error(.div0)]), .error(.div0))
+    @Test func errorPropagates() throws {
+        #expect(try fn().evaluate([.error(.div0)]) == .error(.div0))
     }
 
-    func testTextIsValue() throws {
-        XCTAssertEqual(try fn().evaluate([.text("x")]), .error(.value))
+    @Test func textIsValue() throws {
+        #expect(try fn().evaluate([.text("x")]) == .error(.value))
     }
 }

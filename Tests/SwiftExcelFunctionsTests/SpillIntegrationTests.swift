@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 // The other half of the seam. Evaluation lives here and produces an assignment;
@@ -10,7 +11,7 @@ import SwiftXLSX
 ///
 /// Each package's own tests cover its half. These cover that the halves meet,
 /// which is the part that has no owner and so is the part that rots.
-final class SpillIntegrationTests: XCTestCase {
+@Suite struct SpillIntegrationTests {
 
     /// Builds a sheet, evaluates every array formula on it, and writes the results
     /// into the cells they fill.
@@ -27,7 +28,7 @@ final class SpillIntegrationTests: XCTestCase {
         }
     }
 
-    func testAColumnTransposedIntoARowThroughAFile() throws {
+    @Test func aColumnTransposedIntoARowThroughAFile() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Sheet1")
         sheet.write(10, to: "A1")
@@ -38,19 +39,19 @@ final class SpillIntegrationTests: XCTestCase {
         try recalculate(sheet, in: workbook)
 
         let reread = try Workbook(xlsxData: try workbook.save())
-        let reloaded = try XCTUnwrap(reread.sheets.first)
+        let reloaded = try #require(reread.sheets.first)
 
         for (ref, expected) in [("C1", 10.0), ("D1", 20.0), ("E1", 30.0)] {
             guard case .formula(_, let cached)? = reloaded.cell(at: ref) else {
-                return XCTFail("\(ref) came back as \(String(describing: reloaded.cell(at: ref)))")
+                Issue.record("\(ref) came back as \(String(describing: reloaded.cell(at: ref)))"); return
             }
-            XCTAssertEqual(cached, .number(expected), "\(ref)")
+            #expect(cached == .number(expected), "\(ref)")
         }
     }
 
     /// The anchor keeps its formula and the members keep their marker, so the file
     /// still says how the values were produced.
-    func testTheStructureSurvivesRecalculation() throws {
+    @Test func theStructureSurvivesRecalculation() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Sheet1")
         sheet.write(1, to: "A1")
@@ -60,23 +61,23 @@ final class SpillIntegrationTests: XCTestCase {
         try recalculate(sheet, in: workbook)
 
         let reread = try Workbook(xlsxData: try workbook.save())
-        let reloaded = try XCTUnwrap(reread.sheets.first)
+        let reloaded = try #require(reread.sheets.first)
 
-        guard case .function(let anchor, _) = try XCTUnwrap(reloaded.formulaAST(at: "C1")) else {
-            return XCTFail("C1 lost its formula")
+        guard case .function(let anchor, _) = try #require(reloaded.formulaAST(at: "C1")) else {
+            Issue.record("C1 lost its formula"); return
         }
-        XCTAssertEqual(anchor, "TRANSPOSE")
+        #expect(anchor == "TRANSPOSE")
         guard case .function(let marker, let args) =
-            try XCTUnwrap(reloaded.formulaAST(at: "D1")) else {
-            return XCTFail("D1 lost its marker")
+            try #require(reloaded.formulaAST(at: "D1")) else {
+            Issue.record("D1 lost its marker"); return
         }
-        XCTAssertEqual(marker, "_ARRAY")
-        XCTAssertEqual(args.first, .cellRef(CellRef("C1")))
+        #expect(marker == "_ARRAY")
+        #expect(args.first == .cellRef(CellRef("C1")))
     }
 
     /// A span wider than the result carries `#N/A` out to the file, which is what
     /// Excel shows for a mis-sized array formula.
-    func testAMisSizedSpanKeepsItsNotAvailable() throws {
+    @Test func aMisSizedSpanKeepsItsNotAvailable() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Sheet1")
         sheet.write(1, to: "A1")
@@ -86,15 +87,15 @@ final class SpillIntegrationTests: XCTestCase {
         try recalculate(sheet, in: workbook)
 
         let reread = try Workbook(xlsxData: try workbook.save())
-        let reloaded = try XCTUnwrap(reread.sheets.first)
+        let reloaded = try #require(reread.sheets.first)
         guard case .formula(_, let cached)? = reloaded.cell(at: "E1") else {
-            return XCTFail("E1 is not a formula")
+            Issue.record("E1 is not a formula"); return
         }
-        XCTAssertEqual(cached, .error(.na))
+        #expect(cached == .error(.na))
     }
 
     /// A block, so the loop is exercised on something that is not a vector.
-    func testABlockTransposedThroughAFile() throws {
+    @Test func aBlockTransposedThroughAFile() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Sheet1")
         // 1 2 3
@@ -110,7 +111,7 @@ final class SpillIntegrationTests: XCTestCase {
         try recalculate(sheet, in: workbook)
 
         let reread = try Workbook(xlsxData: try workbook.save())
-        let reloaded = try XCTUnwrap(reread.sheets.first)
+        let reloaded = try #require(reread.sheets.first)
 
         // 1 4
         // 2 5
@@ -119,9 +120,9 @@ final class SpillIntegrationTests: XCTestCase {
                                 ("E2", 2.0), ("F2", 5.0),
                                 ("E3", 3.0), ("F3", 6.0)] {
             guard case .formula(_, let cached)? = reloaded.cell(at: ref) else {
-                return XCTFail("\(ref) came back as \(String(describing: reloaded.cell(at: ref)))")
+                Issue.record("\(ref) came back as \(String(describing: reloaded.cell(at: ref)))"); return
             }
-            XCTAssertEqual(cached, .number(expected), "\(ref)")
+            #expect(cached == .number(expected), "\(ref)")
         }
     }
 }

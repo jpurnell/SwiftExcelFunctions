@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -14,7 +15,7 @@ import SwiftXLSX
 /// The fixture is the corpus's own shape. `Amazon Reporting thru 05-15-18.xlsx` renders a
 /// pivot at `M1:O253` on `W-E Nov 18`, and Excel's cached answer for
 /// `GETPIVOTDATA("Sum of # Minutes Streamed", 'W-E Nov 18'!$M$1)` is the value at `O253`.
-final class GetPivotDataTests: XCTestCase {
+@Suite struct GetPivotDataTests {
 
     /// A sheet holding a small pivot of the same shape: labels in `M`, two data columns.
     ///
@@ -68,17 +69,14 @@ final class GetPivotDataTests: XCTestCase {
     // MARK: - The shape the corpus is full of
 
     /// Two arguments: the grand total of a named data field.
-    func testTheGrandTotalOfADataField() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Minutes Streamed\", M1)"),
-                       .number(300))
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)"), .number(30),
-                       "the first data field, so the column is found by name and not position")
+    @Test func theGrandTotalOfADataField() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Minutes Streamed\", M1)") == .number(300))
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)") == .number(30), "the first data field, so the column is found by name and not position")
     }
 
     /// The second argument identifies the table and nothing else, so any cell of it serves.
-    func testAnyCellOfTheTableIdentifiesIt() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", O3)"), .number(30),
-                       "a cell in the middle of the pivot names the same table as its anchor")
+    @Test func anyCellOfTheTableIdentifiesIt() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", O3)") == .number(30), "a cell in the middle of the pivot names the same table as its anchor")
     }
 
     /// **Sheet-qualified, which is how the corpus writes it.**
@@ -87,10 +85,8 @@ final class GetPivotDataTests: XCTestCase {
     /// workbook renders a pivot at `M1` on dozens of sheets, one per week, so the sheet is
     /// what tells them apart. Matching on the address alone would answer from whichever was
     /// read first.
-    func testTheSheetIsPartOfIdentifyingTheTable() throws {
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Sum of # Minutes Streamed\", 'W-E Nov 18'!$M$1)"),
-            .number(300))
+    @Test func theSheetIsPartOfIdentifyingTheTable() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Minutes Streamed\", 'W-E Nov 18'!$M$1)") == .number(300))
 
         let elsewhere = PivotTableLayout(
             sheet: "W-E Aug 12",
@@ -98,28 +94,24 @@ final class GetPivotDataTests: XCTestCase {
             firstDataRow: 1, firstDataCol: 1,
             dataFields: ["Sum of # Streams", "Sum of # Minutes Streamed"],
             hasRowGrandTotals: true, hasColumnGrandTotals: true)
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Sum of # Streams\", 'W-E Nov 18'!$M$1)",
-                         layouts: [elsewhere]),
-            .error(.ref),
-            "the same address on another sheet is a different table, and is refused")
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", 'W-E Nov 18'!$M$1)",
+                         layouts: [elsewhere]) == .error(.ref), "the same address on another sheet is a different table, and is refused")
     }
 
     // MARK: - Refusing rather than guessing
 
-    func testACellInNoPivotIsARefError() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", A1)"), .error(.ref))
+    @Test func aCellInNoPivotIsARefError() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", A1)") == .error(.ref))
     }
 
-    func testADataFieldThatIsNotInTheTableIsARefError() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of Nothing\", M1)"), .error(.ref))
+    @Test func aDataFieldThatIsNotInTheTableIsARefError() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of Nothing\", M1)") == .error(.ref))
     }
 
     /// A provider with no pivots answers `#REF!` — which is what this package answered before
     /// any of this existed, so nothing that does not model a workbook changes behaviour.
-    func testAProviderWithoutPivotsRefuses() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)", layouts: []),
-                       .error(.ref))
+    @Test func aProviderWithoutPivotsRefuses() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)", layouts: []) == .error(.ref))
     }
 
     /// **A table with no grand total row cannot answer the two-argument form.**
@@ -127,16 +119,15 @@ final class GetPivotDataTests: XCTestCase {
     /// Measured: a pivot with `rowGrandTotals="0"` ends on an ordinary row — in the corpus,
     /// one reading `"KEY Total"`, a *subtotal*. Returning that would be a wrong number
     /// reported quietly, which is worse than refusing.
-    func testATableWithNoGrandTotalRefusesTheTwoArgumentForm() throws {
+    @Test func aTableWithNoGrandTotalRefusesTheTwoArgumentForm() throws {
         let noTotals = PivotTableLayout(
             sheet: "W-E Nov 18",
             range: CellRange(from: CellRef("M1"), to: CellRef("O4")),
             firstDataRow: 1, firstDataCol: 1,
             dataFields: ["Sum of # Streams", "Sum of # Minutes Streamed"],
             hasRowGrandTotals: false, hasColumnGrandTotals: false)
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)",
-                                    layouts: [noTotals]),
-                       .error(.ref))
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1)",
+                                    layouts: [noTotals]) == .error(.ref))
     }
 
     /// Field/item pairs are **phase two** and refused for now.
@@ -149,9 +140,7 @@ final class GetPivotDataTests: XCTestCase {
     /// They need the row labels matched against item values — in a multi-field pivot laid out
     /// hierarchically, with subtotal rows to tell apart from data rows. Refusing is honest;
     /// guessing at a row would not be.
-    func testFieldItemPairsAreRefusedForNow() throws {
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1, \"Genre\", \"Drama\")"),
-            .error(.ref))
+    @Test func fieldItemPairsAreRefusedForNow() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of # Streams\", M1, \"Genre\", \"Drama\")") == .error(.ref))
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -9,7 +10,7 @@ import SwiftXLSX
 /// every formula cell, and assigns the input indices a sampler will fill. That index
 /// assignment is the part with a contract worth pinning: it has to be stable, and it has
 /// to be per *call site* rather than per cell.
-final class ModelSurveyTests: XCTestCase {
+@Suite struct ModelSurveyTests {
 
     /// A provider backed by formula strings, parsed by the real parser.
     private struct Sheet: CellValueProvider {
@@ -40,14 +41,14 @@ final class ModelSurveyTests: XCTestCase {
 
     // MARK: - Finding the roles
 
-    func testEmptySheetSurveysToNothing() {
+    @Test func emptySheetSurveysToNothing() {
         let survey = surveyor.survey(Sheet(cells: [:]))
-        XCTAssertTrue(survey.uncertain.isEmpty)
-        XCTAssertTrue(survey.outputs.isEmpty)
-        XCTAssertFalse(survey.isSimulable)
+        #expect(survey.uncertain.isEmpty)
+        #expect(survey.outputs.isEmpty)
+        #expect(!survey.isSimulable)
     }
 
-    func testUncertainCellsAndOutputsAreFound() throws {
+    @Test func uncertainCellsAndOutputsAreFound() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(100, 10)",
             "B2": "PsiTriangular(5, 7, 12)",
@@ -55,32 +56,32 @@ final class ModelSurveyTests: XCTestCase {
             "B4": "B3+_xll.PsiOutput()"
         ]))
 
-        XCTAssertEqual(survey.uncertain.count, 2)
-        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
-        XCTAssertTrue(survey.isSimulable)
+        #expect(survey.uncertain.count == 2)
+        #expect(survey.outputs == [CellAddress(sheet: "", ref: "B4")])
+        #expect(survey.isSimulable)
     }
 
     /// A cell holding a literal is not a formula and carries no role.
-    func testLiteralCellsAreIgnored() throws {
+    @Test func literalCellsAreIgnored() throws {
         var sheet = try Sheet(["B1": "PsiNormal(0, 1)"])
         sheet.cells[CellRef("D1")] = .number(250)
         sheet.cells[CellRef("D2")] = .text("Revenue")
 
         let survey = surveyor.survey(sheet)
-        XCTAssertEqual(survey.uncertain.count, 1)
+        #expect(survey.uncertain.count == 1)
     }
 
     // MARK: - Input indices
 
     /// Indices must be contiguous from zero, because they address positions in the
     /// `[Double]` the sampler hands to a compiled model.
-    func testInputIndicesAreContiguousFromZero() throws {
+    @Test func inputIndicesAreContiguousFromZero() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(0, 1)",
             "B2": "PsiUniform(0, 1)",
             "B3": "PsiPoisson(4)"
         ]))
-        XCTAssertEqual(survey.uncertain.map(\.inputIndex).sorted(), [0, 1, 2])
+        #expect(survey.uncertain.map(\.inputIndex).sorted() == [0, 1, 2])
     }
 
     /// **The call-site contract, at sheet scope.**
@@ -88,19 +89,19 @@ final class ModelSurveyTests: XCTestCase {
     /// Two draws in one cell need two uniforms. If the surveyor assigned one index per
     /// *cell*, the two would share a draw and become perfectly correlated — a wrong
     /// answer that reads as plausible.
-    func testTwoDrawsInOneCellGetTwoIndices() throws {
+    @Test func twoDrawsInOneCellGetTwoIndices() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(0, 1) + PsiNormal(0, 1)"
         ]))
-        XCTAssertEqual(survey.uncertain.count, 2)
-        XCTAssertEqual(Set(survey.uncertain.map(\.inputIndex)), [0, 1])
-        XCTAssertEqual(Set(survey.uncertain.map(\.address)), [CellAddress(sheet: "", ref: "B1")])
+        #expect(survey.uncertain.count == 2)
+        #expect(Set(survey.uncertain.map(\.inputIndex)) == [0, 1])
+        #expect(Set(survey.uncertain.map(\.address)) == [CellAddress(sheet: "", ref: "B1")])
     }
 
     /// A survey run twice on the same sheet must assign the same indices, or a seeded
     /// run stops being reproducible across processes — dictionary ordering is not stable
     /// between launches, so the surveyor cannot inherit it.
-    func testIndexAssignmentIsDeterministic() throws {
+    @Test func indexAssignmentIsDeterministic() throws {
         let formulas = [
             "Z9": "PsiNormal(0, 1)",
             "A1": "PsiUniform(0, 1)",
@@ -109,46 +110,46 @@ final class ModelSurveyTests: XCTestCase {
         let first = surveyor.survey(try Sheet(formulas))
         let second = surveyor.survey(try Sheet(formulas))
 
-        XCTAssertEqual(first.uncertain.map(\.address), second.uncertain.map(\.address))
-        XCTAssertEqual(first.uncertain.map(\.inputIndex), second.uncertain.map(\.inputIndex))
+        #expect(first.uncertain.map(\.address) == second.uncertain.map(\.address))
+        #expect(first.uncertain.map(\.inputIndex) == second.uncertain.map(\.inputIndex))
     }
 
     /// Reading order, so a person looking at the sheet and a person reading the input
     /// vector are looking at the same sequence.
-    func testIndicesFollowRowThenColumnOrder() throws {
+    @Test func indicesFollowRowThenColumnOrder() throws {
         let survey = surveyor.survey(try Sheet([
             "B2": "PsiNormal(0, 1)",
             "A1": "PsiUniform(0, 1)",
             "B1": "PsiPoisson(4)"
         ]))
-        XCTAssertEqual(survey.uncertain.map(\.address), [CellAddress(sheet: "", ref: "A1"), CellAddress(sheet: "", ref: "B1"), CellAddress(sheet: "", ref: "B2")])
+        #expect(survey.uncertain.map(\.address) == [CellAddress(sheet: "", ref: "A1"), CellAddress(sheet: "", ref: "B1"), CellAddress(sheet: "", ref: "B2")])
     }
 
     // MARK: - Refusing to simulate what it cannot
 
     /// A model carrying a property function nobody has modelled is reported, with the
     /// cell named. §5.1 of the proposal: refuse rather than approximate.
-    func testUnhandledPropertiesAreReportedWithTheirCell() throws {
+    @Test func unhandledPropertiesAreReportedWithTheirCell() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(100, 10, PsiCorrIndep(1))"
         ]))
-        XCTAssertEqual(survey.unhandledProperties[CellAddress(sheet: "", ref: "B1")], ["PSICORRINDEP"])
-        XCTAssertFalse(survey.isFullyModelled)
+        #expect(survey.unhandledProperties[CellAddress(sheet: "", ref: "B1")] == ["PSICORRINDEP"])
+        #expect(!survey.isFullyModelled)
     }
 
     /// Draws with no marker are still simulable — the marker is Frontline's convention,
     /// not a precondition. What the model does not say is which cells to collect.
-    func testDistributionsWithoutAnOutputMarkerAreStillSimulable() throws {
+    @Test func distributionsWithoutAnOutputMarkerAreStillSimulable() throws {
         let survey = surveyor.survey(try Sheet(["B1": "PsiNormal(0, 1)"]))
-        XCTAssertTrue(survey.isSimulable)
-        XCTAssertFalse(survey.declaresItsOwnOutputs)
+        #expect(survey.isSimulable)
+        #expect(!survey.declaresItsOwnOutputs)
     }
 
     /// An output with nothing uncertain feeding it is a constant, not a simulation.
-    func testOutputWithoutUncertaintyIsNotSimulable() throws {
+    @Test func outputWithoutUncertaintyIsNotSimulable() throws {
         let survey = surveyor.survey(try Sheet(["B4": "SUM(A1:A3)+PsiOutput()"]))
-        XCTAssertFalse(survey.isSimulable)
-        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
+        #expect(!survey.isSimulable)
+        #expect(survey.outputs == [CellAddress(sheet: "", ref: "B4")])
     }
 
     /// **A cell asked about is an output.**
@@ -156,24 +157,24 @@ final class ModelSurveyTests: XCTestCase {
     /// `PsiMean(B4)` declares `B4` collected without any marker on `B4` itself. A real
     /// 126-call workbook does exactly this and carries no `PsiOutput()` at all, so
     /// requiring the marker rejected it outright.
-    func testACellNamedByAStatisticIsAnOutput() throws {
+    @Test func aCellNamedByAStatisticIsAnOutput() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(0, 1)",
             "B4": "B1*2",
             "D1": "PsiMean(B4)"
         ]))
-        XCTAssertTrue(survey.isSimulable)
-        XCTAssertTrue(survey.declaresItsOwnOutputs)
-        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
+        #expect(survey.isSimulable)
+        #expect(survey.declaresItsOwnOutputs)
+        #expect(survey.outputs == [CellAddress(sheet: "", ref: "B4")])
     }
 
     /// A marker and a statistic naming the same cell is one output, not two.
-    func testAMarkedCellAlsoAskedAboutIsNotCountedTwice() throws {
+    @Test func aMarkedCellAlsoAskedAboutIsNotCountedTwice() throws {
         let survey = surveyor.survey(try Sheet([
             "B1": "PsiNormal(0, 1)",
             "B4": "B1+PsiOutput()",
             "D1": "PsiMean(B4)"
         ]))
-        XCTAssertEqual(survey.outputs, [CellAddress(sheet: "", ref: "B4")])
+        #expect(survey.outputs == [CellAddress(sheet: "", ref: "B4")])
     }
 }

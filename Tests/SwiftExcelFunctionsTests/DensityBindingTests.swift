@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import BusinessMath
@@ -33,18 +34,17 @@ import BusinessMath
 /// These assertions pass **before** the rebinding as well as after. That is the point: they
 /// are a characterisation of behaviour that must not change, written while the hand-rolled
 /// formulas are still in place, so "still green" afterwards means something.
-final class DensityBindingTests: XCTestCase {
+@Suite struct DensityBindingTests {
 
     private func evaluate(_ name: String, _ args: [CellValue]) throws -> CellValue {
-        let fn = try XCTUnwrap(FunctionRegistry.builtin.function(named: name),
-                               "\(name) is not registered")
+        let fn = try #require(FunctionRegistry.builtin.function(named: name), "\(name) is not registered")
         return try fn.evaluate(args)
     }
 
     private func number(_ name: String, _ args: [CellValue]) throws -> Double {
         let value = try evaluate(name, args)
         guard case .number(let d) = value else {
-            XCTFail("\(name)\(args) gave \(value), expected a number")
+            Issue.record("\(name)\(args) gave \(value), expected a number")
             return .nan
         }
         return d
@@ -93,7 +93,7 @@ final class DensityBindingTests: XCTestCase {
     ]
 
     /// **The check that matters.** Each density is the slope of its own cumulative branch.
-    func testEachDensityIsTheDerivativeOfItsOwnCumulative() throws {
+    @Test func eachDensityIsTheDerivativeOfItsOwnCumulative() throws {
         for subject in Self.subjects {
             // `BETA.DIST on [2, 10]` is a label, not a function name.
             let function = String(subject.name.split(separator: " ")[0])
@@ -104,8 +104,7 @@ final class DensityBindingTests: XCTestCase {
                 let slope = (upper - lower) / (2 * h)
                 let density = try number(function, subject.arguments(x, false))
                 let tolerance = Swift.max(1e-6, Swift.abs(slope) * 1e-4)
-                XCTAssertEqual(density, slope, accuracy: tolerance,
-                               "\(subject.name) at \(x): density \(density), slope \(slope)")
+                #expect(abs(density - slope) <= tolerance, "\(subject.name) at \(x): density \(density), slope \(slope)")
             }
         }
     }
@@ -115,7 +114,7 @@ final class DensityBindingTests: XCTestCase {
     /// Catches a missing Jacobian that the derivative check cannot: a density uniformly
     /// scaled by a constant is still proportional to the CDF's slope only if the CDF is
     /// scaled too, and these two halves are computed by different code.
-    func testEachDensityIntegratesToOne() throws {
+    @Test func eachDensityIntegratesToOne() throws {
         let ranges: [(String, @Sendable (Double, Bool) -> [CellValue], Double, Double)] = [
             ("EXPON.DIST", { x, c in [.number(x), .number(1.5), .bool(c)] }, 0, 40),
             ("GAMMA.DIST", { x, c in [.number(x), .number(3), .number(2), .bool(c)] }, 0, 80),
@@ -131,7 +130,7 @@ final class DensityBindingTests: XCTestCase {
                 let x = lower + Double(step) * h
                 total += (try number(name, arguments(x, false))) * (step % 2 == 0 ? 2 : 4)
             }
-            XCTAssertEqual(total * h / 3, 1, accuracy: 2e-3, "\(name) did not integrate to one")
+            #expect(abs((total * h / 3) - 1) <= 2e-3, "\(name) did not integrate to one")
         }
     }
 
@@ -166,7 +165,7 @@ final class DensityBindingTests: XCTestCase {
     /// package for years and one by the guess that was meant to fix it: `WEIBULL.DIST`'s
     /// unbounded point was changed from `+∞` to `#NUM!` by analogy with `CHISQ.DIST`, and
     /// the answer is 0.
-    func testEveryDensityBoundaryIsWhatExcelAnswered() throws {
+    @Test func everyDensityBoundaryIsWhatExcelAnswered() throws {
         // (formula for the record, arguments, Excel's answer)
         let measured: [(String, [CellValue], CellValue)] = [
             ("F.DIST(0, 1, 5, FALSE)",
@@ -229,10 +228,9 @@ final class DensityBindingTests: XCTestCase {
             let ours = try evaluate(name, arguments)
             switch (excel, ours) {
             case (.number(let expected), .number(let actual)):
-                XCTAssertEqual(actual, expected, accuracy: 1e-12,
-                               "\(formula): Excel says \(expected), we say \(actual)")
+                #expect(abs(actual - expected) <= 1e-12, "\(formula): Excel says \(expected), we say \(actual)")
             default:
-                XCTAssertEqual(ours, excel, "\(formula): Excel says \(excel), we say \(ours)")
+                #expect(ours == excel, "\(formula): Excel says \(excel), we say \(ours)")
             }
         }
     }
@@ -243,49 +241,42 @@ final class DensityBindingTests: XCTestCase {
     /// infinity, and the value reaches `sheet.write(_:to:)` in any workbook this evaluator
     /// feeds — SwiftXLSX has already killed a corpus run once on a value it could not
     /// represent. `GAMMA.DIST` and `WEIBULL.DIST` both returned `+∞` here until round eight.
-    func testNoDensityIsEverNonFinite() throws {
+    @Test func noDensityIsEverNonFinite() throws {
         for shape in [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0] {
             for x in [0.0, 1e-300, 0.5, 4.0] {
                 for name in ["GAMMA.DIST", "WEIBULL.DIST"] {
                     let answer = try evaluate(name, [.number(x), .number(shape), .number(2),
                                                      .bool(false)])
                     if case .number(let d) = answer {
-                        XCTAssertTrue(d.isFinite, "\(name)(\(x), \(shape), 2) gave \(d)")
+                        #expect(d.isFinite, "\(name)(\(x), \(shape), 2) gave \(d)")
                     }
                 }
                 let beta = try evaluate("BETA.DIST", [.number(Swift.min(x, 1)), .number(shape),
                                                       .number(5), .bool(false)])
                 if case .number(let d) = beta {
-                    XCTAssertTrue(d.isFinite, "BETA.DIST at shape \(shape) gave \(d)")
+                    #expect(d.isFinite, "BETA.DIST at shape \(shape) gave \(d)")
                 }
             }
         }
     }
 
     /// Outside the support, and outside the parameters' domain.
-    func testDomainsAreRefused() throws {
-        XCTAssertEqual(try evaluate("EXPON.DIST", [.number(-1), .number(1.5), .bool(false)]),
-                       .error(.num))
-        XCTAssertEqual(try evaluate("EXPON.DIST", [.number(1), .number(0), .bool(false)]),
-                       .error(.num), "a rate of zero describes nothing")
-        XCTAssertEqual(try evaluate("LOGNORM.DIST",
-                                    [.number(0), .number(0.4), .number(0.6), .bool(false)]),
-                       .error(.num), "the log-normal is defined for x > 0 only")
-        XCTAssertEqual(try evaluate("WEIBULL.DIST",
-                                    [.number(-1), .number(2), .number(3), .bool(false)]),
-                       .error(.num))
-        XCTAssertEqual(try evaluate("CHISQ.DIST", [.number(-1), .number(5), .bool(false)]),
-                       .error(.num))
+    @Test func domainsAreRefused() throws {
+        #expect(try evaluate("EXPON.DIST", [.number(-1), .number(1.5), .bool(false)]) == .error(.num))
+        #expect(try evaluate("EXPON.DIST", [.number(1), .number(0), .bool(false)]) == .error(.num), "a rate of zero describes nothing")
+        #expect(try evaluate("LOGNORM.DIST",
+                                    [.number(0), .number(0.4), .number(0.6), .bool(false)]) == .error(.num), "the log-normal is defined for x > 0 only")
+        #expect(try evaluate("WEIBULL.DIST",
+                                    [.number(-1), .number(2), .number(3), .bool(false)]) == .error(.num))
+        #expect(try evaluate("CHISQ.DIST", [.number(-1), .number(5), .bool(false)]) == .error(.num))
         // Outside `[A, B]` altogether is refused; the endpoints themselves follow the
         // measured rule in `testEveryDensityBoundaryIsWhatExcelAnswered`.
-        XCTAssertEqual(try evaluate("BETA.DIST",
+        #expect(try evaluate("BETA.DIST",
                                     [.number(1), .number(2), .number(5), .bool(false),
-                                     .number(2), .number(10)]),
-                       .error(.num), "below A is outside the support")
-        XCTAssertEqual(try evaluate("BETA.DIST",
+                                     .number(2), .number(10)]) == .error(.num), "below A is outside the support")
+        #expect(try evaluate("BETA.DIST",
                                     [.number(12), .number(2), .number(5), .bool(false),
-                                     .number(2), .number(10)]),
-                       .error(.num), "above B is outside the support")
+                                     .number(2), .number(10)]) == .error(.num), "above B is outside the support")
     }
 
     /// `A` and `B` scale the density down by the width, and leave the cumulative alone.
@@ -293,7 +284,7 @@ final class DensityBindingTests: XCTestCase {
     /// The single most likely rebinding defect, and the cheapest to state: the same shape on
     /// a range of 8 has a density one eighth the size at the corresponding point, while the
     /// probability below that point is unchanged.
-    func testTheBetaBoundsCarryAJacobian() throws {
+    @Test func theBetaBoundsCarryAJacobian() throws {
         let width = 8.0
         for unit in [0.15, 0.4, 0.7] {
             let scaled = 2 + unit * width
@@ -302,16 +293,14 @@ final class DensityBindingTests: XCTestCase {
             let onRange = try number("BETA.DIST",
                                      [.number(scaled), .number(2), .number(5), .bool(false),
                                       .number(2), .number(10)])
-            XCTAssertEqual(onRange, onUnit / width, accuracy: 1e-12,
-                           "the density must carry the change of variable")
+            #expect(abs(onRange - (onUnit / width)) <= 1e-12, "the density must carry the change of variable")
 
             let cumulativeOnUnit = try number("BETA.DIST",
                                               [.number(unit), .number(2), .number(5), .bool(true)])
             let cumulativeOnRange = try number("BETA.DIST",
                                                [.number(scaled), .number(2), .number(5),
                                                 .bool(true), .number(2), .number(10)])
-            XCTAssertEqual(cumulativeOnRange, cumulativeOnUnit, accuracy: 1e-12,
-                           "a probability is a probability on any scale")
+            #expect(abs(cumulativeOnRange - cumulativeOnUnit) <= 1e-12, "a probability is a probability on any scale")
         }
     }
 }

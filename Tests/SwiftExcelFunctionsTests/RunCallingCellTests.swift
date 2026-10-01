@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -15,7 +16,7 @@ import SwiftXLSX
 ///
 /// It compounded the argument gap rather than causing it: closing that seam changed nothing
 /// here until the cell was passed, because there was still no position to intersect against.
-final class RunCallingCellTests: XCTestCase {
+@Suite struct RunCallingCellTests {
 
     /// A sheet using the idiom the lookup family is written with: a column of keys, and a
     /// formula per row whose lookup value is the whole column, meaning its own row.
@@ -50,18 +51,18 @@ final class RunCallingCellTests: XCTestCase {
 
     /// **The whole point.** `D2` looks up `A2`, so it is 20 — and was `#N/A` while the run
     /// evaluated it from nowhere.
-    func testARunIntersectsAgainstTheCellBeingEvaluated() throws {
+    @Test func aRunIntersectsAgainstTheCellBeingEvaluated() throws {
         let cells = try book()
         let run = try InterpretedRun.run(
             survey: ModelSurveyor().survey(cells), over: cells, names: NoNames(),
             inSheet: "Sheet1", trials: 1, seed: 1)
-        let results = try XCTUnwrap(run.results(for: CellRef("D2")))
-        XCTAssertEqual(results.values, [20], "row 2 of the table")
+        let results = try #require(run.results(for: CellRef("D2")))
+        #expect(results.values == [20], "row 2 of the table")
     }
 
     /// The parallel engine is the same evaluator and must not disagree with the interpreted
     /// one — two engines that answer differently is worse than one that answers wrongly.
-    func testTheParallelEngineAgrees() async throws {
+    @Test func theParallelEngineAgrees() async throws {
         let cells = try book()
         let survey = ModelSurveyor().survey(cells)
         let order = DependencyGraph(
@@ -73,8 +74,7 @@ final class RunCallingCellTests: XCTestCase {
         let engine = InterpretedRun(survey: survey, evaluationOrder: order, trials: 4, seed: 1,
                                     inSheet: "Sheet1")
         let run = try await engine.runConcurrently(over: cells, names: NoNames())
-        let results = try XCTUnwrap(
-            run.results(for: CellAddress(sheet: "Sheet1", ref: "D2")))
-        XCTAssertEqual(results.values, [20, 20, 20, 20])
+        let results = try #require(run.results(for: CellAddress(sheet: "Sheet1", ref: "D2")))
+        #expect(results.values == [20, 20, 20, 20])
     }
 }

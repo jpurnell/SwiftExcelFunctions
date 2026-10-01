@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -27,7 +28,7 @@ import SwiftXLSX
 /// `-4`, and `(-4)^0.5` stays `#NUM!`. The test is on the exponent's reciprocal, which has to
 /// be an odd integer — and `1/5` is not exactly representable in binary, so `1/0.2` comes back
 /// as `4.999999999999999` and the comparison needs a tolerance rather than an equality.
-final class NegativeBaseRootTests: XCTestCase {
+@Suite struct NegativeBaseRootTests {
 
     private struct NoCells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -52,41 +53,40 @@ final class NegativeBaseRootTests: XCTestCase {
     }
 
     /// **The corpus cell, to the digit.**
-    func testTheCorpusCagr() throws {
-        let ours = try number("(22.454110930290827/-319)^(1/5)-1")
-        XCTAssertNotNil(ours, "Excel has a number here, not #NUM!")
-        XCTAssertEqual(try XCTUnwrap(ours), -1.5881675174209027, accuracy: 1e-12)
+    @Test func theCorpusCagr() throws {
+        let ours = try #require(try number("(22.454110930290827/-319)^(1/5)-1"),
+                                "Excel has a number here, not #NUM!")
+        #expect(ours.isClose(to: -1.5881675174209027, within: 1e-12))
     }
 
-    func testOddRootsOfNegativesAreReal() throws {
-        XCTAssertEqual(try XCTUnwrap(number("(-8)^(1/3)")), -2, accuracy: 1e-12)
-        XCTAssertEqual(try XCTUnwrap(number("(-32)^(1/5)")), -2, accuracy: 1e-12)
-        XCTAssertEqual(try XCTUnwrap(number("(-1)^(1/7)")), -1, accuracy: 1e-12)
+    @Test func oddRootsOfNegativesAreReal() throws {
+        #expect(try abs(#require(try number("(-8)^(1/3)")) - -2) <= 1e-12)
+        #expect(try abs(#require(try number("(-32)^(1/5)")) - -2) <= 1e-12)
+        #expect(try abs(#require(try number("(-1)^(1/7)")) - -1) <= 1e-12)
     }
 
     /// **An even root of a negative has no real value** and stays `#NUM!`.
-    func testEvenRootsOfNegativesStayNum() throws {
-        XCTAssertEqual(try evaluate("(-4)^(1/2)"), .error(.num))
-        XCTAssertEqual(try evaluate("(-16)^(1/4)"), .error(.num))
+    @Test func evenRootsOfNegativesStayNum() throws {
+        #expect(try evaluate("(-4)^(1/2)") == .error(.num))
+        #expect(try evaluate("(-16)^(1/4)") == .error(.num))
     }
 
     /// Nor does an exponent that is not a reciprocal integer become one.
-    func testAnArbitraryFractionalExponentStaysNum() throws {
-        XCTAssertEqual(try evaluate("(-8)^0.7"), .error(.num))
-        XCTAssertEqual(try evaluate("(-8)^(2/3)"), .error(.num),
-                       "a real value exists but Excel does not compute it, and neither do we")
+    @Test func anArbitraryFractionalExponentStaysNum() throws {
+        #expect(try evaluate("(-8)^0.7") == .error(.num))
+        #expect(try evaluate("(-8)^(2/3)") == .error(.num), "a real value exists but Excel does not compute it, and neither do we")
     }
 
     /// Integer exponents and positive bases are untouched.
-    func testTheOrdinaryCasesAreUnchanged() throws {
-        XCTAssertEqual(try XCTUnwrap(number("(-2)^3")), -8, accuracy: 1e-12)
-        XCTAssertEqual(try XCTUnwrap(number("(-2)^2")), 4, accuracy: 1e-12)
-        XCTAssertEqual(try XCTUnwrap(number("8^(1/3)")), 2, accuracy: 1e-12)
-        XCTAssertEqual(try XCTUnwrap(number("0^3")), 0, accuracy: 1e-12)
+    @Test func theOrdinaryCasesAreUnchanged() throws {
+        #expect(try abs(#require(try number("(-2)^3")) - -8) <= 1e-12)
+        #expect(try abs(#require(try number("(-2)^2")) - 4) <= 1e-12)
+        #expect(try abs(#require(try number("8^(1/3)")) - 2) <= 1e-12)
+        #expect(try abs(#require(try number("0^3")) - 0) <= 1e-12)
     }
 
     /// `POWER` is the same operator spelled differently and answers the same.
-    func testPowerAgrees() throws {
-        XCTAssertEqual(try XCTUnwrap(number("POWER(-32,1/5)")), -2, accuracy: 1e-12)
+    @Test func powerAgrees() throws {
+        #expect(try abs(#require(try number("POWER(-32,1/5)")) - -2) <= 1e-12)
     }
 }

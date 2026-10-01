@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -15,7 +16,7 @@ import SwiftXLSX
 /// whole-column reference back to the used range, because reading `$B:$B` otherwise means
 /// materialising a million values. Counting positions is the one job that must not go
 /// through that clipping.
-final class ReferenceShapeTests: XCTestCase {
+@Suite struct ReferenceShapeTests {
 
     private struct Cells: CellValueProvider {
         let values: [String: CellValue]
@@ -43,7 +44,7 @@ final class ReferenceShapeTests: XCTestCase {
         let value = try FormulaEvaluator.evaluate(try FormulaParser.parse(formula),
                                                   cells: Self.populated, names: names)
         guard case .number(let d) = value else {
-            XCTFail("\(formula) gave \(value), expected a number")
+            Issue.record("\(formula) gave \(value), expected a number")
             return .nan
         }
         return d
@@ -54,29 +55,29 @@ final class ReferenceShapeTests: XCTestCase {
     private static let sheetColumns = 16_384.0
 
     /// **The defect.** A whole column is a whole column however little is in it.
-    func testAWholeColumnCountsTheWholeGrid() throws {
-        XCTAssertEqual(try number("ROWS(A:A)"), Self.sheetRows)
-        XCTAssertEqual(try number("COLUMNS(A:A)"), 1)
-        XCTAssertEqual(try number("ROWS(A:C)"), Self.sheetRows)
-        XCTAssertEqual(try number("COLUMNS(A:C)"), 3)
+    @Test func aWholeColumnCountsTheWholeGrid() throws {
+        #expect(try number("ROWS(A:A)").isEqual(to: Self.sheetRows))
+        #expect(try number("COLUMNS(A:A)").isEqual(to: 1))
+        #expect(try number("ROWS(A:C)").isEqual(to: Self.sheetRows))
+        #expect(try number("COLUMNS(A:C)").isEqual(to: 3))
     }
 
     /// The written-out form is the same reference and must give the same answer.
     ///
     /// This is what showed the clipping was the cause rather than the shorthand: both
     /// spellings answered 10.
-    func testTheWrittenOutFormAgrees() throws {
-        XCTAssertEqual(try number("ROWS($A$1:$A$1048576)"), Self.sheetRows)
-        XCTAssertEqual(try number("COLUMNS($A$1:$A$1048576)"), 1)
+    @Test func theWrittenOutFormAgrees() throws {
+        #expect(try number("ROWS($A$1:$A$1048576)").isEqual(to: Self.sheetRows))
+        #expect(try number("COLUMNS($A$1:$A$1048576)").isEqual(to: 1))
     }
 
     /// A whole row already worked, and must keep working.
     ///
     /// `CellRange.clipped(to:)` deliberately keeps a whole row at full width, for exactly the
     /// reason this type generalises. These are the controls for that decision.
-    func testAWholeRowStillCountsTheWholeGrid() throws {
-        XCTAssertEqual(try number("COLUMNS($A$1:$XFD$1)"), Self.sheetColumns)
-        XCTAssertEqual(try number("ROWS($A$1:$XFD$1)"), 1)
+    @Test func aWholeRowStillCountsTheWholeGrid() throws {
+        #expect(try number("COLUMNS($A$1:$XFD$1)").isEqual(to: Self.sheetColumns))
+        #expect(try number("ROWS($A$1:$XFD$1)").isEqual(to: 1))
     }
 
     /// The `1:1` shorthand, which could not be parsed until SwiftXLSX 0.30.0.
@@ -85,20 +86,20 @@ final class ReferenceShapeTests: XCTestCase {
     /// plain `.number` case, and `1:1` lexes as a number. So this question could not even be
     /// *written into* the conformance workbook to ask Excel, and the row was dismissed as a
     /// harness artifact for seven rounds.
-    func testTheWholeRowShorthandCounts() throws {
-        XCTAssertEqual(try number("COLUMNS(1:1)"), Self.sheetColumns)
-        XCTAssertEqual(try number("ROWS(1:1)"), 1)
-        XCTAssertEqual(try number("ROWS(2:5)"), 4)
-        XCTAssertEqual(try number("COLUMNS(2:5)"), Self.sheetColumns)
+    @Test func theWholeRowShorthandCounts() throws {
+        #expect(try number("COLUMNS(1:1)").isEqual(to: Self.sheetColumns))
+        #expect(try number("ROWS(1:1)").isEqual(to: 1))
+        #expect(try number("ROWS(2:5)").isEqual(to: 4))
+        #expect(try number("COLUMNS(2:5)").isEqual(to: Self.sheetColumns))
     }
 
     /// An ordinary bounded range is unaffected — the common case, and the regression risk.
-    func testBoundedRangesAreUnchanged() throws {
-        XCTAssertEqual(try number("ROWS(A1:A10)"), 10)
-        XCTAssertEqual(try number("COLUMNS(A1:C10)"), 3)
-        XCTAssertEqual(try number("ROWS(A1:C10)"), 10)
-        XCTAssertEqual(try number("ROWS(A1)"), 1)
-        XCTAssertEqual(try number("COLUMNS(A1)"), 1)
+    @Test func boundedRangesAreUnchanged() throws {
+        #expect(try number("ROWS(A1:A10)").isEqual(to: 10))
+        #expect(try number("COLUMNS(A1:C10)").isEqual(to: 3))
+        #expect(try number("ROWS(A1:C10)").isEqual(to: 10))
+        #expect(try number("ROWS(A1)").isEqual(to: 1))
+        #expect(try number("COLUMNS(A1)").isEqual(to: 1))
     }
 
     /// A defined name pointing at a whole column counts like one.
@@ -106,7 +107,7 @@ final class ReferenceShapeTests: XCTestCase {
     /// This is how a real model says "this column", so it is most of the value rather than an
     /// extra — the defined-name corpus found 161,901 names, and whole-column targets are
     /// ordinary among them.
-    func testANameThatPointsAtAWholeColumnCountsLikeOne() throws {
+    @Test func aNameThatPointsAtAWholeColumnCountsLikeOne() throws {
         // Built from explicit endpoints rather than `CellRange("A:A")`: that initialiser
         // splits on the colon and parses "A" as a cell reference, so the shorthand does not
         // survive it. A separate gap, and not one this type can paper over — noted here
@@ -116,8 +117,8 @@ final class ReferenceShapeTests: XCTestCase {
             "Amounts": .range(wholeColumn),
             "Window": .range(CellRange("A1:A10"))
         ])
-        XCTAssertEqual(try number("ROWS(Amounts)", names: names), Self.sheetRows)
-        XCTAssertEqual(try number("ROWS(Window)", names: names), 10)
+        #expect(try number("ROWS(Amounts)", names: names).isEqual(to: Self.sheetRows))
+        #expect(try number("ROWS(Window)", names: names).isEqual(to: 10))
     }
 
     /// An array's shape *is* its values, and must still come from them.
@@ -126,16 +127,16 @@ final class ReferenceShapeTests: XCTestCase {
     /// `{1,2,3;4,5,6}` literal did not parse — the gap that discovery led to, now closed in
     /// SwiftXLSX 0.31.0. Both spellings are kept: they exercise different paths to an array,
     /// and the literal is the one a person writes.
-    func testArraysAreStillCountedFromTheirValues() throws {
-        XCTAssertEqual(try number("ROWS({1,2,3;4,5,6})"), 2)
-        XCTAssertEqual(try number("COLUMNS({1,2,3;4,5,6})"), 3)
-        XCTAssertEqual(try number("ROWS(SEQUENCE(2,3))"), 2)
-        XCTAssertEqual(try number("COLUMNS(SEQUENCE(2,3))"), 3)
+    @Test func arraysAreStillCountedFromTheirValues() throws {
+        #expect(try number("ROWS({1,2,3;4,5,6})").isEqual(to: 2))
+        #expect(try number("COLUMNS({1,2,3;4,5,6})").isEqual(to: 3))
+        #expect(try number("ROWS(SEQUENCE(2,3))").isEqual(to: 2))
+        #expect(try number("COLUMNS(SEQUENCE(2,3))").isEqual(to: 3))
     }
 
     /// A computed reference has no shape until it is computed, and falls through.
-    func testComputedReferencesFallThrough() throws {
-        XCTAssertEqual(try number("ROWS(OFFSET(A1,0,0,4,2))"), 4)
-        XCTAssertEqual(try number("COLUMNS(OFFSET(A1,0,0,4,2))"), 2)
+    @Test func computedReferencesFallThrough() throws {
+        #expect(try number("ROWS(OFFSET(A1,0,0,4,2))").isEqual(to: 4))
+        #expect(try number("COLUMNS(OFFSET(A1,0,0,4,2))").isEqual(to: 2))
     }
 }

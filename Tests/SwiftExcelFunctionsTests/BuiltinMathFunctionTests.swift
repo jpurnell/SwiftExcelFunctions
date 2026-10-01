@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinMathFunctionTests: XCTestCase {
+@Suite struct BuiltinMathFunctionTests {
 
     // MARK: - Helpers
 
@@ -19,43 +20,14 @@ final class BuiltinMathFunctionTests: XCTestCase {
         try function(named: name).evaluate(args)
     }
 
-    /// Assert a CellValue equals a number within accuracy.
-    private func assertNumber(
-        _ result: CellValue,
-        _ expected: Double,
-        accuracy: Double = 1e-10,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .number(let value) = result else {
-            XCTFail("Expected .number(\(expected)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(value, expected, accuracy: accuracy, file: file, line: line)
-    }
 
-    /// Assert a CellValue is a specific Excel error.
-    private func assertError(
-        _ result: CellValue,
-        _ expectedError: ExcelError,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .error(let err) = result else {
-            XCTFail("Expected .error(\(expectedError)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(err, expectedError, file: file, line: line)
-    }
 
     // MARK: - Registration count
 
     /// By name rather than by count: a count says something changed without
     /// saying what, and fails identically whether a function arrived or went.
-    func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(
-            Set(BuiltinMathFunctions.all.map(\.name)),
-            ["ABS", "ROUND", "ROUNDUP", "ROUNDDOWN", "SQRT", "LN", "LOG", "EXP",
+    @Test func allContainsEveryFunctionInTheGroup() {
+        #expect(Set(BuiltinMathFunctions.all.map(\.name)) == ["ABS", "ROUND", "ROUNDUP", "ROUNDDOWN", "SQRT", "LN", "LOG", "EXP",
              "POWER", "MOD", "INT", "CEILING", "FLOOR", "SIGN", "PI",
              "RAND", "RANDBETWEEN",
              "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN", "ATAN2",
@@ -66,351 +38,351 @@ final class BuiltinMathFunctionTests: XCTestCase {
 
     // MARK: - ABS
 
-    func testABSPositive() throws {
+    @Test func absPositive() throws {
         let result = try eval("ABS", .number(5))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testABSNegative() throws {
+    @Test func absNegative() throws {
         let result = try eval("ABS", .number(-3.7))
-        assertNumber(result, 3.7)
+        #expect(result.isNumber(3.7))
     }
 
-    func testABSZero() throws {
+    @Test func absZero() throws {
         let result = try eval("ABS", .number(0))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - ROUND
 
-    func testROUNDPositiveDigits() throws {
+    @Test func roundPositiveDigits() throws {
         let result = try eval("ROUND", .number(1234.567), .number(2))
-        assertNumber(result, 1234.57)
+        #expect(result.isNumber(1234.57))
     }
 
-    func testROUNDNegativeDigits() throws {
+    @Test func roundNegativeDigits() throws {
         let result = try eval("ROUND", .number(1234), .number(-2))
-        assertNumber(result, 1200)
+        #expect(result.isNumber(1200))
     }
 
-    func testROUNDZeroDigits() throws {
+    @Test func roundZeroDigits() throws {
         let result = try eval("ROUND", .number(3.5), .number(0))
-        assertNumber(result, 4)
+        #expect(result.isNumber(4))
     }
 
     // MARK: - ROUNDUP
 
-    func testROUNDUPPositive() throws {
+    @Test func roundupPositive() throws {
         let result = try eval("ROUNDUP", .number(3.2), .number(0))
-        assertNumber(result, 4)
+        #expect(result.isNumber(4))
     }
 
-    func testROUNDUPNegative() throws {
+    @Test func roundupNegative() throws {
         let result = try eval("ROUNDUP", .number(-3.2), .number(0))
-        assertNumber(result, -4)
+        #expect(result.isNumber(-4))
     }
 
-    func testROUNDUPWithDigits() throws {
+    @Test func roundupWithDigits() throws {
         let result = try eval("ROUNDUP", .number(3.14159), .number(2))
-        assertNumber(result, 3.15)
+        #expect(result.isNumber(3.15))
     }
 
     // MARK: - ROUNDDOWN
 
-    func testROUNDDOWNPositive() throws {
+    @Test func rounddownPositive() throws {
         let result = try eval("ROUNDDOWN", .number(3.9), .number(0))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testROUNDDOWNNegative() throws {
+    @Test func rounddownNegative() throws {
         let result = try eval("ROUNDDOWN", .number(-3.9), .number(0))
-        assertNumber(result, -3)
+        #expect(result.isNumber(-3))
     }
 
-    func testROUNDDOWNWithDigits() throws {
+    @Test func rounddownWithDigits() throws {
         let result = try eval("ROUNDDOWN", .number(3.149), .number(1))
-        assertNumber(result, 3.1)
+        #expect(result.isNumber(3.1))
     }
 
     // MARK: - SQRT
 
-    func testSQRTPositive() throws {
+    @Test func sqrtPositive() throws {
         let result = try eval("SQRT", .number(25))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testSQRTZero() throws {
+    @Test func sqrtZero() throws {
         let result = try eval("SQRT", .number(0))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testSQRTNegativeReturnsNumError() throws {
+    @Test func sqrtNegativeReturnsNumError() throws {
         let result = try eval("SQRT", .number(-4))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
     // MARK: - LN
 
-    func testLNPositive() throws {
+    @Test func lnPositive() throws {
         let result = try eval("LN", .number(1))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testLNEuler() throws {
+    @Test func lnEuler() throws {
         let result = try eval("LN", .number(Darwin.M_E))
-        assertNumber(result, 1, accuracy: 1e-10)
+        #expect(result.isNumber(1, within: 1e-10))
     }
 
-    func testLNZeroReturnsNumError() throws {
+    @Test func lnZeroReturnsNumError() throws {
         let result = try eval("LN", .number(0))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
-    func testLNNegativeReturnsNumError() throws {
+    @Test func lnNegativeReturnsNumError() throws {
         let result = try eval("LN", .number(-5))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
     // MARK: - LOG
 
-    func testLOGOneArgBase10() throws {
+    @Test func logOneArgBase10() throws {
         let result = try eval("LOG", .number(100))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testLOGTwoArgsCustomBase() throws {
+    @Test func logTwoArgsCustomBase() throws {
         let result = try eval("LOG", .number(8), .number(2))
-        assertNumber(result, 3, accuracy: 1e-10)
+        #expect(result.isNumber(3, within: 1e-10))
     }
 
-    func testLOGBase10Explicit() throws {
+    @Test func logBase10Explicit() throws {
         let result = try eval("LOG", .number(1000), .number(10))
-        assertNumber(result, 3, accuracy: 1e-10)
+        #expect(result.isNumber(3, within: 1e-10))
     }
 
     // MARK: - EXP
 
-    func testEXPBasic() throws {
+    @Test func expBasic() throws {
         let result = try eval("EXP", .number(1))
-        assertNumber(result, Darwin.M_E, accuracy: 1e-10)
+        #expect(result.isNumber(Darwin.M_E, within: 1e-10))
     }
 
-    func testEXPZero() throws {
+    @Test func expZero() throws {
         let result = try eval("EXP", .number(0))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testEXPNegative() throws {
+    @Test func expNegative() throws {
         let result = try eval("EXP", .number(-1))
-        assertNumber(result, 1.0 / Darwin.M_E, accuracy: 1e-10)
+        #expect(result.isNumber(1.0 / Darwin.M_E, within: 1e-10))
     }
 
     // MARK: - POWER
 
-    func testPOWERBasic() throws {
+    @Test func powerBasic() throws {
         let result = try eval("POWER", .number(2), .number(10))
-        assertNumber(result, 1024)
+        #expect(result.isNumber(1024))
     }
 
-    func testPOWERFractionalExponent() throws {
+    @Test func powerFractionalExponent() throws {
         let result = try eval("POWER", .number(9), .number(0.5))
-        assertNumber(result, 3, accuracy: 1e-10)
+        #expect(result.isNumber(3, within: 1e-10))
     }
 
-    func testPOWERZeroExponent() throws {
+    @Test func powerZeroExponent() throws {
         let result = try eval("POWER", .number(5), .number(0))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
     // MARK: - MOD
 
-    func testMODPositivePositive() throws {
+    @Test func modPositivePositive() throws {
         let result = try eval("MOD", .number(7), .number(3))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testMODNegativePositive() throws {
+    @Test func modNegativePositive() throws {
         // Excel: MOD(-7, 3) = 2 (not -1 like Swift %)
         let result = try eval("MOD", .number(-7), .number(3))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMODPositiveNegative() throws {
+    @Test func modPositiveNegative() throws {
         // Excel: MOD(7, -3) = -2
         let result = try eval("MOD", .number(7), .number(-3))
-        assertNumber(result, -2)
+        #expect(result.isNumber(-2))
     }
 
-    func testMODDivideByZero() throws {
+    @Test func modDivideByZero() throws {
         let result = try eval("MOD", .number(7), .number(0))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
     // MARK: - INT
 
-    func testINTPositive() throws {
+    @Test func intPositive() throws {
         // INT(3.7) = 3
         let result = try eval("INT", .number(3.7))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testINTNegative() throws {
+    @Test func intNegative() throws {
         // INT(-3.7) = -4 (floor toward negative infinity)
         let result = try eval("INT", .number(-3.7))
-        assertNumber(result, -4)
+        #expect(result.isNumber(-4))
     }
 
-    func testINTWholeNumber() throws {
+    @Test func intWholeNumber() throws {
         let result = try eval("INT", .number(5))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
     // MARK: - CEILING
 
-    func testCEILINGPositive() throws {
+    @Test func ceilingPositive() throws {
         // CEILING(2.1, 1) = 3
         let result = try eval("CEILING", .number(2.1), .number(1))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testCEILINGNegative() throws {
+    @Test func ceilingNegative() throws {
         // CEILING(-2.1, -1) = -3
         let result = try eval("CEILING", .number(-2.1), .number(-1))
-        assertNumber(result, -3)
+        #expect(result.isNumber(-3))
     }
 
-    func testCEILINGMultiple() throws {
+    @Test func ceilingMultiple() throws {
         // CEILING(4.42, 0.05) = 4.45
         let result = try eval("CEILING", .number(4.42), .number(0.05))
-        assertNumber(result, 4.45, accuracy: 1e-10)
+        #expect(result.isNumber(4.45, within: 1e-10))
     }
 
-    func testCEILINGZeroSignificance() throws {
+    @Test func ceilingZeroSignificance() throws {
         let result = try eval("CEILING", .number(2.5), .number(0))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - FLOOR
 
-    func testFLOORPositive() throws {
+    @Test func floorPositive() throws {
         // FLOOR(2.7, 1) = 2
         let result = try eval("FLOOR", .number(2.7), .number(1))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testFLOORNegative() throws {
+    @Test func floorNegative() throws {
         // FLOOR(-2.7, -1) = -3 (note: Excel FLOOR requires same sign for number and significance)
         let result = try eval("FLOOR", .number(-2.7), .number(-1))
-        assertNumber(result, -3, accuracy: 1e-10)
+        #expect(result.isNumber(-3, within: 1e-10))
     }
 
-    func testFLOORMultiple() throws {
+    @Test func floorMultiple() throws {
         // FLOOR(4.48, 0.05) = 4.45
         let result = try eval("FLOOR", .number(4.48), .number(0.05))
-        assertNumber(result, 4.45, accuracy: 1e-10)
+        #expect(result.isNumber(4.45, within: 1e-10))
     }
 
     // MARK: - SIGN
 
-    func testSIGNPositive() throws {
+    @Test func signPositive() throws {
         let result = try eval("SIGN", .number(42))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testSIGNNegative() throws {
+    @Test func signNegative() throws {
         let result = try eval("SIGN", .number(-3.5))
-        assertNumber(result, -1)
+        #expect(result.isNumber(-1))
     }
 
-    func testSIGNZero() throws {
+    @Test func signZero() throws {
         let result = try eval("SIGN", .number(0))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - PI
 
-    func testPI() throws {
+    @Test func pi() throws {
         let result = try eval("PI")
-        assertNumber(result, Double.pi, accuracy: 1e-14)
+        #expect(result.isNumber(Double.pi, within: 1e-14))
     }
 
     // MARK: - Error propagation
 
-    func testErrorPropagation() throws {
+    @Test func errorPropagation() throws {
         // Passing an error into any function should propagate the error.
         let functions = ["ABS", "SQRT", "LN", "EXP", "SIGN", "INT"]
         for name in functions {
             let result = try eval(name, .error(.value))
-            assertError(result, .value)
+            #expect(result == .error(.value))
         }
     }
 
-    func testErrorPropagationTwoArgs() throws {
+    @Test func errorPropagationTwoArgs() throws {
         let functions = ["ROUND", "ROUNDUP", "ROUNDDOWN", "POWER", "MOD", "CEILING", "FLOOR"]
         for name in functions {
             let result = try eval(name, .error(.ref), .number(1))
-            assertError(result, .ref)
+            #expect(result == .error(.ref))
         }
     }
 
-    func testErrorPropagationSecondArg() throws {
+    @Test func errorPropagationSecondArg() throws {
         let functions = ["ROUND", "ROUNDUP", "ROUNDDOWN", "POWER", "MOD", "CEILING", "FLOOR"]
         for name in functions {
             let result = try eval(name, .number(1), .error(.na))
-            assertError(result, .na)
+            #expect(result == .error(.na))
         }
     }
 
     // MARK: - Type coercion
 
-    func testTypeCoercionTextToNumber() throws {
+    @Test func typeCoercionTextToNumber() throws {
         let result = try eval("ABS", .text("5"))
-        assertNumber(result, 5)
+        #expect(result.isNumber(5))
     }
 
-    func testTypeCoercionTextNonNumericReturnsError() throws {
+    @Test func typeCoercionTextNonNumericReturnsError() throws {
         let result = try eval("ABS", .text("abc"))
-        assertError(result, .value)
+        #expect(result == .error(.value))
     }
 
-    func testTypeCoercionBoolTrue() throws {
+    @Test func typeCoercionBoolTrue() throws {
         let result = try eval("ABS", .bool(true))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testTypeCoercionBoolFalse() throws {
+    @Test func typeCoercionBoolFalse() throws {
         let result = try eval("ABS", .bool(false))
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
-    func testTypeCoercionBlank() throws {
+    @Test func typeCoercionBlank() throws {
         let result = try eval("ABS", .blank)
-        assertNumber(result, 0)
+        #expect(result.isNumber(0))
     }
 
     // MARK: - ExcelFunction metadata
 
-    func testPIHasZeroArgs() {
+    @Test func piHasZeroArgs() {
         let pi = function(named: "PI")
-        XCTAssertEqual(pi.minArgs, 0)
-        XCTAssertEqual(pi.maxArgs, 0)
+        #expect(pi.minArgs == 0)
+        #expect(pi.maxArgs == 0)
     }
 
-    func testLOGHasOptionalSecondArg() {
+    @Test func logHasOptionalSecondArg() {
         let log = function(named: "LOG")
-        XCTAssertEqual(log.minArgs, 1)
-        XCTAssertEqual(log.maxArgs, 2)
+        #expect(log.minArgs == 1)
+        #expect(log.maxArgs == 2)
     }
 
-    func testABSHasExactlyOneArg() {
+    @Test func absHasExactlyOneArg() {
         let abs = function(named: "ABS")
-        XCTAssertEqual(abs.minArgs, 1)
-        XCTAssertEqual(abs.maxArgs, 1)
+        #expect(abs.minArgs == 1)
+        #expect(abs.maxArgs == 1)
     }
 
-    func testROUNDHasExactlyTwoArgs() {
+    @Test func roundHasExactlyTwoArgs() {
         let round = function(named: "ROUND")
-        XCTAssertEqual(round.minArgs, 2)
-        XCTAssertEqual(round.maxArgs, 2)
+        #expect(round.minArgs == 2)
+        #expect(round.maxArgs == 2)
     }
 }

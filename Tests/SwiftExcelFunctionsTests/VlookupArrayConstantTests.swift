@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -9,7 +10,7 @@ import SwiftXLSX
 /// carry in the formula — `{0,"zero";10,"ten"}` — because a conformance case is one string.
 /// Emitting the round showed this package answering `#N/A` to the *control* row, where the
 /// key is really there, so the question could not have been asked honestly.
-final class VlookupArrayConstantTests: XCTestCase {
+@Suite struct VlookupArrayConstantTests {
 
     private struct NoCells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -28,19 +29,18 @@ final class VlookupArrayConstantTests: XCTestCase {
     }
 
     /// The constant is two rows of two columns — `;` separates rows, `,` columns.
-    func testTheConstantsShape() throws {
-        XCTAssertEqual(try evaluate("ROWS({0,\"zero\";10,\"ten\"})"), .number(2))
-        XCTAssertEqual(try evaluate("COLUMNS({0,\"zero\";10,\"ten\"})"), .number(2))
+    @Test func theConstantsShape() throws {
+        #expect(try evaluate("ROWS({0,\"zero\";10,\"ten\"})") == .number(2))
+        #expect(try evaluate("COLUMNS({0,\"zero\";10,\"ten\"})") == .number(2))
     }
 
-    func testAnExactHitAgainstAConstantTable() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(10,{0,\"zero\";10,\"ten\"},2,FALSE)"), .text("ten"))
-        XCTAssertEqual(try evaluate("VLOOKUP(0,{0,\"zero\";10,\"ten\"},2,FALSE)"), .text("zero"))
+    @Test func anExactHitAgainstAConstantTable() throws {
+        #expect(try evaluate("VLOOKUP(10,{0,\"zero\";10,\"ten\"},2,FALSE)") == .text("ten"))
+        #expect(try evaluate("VLOOKUP(0,{0,\"zero\";10,\"ten\"},2,FALSE)") == .text("zero"))
     }
 
-    func testAnApproximateHitAgainstAConstantTable() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(10,{0,\"zero\";10,\"ten\"},2,TRUE)"), .text("ten"))
-        XCTAssertEqual(try evaluate("VLOOKUP(7,{0,\"zero\";10,\"ten\"},2,TRUE)"), .text("zero"),
-                       "the largest key not exceeding 7")
+    @Test func anApproximateHitAgainstAConstantTable() throws {
+        #expect(try evaluate("VLOOKUP(10,{0,\"zero\";10,\"ten\"},2,TRUE)") == .text("ten"))
+        #expect(try evaluate("VLOOKUP(7,{0,\"zero\";10,\"ten\"},2,TRUE)") == .text("zero"), "the largest key not exceeding 7")
     }
 }

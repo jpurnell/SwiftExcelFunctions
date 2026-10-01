@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -31,7 +32,7 @@ import SwiftXLSX
 /// **Subtotals are answers, not noise**: 420 corpus cells at one anchor constrain three of the
 /// four row fields, and row 142 is what Excel returns for them. And an **empty item renders as
 /// the literal text `(blank)`**, which is a value, not a gap.
-final class GetPivotDataPairsTests: XCTestCase {
+@Suite struct GetPivotDataPairsTests {
 
     /// The sheet above, as cells.
     private struct Book: CellValueProvider {
@@ -110,35 +111,29 @@ final class GetPivotDataPairsTests: XCTestCase {
     // MARK: - Every row field constrained
 
     /// The shape 120 corpus cells at one anchor use: all four row fields and the column field.
-    func testAllRowFieldsAndTheColumn() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func allRowFieldsAndTheColumn() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","VD","BP/IP","IP","FME_Calc",20)
-            """),
-            .number(183), "row 140, column G")
+            """) == .number(183), "row 140, column G")
     }
 
     /// **Labels are inherited.** `Scenario` and `Region` are written only on row 136, and the
     /// answer is on row 140 — a scan that requires a literal match in every column finds
     /// nothing at all here.
-    func testLabelsAreCarriedDownFromTheRowThatWroteThem() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func labelsAreCarriedDownFromTheRowThatWroteThem() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","D","FME_Calc",21)
-            """),
-            .number(1233), "row 137, whose C and D are blank on the sheet")
+            """) == .number(1233), "row 137, whose C and D are blank on the sheet")
     }
 
     /// The pairs may be written in any order; Excel matches by name, not by position.
-    func testPairsAreMatchedByNameNotByPosition() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func pairsAreMatchedByNameNotByPosition() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"FME_Calc",22,"Region","GBR",\
             "BP/IP","BP","Scenario","CY","LOBMix_noXH","VD")
-            """),
-            .number(390), "row 139, column I")
+            """) == .number(390), "row 139, column I")
     }
 
     // MARK: - Subtotals, which are answers
@@ -148,22 +143,18 @@ final class GetPivotDataPairsTests: XCTestCase {
     /// Three of four row fields named, and the answer is the subtotal row Excel renders for
     /// exactly that grouping — row 142, labelled `VD Total`. Skipping subtotal rows as "not
     /// data" would refuse every one of those cells.
-    func testAnUnconstrainedInnerFieldIsAnsweredByItsSubtotal() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func anUnconstrainedInnerFieldIsAnsweredByItsSubtotal() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","VD","FME_Calc",20)
-            """),
-            .number(2076), "row 142 — `VD Total`, not row 139")
+            """) == .number(2076), "row 142 — `VD Total`, not row 139")
     }
 
     /// Two levels up: only the outermost two constrained, so the `GBR Total` row answers.
-    func testAnOuterSubtotalAnswersWhenTwoFieldsAreFree() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func anOuterSubtotalAnswersWhenTwoFieldsAreFree() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR","FME_Calc",20)
-            """),
-            .number(5011), "row 146 — `GBR Total`")
+            """) == .number(5011), "row 146 — `GBR Total`")
     }
 
     /// **No pairs against a column axis with no column total is `#REF!`.**
@@ -173,16 +164,15 @@ final class GetPivotDataPairsTests: XCTestCase {
     /// in no cell at all: it is written `colGrandTotals="0"`, so `L135` reads a date and
     /// `L243` is another week's figure. Returning `G243` would have reported one week's number
     /// as the total of twenty-six.
-    func testNoPairsWithNoColumnTotalRefuses() throws {
-        XCTAssertEqual(try evaluate("GETPIVOTDATA(\"Subs\",C134)"), .error(.ref),
-                       "the overall total is rendered nowhere, so there is nothing to return")
+    @Test func noPairsWithNoColumnTotalRefuses() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Subs\",C134)") == .error(.ref), "the overall total is rendered nowhere, so there is nothing to return")
     }
 
     /// And where the table **does** render one, the grand total column answers.
     ///
     /// `pivotTable50` of the same workbook, at `B41:H45`, leaves `colGrandTotals` at its
     /// default and writes `"Grand Total"` into `H42` with the overall figure at `H45`.
-    func testNoPairsReadsTheGrandTotalColumnWhenThereIsOne() throws {
+    @Test func noPairsReadsTheGrandTotalColumnWhenThereIsOne() throws {
         struct Totals: CellValueProvider {
             static let cells: [String: CellValue] = [
                 "B41": .text("Sum of Subs"), "C42": .text("GBR"), "H42": .text("Grand Total"),
@@ -215,34 +205,28 @@ final class GetPivotDataPairsTests: XCTestCase {
             rowFields: [.field("Scenario")], columnFields: [.field("Region")],
             pageFields: [], pageFieldRowCount: 0,
             hasRowGrandTotals: true, hasColumnGrandTotals: true)
-        XCTAssertEqual(
-            try FormulaEvaluator.evaluate(try FormulaParser.parse("GETPIVOTDATA(\"Subs\",B41)"),
+        #expect(try FormulaEvaluator.evaluate(try FormulaParser.parse("GETPIVOTDATA(\"Subs\",B41)"),
                                           cells: Totals(layout: layout), names: NoNames(),
-                                          inSheet: "Exec Summary"),
-            .number(71471), "H45 — the grand total row meeting the grand total column")
+                                          inSheet: "Exec Summary") == .number(71471), "H45 — the grand total row meeting the grand total column")
     }
 
     // MARK: - Items that are not text
 
     /// **Column items here are numbers**, and `"20"` is not `20`. Comparing the rendered text
     /// would match nothing; comparing values matches the column.
-    func testItemsAreComparedByValue() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func itemsAreComparedByValue() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","V","FME_Calc",20)
-            """),
-            .number(303))
+            """) == .number(303))
     }
 
     /// **An empty item renders as the literal text `(blank)`** and is a real item.
-    func testTheBlankItemIsAnItem() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func theBlankItemIsAnItem() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","VD","BP/IP","(blank)","FME_Calc",20)
-            """),
-            .number(1406), "row 141")
+            """) == .number(1406), "row 141")
     }
 
     /// **An omitted item names the blank one**, which is 204 corpus cells.
@@ -252,13 +236,11 @@ final class GetPivotDataPairsTests: XCTestCase {
     /// row it renders as `(blank)`; we answered `#REF!`, which `IFERROR` turned into `0`, so
     /// the finding read `ours=0 excel=1476` and looked like an arithmetic disagreement rather
     /// than a refusal.
-    func testAnOmittedItemNamesTheBlankItem() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func anOmittedItemNamesTheBlankItem() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","GBR",\
             "LOBMix_noXH","VD","BP/IP",,"FME_Calc",20)
-            """),
-            .number(1406), "row 141, the row labelled `(blank)`")
+            """) == .number(1406), "row 141, the row labelled `(blank)`")
     }
 
     // MARK: - Page fields
@@ -266,47 +248,38 @@ final class GetPivotDataPairsTests: XCTestCase {
     /// A page field pair must agree with the filter actually applied, which is rendered above
     /// the table. `ActivityDetail` is filtered to `Connect`, so naming `Connect` is consistent
     /// and constrains nothing further.
-    func testAPageFieldPairThatAgreesWithTheFilterIsAccepted() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func aPageFieldPairThatAgreesWithTheFilterIsAccepted() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"ActivityDetail","Connect","Scenario","CY",\
             "Region","GBR","LOBMix_noXH","V","FME_Calc",20)
-            """),
-            .number(303))
+            """) == .number(303))
     }
 
     /// **Naming an item the filter excludes is `#REF!`.** The table does not contain the
     /// number asked for — it was filtered out before rendering — and answering from the rows
     /// that *are* there would report a `Disconnect` figure as a `Connect` one.
-    func testAPageFieldPairThatContradictsTheFilterRefuses() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func aPageFieldPairThatContradictsTheFilterRefuses() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"ActivityDetail","Disconnect","Scenario","CY",\
             "Region","GBR","LOBMix_noXH","V","FME_Calc",20)
-            """),
-            .error(.ref))
+            """) == .error(.ref))
     }
 
     // MARK: - Refusing rather than guessing
 
-    func testAFieldThatIsOnNoAxisRefuses() throws {
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Fiber\",\"Y\",\"FME_Calc\",20)"),
-            .error(.ref))
+    @Test func aFieldThatIsOnNoAxisRefuses() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Fiber\",\"Y\",\"FME_Calc\",20)") == .error(.ref))
     }
 
-    func testAnItemThatIsNotInTheTableRefuses() throws {
-        XCTAssertEqual(
-            try evaluate("""
+    @Test func anItemThatIsNotInTheTableRefuses() throws {
+        #expect(try evaluate("""
             GETPIVOTDATA("Subs",C134,"Scenario","CY","Region","ZZZ","FME_Calc",20)
-            """),
-            .error(.ref))
+            """) == .error(.ref))
     }
 
     /// A pair naming a field with no item to match it — an odd argument count — is `#REF!`.
-    func testADanglingFieldWithNoItemRefuses() throws {
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Scenario\")"), .error(.ref))
+    @Test func aDanglingFieldWithNoItemRefuses() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Scenario\")") == .error(.ref))
     }
 
     /// **An outer field left free while an inner one is constrained has no row.**
@@ -314,24 +287,20 @@ final class GetPivotDataPairsTests: XCTestCase {
     /// `Region` = `GBR` with `Scenario` unconstrained asks for a total Excel never rendered:
     /// the subtotals nest outermost-first, so there is no `GBR across all scenarios` row.
     /// Refusing is honest; the `CY`/`GBR` row would be a different number.
-    func testConstrainingAnInnerFieldWithoutTheOuterOneRefuses() throws {
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Region\",\"GBR\",\"FME_Calc\",20)"),
-            .error(.ref))
+    @Test func constrainingAnInnerFieldWithoutTheOuterOneRefuses() throws {
+        #expect(try evaluate("GETPIVOTDATA(\"Subs\",C134,\"Region\",\"GBR\",\"FME_Calc\",20)") == .error(.ref))
     }
 
     /// A layout with no axis detail — read from a workbook whose cache could not be reached —
     /// refuses pairs rather than guessing at columns.
-    func testALayoutWithoutAxesRefusesPairs() throws {
+    @Test func aLayoutWithoutAxesRefusesPairs() throws {
         let bare = PivotTableLayout(
             sheet: "NED Mix",
             range: CellRange(from: CellRef("C134"), to: CellRef("L243")),
             firstDataRow: 2, firstDataCol: 4,
             dataFields: ["Sum of Subs"],
             hasRowGrandTotals: true, hasColumnGrandTotals: true)
-        XCTAssertEqual(
-            try evaluate("GETPIVOTDATA(\"Sum of Subs\",C134,\"Scenario\",\"CY\")",
-                         layouts: [bare]),
-            .error(.ref))
+        #expect(try evaluate("GETPIVOTDATA(\"Sum of Subs\",C134,\"Scenario\",\"CY\")",
+                         layouts: [bare]) == .error(.ref))
     }
 }

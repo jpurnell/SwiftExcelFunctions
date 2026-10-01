@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -13,7 +14,7 @@ import SwiftXLSX
 /// sheet resolved perfectly, so the total was plausible and merely wrong. Nothing errored,
 /// nothing refused, and the only way to see it was to compare against Excel's own cached
 /// value on a workbook nobody wrote for us.
-final class SheetSpanEvaluationTests: XCTestCase {
+@Suite struct SheetSpanEvaluationTests {
 
     /// A workbook of named sheets, each holding one value at `B7`.
     private struct Book: CellValueProvider {
@@ -48,40 +49,38 @@ final class SheetSpanEvaluationTests: XCTestCase {
     }
 
     /// The shape the corpus is full of.
-    func testASumAcrossASpanOfSheetsAddsEveryOne() throws {
+    @Test func aSumAcrossASpanOfSheetsAddsEveryOne() throws {
         // 1 + 2 + 4 + 8, with `Cover` and `Notes` outside the span and left out.
-        XCTAssertEqual(try evaluate("SUM('Q1:Q4'!B7)"), .number(15))
+        #expect(try evaluate("SUM('Q1:Q4'!B7)") == .number(15))
     }
 
     /// The ends are included, and nothing beyond them is.
-    func testTheEndsAreIncludedAndNothingElseIs() throws {
-        XCTAssertEqual(try evaluate("SUM('Q1:Q2'!B7)"), .number(3))
-        XCTAssertEqual(try evaluate("SUM('Q2:Q3'!B7)"), .number(6))
-        XCTAssertEqual(try evaluate("SUM('Cover:Q1'!B7)"), .number(101),
-                       "a span may start at the first sheet")
+    @Test func theEndsAreIncludedAndNothingElseIs() throws {
+        #expect(try evaluate("SUM('Q1:Q2'!B7)") == .number(3))
+        #expect(try evaluate("SUM('Q2:Q3'!B7)") == .number(6))
+        #expect(try evaluate("SUM('Cover:Q1'!B7)") == .number(101), "a span may start at the first sheet")
     }
 
     /// A span of one sheet is that sheet, and an ordinary reference still works.
-    func testADegenerateSpanAndAPlainReference() throws {
-        XCTAssertEqual(try evaluate("SUM('Q3:Q3'!B7)"), .number(4))
-        XCTAssertEqual(try evaluate("SUM('Q3'!B7)"), .number(4),
-                       "no colon, so one sheet — the path that already worked")
+    @Test func aDegenerateSpanAndAPlainReference() throws {
+        #expect(try evaluate("SUM('Q3:Q3'!B7)") == .number(4))
+        #expect(try evaluate("SUM('Q3'!B7)") == .number(4), "no colon, so one sheet — the path that already worked")
     }
 
     /// Other aggregates see the same values, since the span produces an array like any other.
-    func testTheSpanIsAnArrayLikeAnyOther() throws {
-        XCTAssertEqual(try evaluate("COUNT('Q1:Q4'!B7)"), .number(4))
-        XCTAssertEqual(try evaluate("MAX('Q1:Q4'!B7)"), .number(8))
-        XCTAssertEqual(try evaluate("MIN('Q1:Q4'!B7)"), .number(1))
+    @Test func theSpanIsAnArrayLikeAnyOther() throws {
+        #expect(try evaluate("COUNT('Q1:Q4'!B7)") == .number(4))
+        #expect(try evaluate("MAX('Q1:Q4'!B7)") == .number(8))
+        #expect(try evaluate("MIN('Q1:Q4'!B7)") == .number(1))
     }
 
     /// An end that names no sheet reads as empty rather than as one end of the span.
     ///
     /// **Silently dropping to one end is the bug this replaces**, so it must not come back
     /// as the error path. `SUM` over nothing is 0, which is what an empty range gives.
-    func testAnEndThatNamesNoSheetReadsAsEmpty() throws {
-        XCTAssertEqual(try evaluate("SUM('Q1:Nope'!B7)"), .number(0))
-        XCTAssertEqual(try evaluate("SUM('Nope:Q4'!B7)"), .number(0))
+    @Test func anEndThatNamesNoSheetReadsAsEmpty() throws {
+        #expect(try evaluate("SUM('Q1:Nope'!B7)") == .number(0))
+        #expect(try evaluate("SUM('Nope:Q4'!B7)") == .number(0))
     }
 }
 
@@ -101,7 +100,7 @@ final class SheetSpanEvaluationTests: XCTestCase {
 /// `SUMPRODUCT` forces array evaluation of its arguments and `SUM` does not. Acting on the
 /// prediction would have broken the case that already agreed, and only asking `COLUMN` alone
 /// alongside the whole idiom caught it.
-final class ArrayContextTests: XCTestCase {
+@Suite struct ArrayContextTests {
 
     /// Six cells across columns H to M, so the column numbers are 8 through 13.
     private struct Row: CellValueProvider {
@@ -125,26 +124,24 @@ final class ArrayContextTests: XCTestCase {
     }
 
     /// Outside an array context, `COLUMN` over a range is its leftmost column.
-    func testSUMLeavesCOLUMNAsAScalar() throws {
-        XCTAssertEqual(try evaluate("SUM(COLUMN($H2:$M2))"), .number(8))
-        XCTAssertEqual(try evaluate("SUM(MOD(COLUMN($H2:$M2), 2))"), .number(0))
+    @Test func sumLeavesCOLUMNAsAScalar() throws {
+        #expect(try evaluate("SUM(COLUMN($H2:$M2))") == .number(8))
+        #expect(try evaluate("SUM(MOD(COLUMN($H2:$M2), 2))") == .number(0))
     }
 
     /// Inside `SUMPRODUCT`, it is the whole array.
-    func testSUMPRODUCTEvaluatesCOLUMNAsAnArray() throws {
+    @Test func sumproductEvaluatesCOLUMNAsAnArray() throws {
         // Columns 8…13: three of them even.
-        XCTAssertEqual(try evaluate("SUMPRODUCT((MOD(COLUMN($H2:$M2), 2) = 0) * 1)"),
-                       .number(3))
+        #expect(try evaluate("SUMPRODUCT((MOD(COLUMN($H2:$M2), 2) = 0) * 1)") == .number(3))
         // And the array reaches through nesting — the corpus's own shape wraps COLUMN in
         // MOD, in a comparison, in a multiplication.
-        XCTAssertEqual(try evaluate("SUMPRODUCT((MOD(COLUMN($H2:$M2), 2) = 1) * 1)"),
-                       .number(3))
+        #expect(try evaluate("SUMPRODUCT((MOD(COLUMN($H2:$M2), 2) = 1) * 1)") == .number(3))
     }
 
     /// `ROW` is the same function turned ninety degrees, and must follow.
-    func testROWFollowsTheSameRule() throws {
-        XCTAssertEqual(try evaluate("SUM(ROW($H2:$H5))"), .number(2))
-        XCTAssertEqual(try evaluate("SUMPRODUCT((ROW($H2:$H5) > 0) * 1)"), .number(4))
+    @Test func rowFollowsTheSameRule() throws {
+        #expect(try evaluate("SUM(ROW($H2:$H5))") == .number(2))
+        #expect(try evaluate("SUMPRODUCT((ROW($H2:$H5) > 0) * 1)") == .number(4))
     }
 }
 
@@ -159,7 +156,7 @@ final class ArrayContextTests: XCTestCase {
 /// Asserted through the evaluator because stretching needs the **reference**: an
 /// `ExcelFunction` receives evaluated values, and by then a one-cell sum range is a single
 /// number with no address.
-final class SumRangeStretchTests: XCTestCase {
+@Suite struct SumRangeStretchTests {
 
     /// `H2:J2` are the keys `x`, `y`, `x`; `K2:M2` are 1, 2, 3.
     private struct Sheet: CellValueProvider {
@@ -186,15 +183,12 @@ final class SumRangeStretchTests: XCTestCase {
                                       names: NoNames())
     }
 
-    func testSUMIFStretchesAShortSumRange() throws {
-        XCTAssertEqual(try evaluate("SUMIF(H2:J2, \"x\", K2)"), .number(4),
-                       "K2 grows to K2:M2, so the rows keyed x are 1 and 3")
-        XCTAssertEqual(try evaluate("SUMIF(H2:J2, \"x\", K2:M2)"), .number(4),
-                       "control: written in full, the same answer")
+    @Test func sumifStretchesAShortSumRange() throws {
+        #expect(try evaluate("SUMIF(H2:J2, \"x\", K2)") == .number(4), "K2 grows to K2:M2, so the rows keyed x are 1 and 3")
+        #expect(try evaluate("SUMIF(H2:J2, \"x\", K2:M2)") == .number(4), "control: written in full, the same answer")
     }
 
-    func testSUMIFSRefusesAShortSumRange() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(K2, H2:J2, \"x\")"), .error(.value),
-                       "SUMIFS requires the shapes to match, and says so")
+    @Test func sumifsRefusesAShortSumRange() throws {
+        #expect(try evaluate("SUMIFS(K2, H2:J2, \"x\")") == .error(.value), "SUMIFS requires the shapes to match, and says so")
     }
 }

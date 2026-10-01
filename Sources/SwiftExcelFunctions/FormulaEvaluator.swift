@@ -136,6 +136,14 @@ public enum FormulaEvaluator {
     ///
     /// Raising it is not a matter of choosing a larger number. It needs an explicit stack or
     /// a trampoline in `evaluateNode`, and until then this is the honest ceiling.
+    ///
+    /// **It is a ceiling for an 8 MiB stack, and not every thread has one.** That bisection
+    /// ran on the main thread. A secondary thread gets 512 KiB, which includes every thread
+    /// in Swift concurrency's cooperative pool. The move to Swift Testing showed what that
+    /// costs: on those threads a debug build crashes (`SIGBUS`) at 100 nested negations and
+    /// at 65 nested `IF`s, which is legal Excel, long before this guard is reached. Until
+    /// `evaluateNode` stops recursing, evaluate deep formulas on a thread created with an
+    /// 8 MiB `stackSize`. The depth tests do exactly that (`onMeasuredStack`).
     public static let maxNodeDepth = 512
 
     /// The three budgets, threaded as one value.

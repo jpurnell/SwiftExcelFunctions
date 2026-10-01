@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -32,7 +33,7 @@ import SwiftXLSX
 ///   2   2014       2
 ///   3   2015       3
 /// ```
-final class IfArrayConditionTests: XCTestCase {
+@Suite struct IfArrayConditionTests {
 
     private struct Book: CellValueProvider {
         static let cells: [String: CellValue] = [
@@ -60,59 +61,55 @@ final class IfArrayConditionTests: XCTestCase {
     }
 
     /// The condition is an array, so the answer is one per element.
-    func testAnArrayConditionGivesAnArray() throws {
+    @Test func anArrayConditionGivesAnArray() throws {
         guard case .array(let matrix) = try evaluate("IF(A1:A3=2015,B1:B3,0)") else {
-            return XCTFail("expected an array, one element per row")
+            Issue.record("expected an array, one element per row"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(1), .number(0), .number(3)],
-                       "row 2 is the wrong year, so its branch is the false one")
+        #expect(matrix.elements == [.number(1), .number(0), .number(3)], "row 2 is the wrong year, so its branch is the false one")
     }
 
     /// **The corpus shape**, which finds its row.
-    func testTheCorpusShapeFindsItsRow() throws {
-        XCTAssertEqual(
-            try evaluate("INDEX(C1:C3,MATCH(3,IF(A1:A3=2015,B1:B3,0),0),0)"), .text("third"))
+    @Test func theCorpusShapeFindsItsRow() throws {
+        #expect(try evaluate("INDEX(C1:C3,MATCH(3,IF(A1:A3=2015,B1:B3,0),0),0)") == .text("third"))
     }
 
     /// And where the pair is not in the sheet, the answer is `#N/A` — not `#VALUE!`.
     ///
     /// 63 of the 64 corpus cells are this: the template asks for a year the input does not
     /// carry. Excel says "not found"; we said "malformed", which is a different statement.
-    func testAPairThatIsNotThereIsNotFoundRatherThanMalformed() throws {
-        XCTAssertEqual(try evaluate("MATCH(2,IF(A1:A3=2015,B1:B3,0),0)"), .error(.na))
+    @Test func aPairThatIsNotThereIsNotFoundRatherThanMalformed() throws {
+        #expect(try evaluate("MATCH(2,IF(A1:A3=2015,B1:B3,0),0)") == .error(.na))
     }
 
     /// Both branches may be arrays, and they are read at the same position.
-    func testBothBranchesMayBeArrays() throws {
+    @Test func bothBranchesMayBeArrays() throws {
         guard case .array(let matrix) = try evaluate("IF(A1:A3=2015,B1:B3,C1:C3)") else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(1), .text("second"), .number(3)])
+        #expect(matrix.elements == [.number(1), .text("second"), .number(3)])
     }
 
     /// A missing third argument is `FALSE`, element by element, as it is for a scalar call.
-    func testTheOmittedBranchIsFalse() throws {
+    @Test func theOmittedBranchIsFalse() throws {
         guard case .array(let matrix) = try evaluate("IF(A1:A3=2015,B1:B3)") else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(1), .bool(false), .number(3)])
+        #expect(matrix.elements == [.number(1), .bool(false), .number(3)])
     }
 
     /// **A branch shorter than the condition runs out**, and Excel says so with `#N/A` rather
     /// than reusing a value or padding with a blank.
-    func testABranchShorterThanTheConditionRunsOut() throws {
+    @Test func aBranchShorterThanTheConditionRunsOut() throws {
         guard case .array(let matrix) = try evaluate("IF(A1:A3=2015,B1:B2,0)") else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(1), .number(0), .error(.na)],
-                       "the third row has no true branch to take")
+        #expect(matrix.elements == [.number(1), .number(0), .error(.na)], "the third row has no true branch to take")
     }
 
     /// A scalar condition is untouched, and neither branch is evaluated needlessly — the
     /// laziness that makes `IF(A1=0,"",1/A1)` safe is not traded away for this.
-    func testAScalarConditionStillTakesOneBranch() throws {
-        XCTAssertEqual(try evaluate("IF(A1=2015,B1,1/0)"), .number(1),
-                       "the false branch divides by zero and must not be evaluated")
-        XCTAssertEqual(try evaluate("IF(A2=2015,1/0,B2)"), .number(2))
+    @Test func aScalarConditionStillTakesOneBranch() throws {
+        #expect(try evaluate("IF(A1=2015,B1,1/0)") == .number(1), "the false branch divides by zero and must not be evaluated")
+        #expect(try evaluate("IF(A2=2015,1/0,B2)") == .number(2))
     }
 }

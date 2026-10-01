@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -37,7 +38,7 @@ import SwiftXLSX
 /// **`rowGrandTotals` is on, and there is more than one grand total row.** With the data field
 /// names on the row axis Excel writes one per data field, so the last row of the range is
 /// `"Total  HSI"` and a reader taking it for *the* grand total answers `HSI` to every question.
-final class GetPivotDataStackedTests: XCTestCase {
+@Suite struct GetPivotDataStackedTests {
 
     private struct Book: CellValueProvider {
         static let cells: [String: CellValue] = [
@@ -124,34 +125,28 @@ final class GetPivotDataStackedTests: XCTestCase {
 
     /// Both column fields named: the outer one is inherited across, the inner one picks out
     /// the column. `H95` sits under `CY` (written at `G93`) and `WNE`.
-    func testBothColumnFieldsNameOneColumn() throws {
-        XCTAssertEqual(
-            try evaluate(#"""
+    @Test func bothColumnFieldsNameOneColumn() throws {
+        #expect(try evaluate(#"""
             GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Report_Date","2014-06-02",\
             "Scenario","CY","Region","WNE")
-            """#.replacingOccurrences(of: "\\\n", with: "")),
-            .number(85))
+            """#.replacingOccurrences(of: "\\\n", with: "")) == .number(85))
     }
 
     /// **The outer column item is sparse.** `PY` is written once at `J93` and covers `J` and
     /// `K`; asking for `PY`/`WNE` must reach `K95`, whose own header row says only `WNE`.
-    func testTheOuterColumnItemIsCarriedAcross() throws {
-        XCTAssertEqual(
-            try evaluate(#"""
+    @Test func theOuterColumnItemIsCarriedAcross() throws {
+        #expect(try evaluate(#"""
             GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Report_Date","2014-06-02",\
             "Scenario","PY","Region","WNE")
-            """#.replacingOccurrences(of: "\\\n", with: "")),
-            .number(70), "K95 — `PY` was written two columns to its left")
+            """#.replacingOccurrences(of: "\\\n", with: "")) == .number(70), "K95 — `PY` was written two columns to its left")
     }
 
     /// Naming only the outer column field asks for its total across the inner one, which is
     /// the column Excel headed `CY Total`.
-    func testNamingOnlyTheOuterColumnFieldReadsItsSubtotal() throws {
-        XCTAssertEqual(
-            try evaluate(#"""
+    @Test func namingOnlyTheOuterColumnFieldReadsItsSubtotal() throws {
+        #expect(try evaluate(#"""
             GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Report_Date","2014-06-02","Scenario","CY")
-            """#),
-            .number(308), "I95 — the `CY Total` column")
+            """#) == .number(308), "I95 — the `CY Total` column")
     }
 
     // MARK: - A gap in the row constraints
@@ -163,12 +158,10 @@ final class GetPivotDataStackedTests: XCTestCase {
     /// marks the last 21 days and the blank item holds the rest, so each date appears under
     /// exactly one of them. Measured: 48 distinct dates in one group of the real pivot, none
     /// repeated across the split.
-    func testAGapResolvesWhenExactlyOneRowMatches() throws {
-        XCTAssertEqual(
-            try evaluate(#"""
+    @Test func aGapResolvesWhenExactlyOneRowMatches() throws {
+        #expect(try evaluate(#"""
             GETPIVOTDATA(" B1",D92,"Report_Date","2014-05-19","Scenario","CY","Region","GBR")
-            """#),
-            .number(109), "row 98, which is the only `B1` row carrying that date")
+            """#) == .number(109), "row 98, which is the only `B1` row carrying that date")
     }
 
     /// And where a gap leaves **two** rows matching, there is no answer to give.
@@ -177,7 +170,7 @@ final class GetPivotDataStackedTests: XCTestCase {
     /// not — where the same date appeared under both items — would have the figure split
     /// across two rows and their total written nowhere, so returning either would be one half
     /// reported as the whole.
-    func testAnAmbiguousGapRefuses() throws {
+    @Test func anAmbiguousGapRefuses() throws {
         /// The same shape, with `2014-06-02` appearing under **both** flag items.
         struct Split: CellValueProvider {
             static let cells: [String: CellValue] = [
@@ -221,51 +214,37 @@ final class GetPivotDataStackedTests: XCTestCase {
                                           cells: Split(layout: layout), names: NoNames(),
                                           inSheet: "Forecast")
         }
-        XCTAssertEqual(
-            try ask(#"GETPIVOTDATA(" B1",D92,"Report_Date","2014-06-02","Scenario","CY")"#),
-            .error(.ref),
-            "rows 95 and 96 both carry that date, and their sum is written nowhere")
-        XCTAssertEqual(
-            try ask(#"""
+        #expect(try ask(#"GETPIVOTDATA(" B1",D92,"Report_Date","2014-06-02","Scenario","CY")"#) == .error(.ref), "rows 95 and 96 both carry that date, and their sum is written nowhere")
+        #expect(try ask(#"""
             GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Report_Date","2014-06-02","Scenario","CY")
-            """#),
-            .number(223),
-            "naming the field that was free picks out one of them again")
+            """#) == .number(223), "naming the field that was free picks out one of them again")
     }
 
     // MARK: - Subtotals written the other way round
 
     /// A middle level's subtotal, captioned **after** the item: `"L21 Total"`.
-    func testAMiddleLevelSubtotalUsesTheSuffixForm() throws {
-        XCTAssertEqual(
-            try evaluate(#"GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Scenario","CY","Region","GBR")"#),
-            .number(468), "row 97 — `Report_Date` free, so the `L21 Total` row")
+    @Test func aMiddleLevelSubtotalUsesTheSuffixForm() throws {
+        #expect(try evaluate(#"GETPIVOTDATA(" B1",D92,"Last21Flag","L21","Scenario","CY","Region","GBR")"#) == .number(468), "row 97 — `Report_Date` free, so the `L21 Total` row")
     }
 
     /// The values pseudo-field's total, captioned **before** the item: `"Total  B1"`.
     ///
     /// Both row fields below it are free, so this is that data field's grand total — one of
     /// several, since Excel writes one per data field when their names are on the row axis.
-    func testTheValuesTotalUsesThePrefixForm() throws {
-        XCTAssertEqual(
-            try evaluate(#"GETPIVOTDATA(" B1",D92,"Scenario","CY","Region","GBR")"#),
-            .number(577), "row 102 — `Total  B1`")
+    @Test func theValuesTotalUsesThePrefixForm() throws {
+        #expect(try evaluate(#"GETPIVOTDATA(" B1",D92,"Scenario","CY","Region","GBR")"#) == .number(577), "row 102 — `Total  B1`")
     }
 
     /// **The last row of the range is not *the* grand total here.**
     ///
     /// It reads `"Total  HSI"`, and a lookup that took it for the table's total would answer
     /// `HSI` to every question asked of the table. The data field selects among them.
-    func testEachDataFieldHasItsOwnGrandTotalRow() throws {
-        XCTAssertEqual(
-            try evaluate(#"GETPIVOTDATA(" HSI",D92,"Scenario","CY","Region","GBR")"#),
-            .number(293), "row 103, not row 102")
+    @Test func eachDataFieldHasItsOwnGrandTotalRow() throws {
+        #expect(try evaluate(#"GETPIVOTDATA(" HSI",D92,"Scenario","CY","Region","GBR")"#) == .number(293), "row 103, not row 102")
     }
 
     /// By source name as well as caption, and the leading space is not trimmed away.
-    func testTheSourceNameSelectsTheSameRow() throws {
-        XCTAssertEqual(
-            try evaluate(#"GETPIVOTDATA("B1",D92,"Scenario","CY","Region","GBR")"#),
-            .number(577), "`B1` is the source field behind the caption ` B1`")
+    @Test func theSourceNameSelectsTheSameRow() throws {
+        #expect(try evaluate(#"GETPIVOTDATA("B1",D92,"Scenario","CY","Region","GBR")"#) == .number(577), "`B1` is the source field behind the caption ` B1`")
     }
 }

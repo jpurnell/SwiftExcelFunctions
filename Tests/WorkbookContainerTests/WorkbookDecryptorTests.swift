@@ -1,5 +1,6 @@
 import Foundation
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookContainer
 
 /// Decrypting an ECMA-376 protected workbook.
@@ -7,90 +8,82 @@ import XCTest
 /// The measure of success is exact: decrypting must reproduce the original package **byte
 /// for byte**, because the result is handed straight to a ZIP reader. A nearly-right answer
 /// is not a partial success here, it is a corrupt archive.
-final class WorkbookDecryptorTests: XCTestCase {
+@Suite struct WorkbookDecryptorTests {
 
     private func fixture(_ name: String) throws -> Data {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures/\(name)",
-                                                  withExtension: nil),
-                                "fixture \(name) is missing from the test bundle")
+        let url = try #require(Bundle.module.url(forResource: "Fixtures/\(name)",
+                                                  withExtension: nil), "fixture \(name) is missing from the test bundle")
         return try Data(contentsOf: url)
     }
 
-    func testTheRightPasswordReproducesTheOriginalExactly() throws {
+    @Test func theRightPasswordReproducesTheOriginalExactly() throws {
         let decrypted = try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"),
                                                       password: "swordfish")
-        XCTAssertEqual(decrypted, try fixture("plain.xlsx"),
-                       "decryption must reproduce the package byte for byte")
+        #expect(try decrypted == fixture("plain.xlsx"), "decryption must reproduce the package byte for byte")
     }
 
-    func testTheDecryptedBytesAreAWorkbookAZipReaderWouldAccept() throws {
+    @Test func theDecryptedBytesAreAWorkbookAZipReaderWouldAccept() throws {
         let decrypted = try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"),
                                                       password: "swordfish")
-        XCTAssertEqual(ContainerKind(of: decrypted), .zip)
+        #expect(ContainerKind(of: decrypted) == .zip)
     }
 
     /// A wrong password must be *reported*, not returned as rubbish.
     ///
     /// The format carries a verifier precisely so this is knowable before decrypting
     /// anything, and handing back plausible-looking garbage would be the worse failure.
-    func testAWrongPasswordIsRefusedRatherThanProducingRubbish() throws {
-        XCTAssertThrowsError(
-            try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"),
-                                          password: "not the password")
-        ) { error in
+    @Test func aWrongPasswordIsRefusedRatherThanProducingRubbish() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"),
+                                          password: "not the password") }) {
             guard case WorkbookDecryptionError.wrongPassword = error else {
-                return XCTFail("expected wrongPassword, got \(error)")
+                Issue.record("expected wrongPassword, got \(error)"); return
             }
         }
     }
 
-    func testAnEmptyPasswordIsAWrongPasswordNotACrash() throws {
-        XCTAssertThrowsError(
-            try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"), password: "")
-        ) { error in
+    @Test func anEmptyPasswordIsAWrongPasswordNotACrash() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try WorkbookDecryptor.decrypt(try fixture("agile-encrypted.xlsx"), password: "") }) {
             guard case WorkbookDecryptionError.wrongPassword = error else {
-                return XCTFail("expected wrongPassword, got \(error)")
+                Issue.record("expected wrongPassword, got \(error)"); return
             }
         }
     }
 
-    func testAnUnencryptedWorkbookIsRefusedAsNotEncrypted() throws {
-        XCTAssertThrowsError(
-            try WorkbookDecryptor.decrypt(try fixture("plain.xlsx"), password: "swordfish")
-        ) { error in
+    @Test func anUnencryptedWorkbookIsRefusedAsNotEncrypted() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try WorkbookDecryptor.decrypt(try fixture("plain.xlsx"), password: "swordfish") }) {
             guard case WorkbookDecryptionError.notEncrypted = error else {
-                return XCTFail("expected notEncrypted, got \(error)")
+                Issue.record("expected notEncrypted, got \(error)"); return
             }
         }
     }
 
     /// The cheap question — "would a password even help?" — must not need a password.
-    func testWhetherAFileIsEncryptedIsAnswerableWithoutOne() throws {
-        XCTAssertTrue(WorkbookDecryptor.isEncrypted(try fixture("agile-encrypted.xlsx")))
-        XCTAssertFalse(WorkbookDecryptor.isEncrypted(try fixture("plain.xlsx")))
-        XCTAssertFalse(WorkbookDecryptor.isEncrypted(Data("not a workbook".utf8)))
+    @Test func whetherAFileIsEncryptedIsAnswerableWithoutOne() throws {
+        #expect(WorkbookDecryptor.isEncrypted(try fixture("agile-encrypted.xlsx")))
+        #expect(!WorkbookDecryptor.isEncrypted(try fixture("plain.xlsx")))
+        #expect(!WorkbookDecryptor.isEncrypted(Data("not a workbook".utf8)))
     }
 
-    func testTheDescriptorReadsTheParametersTheFileDeclares() throws {
+    @Test func theDescriptorReadsTheParametersTheFileDeclares() throws {
         let container = try CompoundFile(try fixture("agile-encrypted.xlsx"))
         let descriptor = try AgileEncryption(stream: try container.stream(named: "EncryptionInfo"))
-        XCTAssertEqual(descriptor.keyData.cipherAlgorithm, "AES")
-        XCTAssertEqual(descriptor.keyData.cipherChaining, "ChainingModeCBC")
-        XCTAssertGreaterThan(descriptor.passwordKey.spinCount, 0)
-        XCTAssertEqual(descriptor.passwordKey.keyBits % 8, 0)
-        XCTAssertFalse(descriptor.passwordKey.saltValue.isEmpty)
+        #expect(descriptor.keyData.cipherAlgorithm == "AES")
+        #expect(descriptor.keyData.cipherChaining == "ChainingModeCBC")
+        #expect(descriptor.passwordKey.spinCount > 0)
+        #expect((descriptor.passwordKey.keyBits % 8) == 0)
+        #expect(!descriptor.passwordKey.saltValue.isEmpty)
     }
 }
 
 /// The hashes this accepts, and the one it refuses on purpose.
 extension WorkbookDecryptorTests {
 
-    func testTheDescriptorSpellingIsNormalisedRatherThanMatchedLiterally() {
+    @Test func theDescriptorSpellingIsNormalisedRatherThanMatchedLiterally() {
         // Writers disagree about punctuation; the algorithm is the same either way.
-        XCTAssertEqual(EncryptionHash(descriptorName: "SHA512"), .sha512)
-        XCTAssertEqual(EncryptionHash(descriptorName: "SHA-512"), .sha512)
-        XCTAssertEqual(EncryptionHash(descriptorName: "sha512"), .sha512)
-        XCTAssertEqual(EncryptionHash(descriptorName: "SHA256"), .sha256)
+        #expect(EncryptionHash(descriptorName: "SHA512") == .sha512)
+        #expect(EncryptionHash(descriptorName: "SHA-512") == .sha512)
+        #expect(EncryptionHash(descriptorName: "sha512") == .sha512)
+        #expect(EncryptionHash(descriptorName: "SHA256") == .sha256)
     }
 
     /// SHA-1 is supported because real files require it.
@@ -99,9 +92,9 @@ extension WorkbookDecryptorTests {
     /// therefore SHA-512. The two 2012 workbooks that prompted this feature both declare
     /// `SHA1` with 128-bit AES, so that theory broke exactly the case it was built for. The
     /// theory had been checked against a fixture this project generated itself.
-    func testSHA1IsSupportedBecauseRealFilesUseIt() {
-        XCTAssertEqual(EncryptionHash(descriptorName: "SHA1"), .sha1)
-        XCTAssertEqual(EncryptionHash(descriptorName: "SHA-1"), .sha1)
+    @Test func sha1IsSupportedBecauseRealFilesUseIt() {
+        #expect(EncryptionHash(descriptorName: "SHA1") == .sha1)
+        #expect(EncryptionHash(descriptorName: "SHA-1") == .sha1)
     }
 }
 
@@ -112,30 +105,27 @@ extension WorkbookDecryptorTests {
 extension WorkbookDecryptorTests {
 
     /// SHA-1 with 128-bit AES, which is what the workbooks this feature exists for declare.
-    func testSHA1WithAES128Decrypts() throws {
+    @Test func sha1WithAES128Decrypts() throws {
         let decrypted = try WorkbookDecryptor.decrypt(try fixture("agile-sha1-aes128.xlsx"),
                                                       password: "swordfish")
-        XCTAssertEqual(decrypted, try fixture("plain.xlsx"),
-                       "SHA-1 with AES-128 must decrypt byte for byte, as SHA-512 does")
+        #expect(try decrypted == fixture("plain.xlsx"), "SHA-1 with AES-128 must decrypt byte for byte, as SHA-512 does")
     }
 
-    func testTheSHA1FixtureReallyDeclaresSHA1() throws {
+    @Test func theSHA1FixtureReallyDeclaresSHA1() throws {
         // Guarding the guard: a fixture silently regenerated with different parameters
         // would leave this suite green while testing the same path twice.
         let container = try CompoundFile(try fixture("agile-sha1-aes128.xlsx"))
         let descriptor = try AgileEncryption(stream: try container.stream(named: "EncryptionInfo"))
-        XCTAssertEqual(descriptor.keyData.hashAlgorithm, .sha1)
-        XCTAssertEqual(descriptor.passwordKey.hashAlgorithm, .sha1)
-        XCTAssertEqual(descriptor.keyData.keyBits, 128)
+        #expect(descriptor.keyData.hashAlgorithm == .sha1)
+        #expect(descriptor.passwordKey.hashAlgorithm == .sha1)
+        #expect(descriptor.keyData.keyBits == 128)
     }
 
-    func testAWrongPasswordIsRefusedForSHA1Too() throws {
-        XCTAssertThrowsError(
-            try WorkbookDecryptor.decrypt(try fixture("agile-sha1-aes128.xlsx"),
-                                          password: "not it")
-        ) { error in
+    @Test func aWrongPasswordIsRefusedForSHA1Too() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try WorkbookDecryptor.decrypt(try fixture("agile-sha1-aes128.xlsx"),
+                                          password: "not it") }) {
             guard case WorkbookDecryptionError.wrongPassword = error else {
-                return XCTFail("expected wrongPassword, got \(error)")
+                Issue.record("expected wrongPassword, got \(error)"); return
             }
         }
     }

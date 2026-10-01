@@ -1,6 +1,7 @@
 import Foundation
 import SwiftExcelCore
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// Excel's complex family — `COMPLEX` and the twenty-five `IM*` functions.
@@ -19,29 +20,29 @@ import XCTest
 /// goes wrong: the suffix must be `i` or `j` and never `I` or `J`, a result carries the
 /// suffix its arguments used, and a complex number with no imaginary part is written as a
 /// bare real with no suffix at all.
-final class ComplexFunctionTests: XCTestCase {
+@Suite struct ComplexFunctionTests {
 
     private let registry = FunctionRegistry.builtin
 
     private func call(_ name: String, _ args: CellValue...) throws -> CellValue {
-        let function = try XCTUnwrap(registry.function(named: name), "\(name) is not registered")
+        let function = try #require(registry.function(named: name), "\(name) is not registered")
         return try function.evaluate(args)
     }
 
     private func text(_ name: String, _ args: CellValue...) throws -> String {
-        let function = try XCTUnwrap(registry.function(named: name), "\(name) is not registered")
+        let function = try #require(registry.function(named: name), "\(name) is not registered")
         let result = try function.evaluate(args)
         guard case .text(let s) = result else {
-            XCTFail("\(name) returned \(result), not text"); return ""
+            Issue.record("\(name) returned \(result), not text"); return ""
         }
         return s
     }
 
     private func number(_ name: String, _ args: CellValue...) throws -> Double {
-        let function = try XCTUnwrap(registry.function(named: name), "\(name) is not registered")
+        let function = try #require(registry.function(named: name), "\(name) is not registered")
         let result = try function.evaluate(args)
         guard case .number(let v) = result else {
-            XCTFail("\(name) returned \(result), not a number"); return .nan
+            Issue.record("\(name) returned \(result), not a number"); return .nan
         }
         return v
     }
@@ -51,52 +52,50 @@ final class ComplexFunctionTests: XCTestCase {
         (try number("IMREAL", value), try number("IMAGINARY", value))
     }
 
-    private func assertSame(_ a: CellValue, _ b: CellValue,
-                            accuracy: Double = 1e-9, _ message: String = "",
-                            file: StaticString = #filePath, line: UInt = #line) throws {
+    /// Whether two complex results agree, part by part, within `accuracy`.
+    private func isSame(_ a: CellValue, _ b: CellValue, accuracy: Double = 1e-9) throws -> Bool {
         let (ar, ai) = try parts(a), (br, bi) = try parts(b)
-        XCTAssertEqual(ar, br, accuracy: accuracy, message, file: file, line: line)
-        XCTAssertEqual(ai, bi, accuracy: accuracy, message, file: file, line: line)
+        return ar.isClose(to: br, within: accuracy) && ai.isClose(to: bi, within: accuracy)
     }
 
     // MARK: - Registration
 
-    func testAllTwentySixComplexFunctionsAreRegistered() {
+    @Test func allTwentySixComplexFunctionsAreRegistered() {
         let names = ["COMPLEX", "IMABS", "IMAGINARY", "IMARGUMENT", "IMCONJUGATE", "IMCOS",
                      "IMCOSH", "IMCOT", "IMCSC", "IMCSCH", "IMDIV", "IMEXP", "IMLN", "IMLOG10",
                      "IMLOG2", "IMPOWER", "IMPRODUCT", "IMREAL", "IMSEC", "IMSECH", "IMSIN",
                      "IMSINH", "IMSQRT", "IMSUB", "IMSUM", "IMTAN"]
-        XCTAssertEqual(names.count, 26)
+        #expect(names.count == 26)
         for name in names {
-            XCTAssertNotNil(registry.function(named: name), "\(name) is not registered")
+            #expect(registry.resolvedName(name) == FunctionRegistry.canonical(name), "\(name) is not registered")
         }
     }
 
     // MARK: - The text format, which is the Excel-specific part
 
-    func testComplexBuildsTheTextFormAndTheAccessorsTakeItApart() throws {
-        XCTAssertEqual(try text("COMPLEX", .number(3), .number(4)), "3+4i")
-        XCTAssertEqual(try text("COMPLEX", .number(3), .number(-4)), "3-4i")
-        XCTAssertEqual(try number("IMREAL", .text("3+4i")), 3)
-        XCTAssertEqual(try number("IMAGINARY", .text("3+4i")), 4)
+    @Test func complexBuildsTheTextFormAndTheAccessorsTakeItApart() throws {
+        #expect(try text("COMPLEX", .number(3), .number(4)) == "3+4i")
+        #expect(try text("COMPLEX", .number(3), .number(-4)) == "3-4i")
+        #expect(try number("IMREAL", .text("3+4i")).isEqual(to: 3))
+        #expect(try number("IMAGINARY", .text("3+4i")).isEqual(to: 4))
     }
 
     /// A complex number with no imaginary part is a bare real, with no suffix at all.
-    func testAZeroImaginaryPartIsWrittenWithoutASuffix() throws {
-        XCTAssertEqual(try text("COMPLEX", .number(7), .number(0)), "7")
-        XCTAssertEqual(try text("IMSUM", .text("3"), .text("4")), "7")
+    @Test func aZeroImaginaryPartIsWrittenWithoutASuffix() throws {
+        #expect(try text("COMPLEX", .number(7), .number(0)) == "7")
+        #expect(try text("IMSUM", .text("3"), .text("4")) == "7")
     }
 
     /// A zero real part leaves the imaginary term standing alone, and the unit is bare.
-    func testAZeroRealPartLeavesTheImaginaryTermAlone() throws {
-        XCTAssertEqual(try text("COMPLEX", .number(0), .number(4)), "4i")
-        XCTAssertEqual(try text("COMPLEX", .number(0), .number(1)), "i")
+    @Test func aZeroRealPartLeavesTheImaginaryTermAlone() throws {
+        #expect(try text("COMPLEX", .number(0), .number(4)) == "4i")
+        #expect(try text("COMPLEX", .number(0), .number(1)) == "i")
     }
 
-    func testTheJSuffixIsAcceptedAndCarriedThrough() throws {
-        XCTAssertEqual(try text("COMPLEX", .number(3), .number(4), .text("j")), "3+4j")
-        XCTAssertEqual(try text("IMSUM", .text("1+1j"), .text("2+2j")), "3+3j")
-        XCTAssertEqual(try text("IMCONJUGATE", .text("3+4j")), "3-4j")
+    @Test func theJSuffixIsAcceptedAndCarriedThrough() throws {
+        #expect(try text("COMPLEX", .number(3), .number(4), .text("j")) == "3+4j")
+        #expect(try text("IMSUM", .text("1+1j"), .text("2+2j")) == "3+3j")
+        #expect(try text("IMCONJUGATE", .text("3+4j")) == "3-4j")
     }
 
     /// Uppercase is refused — but the two ways of writing it give *different* errors.
@@ -109,10 +108,10 @@ final class ComplexFunctionTests: XCTestCase {
     /// The distinction is coherent once seen: text that cannot be read as a complex number
     /// is `#NUM!` however it fails, and `"banana"` and `"3+4"` already returned that. An
     /// argument of the wrong kind is `#VALUE!`, and `COMPLEX`'s suffix is an argument.
-    func testAnUppercaseSuffixIsRefused() throws {
-        XCTAssertEqual(try call("IMABS", .text("3+4I")), .error(.num))
-        XCTAssertEqual(try call("IMABS", .text("3+4J")), .error(.num))
-        XCTAssertEqual(try call("COMPLEX", .number(3), .number(4), .text("I")), .error(.value))
+    @Test func anUppercaseSuffixIsRefused() throws {
+        #expect(try call("IMABS", .text("3+4I")) == .error(.num))
+        #expect(try call("IMABS", .text("3+4J")) == .error(.num))
+        #expect(try call("COMPLEX", .number(3), .number(4), .text("I")) == .error(.value))
     }
 
     /// Excel writes the exponent marker in upper case.
@@ -120,9 +119,9 @@ final class ComplexFunctionTests: XCTestCase {
     /// Measured on `IMPOWER("i", 2)`, which at the time produced an exponent in both. It no
     /// longer does — integer powers are multiplied out now — so the rule is pinned on a
     /// component small enough to need the notation on its own.
-    func testAnExponentMarkerIsUppercase() throws {
-        XCTAssertEqual(try text("COMPLEX", .number(1e-20), .number(1)), "1E-20+i")
-        XCTAssertEqual(try text("COMPLEX", .number(1), .number(1e-20)), "1+1E-20i")
+    @Test func anExponentMarkerIsUppercase() throws {
+        #expect(try text("COMPLEX", .number(1e-20), .number(1)) == "1E-20+i")
+        #expect(try text("COMPLEX", .number(1), .number(1e-20)) == "1+1E-20i")
     }
 
     /// Two routes to one answer must not disagree, which is this package's first principle.
@@ -134,154 +133,142 @@ final class ComplexFunctionTests: XCTestCase {
     /// The cause was swift-numerics: its `pow(z, n: Int)` is `exp(log(z) · n)` despite
     /// taking an `Int`, and `exp(iπ)` carries `sin` of the nearest `Double` to π, which is
     /// `1.2246e-16` rather than nought.
-    func testAnIntegerPowerIsTheProductAndNotALogarithm() throws {
-        XCTAssertEqual(try text("IMPOWER", .text("i"), .number(2)), "-1")
-        XCTAssertEqual(try text("IMPOWER", .text("i"), .number(2)),
-                       try text("IMPRODUCT", .text("i"), .text("i")))
-        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(3)),
-                       try text("IMPRODUCT", .text("1+1i"), .text("1+1i"), .text("1+1i")))
+    @Test func anIntegerPowerIsTheProductAndNotALogarithm() throws {
+        #expect(try text("IMPOWER", .text("i"), .number(2)) == "-1")
+        #expect(try text("IMPOWER", .text("i"), .number(2)) == text("IMPRODUCT", .text("i"), .text("i")))
+        #expect(try text("IMPOWER", .text("1+1i"), .number(3)) == text("IMPRODUCT", .text("1+1i"), .text("1+1i"), .text("1+1i")))
     }
 
-    func testAnIntegerPowerHandlesZeroAndNegativeExponents() throws {
-        XCTAssertEqual(try text("IMPOWER", .text("2+3i"), .number(0)), "1")
+    @Test func anIntegerPowerHandlesZeroAndNegativeExponents() throws {
+        #expect(try text("IMPOWER", .text("2+3i"), .number(0)) == "1")
         // (1+i)² is 2i, so its reciprocal is −0.5i.
-        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(-2)), "-0.5i")
+        #expect(try text("IMPOWER", .text("1+1i"), .number(-2)) == "-0.5i")
     }
 
     /// Excel writes each component to fifteen significant digits, and these return text, so
     /// the digits are the value rather than a presentation of it.
-    func testComponentsAreWrittenToFifteenSignificantDigits() throws {
+    @Test func componentsAreWrittenToFifteenSignificantDigits() throws {
         // Measured: Excel gives "-2+2i" here, not "-1.9999999999999996+2i".
-        XCTAssertEqual(try text("IMPOWER", .text("1+1i"), .number(3)), "-2+2i")
-        XCTAssertEqual(try text("IMEXP", .text("1+1i")),
-                       "1.46869393991589+2.28735528717884i")
-        XCTAssertEqual(try text("IMLOG2", .text("3+4i")),
-                       "2.32192809488736+1.33780421245098i")
+        #expect(try text("IMPOWER", .text("1+1i"), .number(3)) == "-2+2i")
+        #expect(try text("IMEXP", .text("1+1i")) == "1.46869393991589+2.28735528717884i")
+        #expect(try text("IMLOG2", .text("3+4i")) == "2.32192809488736+1.33780421245098i")
     }
 
-    func testTextThatIsNotAComplexNumberIsANumError() throws {
-        XCTAssertEqual(try call("IMABS", .text("banana")), .error(.num))
+    @Test func textThatIsNotAComplexNumberIsANumError() throws {
+        #expect(try call("IMABS", .text("banana")) == .error(.num))
         // A missing suffix is not an implied one.
-        XCTAssertEqual(try call("IMABS", .text("3+4")), .error(.num))
+        #expect(try call("IMABS", .text("3+4")) == .error(.num))
     }
 
-    func testAPlainNumberIsAComplexNumberWithNoImaginaryPart() throws {
-        XCTAssertEqual(try number("IMREAL", .number(5)), 5)
-        XCTAssertEqual(try number("IMAGINARY", .number(5)), 0)
+    @Test func aPlainNumberIsAComplexNumberWithNoImaginaryPart() throws {
+        #expect(try number("IMREAL", .number(5)).isEqual(to: 5))
+        #expect(try number("IMAGINARY", .number(5)) == 0)
     }
 
     // MARK: - Arithmetic, asserted as inverses
 
-    func testSubtractionUndoesAddition() throws {
+    @Test func subtractionUndoesAddition() throws {
         let z: CellValue = .text("3+4i"), w: CellValue = .text("-1.5+2.25i")
         let sum = try call("IMSUM", z, w)
-        try assertSame(try call("IMSUB", sum, w), z, "IMSUB must undo IMSUM")
+        #expect(try isSame(call("IMSUB", sum, w), z), "IMSUB must undo IMSUM")
     }
 
-    func testDivisionUndoesMultiplication() throws {
+    @Test func divisionUndoesMultiplication() throws {
         let z: CellValue = .text("3+4i"), w: CellValue = .text("-1.5+2.25i")
         let product = try call("IMPRODUCT", z, w)
-        try assertSame(try call("IMDIV", product, w), z, "IMDIV must undo IMPRODUCT")
+        #expect(try isSame(call("IMDIV", product, w), z), "IMDIV must undo IMPRODUCT")
     }
 
-    func testSumAndProductAreVariadic() throws {
-        XCTAssertEqual(try text("IMSUM", .text("1+1i"), .text("2+2i"), .text("3+3i")), "6+6i")
-        try assertSame(try call("IMPRODUCT", .text("1+1i"), .text("1+1i"), .text("1+1i")),
-                       try call("IMPOWER", .text("1+1i"), .number(3)))
+    @Test func sumAndProductAreVariadic() throws {
+        #expect(try text("IMSUM", .text("1+1i"), .text("2+2i"), .text("3+3i")) == "6+6i")
+        #expect(try isSame(call("IMPRODUCT", .text("1+1i"), .text("1+1i"), .text("1+1i")), call("IMPOWER", .text("1+1i"), .number(3))))
     }
 
     // MARK: - The transcendental identities
 
-    func testExponentialUndoesLogarithm() throws {
+    @Test func exponentialUndoesLogarithm() throws {
         for z in ["3+4i", "-2+0.5i", "0.25-1.75i"] {
-            try assertSame(try call("IMEXP", try call("IMLN", .text(z))), .text(z),
-                           accuracy: 1e-9, "IMEXP must undo IMLN for \(z)")
+            #expect(try isSame(call("IMEXP", try call("IMLN", .text(z))), .text(z), accuracy: 1e-9), "IMEXP must undo IMLN for \(z)")
         }
     }
 
-    func testSquareRootSquaresBack() throws {
+    @Test func squareRootSquaresBack() throws {
         for z in ["3+4i", "-2+0.5i"] {
-            try assertSame(try call("IMPOWER", try call("IMSQRT", .text(z)), .number(2)),
-                           .text(z), accuracy: 1e-9, "IMSQRT then square must return \(z)")
+            #expect(try isSame(call("IMPOWER", try call("IMSQRT", .text(z)), .number(2)), .text(z), accuracy: 1e-9), "IMSQRT then square must return \(z)")
         }
     }
 
-    func testThePythagoreanIdentityHolds() throws {
+    @Test func thePythagoreanIdentityHolds() throws {
         for z in ["1+1i", "0.5-2i"] {
             let sin2 = try call("IMPOWER", try call("IMSIN", .text(z)), .number(2))
             let cos2 = try call("IMPOWER", try call("IMCOS", .text(z)), .number(2))
-            try assertSame(try call("IMSUM", sin2, cos2), .text("1"),
-                           accuracy: 1e-9, "sin² + cos² must be 1 at \(z)")
+            #expect(try isSame(call("IMSUM", sin2, cos2), .text("1"), accuracy: 1e-9), "sin² + cos² must be 1 at \(z)")
         }
     }
 
-    func testTheHyperbolicIdentityHolds() throws {
+    @Test func theHyperbolicIdentityHolds() throws {
         // cosh² − sinh² = 1.
         for z in ["1+1i", "0.5-2i"] {
             let cosh2 = try call("IMPOWER", try call("IMCOSH", .text(z)), .number(2))
             let sinh2 = try call("IMPOWER", try call("IMSINH", .text(z)), .number(2))
-            try assertSame(try call("IMSUB", cosh2, sinh2), .text("1"),
-                           accuracy: 1e-9, "cosh² − sinh² must be 1 at \(z)")
+            #expect(try isSame(call("IMSUB", cosh2, sinh2), .text("1"), accuracy: 1e-9), "cosh² − sinh² must be 1 at \(z)")
         }
     }
 
     /// The five reciprocal spellings are exactly that, and nothing more.
-    func testTheReciprocalFunctionsAreReciprocals() throws {
+    @Test func theReciprocalFunctionsAreReciprocals() throws {
         let z: CellValue = .text("1+1i")
         let pairs = [("IMSEC", "IMCOS"), ("IMCSC", "IMSIN"), ("IMCOT", "IMTAN"),
                      ("IMSECH", "IMCOSH"), ("IMCSCH", "IMSINH")]
         for (reciprocal, base) in pairs {
             let expected = try call("IMDIV", .text("1"), try call(base, z))
-            try assertSame(try call(reciprocal, z), expected,
-                           accuracy: 1e-9, "\(reciprocal) must be 1/\(base)")
+            #expect(try isSame(call(reciprocal, z), expected, accuracy: 1e-9), "\(reciprocal) must be 1/\(base)")
         }
     }
 
-    func testTheLogarithmBasesAreChangesOfBase() throws {
+    @Test func theLogarithmBasesAreChangesOfBase() throws {
         let z: CellValue = .text("3+4i")
         let ln = try call("IMLN", z)
-        try assertSame(try call("IMLOG10", z),
-                       try call("IMDIV", ln, .number(log(10.0))), accuracy: 1e-9)
-        try assertSame(try call("IMLOG2", z),
-                       try call("IMDIV", ln, .number(log(2.0))), accuracy: 1e-9)
+        #expect(try isSame(call("IMLOG10", z), call("IMDIV", ln, .number(log(10.0))), accuracy: 1e-9))
+        #expect(try isSame(call("IMLOG2", z), call("IMDIV", ln, .number(log(2.0))), accuracy: 1e-9))
     }
 
     // MARK: - Modulus, argument, conjugate
 
-    func testAbsoluteValueIsTheHypotenuse() throws {
-        XCTAssertEqual(try number("IMABS", .text("3+4i")), 5, accuracy: 1e-12)
+    @Test func absoluteValueIsTheHypotenuse() throws {
+        #expect(try abs(number("IMABS", .text("3+4i")) - 5) <= 1e-12)
     }
 
-    func testTheArgumentRecoversTheAngleItWasBuiltFrom() throws {
+    @Test func theArgumentRecoversTheAngleItWasBuiltFrom() throws {
         for theta in [0.3, 1.0, -2.0, 3.0] {
             let z = try call("COMPLEX", .number(cos(theta)), .number(sin(theta)))
-            XCTAssertEqual(try number("IMARGUMENT", z), theta, accuracy: 1e-9)
+            #expect(try abs(number("IMARGUMENT", z) - theta) <= 1e-9)
         }
     }
 
-    func testConjugatingTwiceReturnsTheOriginal() throws {
+    @Test func conjugatingTwiceReturnsTheOriginal() throws {
         let z: CellValue = .text("3-4i")
-        try assertSame(try call("IMCONJUGATE", try call("IMCONJUGATE", z)), z)
+        #expect(try isSame(call("IMCONJUGATE", try call("IMCONJUGATE", z)), z))
     }
 
     // MARK: - The domains Excel refuses
 
-    func testTheLogarithmOfZeroIsRefused() throws {
-        XCTAssertEqual(try call("IMLN", .text("0")), .error(.num))
-        XCTAssertEqual(try call("IMLOG10", .text("0")), .error(.num))
-        XCTAssertEqual(try call("IMLOG2", .text("0")), .error(.num))
+    @Test func theLogarithmOfZeroIsRefused() throws {
+        #expect(try call("IMLN", .text("0")) == .error(.num))
+        #expect(try call("IMLOG10", .text("0")) == .error(.num))
+        #expect(try call("IMLOG2", .text("0")) == .error(.num))
     }
 
-    func testDivisionByZeroIsRefused() throws {
-        XCTAssertEqual(try call("IMDIV", .text("3+4i"), .text("0")), .error(.num))
+    @Test func divisionByZeroIsRefused() throws {
+        #expect(try call("IMDIV", .text("3+4i"), .text("0")) == .error(.num))
     }
 
-    func testTheArgumentOfZeroIsRefused() throws {
-        XCTAssertEqual(try call("IMARGUMENT", .text("0")), .error(.div0))
+    @Test func theArgumentOfZeroIsRefused() throws {
+        #expect(try call("IMARGUMENT", .text("0")) == .error(.div0))
     }
 
-    func testAnErrorArgumentPropagates() throws {
-        XCTAssertEqual(try call("IMABS", .error(.na)), .error(.na))
-        XCTAssertEqual(try call("IMSUM", .text("1+1i"), .error(.div0)), .error(.div0))
+    @Test func anErrorArgumentPropagates() throws {
+        #expect(try call("IMABS", .error(.na)) == .error(.na))
+        #expect(try call("IMSUM", .text("1+1i"), .error(.div0)) == .error(.div0))
     }
 }

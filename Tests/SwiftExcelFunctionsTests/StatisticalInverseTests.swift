@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import BusinessMath
@@ -16,15 +17,15 @@ import BusinessMath
 /// BINOM.INV(trials, probability_s, alpha)   probability_s ∈ [0,1], alpha ∈ [0,1]
 /// CHISQ.INV.RT(probability, deg_freedom)    probability ∈ [0,1], df ∈ [1, 10^10)
 /// ```
-final class StatisticalInverseTests: XCTestCase {
+@Suite struct StatisticalInverseTests {
 
     private func call(_ name: String, _ args: Double...) throws -> CellValue {
-        let fn = try XCTUnwrap(FunctionRegistry.builtin.function(named: name), "\(name) is not registered")
+        let fn = try #require(FunctionRegistry.builtin.function(named: name), "\(name) is not registered")
         return try fn.evaluate(args.map { .number($0) })
     }
 
     private func number(_ value: CellValue) throws -> Double {
-        guard case .number(let d) = value else { throw XCTSkip("expected a number, got \(value)") }
+        guard case .number(let d) = value else { throw TestFailure("expected a number, got \(value)") }
         return d
     }
 
@@ -49,19 +50,18 @@ final class StatisticalInverseTests: XCTestCase {
     /// about one recalled without reading it at all. So this asserts the **documented
     /// relationship** instead, which needs no memory: the right-tailed inverse at `p`,
     /// pushed back through the CDF, must give `1 − p`.
-    func testChiSquaredInverseRoundTripsThroughTheCDF() throws {
+    @Test func chiSquaredInverseRoundTripsThroughTheCDF() throws {
         for (p, df) in [(0.05, 10), (0.5, 3), (0.99, 7), (0.01, 20)] {
             let critical = try number(try call("CHISQ.INV.RT", p, Double(df)))
             let distribution = DistributionChiSquared(degreesOfFreedom: df)
-            XCTAssertEqual(distribution.cdf(critical), 1 - p, accuracy: 1e-9,
-                           "CHISQ.INV.RT(\(p), \(df)) did not round-trip")
+            #expect(abs(distribution.cdf(critical) - (1 - p)) <= 1e-9, "CHISQ.INV.RT(\(p), \(df)) did not round-trip")
         }
     }
 
     /// A sanity check against the value every statistics table carries: the 95th
     /// percentile of chi-squared with 10 degrees of freedom is 18.307.
-    func testAgainstTheTabulatedCriticalValue() throws {
-        XCTAssertEqual(try number(try call("CHISQ.INV.RT", 0.05, 10)), 18.307, accuracy: 1e-3)
+    @Test func againstTheTabulatedCriticalValue() throws {
+        #expect(try abs(number(try call("CHISQ.INV.RT", 0.05, 10)) - 18.307) <= 1e-3)
     }
 
     /// **The right tail is the point.** `CHISQ.INV.RT(p, df)` and the left-tailed quantile
@@ -70,21 +70,20 @@ final class StatisticalInverseTests: XCTestCase {
     ///
     /// Getting this backwards is the `CHIDIST`/`CHISQ.DIST` trap one function along, and it
     /// returns a positive number in the right range either way.
-    func testRightTailIsTheComplementOfTheLeft() throws {
+    @Test func rightTailIsTheComplementOfTheLeft() throws {
         let rightAt05 = try number(try call("CHISQ.INV.RT", 0.05, 8))
         let rightAt95 = try number(try call("CHISQ.INV.RT", 0.95, 8))
         // A larger right-tail probability means a smaller critical value.
-        XCTAssertGreaterThan(rightAt05, rightAt95,
-                             "the right-tail inverse must decrease as probability increases")
+        #expect(rightAt05 > rightAt95, "the right-tail inverse must decrease as probability increases")
     }
 
     /// Microsoft's stated domain: probability in `[0, 1]`, degrees of freedom in
     /// `[1, 10^10)`. Outside it, `#NUM!`.
-    func testChiSquaredInverseDomain() throws {
-        XCTAssertEqual(try call("CHISQ.INV.RT", -0.1, 10), .error(.num))
-        XCTAssertEqual(try call("CHISQ.INV.RT", 1.1, 10), .error(.num))
-        XCTAssertEqual(try call("CHISQ.INV.RT", 0.5, 0), .error(.num))
-        XCTAssertEqual(try call("CHISQ.INV.RT", 0.5, 1e10), .error(.num))
+    @Test func chiSquaredInverseDomain() throws {
+        #expect(try call("CHISQ.INV.RT", -0.1, 10) == .error(.num))
+        #expect(try call("CHISQ.INV.RT", 1.1, 10) == .error(.num))
+        #expect(try call("CHISQ.INV.RT", 0.5, 0) == .error(.num))
+        #expect(try call("CHISQ.INV.RT", 0.5, 1e10) == .error(.num))
     }
 
     // MARK: - BINOM.INV
@@ -94,8 +93,8 @@ final class StatisticalInverseTests: XCTestCase {
     /// Microsoft's definition is *"the smallest value for which the cumulative binomial
     /// distribution is greater than or equal to a criterion value"* — so the result is a
     /// count of successes, and the comparison is `≥`, not `>`.
-    func testBinomialInverse() throws {
-        XCTAssertEqual(try call("BINOM.INV", 6, 0.5, 0.75), .number(4))
+    @Test func binomialInverse() throws {
+        #expect(try call("BINOM.INV", 6, 0.5, 0.75) == .number(4))
     }
 
     /// **The boundary is inclusive.** At `alpha` exactly equal to a cumulative value, the
@@ -104,24 +103,24 @@ final class StatisticalInverseTests: XCTestCase {
     ///
     /// With 2 trials at p = 0.5 the cumulative is 0.25, 0.75, 1.0. So `alpha = 0.75` must
     /// give 1, not 2.
-    func testTheCriterionIsInclusive() throws {
-        XCTAssertEqual(try call("BINOM.INV", 2, 0.5, 0.25), .number(0))
-        XCTAssertEqual(try call("BINOM.INV", 2, 0.5, 0.75), .number(1))
-        XCTAssertEqual(try call("BINOM.INV", 2, 0.5, 1.0), .number(2))
+    @Test func theCriterionIsInclusive() throws {
+        #expect(try call("BINOM.INV", 2, 0.5, 0.25) == .number(0))
+        #expect(try call("BINOM.INV", 2, 0.5, 0.75) == .number(1))
+        #expect(try call("BINOM.INV", 2, 0.5, 1.0) == .number(2))
     }
 
     /// A certainty collapses the distribution: every trial succeeds, so any criterion is
     /// met only at `trials`.
-    func testCertainSuccess() throws {
-        XCTAssertEqual(try call("BINOM.INV", 5, 1.0, 0.5), .number(5))
-        XCTAssertEqual(try call("BINOM.INV", 5, 0.0, 0.5), .number(0))
+    @Test func certainSuccess() throws {
+        #expect(try call("BINOM.INV", 5, 1.0, 0.5) == .number(5))
+        #expect(try call("BINOM.INV", 5, 0.0, 0.5) == .number(0))
     }
 
     /// Microsoft's stated domain: `probability_s` and `alpha` both in `[0, 1]`, trials a
     /// non-negative count.
-    func testBinomialInverseDomain() throws {
-        XCTAssertEqual(try call("BINOM.INV", 6, 1.5, 0.75), .error(.num))
-        XCTAssertEqual(try call("BINOM.INV", 6, 0.5, -0.1), .error(.num))
-        XCTAssertEqual(try call("BINOM.INV", -1, 0.5, 0.75), .error(.num))
+    @Test func binomialInverseDomain() throws {
+        #expect(try call("BINOM.INV", 6, 1.5, 0.75) == .error(.num))
+        #expect(try call("BINOM.INV", 6, 0.5, -0.1) == .error(.num))
+        #expect(try call("BINOM.INV", -1, 0.5, 0.75) == .error(.num))
     }
 }

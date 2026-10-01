@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -35,7 +36,7 @@ import SwiftXLSX
 ///   4    4    40
 ///   5    5    50
 /// ```
-final class ImplicitIntersectionTests: XCTestCase {
+@Suite struct ImplicitIntersectionTests {
 
     private struct Book: CellValueProvider {
         static let cells: [String: CellValue] = [
@@ -77,53 +78,48 @@ final class ImplicitIntersectionTests: XCTestCase {
     // MARK: - The measured shape
 
     /// **The corpus cell.** Written in row 3, `A1:A5 > 2` means `A3 > 2`, which is true.
-    func testAComparisonIntersectsWithTheFormulasRow() throws {
-        XCTAssertEqual(try evaluate("IF(AND(A1:A5>2,A1:A5<5),1,0)", at: "D3"), .number(1),
-                       "row 3: 3 > 2 and 3 < 5")
-        XCTAssertEqual(try evaluate("IF(AND(A1:A5>2,A1:A5<5),1,0)", at: "D1"), .number(0),
-                       "row 1: 1 is not > 2")
+    @Test func aComparisonIntersectsWithTheFormulasRow() throws {
+        #expect(try evaluate("IF(AND(A1:A5>2,A1:A5<5),1,0)", at: "D3") == .number(1), "row 3: 3 > 2 and 3 < 5")
+        #expect(try evaluate("IF(AND(A1:A5>2,A1:A5<5),1,0)", at: "D1") == .number(0), "row 1: 1 is not > 2")
     }
 
     /// Arithmetic intersects too — it is the operator that expects one value, not the function.
-    func testArithmeticIntersects() throws {
-        XCTAssertEqual(try evaluate("A1:A5*10", at: "D4"), .number(40))
-        XCTAssertEqual(try evaluate("A1:A5&\"x\"", at: "D2"), .text("2x"))
+    @Test func arithmeticIntersects() throws {
+        #expect(try evaluate("A1:A5*10", at: "D4") == .number(40))
+        #expect(try evaluate("A1:A5&\"x\"", at: "D2") == .text("2x"))
     }
 
     /// A range spanning **columns** intersects against the formula's column instead.
-    func testARowRangeIntersectsWithTheFormulasColumn() throws {
-        XCTAssertEqual(try evaluate("A1:B1*2", at: "B7"), .number(20), "column B of row 1")
+    @Test func aRowRangeIntersectsWithTheFormulasColumn() throws {
+        #expect(try evaluate("A1:B1*2", at: "B7") == .number(20), "column B of row 1")
     }
 
     /// **No intersection is `#VALUE!`**, which is Excel's answer and not a silent zero.
-    func testNoIntersectionIsAValueError() throws {
-        XCTAssertEqual(try evaluate("A1:A5*10", at: "D9"), .error(.value),
-                       "row 9 is outside A1:A5")
+    @Test func noIntersectionIsAValueError() throws {
+        #expect(try evaluate("A1:A5*10", at: "D9") == .error(.value), "row 9 is outside A1:A5")
     }
 
     // MARK: - Where it must not fire
 
     /// **An array-entered formula means the whole range**, and 64 corpus cells depend on it.
-    func testAnArrayEnteredFormulaDoesNotIntersect() throws {
+    @Test func anArrayEnteredFormulaDoesNotIntersect() throws {
         guard case .array(let matrix) =
                 try evaluate("A1:A5>2", at: "D3", arrayEntered: ["D3"]) else {
-            return XCTFail("array-entered: the comparison stays a column")
+            Issue.record("array-entered: the comparison stays a column"); return
         }
-        XCTAssertEqual(matrix.elements.count, 5)
+        #expect(matrix.elements.count == 5)
     }
 
     /// **`SUMPRODUCT` asks for arrays**, normally entered or not — the idiom exists for that.
-    func testSumproductStillSeesArrays() throws {
-        XCTAssertEqual(try evaluate("SUMPRODUCT((A1:A5>2)*B1:B5)", at: "D3"), .number(120),
-                       "30 + 40 + 50, not row 3 alone")
-        XCTAssertEqual(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3"), .number(3))
+    @Test func sumproductStillSeesArrays() throws {
+        #expect(try evaluate("SUMPRODUCT((A1:A5>2)*B1:B5)", at: "D3") == .number(120), "30 + 40 + 50, not row 3 alone")
+        #expect(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3") == .number(3))
     }
 
     /// A range passed to a function that **takes ranges** is never intersected.
-    func testARangeArgumentToAnAggregateIsUntouched() throws {
-        XCTAssertEqual(try evaluate("SUM(A1:A5)", at: "D3"), .number(15))
-        XCTAssertEqual(try evaluate("COUNT(A1:A5)", at: "D9"), .number(5),
-                       "even from a row the range does not reach")
+    @Test func aRangeArgumentToAnAggregateIsUntouched() throws {
+        #expect(try evaluate("SUM(A1:A5)", at: "D3") == .number(15))
+        #expect(try evaluate("COUNT(A1:A5)", at: "D9") == .number(5), "even from a row the range does not reach")
     }
 
     // MARK: - Scalar function arguments
@@ -141,49 +137,40 @@ final class ImplicitIntersectionTests: XCTestCase {
     /// The list is therefore closed **where it is known**, not guessed at wholesale: the lookup
     /// family, whose first argument is a single value in every form Excel documents. The rest
     /// of the gap stays open and stays recorded, below.
-    func testTheLookupValueOfVlookupIntersects() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3"), .number(30),
-                       "row 3: looks up 3, and B3 is 30")
-        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D1"), .number(10),
-                       "row 1: looks up 1")
+    @Test func theLookupValueOfVlookupIntersects() throws {
+        #expect(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3") == .number(30), "row 3: looks up 3, and B3 is 30")
+        #expect(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D1") == .number(10), "row 1: looks up 1")
     }
 
     /// The **table** is a range and must never be intersected, which is the half of this that
     /// a wrong guess would break: from row 9 the table still spans every row it always did.
-    func testTheTableOfVlookupIsNotIntersected() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(3,A1:B5,2)", at: "D9"), .number(30))
+    @Test func theTableOfVlookupIsNotIntersected() throws {
+        #expect(try evaluate("VLOOKUP(3,A1:B5,2)", at: "D9") == .number(30))
     }
 
     /// `MATCH` takes its lookup value the same way, and its array the same way as the table.
-    func testTheLookupValueOfMatchIntersects() throws {
-        XCTAssertEqual(try evaluate("MATCH(A1:A5,A1:A5,0)", at: "D3"), .number(3),
-                       "looks up 3, which is the third row")
-        XCTAssertEqual(try evaluate("MATCH(4,A1:A5,0)", at: "D9"), .number(4),
-                       "the array is untouched from a row outside it")
+    @Test func theLookupValueOfMatchIntersects() throws {
+        #expect(try evaluate("MATCH(A1:A5,A1:A5,0)", at: "D3") == .number(3), "looks up 3, which is the third row")
+        #expect(try evaluate("MATCH(4,A1:A5,0)", at: "D9") == .number(4), "the array is untouched from a row outside it")
     }
 
     /// `HLOOKUP` intersects against the **column**, because its lookup value is normally
     /// written as a row.
-    func testTheLookupValueOfHlookupIntersects() throws {
-        XCTAssertEqual(try evaluate("HLOOKUP(A1:B1,A1:B5,2)", at: "B7"), .number(20),
-                       "column B of row 1 is 10, and row 2 beneath it is 20")
+    @Test func theLookupValueOfHlookupIntersects() throws {
+        #expect(try evaluate("HLOOKUP(A1:B1,A1:B5,2)", at: "B7") == .number(20), "column B of row 1 is 10, and row 2 beneath it is 20")
     }
 
     /// A lookup value that intersects with nothing is `#VALUE!`, as it is for an operator.
-    func testALookupValueThatMissesIsAValueError() throws {
-        XCTAssertEqual(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D9"), .error(.value))
+    @Test func aLookupValueThatMissesIsAValueError() throws {
+        #expect(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D9") == .error(.value))
     }
 
     /// **Both gates still hold.** An array-entered formula means the whole range, and nothing
     /// inside a call that asked for arrays intersects — the argument seam reuses the operator
     /// seam's rule rather than restating it, so it cannot drift from it.
-    func testTheGatesStillHoldForArguments() throws {
-        XCTAssertEqual(
-            try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3", arrayEntered: ["D3"]),
-            .error(.na),
-            "array-entered: the lookup value stays a column and matches nothing")
-        XCTAssertEqual(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3"), .number(3),
-                       "and an array context is still an array context")
+    @Test func theGatesStillHoldForArguments() throws {
+        #expect(try evaluate("VLOOKUP(A1:A5,A1:B5,2)", at: "D3", arrayEntered: ["D3"]) == .error(.na), "array-entered: the lookup value stays a column and matches nothing")
+        #expect(try evaluate("SUMPRODUCT(--(A1:A5>2))", at: "D3") == .number(3), "and an array context is still an array context")
     }
 
     /// **The rest of the gap, still open and still measured.**
@@ -201,22 +188,21 @@ final class ImplicitIntersectionTests: XCTestCase {
     ///
     /// This test pins what this package does, and says what Excel does, so the remainder is a
     /// recorded measurement rather than an unexamined difference.
-    func testIntersectionStillDoesNotReachEveryFunctionArgument() throws {
-        XCTAssertEqual(try evaluate("ABS(A1:A5)", at: "D3"), .error(.value),
-                       "Excel answers 3 here — see the note. Measured, not agreed")
+    @Test func intersectionStillDoesNotReachEveryFunctionArgument() throws {
+        #expect(try evaluate("ABS(A1:A5)", at: "D3") == .error(.value), "Excel answers 3 here — see the note. Measured, not agreed")
     }
 
     /// With no calling cell there is nothing to intersect against, so the array survives —
     /// which is what keeps every existing test that evaluates without an address working.
-    func testWithoutACallingCellNothingIntersects() throws {
+    @Test func withoutACallingCellNothingIntersects() throws {
         let value = try FormulaEvaluator.evaluate(
             try FormulaParser.parse("A1:A5>2"), cells: Book(), names: NoNames(),
             inSheet: "Sheet1")
-        guard case .array = value else { return XCTFail("expected an array") }
+        #expect(value.isArray, "with no calling cell, the comparison answers the whole range")
     }
 
     /// A one-cell range is already a single value and is unaffected either way.
-    func testAOneCellRangeIsUnaffected() throws {
-        XCTAssertEqual(try evaluate("A2:A2*10", at: "D9"), .number(20))
+    @Test func aOneCellRangeIsUnaffected() throws {
+        #expect(try evaluate("A2:A2*10", at: "D9") == .number(20))
     }
 }

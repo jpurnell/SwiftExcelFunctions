@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -13,7 +14,7 @@ import SwiftExcelCore
 /// This asks. It is a measurement rather than an assertion: what the registry answers is
 /// a fact to discover, and asserting a particular count would fail the moment someone
 /// binds one more function.
-final class UnreviewedCoverageTests: XCTestCase {
+@Suite struct UnreviewedCoverageTests {
 
     /// The matrix, as rows of `(source, function, category, status)`.
     private func matrix() throws -> [(source: String, function: String, category: String, status: String)] {
@@ -26,7 +27,7 @@ final class UnreviewedCoverageTests: XCTestCase {
             .appendingPathComponent("excel_function_coverage_matrix.tsv")
 
         guard let text = try? String(contentsOf: path, encoding: .utf8) else {
-            throw XCTSkip("coverage matrix not found at \(path.path)")
+            throw TestFailure("coverage matrix not found at \(path.path)")
         }
 
         // `whereSeparator:` rather than `split(separator: "\n")`. In Swift `\r\n` is a
@@ -46,7 +47,7 @@ final class UnreviewedCoverageTests: XCTestCase {
     /// largely Foundation, libm and swift-numerics — so a large share should resolve to
     /// near-free."* This is the number that says whether that is true, and where the
     /// remaining work actually is.
-    func testHowMuchOfTheUnreviewedBucketAlreadyAnswers() throws {
+    @Test func howMuchOfTheUnreviewedBucketAlreadyAnswers() throws {
         let registry = FunctionRegistry.builtin
         let rows = try matrix()
         // **Every source, not only EXCEL.** This filtered to `EXCEL` because the 147 `PSI`
@@ -101,7 +102,7 @@ final class UnreviewedCoverageTests: XCTestCase {
 
         // The matrix was read: this is the guard the assertion below used to be, and it
         // belongs on the whole file rather than on one status.
-        XCTAssertGreaterThan(rows.count, 0, "the coverage matrix was empty or unreadable")
+        #expect(rows.count > 0, "the coverage matrix was empty or unreadable")
 
         // **Zero, and it is meant to stay zero.** This asserted `total > 0` for as long as
         // the bucket had rows in it — a sanity check that the file had been parsed, written
@@ -112,7 +113,7 @@ final class UnreviewedCoverageTests: XCTestCase {
         // kind of thing that refills quietly. A new Excel release adds functions, someone
         // appends them as `unreviewed`, and nothing says so until a release goes out claiming
         // a coverage the matrix no longer supports. Now something says so.
-        XCTAssertEqual(total, 0, """
+        #expect(total == 0, """
             \(total) rows are unreviewed again. That is not a failure — new functions arrive \
             — but each needs classifying: implemented, bindable, or out of scope with a \
             written reason. See project/master_plan.md and, for the shape of a reason, \

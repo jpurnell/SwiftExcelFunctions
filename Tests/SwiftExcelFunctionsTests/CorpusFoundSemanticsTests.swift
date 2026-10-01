@@ -1,7 +1,8 @@
 import Foundation
 import SwiftExcelCore
 import SwiftXLSX
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// Semantics found by putting real workbooks to the checker, rather than by writing tests.
@@ -10,7 +11,7 @@ import XCTest
 /// invisible to the suite because **nobody writes these formulas on purpose in a test** —
 /// they write them in a spreadsheet. An empty cell compared to `""`, a date concatenated
 /// into a criterion, a blank cell formatted as a date: the stuff of real files.
-final class CorpusFoundSemanticsTests: XCTestCase {
+@Suite struct CorpusFoundSemanticsTests {
 
     private struct Cells: CellValueProvider {
         let values: [String: CellValue]
@@ -51,20 +52,20 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     ///
     /// `IF(AND(E20="",G20="No"),1,2)` is how a spreadsheet asks "has this been filled in
     /// yet". It answered 2 where Excel cached 1.
-    func testAnEmptyCellIsBothZeroAndEmptyText() throws {
-        XCTAssertEqual(try evaluate("E20=\"\""), .bool(true))
-        XCTAssertEqual(try evaluate("E20=0"), .bool(true))
-        XCTAssertEqual(try evaluate("IF(AND(E20=\"\",G20=\"No\"),1,2)"), .number(1))
+    @Test func anEmptyCellIsBothZeroAndEmptyText() throws {
+        #expect(try evaluate("E20=\"\"") == .bool(true))
+        #expect(try evaluate("E20=0") == .bool(true))
+        #expect(try evaluate("IF(AND(E20=\"\",G20=\"No\"),1,2)") == .number(1))
 
         // And the negations, which a half-filled template uses just as often.
-        XCTAssertEqual(try evaluate("E20<>\"\""), .bool(false))
-        XCTAssertEqual(try evaluate("G20=\"\""), .bool(false))
+        #expect(try evaluate("E20<>\"\"") == .bool(false))
+        #expect(try evaluate("G20=\"\"") == .bool(false))
     }
 
     /// A blank still orders against text and numbers the way Excel orders them.
-    func testABlankStillOrdersSensibly() throws {
-        XCTAssertEqual(try evaluate("E20<1"), .bool(true))
-        XCTAssertEqual(try evaluate("E20>-1"), .bool(true))
+    @Test func aBlankStillOrdersSensibly() throws {
+        #expect(try evaluate("E20<1") == .bool(true))
+        #expect(try evaluate("E20>-1") == .bool(true))
     }
 
     // MARK: - A date is a number
@@ -73,19 +74,19 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     ///
     /// An ISO string here made `">=" & I4` a criterion no date could ever match, so
     /// `SUMIFS(amounts, dates, ">="&I$4, …)` summed nothing while looking entirely right.
-    func testADateConcatenatesAsItsSerial() throws {
+    @Test func aDateConcatenatesAsItsSerial() throws {
         guard case .text(let joined) = try evaluate("\">=\"&D1") else {
-            return XCTFail("expected text")
+            Issue.record("expected text"); return
         }
-        XCTAssertEqual(joined, ">=45244")
-        XCTAssertFalse(joined.contains("-"), "an ISO date is not what Excel writes here")
+        #expect(joined == ">=45244")
+        #expect(!joined.contains("-"), "an ISO date is not what Excel writes here")
     }
 
     /// And the criterion built that way selects the dates it should.
-    func testACriterionBuiltFromADateSelects() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(C1:C3,B1:B3,\">=45100\")"), .number(50))
-        XCTAssertEqual(try evaluate("SUMIFS(C1:C3,B1:B3,\">=\"&B2,B1:B3,\"<=\"&B3)"), .number(50))
-        XCTAssertEqual(try evaluate("COUNTIFS(B1:B3,\"<\"&B3)"), .number(2))
+    @Test func aCriterionBuiltFromADateSelects() throws {
+        #expect(try evaluate("SUMIFS(C1:C3,B1:B3,\">=45100\")") == .number(50))
+        #expect(try evaluate("SUMIFS(C1:C3,B1:B3,\">=\"&B2,B1:B3,\"<=\"&B3)") == .number(50))
+        #expect(try evaluate("COUNTIFS(B1:B3,\"<\"&B3)") == .number(2))
     }
 
     // MARK: - Serial zero is a date Excel will show
@@ -95,14 +96,13 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     /// It is what an empty cell formatted as a date renders as, which a template full of
     /// unfilled date cells produces by the hundred. Refusing it sent the call down the
     /// numeric path, where the answer was `"0"`.
-    func testSerialZeroFormatsAsExcelShowsIt() throws {
-        XCTAssertEqual(try evaluate("TEXT(0,\"yyyy-mm-dd\")"), .text("1900-01-00"))
-        XCTAssertEqual(try evaluate("TEXT(0,\"yyyy-mm-ddThh:mm:ss\")"),
-                       .text("1900-01-00T00:00:00"))
+    @Test func serialZeroFormatsAsExcelShowsIt() throws {
+        #expect(try evaluate("TEXT(0,\"yyyy-mm-dd\")") == .text("1900-01-00"))
+        #expect(try evaluate("TEXT(0,\"yyyy-mm-ddThh:mm:ss\")") == .text("1900-01-00T00:00:00"))
         // Serial 1 is the first day Excel has, and is unaffected.
-        XCTAssertEqual(try evaluate("TEXT(1,\"yyyy-mm-dd\")"), .text("1900-01-01"))
+        #expect(try evaluate("TEXT(1,\"yyyy-mm-dd\")") == .text("1900-01-01"))
         // A negative serial is no date at all.
-        XCTAssertEqual(try evaluate("TEXT(-1,\"yyyy-mm-dd\")"), .text("-1"))
+        #expect(try evaluate("TEXT(-1,\"yyyy-mm-dd\")") == .text("-1"))
     }
 
     // MARK: - IPMT and PPMT, which had swapped places
@@ -112,18 +112,16 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     /// A positive present value is money owed, so both parts of the payment are negative.
     /// The sign was inverted here, and the two errors cancelled in `IPMT + PPMT = PMT` —
     /// which is why the identity test beside them passed throughout.
-    func testTheTwoHalvesOfAPaymentHaveExcelsSigns() throws {
-        XCTAssertEqual(try number("IPMT(0.1/12,1,36,8000)"), -66.67, accuracy: 0.01)
-        XCTAssertEqual(try number("PPMT(0.1/12,1,24,2000)"), -75.62, accuracy: 0.01)
+    @Test func theTwoHalvesOfAPaymentHaveExcelsSigns() throws {
+        #expect(try abs(number("IPMT(0.1/12,1,36,8000)") - -66.67) <= 0.01)
+        #expect(try abs(number("PPMT(0.1/12,1,24,2000)") - -75.62) <= 0.01)
 
         // Later in a mortgage the principal overtakes the interest; early on it does not.
         // Getting them the wrong way round is invisible in the total and obvious here.
         let earlyInterest = try number("IPMT(0.05/12,18,360,500000)")
         let earlyPrincipal = try number("PPMT(0.05/12,18,360,500000)")
-        XCTAssertLessThan(earlyInterest, earlyPrincipal,
-                          "eighteen months into a thirty-year loan, interest is the larger part")
-        XCTAssertEqual(earlyInterest + earlyPrincipal,
-                       try number("PMT(0.05/12,360,500000)"), accuracy: 1e-9)
+        #expect(earlyInterest < earlyPrincipal, "eighteen months into a thirty-year loan, interest is the larger part")
+        #expect(try abs((earlyInterest + earlyPrincipal) - number("PMT(0.05/12,360,500000)")) <= 1e-9)
     }
 
     // MARK: - What the last corpus sweep left
@@ -133,13 +131,13 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     /// A spreadsheet has no way to show an infinity, and every function downstream would
     /// have had to invent an answer for one. `B11*EXP(B12*B13)` in a corpus workbook caches
     /// `#NUM!` where this answered `inf`.
-    func testArithmeticThatLeavesTheRealsIsRefused() throws {
+    @Test func arithmeticThatLeavesTheRealsIsRefused() throws {
         // Written as powers rather than as `1E+300`: the parser does not read a
         // scientific-notation literal, which is a separate gap and is recorded as one.
-        XCTAssertEqual(try evaluate("(10^300)*(10^300)"), .error(.num))
-        XCTAssertEqual(try evaluate("-(10^300)*(10^300)"), .error(.num))
-        XCTAssertEqual(try evaluate("(10^300)+(10^300)"), .number(2e300))
-        XCTAssertEqual(try evaluate("(10^308)*10"), .error(.num))
+        #expect(try evaluate("(10^300)*(10^300)") == .error(.num))
+        #expect(try evaluate("-(10^300)*(10^300)") == .error(.num))
+        #expect(try evaluate("(10^300)+(10^300)") == .number(2e300))
+        #expect(try evaluate("(10^308)*10") == .error(.num))
     }
 
     /// A number becomes text at **fifteen significant digits**, which is what Excel writes.
@@ -148,12 +146,12 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     /// `"Donations: 1052.949999999999"` — a `Double` carries seventeen digits and Excel
     /// shows fifteen. This is Excel *displaying* a number rather than *storing* one, which
     /// is why ADR-003 declines the storage limit and this is implemented.
-    func testANumberBecomesTextAtFifteenDigits() throws {
-        XCTAssertEqual(try evaluate("\"x\"&(0.1+0.2)"), .text("x0.3"))
-        XCTAssertEqual(try evaluate("\"x\"&(77.1)"), .text("x77.1"))
-        XCTAssertEqual(try evaluate("\"x\"&(1/3)"), .text("x0.333333333333333"))
+    @Test func aNumberBecomesTextAtFifteenDigits() throws {
+        #expect(try evaluate("\"x\"&(0.1+0.2)") == .text("x0.3"))
+        #expect(try evaluate("\"x\"&(77.1)") == .text("x77.1"))
+        #expect(try evaluate("\"x\"&(1/3)") == .text("x0.333333333333333"))
         // A whole number keeps its integer form.
-        XCTAssertEqual(try evaluate("\"x\"&42"), .text("x42"))
+        #expect(try evaluate("\"x\"&42") == .text("x42"))
     }
 
     /// Excel's comparison rule applies wherever Excel compares — a criterion included.
@@ -161,36 +159,36 @@ final class CorpusFoundSemanticsTests: XCTestCase {
     /// `COUNTIF(H2:H23, "1")` counts `0.99999999999999978` as a 1, because the difference is
     /// negligible against the operands. Comparing the raw doubles answered 6 where Excel
     /// answered 11.
-    func testACriterionComparesTheWayExcelCompares() throws {
+    @Test func aCriterionComparesTheWayExcelCompares() throws {
         let column = CellValue.array(CellMatrix(row: [
             .number(0.99999999999999978), .number(1), .number(0.98), .number(1),
         ]))
         guard let countif = FunctionRegistry.builtin.function(named: "COUNTIF") else {
-            return XCTFail("COUNTIF is not registered")
+            Issue.record("COUNTIF is not registered"); return
         }
-        XCTAssertEqual(try countif.evaluate([column, .text("1")]), .number(3))
-        XCTAssertEqual(try countif.evaluate([column, .text("<1")]), .number(1))
+        #expect(try countif.evaluate([column, .text("1")]) == .number(3))
+        #expect(try countif.evaluate([column, .text("<1")]) == .number(1))
     }
 
     /// `SUMPRODUCT` propagates an error rather than dropping the term.
     ///
     /// Text and blanks contribute zero so their term falls out; `#N/A` makes the whole sum
     /// `#N/A`, which is what stops a total quietly reading low because one input is missing.
-    func testSumproductPropagatesAnError() throws {
+    @Test func sumproductPropagatesAnError() throws {
         let good = CellValue.array(CellMatrix(row: [.number(1), .number(2)]))
         let missing = CellValue.array(CellMatrix(row: [.number(1), .error(.na)]))
         let texty = CellValue.array(CellMatrix(row: [.number(1), .text("x")]))
         guard let sumproduct = FunctionRegistry.builtin.function(named: "SUMPRODUCT") else {
-            return XCTFail("SUMPRODUCT is not registered")
+            Issue.record("SUMPRODUCT is not registered"); return
         }
-        XCTAssertEqual(try sumproduct.evaluate([good, good]), .number(5))
-        XCTAssertEqual(try sumproduct.evaluate([good, missing]), .error(.na))
-        XCTAssertEqual(try sumproduct.evaluate([good, texty]), .number(1))
+        #expect(try sumproduct.evaluate([good, good]) == .number(5))
+        #expect(try sumproduct.evaluate([good, missing]) == .error(.na))
+        #expect(try sumproduct.evaluate([good, texty]) == .number(1))
     }
 
     private func number(_ formula: String) throws -> Double {
         guard case .number(let value) = try evaluate(formula) else {
-            XCTFail("\(formula) did not produce a number"); return .nan
+            Issue.record("\(formula) did not produce a number"); return .nan
         }
         return value
     }

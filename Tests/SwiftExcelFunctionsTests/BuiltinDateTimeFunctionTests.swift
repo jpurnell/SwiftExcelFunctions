@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinDateTimeFunctionTests: XCTestCase {
+@Suite struct BuiltinDateTimeFunctionTests {
 
     // MARK: - WEEKDAY's return types, measured in round thirteen
 
@@ -27,34 +28,30 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     /// | 15 | Friday | 6 |
     /// | 16 | Saturday | 5 |
     /// | 17 | Sunday | 4 |
-    func testTheWeekCanStartOnAnyNamedDay() throws {
+    @Test func theWeekCanStartOnAnyNamedDay() throws {
         // 41640 is Wednesday, 1 January 2014.
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(11)), 3)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(12)), 2)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(13)), 1)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(14)), 7)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(15)), 6)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(16)), 5)
-        assertNumber(try eval("WEEKDAY", .number(41640), .number(17)), 4)
+        #expect(try eval("WEEKDAY", .number(41640), .number(11)).isNumber(3))
+        #expect(try eval("WEEKDAY", .number(41640), .number(12)).isNumber(2))
+        #expect(try eval("WEEKDAY", .number(41640), .number(13)).isNumber(1))
+        #expect(try eval("WEEKDAY", .number(41640), .number(14)).isNumber(7))
+        #expect(try eval("WEEKDAY", .number(41640), .number(15)).isNumber(6))
+        #expect(try eval("WEEKDAY", .number(41640), .number(16)).isNumber(5))
+        #expect(try eval("WEEKDAY", .number(41640), .number(17)).isNumber(4))
     }
 
     /// A second and third date, so no convention rests on one day's coincidence.
-    func testTheNamedStartDaysHoldAcrossTheWeekend() throws {
+    @Test func theNamedStartDaysHoldAcrossTheWeekend() throws {
         // 41643 is Saturday, 41644 is Sunday.
-        assertNumber(try eval("WEEKDAY", .number(41643), .number(17)), 7, accuracy: 0)
-        assertNumber(try eval("WEEKDAY", .number(41644), .number(17)), 1, accuracy: 0)
-        assertNumber(try eval("WEEKDAY", .number(41644), .number(16)), 2, accuracy: 0)
+        #expect(try eval("WEEKDAY", .number(41643), .number(17)).isNumber(7, within: 0))
+        #expect(try eval("WEEKDAY", .number(41644), .number(17)).isNumber(1, within: 0))
+        #expect(try eval("WEEKDAY", .number(41644), .number(16)).isNumber(2, within: 0))
     }
 
     /// 11 and 17 are the old 2 and 1 under new names, which is worth pinning.
-    func testTheNewTypesAgreeWithTheOldOnesTheyRestate() throws {
+    @Test func theNewTypesAgreeWithTheOldOnesTheyRestate() throws {
         for serial in [41640.0, 41643, 41644, 1, 0] {
-            XCTAssertEqual(try eval("WEEKDAY", .number(serial), .number(11)),
-                           try eval("WEEKDAY", .number(serial), .number(2)),
-                           "11 starts the week on Monday, as 2 does — serial \(serial)")
-            XCTAssertEqual(try eval("WEEKDAY", .number(serial), .number(17)),
-                           try eval("WEEKDAY", .number(serial), .number(1)),
-                           "17 starts it on Sunday, as 1 does — serial \(serial)")
+            #expect(try eval("WEEKDAY", .number(serial), .number(11)) == eval("WEEKDAY", .number(serial), .number(2)), "11 starts the week on Monday, as 2 does — serial \(serial)")
+            #expect(try eval("WEEKDAY", .number(serial), .number(17)) == eval("WEEKDAY", .number(serial), .number(1)), "17 starts it on Sunday, as 1 does — serial \(serial)")
         }
     }
 
@@ -63,10 +60,9 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     /// Measured: 0, 4, 10, 18 and −1 are all `#NUM!`, and this package already agreed. Kept
     /// as the control that makes the seven above meaningful — widening the set must not
     /// widen it further than Excel does.
-    func testAReturnTypeOutsideTheSetIsRefused() throws {
+    @Test func aReturnTypeOutsideTheSetIsRefused() throws {
         for type in [0.0, 4, 5, 10, 18, -1] {
-            XCTAssertEqual(try eval("WEEKDAY", .number(41640), .number(type)), .error(.num),
-                           "return_type \(type)")
+            #expect(try eval("WEEKDAY", .number(41640), .number(type)) == .error(.num), "return_type \(type)")
         }
     }
 
@@ -85,34 +81,34 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     /// project has been wrong about seven times — most recently `GAMMA.DIST` and
     /// `WEIBULL.DIST`, which face an identical boundary and answer it differently. Each was
     /// asked. As it happens all six agree, and now that is a fact rather than a hope.
-    func testEveryDateFunctionAcceptsSerialZero() throws {
-        assertNumber(try eval("YEAR", .number(0)), 1900)
-        assertNumber(try eval("MONTH", .number(0)), 1)
-        assertNumber(try eval("DAY", .number(0)), 0)
-        assertNumber(try eval("WEEKDAY", .number(0)), 7)
-        assertNumber(try eval("WEEKDAY", .number(0), .number(2)), 6)
-        assertNumber(try eval("EOMONTH", .number(0), .number(0)), 31)
-        assertNumber(try eval("EDATE", .number(0), .number(0)), 0)
-        assertNumber(try eval("EDATE", .number(0), .number(1)), 31)
+    @Test func everyDateFunctionAcceptsSerialZero() throws {
+        #expect(try eval("YEAR", .number(0)).isNumber(1900))
+        #expect(try eval("MONTH", .number(0)).isNumber(1))
+        #expect(try eval("DAY", .number(0)).isNumber(0))
+        #expect(try eval("WEEKDAY", .number(0)).isNumber(7))
+        #expect(try eval("WEEKDAY", .number(0), .number(2)).isNumber(6))
+        #expect(try eval("EOMONTH", .number(0), .number(0)).isNumber(31))
+        #expect(try eval("EDATE", .number(0), .number(0)).isNumber(0))
+        #expect(try eval("EDATE", .number(0), .number(1)).isNumber(31))
     }
 
     /// A fraction of that day is still that day.
-    func testAFractionalSerialIsTruncatedRatherThanRefused() throws {
-        assertNumber(try eval("MONTH", .number(0.5)), 1)
-        assertNumber(try eval("DAY", .number(0.5)), 0)
-        assertNumber(try eval("YEAR", .number(0.99)), 1900)
+    @Test func aFractionalSerialIsTruncatedRatherThanRefused() throws {
+        #expect(try eval("MONTH", .number(0.5)).isNumber(1))
+        #expect(try eval("DAY", .number(0.5)).isNumber(0))
+        #expect(try eval("YEAR", .number(0.99)).isNumber(1900))
     }
 
     /// Below zero there is no date, and Excel says so.
     ///
     /// The half of the boundary this package already had right, kept as the control that
     /// makes the change above meaningful: moving the floor must not remove the floor.
-    func testANegativeSerialIsStillRefused() throws {
+    @Test func aNegativeSerialIsStillRefused() throws {
         for name in ["YEAR", "MONTH", "DAY", "WEEKDAY"] {
-            XCTAssertEqual(try eval(name, .number(-1)), .error(.num), "\(name)(-1)")
+            #expect(try eval(name, .number(-1)) == .error(.num), "\(name)(-1)")
         }
-        XCTAssertEqual(try eval("EOMONTH", .number(-1), .number(0)), .error(.num))
-        XCTAssertEqual(try eval("EDATE", .number(-1), .number(0)), .error(.num))
+        #expect(try eval("EOMONTH", .number(-1), .number(0)) == .error(.num))
+        #expect(try eval("EDATE", .number(-1), .number(0)) == .error(.num))
     }
 
     /// 9999-12-31 is the last date Excel will name, and one past it is `#NUM!`.
@@ -121,15 +117,14 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     /// `EOMONTH(2958465, 1)` answered 2958496 — a serial for a date Excel refuses to name.
     /// Found in the same round as the floor, going the other way: the guard was wrong at
     /// both ends, and only one end had a corpus behind it.
-    func testTheSerialCeilingIsTheLastDateExcelWillName() throws {
+    @Test func theSerialCeilingIsTheLastDateExcelWillName() throws {
         // The last valid day, as controls.
-        assertNumber(try eval("YEAR", .number(2958465)), 9999)
-        assertNumber(try eval("MONTH", .number(2958465)), 12)
-        assertNumber(try eval("DAY", .number(2958465)), 31)
+        #expect(try eval("YEAR", .number(2958465)).isNumber(9999))
+        #expect(try eval("MONTH", .number(2958465)).isNumber(12))
+        #expect(try eval("DAY", .number(2958465)).isNumber(31))
 
-        XCTAssertEqual(try eval("YEAR", .number(2958466)), .error(.num), "one day past the end")
-        XCTAssertEqual(try eval("EOMONTH", .number(2958465), .number(1)), .error(.num),
-                       "a month past the end is a date Excel will not name")
+        #expect(try eval("YEAR", .number(2958466)) == .error(.num), "one day past the end")
+        #expect(try eval("EOMONTH", .number(2958465), .number(1)) == .error(.num), "a month past the end is a date Excel will not name")
     }
 
     // MARK: - Helpers
@@ -145,32 +140,7 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
         try function(named: name).evaluate(args)
     }
 
-    private func assertNumber(
-        _ result: CellValue,
-        _ expected: Double,
-        accuracy: Double = 1e-10,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .number(let value) = result else {
-            XCTFail("Expected .number(\(expected)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(value, expected, accuracy: accuracy, file: file, line: line)
-    }
 
-    private func assertError(
-        _ result: CellValue,
-        _ expectedError: ExcelError,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .error(let err) = result else {
-            XCTFail("Expected .error(\(expectedError)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(err, expectedError, file: file, line: line)
-    }
 
     // MARK: - Registration count
 
@@ -178,212 +148,210 @@ final class BuiltinDateTimeFunctionTests: XCTestCase {
     ///
     /// A count alone says a function was added but not which, and it fails the
     /// same way whether something arrived or something was lost.
-    func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(
-            Set(BuiltinDateTimeFunctions.all.map(\.name)),
-            Set(("TODAY, NOW, YEAR, MONTH, DAY, DATE, WEEKDAY, EOMONTH, EDATE, DAYS, "
+    @Test func allContainsEveryFunctionInTheGroup() {
+        #expect(Set(BuiltinDateTimeFunctions.all.map(\.name)) == Set(("TODAY, NOW, YEAR, MONTH, DAY, DATE, WEEKDAY, EOMONTH, EDATE, DAYS, "
                  + "HOUR, MINUTE, SECOND, WORKDAY, DATEVALUE, TIME")
                 .split(separator: ", ").map(String.init)))
     }
 
     // MARK: - DATE
 
-    func testDATEJan1_1900() throws {
+    @Test func dateJan1_1900() throws {
         // Serial 1 = Jan 1, 1900
         let result = try eval("DATE", .number(1900), .number(1), .number(1))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testDATEJan2_1900() throws {
+    @Test func dateJan2_1900() throws {
         let result = try eval("DATE", .number(1900), .number(1), .number(2))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testDATEFeb28_1900() throws {
+    @Test func dateFeb28_1900() throws {
         // Feb 28, 1900 = serial 59
         let result = try eval("DATE", .number(1900), .number(2), .number(28))
-        assertNumber(result, 59)
+        #expect(result.isNumber(59))
     }
 
-    func testDATEFeb29_1900_PhantomDay() throws {
+    @Test func dateFeb29_1900_PhantomDay() throws {
         // Excel's bug: Feb 29, 1900 = serial 60 (this day doesn't actually exist)
         let result = try eval("DATE", .number(1900), .number(2), .number(29))
-        assertNumber(result, 60)
+        #expect(result.isNumber(60))
     }
 
-    func testDATEMar1_1900() throws {
+    @Test func dateMar1_1900() throws {
         // Mar 1, 1900 = serial 61
         let result = try eval("DATE", .number(1900), .number(3), .number(1))
-        assertNumber(result, 61)
+        #expect(result.isNumber(61))
     }
 
-    func testDATEJan1_2024() throws {
+    @Test func dateJan1_2024() throws {
         // Known value: Jan 1, 2024 = serial 45292
         let result = try eval("DATE", .number(2024), .number(1), .number(1))
-        assertNumber(result, 45292)
+        #expect(result.isNumber(45292))
     }
 
-    func testDATEDec31_1999() throws {
+    @Test func dateDec31_1999() throws {
         // Dec 31, 1999 = serial 36525 (common reference point)
         let result = try eval("DATE", .number(1999), .number(12), .number(31))
-        assertNumber(result, 36525)
+        #expect(result.isNumber(36525))
     }
 
-    func testDATEShortYear() throws {
+    @Test func dateShortYear() throws {
         // Year 0-1899 are treated as 1900-3799
         // DATE(24, 1, 1) = DATE(1924, 1, 1) = serial 8767
         let result = try eval("DATE", .number(24), .number(1), .number(1))
-        assertNumber(result, 8767)
+        #expect(result.isNumber(8767))
     }
 
     // MARK: - YEAR
 
-    func testYEARSerial1() throws {
+    @Test func yearSerial1() throws {
         let result = try eval("YEAR", .number(1))
-        assertNumber(result, 1900)
+        #expect(result.isNumber(1900))
     }
 
-    func testYEARSerial45292() throws {
+    @Test func yearSerial45292() throws {
         // Jan 1, 2024
         let result = try eval("YEAR", .number(45292))
-        assertNumber(result, 2024)
+        #expect(result.isNumber(2024))
     }
 
-    func testYEARSerial60() throws {
+    @Test func yearSerial60() throws {
         // The phantom Feb 29, 1900
         let result = try eval("YEAR", .number(60))
-        assertNumber(result, 1900)
+        #expect(result.isNumber(1900))
     }
 
-    func testYEARErrorPropagation() throws {
+    @Test func yearErrorPropagation() throws {
         let result = try eval("YEAR", .error(.ref))
-        assertError(result, .ref)
+        #expect(result == .error(.ref))
     }
 
     // MARK: - MONTH
 
-    func testMONTHJanuary() throws {
+    @Test func monthJanuary() throws {
         let result = try eval("MONTH", .number(1))
-        assertNumber(result, 1) // Jan
+        #expect(result.isNumber(1)) // Jan
     }
 
-    func testMONTHSerial60() throws {
+    @Test func monthSerial60() throws {
         // Phantom Feb 29, 1900
         let result = try eval("MONTH", .number(60))
-        assertNumber(result, 2)
+        #expect(result.isNumber(2))
     }
 
-    func testMONTHSerial61() throws {
+    @Test func monthSerial61() throws {
         // Mar 1, 1900
         let result = try eval("MONTH", .number(61))
-        assertNumber(result, 3)
+        #expect(result.isNumber(3))
     }
 
-    func testMONTHDecember() throws {
+    @Test func monthDecember() throws {
         // Dec 31, 1999 = serial 36525
         let result = try eval("MONTH", .number(36525))
-        assertNumber(result, 12)
+        #expect(result.isNumber(12))
     }
 
     // MARK: - DAY
 
-    func testDAYSerial1() throws {
+    @Test func daySerial1() throws {
         // Jan 1
         let result = try eval("DAY", .number(1))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
-    func testDAYSerial59() throws {
+    @Test func daySerial59() throws {
         // Feb 28, 1900
         let result = try eval("DAY", .number(59))
-        assertNumber(result, 28)
+        #expect(result.isNumber(28))
     }
 
-    func testDAYSerial60() throws {
+    @Test func daySerial60() throws {
         // Phantom Feb 29, 1900
         let result = try eval("DAY", .number(60))
-        assertNumber(result, 29)
+        #expect(result.isNumber(29))
     }
 
-    func testDAYSerial61() throws {
+    @Test func daySerial61() throws {
         // Mar 1, 1900
         let result = try eval("DAY", .number(61))
-        assertNumber(result, 1)
+        #expect(result.isNumber(1))
     }
 
     // MARK: - TODAY
 
-    func testTODAYReturnsReasonableSerial() throws {
+    @Test func todayReturnsReasonableSerial() throws {
         let result = try eval("TODAY")
         guard case .number(let serial) = result else {
-            XCTFail("Expected .number, got \(result)")
+            Issue.record("Expected .number, got \(result)")
             return
         }
         // Today should be well past 2020 (serial > 43831 for Jan 1, 2020)
-        XCTAssertGreaterThan(serial, 43831)
+        #expect(serial > 43831)
         // And should be a whole number (no time component)
-        XCTAssertEqual(serial, serial.rounded(.towardZero))
+        #expect(serial == serial.rounded(.towardZero))
     }
 
     // MARK: - NOW
 
-    func testNOWReturnsSerialWithFraction() throws {
+    @Test func nowReturnsSerialWithFraction() throws {
         let result = try eval("NOW")
         guard case .number(let serial) = result else {
-            XCTFail("Expected .number, got \(result)")
+            Issue.record("Expected .number, got \(result)")
             return
         }
         // NOW should be >= TODAY's value
-        XCTAssertGreaterThan(serial, 43831)
+        #expect(serial > 43831)
     }
 
     // MARK: - Roundtrip: DATE -> YEAR/MONTH/DAY
 
-    func testRoundtripDate() throws {
+    @Test func roundtripDate() throws {
         // DATE(2024, 6, 15) -> serial -> YEAR/MONTH/DAY
         let serial = try eval("DATE", .number(2024), .number(6), .number(15))
         let y = try eval("YEAR", serial)
         let m = try eval("MONTH", serial)
         let d = try eval("DAY", serial)
-        assertNumber(y, 2024)
-        assertNumber(m, 6)
-        assertNumber(d, 15)
+        #expect(y.isNumber(2024))
+        #expect(m.isNumber(6))
+        #expect(d.isNumber(15))
     }
 
-    func testRoundtripDateLeapYear() throws {
+    @Test func roundtripDateLeapYear() throws {
         // Feb 29, 2024 (real leap year)
         let serial = try eval("DATE", .number(2024), .number(2), .number(29))
         let y = try eval("YEAR", serial)
         let m = try eval("MONTH", serial)
         let d = try eval("DAY", serial)
-        assertNumber(y, 2024)
-        assertNumber(m, 2)
-        assertNumber(d, 29)
+        #expect(y.isNumber(2024))
+        #expect(m.isNumber(2))
+        #expect(d.isNumber(29))
     }
 
     // MARK: - Metadata
 
-    func testTODAYMetadata() {
+    @Test func todayMetadata() {
         let fn = function(named: "TODAY")
-        XCTAssertEqual(fn.minArgs, 0)
-        XCTAssertEqual(fn.maxArgs, 0)
+        #expect(fn.minArgs == 0)
+        #expect(fn.maxArgs == 0)
     }
 
-    func testNOWMetadata() {
+    @Test func nowMetadata() {
         let fn = function(named: "NOW")
-        XCTAssertEqual(fn.minArgs, 0)
-        XCTAssertEqual(fn.maxArgs, 0)
+        #expect(fn.minArgs == 0)
+        #expect(fn.maxArgs == 0)
     }
 
-    func testYEARMetadata() {
+    @Test func yearMetadata() {
         let fn = function(named: "YEAR")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertEqual(fn.maxArgs, 1)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == 1)
     }
 
-    func testDATEMetadata() {
+    @Test func dateMetadata() {
         let fn = function(named: "DATE")
-        XCTAssertEqual(fn.minArgs, 3)
-        XCTAssertEqual(fn.maxArgs, 3)
+        #expect(fn.minArgs == 3)
+        #expect(fn.maxArgs == 3)
     }
 }

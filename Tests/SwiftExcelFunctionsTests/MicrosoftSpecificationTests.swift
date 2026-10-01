@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 import SwiftXLSX
 @testable import SwiftExcelFunctions
@@ -26,7 +27,7 @@ import SwiftXLSX
 /// consistent with ourselves, which is exactly the mistake that let a day-count
 /// bug ship: two implementations reasoning from one definition agree with each
 /// other and are both wrong.
-final class MicrosoftSpecificationTests: XCTestCase {
+@Suite struct MicrosoftSpecificationTests {
 
     // MARK: - Helpers
 
@@ -42,13 +43,13 @@ final class MicrosoftSpecificationTests: XCTestCase {
         for group in groups {
             if let found = group.first(where: { $0.name == name }) { return found }
         }
-        throw XCTSkip("\(name) is not registered")
+        throw TestFailure("\(name) is not registered")
     }
 
     private func number(_ name: String, _ args: [CellValue]) throws -> Double {
         let result = try function(name).evaluate(args)
         guard case .number(let value) = result else {
-            XCTFail("\(name) answered \(result), not a number")
+            Issue.record("\(name) answered \(result), not a number")
             return .nan
         }
         return value
@@ -71,10 +72,10 @@ final class MicrosoftSpecificationTests: XCTestCase {
 
     /// Microsoft's first worked example: `=NPV(0.1, -10000, 3000, 4200, 6800)`,
     /// published as `$1,188.44`.
-    func testNpvDiscountsTheFirstValueOnePeriod() throws {
+    @Test func npvDiscountsTheFirstValueOnePeriod() throws {
         let value = try number("NPV", [.number(0.1), .number(-10000), .number(3000),
                                        .number(4200), .number(6800)])
-        XCTAssertEqual(value, 1188.4434123352212, accuracy: 1e-9)
+        #expect(abs(value - 1188.4434123352212) <= 1e-9)
     }
 
     /// The same cash flows as one range, which is how a worksheet writes it.
@@ -82,27 +83,27 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// Microsoft's own examples use both forms — `=NPV(A2, A3, A4, A5, A6)` and
     /// `=NPV(A2, A4:A8)+A3` — so a reference argument is not an edge case, it is the
     /// ordinary case. The corpus oracle found 126 disagreements here.
-    func testNpvAcceptsARangeAsOneArgument() throws {
+    @Test func npvAcceptsARangeAsOneArgument() throws {
         let value = try number("NPV", [.number(0.1),
                                        column([-10000, 3000, 4200, 6800])])
-        XCTAssertEqual(value, 1188.4434123352212, accuracy: 1e-9)
+        #expect(abs(value - 1188.4434123352212) <= 1e-9)
     }
 
     /// Microsoft's second example: `=NPV(0.08, A4:A8) + A3`, published as `$1,922.06`
     /// with `A3 = -40000` held outside because it falls at period 0.
-    func testNpvWithAnInitialOutlayOutsideTheFunction() throws {
+    @Test func npvWithAnInitialOutlayOutsideTheFunction() throws {
         let value = try number("NPV", [.number(0.08),
                                        column([8000, 9200, 10000, 12000, 14500])])
-        XCTAssertEqual(value - 40000, 1922.061554932363, accuracy: 1e-9)
+        #expect(abs((value - 40000) - 1922.061554932363) <= 1e-9)
     }
 
     /// Microsoft's third: `=NPV(0.08, A4:A8, -9000) + A3`, published as `($3,749.47)`.
     /// A trailing scalar after a range extends the series by one more period.
-    func testNpvMixesARangeAndAScalar() throws {
+    @Test func npvMixesARangeAndAScalar() throws {
         let value = try number("NPV", [.number(0.08),
                                        column([8000, 9200, 10000, 12000, 14500]),
                                        .number(-9000)])
-        XCTAssertEqual(value - 40000, -3749.4650870155747, accuracy: 1e-9)
+        #expect(abs((value - 40000) - -3749.4650870155747) <= 1e-9)
     }
 
     /// Microsoft: "If an argument is an array or reference, only numbers in that
@@ -111,23 +112,22 @@ final class MicrosoftSpecificationTests: XCTestCase {
     ///
     /// Ignored, not zero — a blank in the middle of a column must not consume a
     /// period, or every cash flow after it is discounted one period too far.
-    func testNpvIgnoresNonNumbersInsideARange() throws {
+    @Test func npvIgnoresNonNumbersInsideARange() throws {
         let clean = try number("NPV", [.number(0.1), column([100, 200, 300])])
         let withNoise = try number("NPV", [
             .number(0.1),
             .array(CellMatrix(column: [.number(100), .blank, .number(200),
                                        .text("n/a"), .number(300), .bool(true)])),
         ])
-        XCTAssertEqual(withNoise, clean, accuracy: 1e-9,
-                       "a blank must not shift the periods after it")
+        #expect(abs(withNoise - clean) <= 1e-9, "a blank must not shift the periods after it")
     }
 
     /// The order of the arguments is the order of the cash flows, so reversing them
     /// must change the answer. Guards against an implementation that sums first.
-    func testNpvIsOrderDependent() throws {
+    @Test func npvIsOrderDependent() throws {
         let forward = try number("NPV", [.number(0.1), column([100, 200, 300])])
         let backward = try number("NPV", [.number(0.1), column([300, 200, 100])])
-        XCTAssertNotEqual(forward, backward, accuracy: 1e-9)
+        #expect(abs(forward - backward) > 1e-9)
     }
 
     // MARK: - YEARFRAC and the day counts
@@ -151,10 +151,9 @@ final class MicrosoftSpecificationTests: XCTestCase {
     private static let jul31_2021 = 44408.0  // 2021-07-31
 
     /// Six thirty-day months over 360 is exactly half a year, on any 30/360 basis.
-    func testYearFracThirtyThreeSixtyOnCleanDates() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(Self.jul1_2026), .number(0)]),
-                       0.5, accuracy: 1e-12)
+    @Test func yearFracThirtyThreeSixtyOnCleanDates() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(0)]) - 0.5) <= 1e-12)
     }
 
     /// Basis 3 counts real days over 365: 1 January to 1 July 2026 is 181 days.
@@ -168,26 +167,23 @@ final class MicrosoftSpecificationTests: XCTestCase {
     ///
     /// Keep the date pair. A test that never crosses a boundary cannot see this
     /// defect come back.
-    func testYearFracActual365CountsRealDays() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(Self.jul1_2026), .number(3)]),
-                       181.0 / 365.0, accuracy: 1e-12)
+    @Test func yearFracActual365CountsRealDays() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(3)]) - (181.0 / 365.0)) <= 1e-12)
     }
 
     /// Basis 2 is the same day count over 360, and carried the same hour.
-    func testYearFracActual360() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(Self.jul1_2026), .number(2)]),
-                       181.0 / 360.0, accuracy: 1e-12)
+    @Test func yearFracActual360() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(2)]) - (181.0 / 360.0)) <= 1e-12)
     }
 
     /// The same interval within one side of a DST change is exact, which is what
     /// isolates the cause. 1 January to 1 March 2026 is 59 days and never crosses.
-    func testYearFracActual365IsExactWithinOneOffset() throws {
+    @Test func yearFracActual365IsExactWithinOneOffset() throws {
         let mar1_2026 = 46082.0   // 2026-03-01
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(mar1_2026), .number(3)]),
-                       59.0 / 365.0, accuracy: 1e-12)
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(mar1_2026), .number(3)]) - (59.0 / 365.0)) <= 1e-12)
     }
 
     /// **The NASD February rule.** The last day of February counts as a 30th, and
@@ -200,10 +196,9 @@ final class MicrosoftSpecificationTests: XCTestCase {
     ///
     /// Fixed in BusinessMath 2.15.0 — see `testTheFebruaryEndOfMonthRule`, which
     /// holds the same case with its provenance.
-    func testYearFracFebruaryMonthEndIsThirty() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb29_2020),
-                                               .number(Self.dec31_2020), .number(0)]),
-                       301.0 / 360.0, accuracy: 1e-12)
+    @Test func yearFracFebruaryMonthEndIsThirty() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.feb29_2020),
+                                               .number(Self.dec31_2020), .number(0)]) - (301.0 / 360.0)) <= 1e-12)
     }
 
     /// The common-year half of the same rule: 28 February is the month end too.
@@ -221,20 +216,18 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// 31 December is 30·10 + (31−30) = 301 — and that one is pinned to Excel's own
     /// cached value in a corpus workbook. An expectation of 150 here would assume the
     /// end date *is* pulled back, contradicting the case that has the evidence.
-    func testYearFracCommonYearFebruaryMonthEnd() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.feb28_2021),
-                                               .number(Self.jul31_2021), .number(0)]),
-                       151.0 / 360.0, accuracy: 1e-12)
+    @Test func yearFracCommonYearFebruaryMonthEnd() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.feb28_2021),
+                                               .number(Self.jul31_2021), .number(0)]) - (151.0 / 360.0)) <= 1e-12)
     }
 
     /// Basis 4, European 30/360: every month is thirty days, with no February rule
     /// and no end-of-month pull-back. 1 January to 1 July 2026 is six months.
     ///
     /// The only basis with no outstanding defect behind it.
-    func testYearFracEuropeanThirtyThreeSixty() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(Self.jul1_2026), .number(4)]),
-                       0.5, accuracy: 1e-12)
+    @Test func yearFracEuropeanThirtyThreeSixty() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(4)]) - 0.5) <= 1e-12)
     }
 
     /// Basis 1 within a single calendar year divides by that year's length. 2026 is
@@ -243,17 +236,16 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// Carried the same daylight-saving hour as bases 2 and 3 — `actualActual` was
     /// added in BusinessMath 2.11.0 on top of the same elapsed-time measurement, and
     /// was fixed with them in 2.14.0.
-    func testYearFracActualActualWithinOneYear() throws {
-        XCTAssertEqual(try number("YEARFRAC", [.number(Self.jan1_2026),
-                                               .number(Self.jul1_2026), .number(1)]),
-                       181.0 / 365.0, accuracy: 1e-12)
+    @Test func yearFracActualActualWithinOneYear() throws {
+        #expect(try abs(number("YEARFRAC", [.number(Self.jan1_2026),
+                                               .number(Self.jul1_2026), .number(1)]) - (181.0 / 365.0)) <= 1e-12)
     }
 
     /// A basis Excel does not define is `#NUM!`.
-    func testYearFracRefusesAnUndefinedBasis() throws {
-        XCTAssertEqual(try function("YEARFRAC").evaluate([
+    @Test func yearFracRefusesAnUndefinedBasis() throws {
+        #expect(try function("YEARFRAC").evaluate([
             .number(Self.jan1_2026), .number(Self.jul1_2026), .number(5),
-        ]), .error(.num))
+        ]) == .error(.num))
     }
 
     // MARK: - Lookups
@@ -268,46 +260,46 @@ final class MicrosoftSpecificationTests: XCTestCase {
         let width = rows.first?.count ?? 0
         guard let matrix = CellMatrix(elements: rows.flatMap { $0 },
                                       rows: rows.count, columns: width) else {
-            XCTFail("ragged table")
+            Issue.record("ragged table")
             return .error(.value)
         }
         return .array(matrix)
     }
 
-    func testVlookupApproximateTakesTheNextSmallest() throws {
+    @Test func vlookupApproximateTakesTheNextSmallest() throws {
         let table = grid([[.number(10), .text("ten")],
                           [.number(20), .text("twenty")],
                           [.number(30), .text("thirty")]])
-        XCTAssertEqual(try function("VLOOKUP").evaluate(
-            [.number(25), table, .number(2), .bool(true)]), .text("twenty"))
+        #expect(try function("VLOOKUP").evaluate(
+            [.number(25), table, .number(2), .bool(true)]) == .text("twenty"))
     }
 
     /// Below the first key there is no smaller value, so `#N/A`.
-    func testVlookupApproximateBelowTheFirstKeyIsNotAvailable() throws {
+    @Test func vlookupApproximateBelowTheFirstKeyIsNotAvailable() throws {
         let table = grid([[.number(10), .text("ten")], [.number(20), .text("twenty")]])
-        XCTAssertEqual(try function("VLOOKUP").evaluate(
-            [.number(5), table, .number(2), .bool(true)]), .error(.na))
+        #expect(try function("VLOOKUP").evaluate(
+            [.number(5), table, .number(2), .bool(true)]) == .error(.na))
     }
 
-    func testVlookupExactRefusesANearMiss() throws {
+    @Test func vlookupExactRefusesANearMiss() throws {
         let table = grid([[.number(10), .text("ten")], [.number(20), .text("twenty")]])
-        XCTAssertEqual(try function("VLOOKUP").evaluate(
-            [.number(15), table, .number(2), .bool(false)]), .error(.na))
+        #expect(try function("VLOOKUP").evaluate(
+            [.number(15), table, .number(2), .bool(false)]) == .error(.na))
     }
 
     /// Microsoft: "If col_index_num is greater than the number of columns in
     /// table_array, VLOOKUP returns the #REF! error value."
-    func testVlookupPastTheTableIsARefError() throws {
+    @Test func vlookupPastTheTableIsARefError() throws {
         let table = grid([[.number(10), .text("ten")]])
-        XCTAssertEqual(try function("VLOOKUP").evaluate(
-            [.number(10), table, .number(3), .bool(false)]), .error(.ref))
+        #expect(try function("VLOOKUP").evaluate(
+            [.number(10), table, .number(3), .bool(false)]) == .error(.ref))
     }
 
     /// And "if col_index_num is less than 1, VLOOKUP returns #VALUE!".
-    func testVlookupBelowTheFirstColumnIsAValueError() throws {
+    @Test func vlookupBelowTheFirstColumnIsAValueError() throws {
         let table = grid([[.number(10), .text("ten")]])
-        XCTAssertEqual(try function("VLOOKUP").evaluate(
-            [.number(10), table, .number(0), .bool(false)]), .error(.value))
+        #expect(try function("VLOOKUP").evaluate(
+            [.number(10), table, .number(0), .bool(false)]) == .error(.value))
     }
 
     // MARK: - XLOOKUP
@@ -324,100 +316,100 @@ final class MicrosoftSpecificationTests: XCTestCase {
         .array(CellMatrix(row: values))
     }
 
-    func testXlookupFindsAnExactMatch() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupFindsAnExactMatch() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .text("b"),
             row([.text("a"), .text("b"), .text("c")]),
             row([.number(1), .number(2), .number(3)]),
-        ]), .number(2))
+        ]) == .number(2))
     }
 
     /// **The default is exact**, the reverse of `VLOOKUP`. A near miss is `#N/A`
     /// rather than the next smallest, which is the single most consequential
     /// difference between them.
-    func testXlookupDefaultsToExact() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupDefaultsToExact() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .number(25),
             row([.number(10), .number(20), .number(30)]),
             row([.text("ten"), .text("twenty"), .text("thirty")]),
-        ]), .error(.na))
+        ]) == .error(.na))
     }
 
     /// `if_not_found` replaces the `IFERROR` wrapper VLOOKUP needed.
-    func testXlookupReturnsWhatYouAskForWhenNothingMatches() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupReturnsWhatYouAskForWhenNothingMatches() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .number(25),
             row([.number(10), .number(20)]),
             row([.text("ten"), .text("twenty")]),
             .text("none"),
-        ]), .text("none"))
+        ]) == .text("none"))
     }
 
     /// `match_mode` −1 is exact or next smaller, 1 is exact or next larger.
-    func testXlookupApproximateModes() throws {
+    @Test func xlookupApproximateModes() throws {
         let keys = row([.number(10), .number(20), .number(30)])
         let results = row([.text("ten"), .text("twenty"), .text("thirty")])
-        XCTAssertEqual(try function("XLOOKUP").evaluate(
-            [.number(25), keys, results, .text("none"), .number(-1)]), .text("twenty"))
-        XCTAssertEqual(try function("XLOOKUP").evaluate(
-            [.number(25), keys, results, .text("none"), .number(1)]), .text("thirty"))
+        #expect(try function("XLOOKUP").evaluate(
+            [.number(25), keys, results, .text("none"), .number(-1)]) == .text("twenty"))
+        #expect(try function("XLOOKUP").evaluate(
+            [.number(25), keys, results, .text("none"), .number(1)]) == .text("thirty"))
     }
 
     /// **The result may sit before the key.** `VLOOKUP` cannot do this at all: its
     /// offset counts rightwards from the key column, so a leftward answer needs
     /// `INDEX`/`MATCH`. Here the two ranges are independent.
-    func testXlookupReturnsAColumnLeftOfTheKey() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupReturnsAColumnLeftOfTheKey() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .text("b"),
             row([.text("a"), .text("b")]),      // keys, notionally column B
             row([.number(1), .number(2)]),      // results, notionally column A
-        ]), .number(2))
+        ]) == .number(2))
     }
 
     /// `search_mode` −1 searches last to first, so a duplicated key answers with the
     /// later of the two.
-    func testXlookupCanSearchBackwards() throws {
+    @Test func xlookupCanSearchBackwards() throws {
         let keys = row([.text("a"), .text("b"), .text("a")])
         let results = row([.number(1), .number(2), .number(3)])
-        XCTAssertEqual(try function("XLOOKUP").evaluate(
-            [.text("a"), keys, results, .text("none"), .number(0), .number(1)]), .number(1))
-        XCTAssertEqual(try function("XLOOKUP").evaluate(
-            [.text("a"), keys, results, .text("none"), .number(0), .number(-1)]), .number(3))
+        #expect(try function("XLOOKUP").evaluate(
+            [.text("a"), keys, results, .text("none"), .number(0), .number(1)]) == .number(1))
+        #expect(try function("XLOOKUP").evaluate(
+            [.text("a"), keys, results, .text("none"), .number(0), .number(-1)]) == .number(3))
     }
 
     /// Mismatched ranges are `#VALUE!`: there is no answer to give.
-    func testXlookupRefusesMismatchedRanges() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupRefusesMismatchedRanges() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .text("a"),
             row([.text("a"), .text("b"), .text("c")]),
             row([.number(1), .number(2)]),
-        ]), .error(.value))
+        ]) == .error(.value))
     }
 
     /// Wildcard matching is refused rather than silently treated as exact, which
     /// would find the wrong row and say nothing about it.
-    func testXlookupRefusesWildcardMode() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupRefusesWildcardMode() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .text("a*"),
             row([.text("abc")]), row([.number(1)]),
             .text("none"), .number(2),
-        ]), .error(.value))
+        ]) == .error(.value))
     }
 
     /// An error in the lookup propagates — but not one in `if_not_found`, whose
     /// whole purpose is to be produced when the lookup fails.
-    func testXlookupPropagatesButHonoursIfNotFound() throws {
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+    @Test func xlookupPropagatesButHonoursIfNotFound() throws {
+        #expect(try function("XLOOKUP").evaluate([
             .error(.name), row([.text("a")]), row([.number(1)]),
-        ]), .error(.name))
-        XCTAssertEqual(try function("XLOOKUP").evaluate([
+        ]) == .error(.name))
+        #expect(try function("XLOOKUP").evaluate([
             .text("z"), row([.text("a")]), row([.number(1)]), .error(.na),
-        ]), .error(.na), "an error is a legitimate thing to ask for on failure")
+        ]) == .error(.na), "an error is a legitimate thing to ask for on failure")
     }
 
     /// It resolves through `_xlfn.`, which is how an older `.xlsx` carries it.
-    func testXlookupResolvesThroughTheModernPrefix() {
-        XCTAssertNotNil(FunctionRegistry.builtin.function(named: "_xlfn.XLOOKUP"))
+    @Test func xlookupResolvesThroughTheModernPrefix() {
+        #expect(FunctionRegistry.builtin.resolvedName("_xlfn.XLOOKUP") == "XLOOKUP")
     }
 
     // MARK: - XIRR convergence
@@ -432,7 +424,7 @@ final class MicrosoftSpecificationTests: XCTestCase {
     ///
     /// Written as a property because the alternative — asserting Excel's number —
     /// would pin us to Excel's convergence residue and call it correctness.
-    func testXirrReturnsAnActualRoot() throws {
+    @Test func xirrReturnsAnActualRoot() throws {
         // Four flows a year apart: -1000 out, then 400, 400, 400 back.
         let serials: [Double] = [44197, 44562, 44927, 45292]  // 2021-01-01 .. 2024-01-01
         let flows: [Double] = [-1000, 400, 400, 400]
@@ -447,10 +439,9 @@ final class MicrosoftSpecificationTests: XCTestCase {
             let years = (serial - serials[0]) / 365.0
             residue += flow / pow(1 + rate, years)
         }
-        XCTAssertEqual(residue, 0, accuracy: 1e-6,
-                       "the returned rate must actually zero the discounted flows")
-        XCTAssertGreaterThan(rate, 0.09)
-        XCTAssertLessThan(rate, 0.11)
+        #expect(abs(residue - 0) <= 1e-6, "the returned rate must actually zero the discounted flows")
+        #expect(rate > 0.09)
+        #expect(rate < 0.11)
     }
 
     // MARK: - Text
@@ -463,110 +454,103 @@ final class MicrosoftSpecificationTests: XCTestCase {
         try function(name).evaluate(args)
     }
 
-    func testFindIsOneBasedAndCaseSensitive() throws {
-        XCTAssertEqual(try text("FIND", .text("M"), .text("Miriam McGovern")), .number(1))
-        XCTAssertEqual(try text("FIND", .text("m"), .text("Miriam McGovern")), .number(6))
-        XCTAssertEqual(try text("FIND", .text("M"), .text("Miriam McGovern"), .number(3)),
-                       .number(8))
+    @Test func findIsOneBasedAndCaseSensitive() throws {
+        #expect(try text("FIND", .text("M"), .text("Miriam McGovern")) == .number(1))
+        #expect(try text("FIND", .text("m"), .text("Miriam McGovern")) == .number(6))
+        #expect(try text("FIND", .text("M"), .text("Miriam McGovern"), .number(3)) == .number(8))
     }
 
     /// Microsoft: "If find_text does not appear in within_text, FIND returns the
     /// #VALUE! error value."
-    func testFindReturnsValueErrorWhenAbsent() throws {
-        XCTAssertEqual(try text("FIND", .text("z"), .text("abc")), .error(.value))
+    @Test func findReturnsValueErrorWhenAbsent() throws {
+        #expect(try text("FIND", .text("z"), .text("abc")) == .error(.value))
     }
 
     /// "If find_text is empty, FIND matches the first character in the search
     /// string" — so it returns start_num rather than failing.
-    func testFindWithEmptyNeedleReturnsTheStart() throws {
-        XCTAssertEqual(try text("FIND", .text(""), .text("abc")), .number(1))
-        XCTAssertEqual(try text("FIND", .text(""), .text("abc"), .number(2)), .number(2))
+    @Test func findWithEmptyNeedleReturnsTheStart() throws {
+        #expect(try text("FIND", .text(""), .text("abc")) == .number(1))
+        #expect(try text("FIND", .text(""), .text("abc"), .number(2)) == .number(2))
     }
 
     /// "If start_num is not greater than zero, or is greater than the length of
     /// within_text, FIND returns #VALUE!."
-    func testFindRejectsAnOutOfRangeStart() throws {
-        XCTAssertEqual(try text("FIND", .text("a"), .text("abc"), .number(0)), .error(.value))
-        XCTAssertEqual(try text("FIND", .text("a"), .text("abc"), .number(4)), .error(.value))
+    @Test func findRejectsAnOutOfRangeStart() throws {
+        #expect(try text("FIND", .text("a"), .text("abc"), .number(0)) == .error(.value))
+        #expect(try text("FIND", .text("a"), .text("abc"), .number(4)) == .error(.value))
     }
 
-    func testSearchIsCaseInsensitive() throws {
-        XCTAssertEqual(try text("SEARCH", .text("m"), .text("Miriam McGovern")), .number(1))
-        XCTAssertEqual(try text("SEARCH", .text("M"), .text("Miriam McGovern")), .number(1))
+    @Test func searchIsCaseInsensitive() throws {
+        #expect(try text("SEARCH", .text("m"), .text("Miriam McGovern")) == .number(1))
+        #expect(try text("SEARCH", .text("M"), .text("Miriam McGovern")) == .number(1))
     }
 
     /// SEARCH takes `?` for one character and `*` for any run of them.
-    func testSearchTakesWildcards() throws {
-        XCTAssertEqual(try text("SEARCH", .text("b?d"), .text("abcde")), .number(2))
-        XCTAssertEqual(try text("SEARCH", .text("a*e"), .text("abcde")), .number(1))
-        XCTAssertEqual(try text("SEARCH", .text("x*z"), .text("abcde")), .error(.value))
+    @Test func searchTakesWildcards() throws {
+        #expect(try text("SEARCH", .text("b?d"), .text("abcde")) == .number(2))
+        #expect(try text("SEARCH", .text("a*e"), .text("abcde")) == .number(1))
+        #expect(try text("SEARCH", .text("x*z"), .text("abcde")) == .error(.value))
     }
 
     // Microsoft on SUBSTITUTE: "Substitutes new_text for old_text in a text string.
     // Use SUBSTITUTE when you want to replace specific text… If instance_num is
     // specified, only that instance is replaced."
 
-    func testSubstituteReplacesEveryInstance() throws {
-        XCTAssertEqual(try text("SUBSTITUTE", .text("Sales Data"), .text("Sales"),
-                                .text("Cost")), .text("Cost Data"))
-        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+")),
-                       .text("a+b+c"))
+    @Test func substituteReplacesEveryInstance() throws {
+        #expect(try text("SUBSTITUTE", .text("Sales Data"), .text("Sales"),
+                                .text("Cost")) == .text("Cost Data"))
+        #expect(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+")) == .text("a+b+c"))
     }
 
-    func testSubstituteReplacesOnlyTheNamedInstance() throws {
+    @Test func substituteReplacesOnlyTheNamedInstance() throws {
         // Microsoft's own example: Quarter 1, 2011 -> Quarter 2, 2011
-        XCTAssertEqual(try text("SUBSTITUTE", .text("Quarter 1, 2011"), .text("1"),
-                                .text("2"), .number(1)), .text("Quarter 2, 2011"))
-        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+"),
-                                .number(2)), .text("a-b+c"))
+        #expect(try text("SUBSTITUTE", .text("Quarter 1, 2011"), .text("1"),
+                                .text("2"), .number(1)) == .text("Quarter 2, 2011"))
+        #expect(try text("SUBSTITUTE", .text("a-b-c"), .text("-"), .text("+"),
+                                .number(2)) == .text("a-b+c"))
     }
 
     /// "SUBSTITUTE is case-sensitive" — unlike REPLACE, which works by position.
-    func testSubstituteIsCaseSensitive() throws {
-        XCTAssertEqual(try text("SUBSTITUTE", .text("aAa"), .text("a"), .text("z")),
-                       .text("zAz"))
+    @Test func substituteIsCaseSensitive() throws {
+        #expect(try text("SUBSTITUTE", .text("aAa"), .text("a"), .text("z")) == .text("zAz"))
     }
 
     /// An instance number beyond the count changes nothing, rather than erroring.
-    func testSubstituteWithATooLargeInstanceIsUnchanged() throws {
-        XCTAssertEqual(try text("SUBSTITUTE", .text("a-b"), .text("-"), .text("+"),
-                                .number(5)), .text("a-b"))
+    @Test func substituteWithATooLargeInstanceIsUnchanged() throws {
+        #expect(try text("SUBSTITUTE", .text("a-b"), .text("-"), .text("+"),
+                                .number(5)) == .text("a-b"))
     }
 
     /// Empty old_text leaves the string alone; Excel has nothing to find.
-    func testSubstituteWithEmptyOldTextIsUnchanged() throws {
-        XCTAssertEqual(try text("SUBSTITUTE", .text("abc"), .text(""), .text("z")),
-                       .text("abc"))
+    @Test func substituteWithEmptyOldTextIsUnchanged() throws {
+        #expect(try text("SUBSTITUTE", .text("abc"), .text(""), .text("z")) == .text("abc"))
     }
 
-    func testProperCapitalisesEachWord() throws {
-        XCTAssertEqual(try text("PROPER", .text("this is a TITLE")),
-                       .text("This Is A Title"))
-        XCTAssertEqual(try text("PROPER", .text("2-cent's worth")),
-                       .text("2-Cent'S Worth"), "Excel breaks on the apostrophe too")
+    @Test func properCapitalisesEachWord() throws {
+        #expect(try text("PROPER", .text("this is a TITLE")) == .text("This Is A Title"))
+        #expect(try text("PROPER", .text("2-cent's worth")) == .text("2-Cent'S Worth"), "Excel breaks on the apostrophe too")
     }
 
     /// CLEAN removes the non-printing characters 0–31.
-    func testCleanRemovesControlCharacters() throws {
-        XCTAssertEqual(try text("CLEAN", .text("a\u{07}b\u{07}c")), .text("abc"))
-        XCTAssertEqual(try text("CLEAN", .text("plain")), .text("plain"))
+    @Test func cleanRemovesControlCharacters() throws {
+        #expect(try text("CLEAN", .text("a\u{07}b\u{07}c")) == .text("abc"))
+        #expect(try text("CLEAN", .text("plain")) == .text("plain"))
     }
 
     /// NUMBERVALUE reads a number from text using explicit separators, so it does
     /// not depend on the machine's locale.
-    func testNumberValueUsesTheSeparatorsItIsGiven() throws {
-        XCTAssertEqual(try text("NUMBERVALUE", .text("2.500,27"), .text(","), .text(".")),
-                       .number(2500.27))
-        XCTAssertEqual(try text("NUMBERVALUE", .text("3.5")), .number(3.5))
+    @Test func numberValueUsesTheSeparatorsItIsGiven() throws {
+        #expect(try text("NUMBERVALUE", .text("2.500,27"), .text(","), .text(".")) == .number(2500.27))
+        #expect(try text("NUMBERVALUE", .text("3.5")) == .number(3.5))
     }
 
     /// "If empty, an empty string is used" — an empty argument is 0, not an error.
-    func testNumberValueOfEmptyIsZero() throws {
-        XCTAssertEqual(try text("NUMBERVALUE", .text("")), .number(0))
+    @Test func numberValueOfEmptyIsZero() throws {
+        #expect(try text("NUMBERVALUE", .text("")) == .number(0))
     }
 
-    func testNumberValueRefusesWhatIsNotANumber() throws {
-        XCTAssertEqual(try text("NUMBERVALUE", .text("abc")), .error(.value))
+    @Test func numberValueRefusesWhatIsNotANumber() throws {
+        #expect(try text("NUMBERVALUE", .text("abc")) == .error(.value))
     }
 
     // MARK: - Dates and references
@@ -576,78 +560,70 @@ final class MicrosoftSpecificationTests: XCTestCase {
     ///
     /// Microsoft's own example: 2008-10-01 plus 151 working days is 2009-04-30, and
     /// with the four holidays listed it becomes 2009-05-06.
-    func testWorkdaySkipsWeekends() throws {
+    @Test func workdaySkipsWeekends() throws {
         // 2026-01-01 is a Thursday; one working day on is Friday the 2nd,
         // two is Monday the 5th.
         let jan1 = 46023.0
-        XCTAssertEqual(try number("WORKDAY", [.number(jan1), .number(1)]), jan1 + 1)
-        XCTAssertEqual(try number("WORKDAY", [.number(jan1), .number(2)]), jan1 + 4)
+        #expect(try number("WORKDAY", [.number(jan1), .number(1)]).isEqual(to: (jan1 + 1)))
+        #expect(try number("WORKDAY", [.number(jan1), .number(2)]).isEqual(to: (jan1 + 4)))
     }
 
-    func testWorkdayCountsBackwards() throws {
+    @Test func workdayCountsBackwards() throws {
         // 2026-01-05 is a Monday; one working day back is Friday the 2nd.
         let jan5 = 46027.0
-        XCTAssertEqual(try number("WORKDAY", [.number(jan5), .number(-1)]), jan5 - 3)
+        #expect(try number("WORKDAY", [.number(jan5), .number(-1)]).isEqual(to: (jan5 - 3)))
     }
 
-    func testWorkdaySkipsHolidays() throws {
+    @Test func workdaySkipsHolidays() throws {
         let jan1 = 46023.0    // Thursday
         // With Friday the 2nd a holiday, one working day on is Monday the 5th.
-        XCTAssertEqual(
-            try number("WORKDAY", [.number(jan1), .number(1),
-                                   .array(CellMatrix(column: [.number(jan1 + 1)]))]),
-            jan1 + 4)
+        #expect(try number("WORKDAY", [.number(jan1), .number(1), .array(CellMatrix(column: [.number(jan1 + 1)]))]).isEqual(to: (jan1 + 4)))
     }
 
     /// Zero days stays put, even on a weekend — Excel does not snap to a workday.
-    func testWorkdayWithZeroDaysStaysPut() throws {
+    @Test func workdayWithZeroDaysStaysPut() throws {
         let jan3 = 46025.0   // Saturday
-        XCTAssertEqual(try number("WORKDAY", [.number(jan3), .number(0)]), jan3)
+        #expect(try number("WORKDAY", [.number(jan3), .number(0)]).isEqual(to: jan3))
     }
 
     /// `DATEVALUE(text)` — the serial for a date written as text.
-    func testDateValueReadsATextDate() throws {
-        XCTAssertEqual(try number("DATEVALUE", [.text("2026-01-01")]), 46023)
-        XCTAssertEqual(try number("DATEVALUE", [.text("1/1/2026")]), 46023)
+    @Test func dateValueReadsATextDate() throws {
+        #expect(try number("DATEVALUE", [.text("2026-01-01")]).isEqual(to: 46023))
+        #expect(try number("DATEVALUE", [.text("1/1/2026")]).isEqual(to: 46023))
     }
 
-    func testDateValueRefusesWhatIsNotADate() throws {
-        XCTAssertEqual(try function("DATEVALUE").evaluate([.text("not a date")]),
-                       .error(.value))
+    @Test func dateValueRefusesWhatIsNotADate() throws {
+        #expect(try function("DATEVALUE").evaluate([.text("not a date")]) == .error(.value))
     }
 
     /// `TIME(hour, minute, second)` — a fraction of a day, so noon is 0.5.
-    func testTimeIsAFractionOfADay() throws {
-        XCTAssertEqual(try number("TIME", [.number(12), .number(0), .number(0)]),
-                       0.5, accuracy: 1e-12)
-        XCTAssertEqual(try number("TIME", [.number(6), .number(0), .number(0)]),
-                       0.25, accuracy: 1e-12)
+    @Test func timeIsAFractionOfADay() throws {
+        #expect(try abs(number("TIME", [.number(12), .number(0), .number(0)]) - 0.5) <= 1e-12)
+        #expect(try abs(number("TIME", [.number(6), .number(0), .number(0)]) - 0.25) <= 1e-12)
     }
 
     /// "If hour is greater than 23, it is divided by 24 and the remainder is
     /// treated as the hour value."
-    func testTimeWrapsPastMidnight() throws {
-        XCTAssertEqual(try number("TIME", [.number(27), .number(0), .number(0)]),
-                       0.125, accuracy: 1e-12)
+    @Test func timeWrapsPastMidnight() throws {
+        #expect(try abs(number("TIME", [.number(27), .number(0), .number(0)]) - 0.125) <= 1e-12)
     }
 
     /// `ROWS` and `COLUMNS` count a range's shape — which the value now carries.
-    func testRowsAndColumnsCountTheShape() throws {
+    @Test func rowsAndColumnsCountTheShape() throws {
         let block = grid([[.number(1), .number(2), .number(3)],
                           [.number(4), .number(5), .number(6)]])
-        XCTAssertEqual(try number("ROWS", [block]), 2)
-        XCTAssertEqual(try number("COLUMNS", [block]), 3)
-        XCTAssertEqual(try number("ROWS", [.number(1)]), 1, "a lone value is 1x1")
-        XCTAssertEqual(try number("COLUMNS", [.number(1)]), 1)
+        #expect(try number("ROWS", [block]).isEqual(to: 2))
+        #expect(try number("COLUMNS", [block]).isEqual(to: 3))
+        #expect(try number("ROWS", [.number(1)]).isEqual(to: 1), "a lone value is 1x1")
+        #expect(try number("COLUMNS", [.number(1)]).isEqual(to: 1))
     }
 
     /// `HYPERLINK(location, [friendly_name])` displays the friendly name, or the
     /// location when there is none. The jump is a UI act; the value is text.
-    func testHyperlinkShowsItsFriendlyName() throws {
-        XCTAssertEqual(try function("HYPERLINK").evaluate(
-            [.text("https://example.com"), .text("Example")]), .text("Example"))
-        XCTAssertEqual(try function("HYPERLINK").evaluate([.text("https://example.com")]),
-                       .text("https://example.com"))
+    @Test func hyperlinkShowsItsFriendlyName() throws {
+        #expect(try function("HYPERLINK").evaluate(
+            [.text("https://example.com"), .text("Example")]) == .text("Example"))
+        #expect(try function("HYPERLINK").evaluate([.text("https://example.com")]) == .text("https://example.com"))
     }
 
     // MARK: - Foundation maths
@@ -655,47 +631,44 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // Bridged rather than reimplemented: these are libm's, and a second
     // implementation of a sine would be a liability with no upside.
 
-    func testTrigonometryIsInRadians() throws {
-        XCTAssertEqual(try number("SIN", [.number(0)]), 0, accuracy: 1e-12)
-        XCTAssertEqual(try number("COS", [.number(0)]), 1, accuracy: 1e-12)
+    @Test func trigonometryIsInRadians() throws {
+        #expect(try abs(number("SIN", [.number(0)]) - 0) <= 1e-12)
+        #expect(try abs(number("COS", [.number(0)]) - 1) <= 1e-12)
         let pi = try number("PI", [])
-        XCTAssertEqual(try number("SIN", [.number(pi / 2)]), 1, accuracy: 1e-12)
-        XCTAssertEqual(try number("COS", [.number(pi)]), -1, accuracy: 1e-12)
-        XCTAssertEqual(try number("TAN", [.number(0)]), 0, accuracy: 1e-12)
+        #expect(try abs(number("SIN", [.number(pi / 2)]) - 1) <= 1e-12)
+        #expect(try abs(number("COS", [.number(pi)]) - -1) <= 1e-12)
+        #expect(try abs(number("TAN", [.number(0)]) - 0) <= 1e-12)
     }
 
-    func testLogBaseTen() throws {
-        XCTAssertEqual(try number("LOG10", [.number(1000)]), 3, accuracy: 1e-12)
-        XCTAssertEqual(try number("LOG10", [.number(1)]), 0, accuracy: 1e-12)
+    @Test func logBaseTen() throws {
+        #expect(try abs(number("LOG10", [.number(1000)]) - 3) <= 1e-12)
+        #expect(try abs(number("LOG10", [.number(1)]) - 0) <= 1e-12)
     }
 
     /// `TRUNC` cuts toward zero; `INT` rounds down. They differ on negatives, which
     /// is the only reason both exist.
-    func testTruncCutsTowardZero() throws {
-        XCTAssertEqual(try number("TRUNC", [.number(8.9)]), 8)
-        XCTAssertEqual(try number("TRUNC", [.number(-8.9)]), -8, "TRUNC toward zero")
-        XCTAssertEqual(try number("INT", [.number(-8.9)]), -9, "INT rounds down")
-        XCTAssertEqual(try number("TRUNC", [.number(3.14159), .number(2)]), 3.14,
-                       accuracy: 1e-12)
+    @Test func truncCutsTowardZero() throws {
+        #expect(try number("TRUNC", [.number(8.9)]).isEqual(to: 8))
+        #expect(try number("TRUNC", [.number(-8.9)]).isEqual(to: -8), "TRUNC toward zero")
+        #expect(try number("INT", [.number(-8.9)]).isEqual(to: -9), "INT rounds down")
+        #expect(try abs(number("TRUNC", [.number(3.14159), .number(2)]) - 3.14) <= 1e-12)
     }
 
-    func testProductMultipliesEverything() throws {
-        XCTAssertEqual(try number("PRODUCT", [.number(2), .number(3), .number(4)]), 24)
-        XCTAssertEqual(try number("PRODUCT", [column([2, 3, 4])]), 24)
-        XCTAssertEqual(try number("PRODUCT", [.number(5)]), 5)
+    @Test func productMultipliesEverything() throws {
+        #expect(try number("PRODUCT", [.number(2), .number(3), .number(4)]).isEqual(to: 24))
+        #expect(try number("PRODUCT", [column([2, 3, 4])]).isEqual(to: 24))
+        #expect(try number("PRODUCT", [.number(5)]).isEqual(to: 5))
     }
 
     /// Text and blanks inside a range are ignored, as with the other aggregates.
-    func testProductIgnoresNonNumbersInARange() throws {
-        XCTAssertEqual(try number("PRODUCT", [
-            .array(CellMatrix(column: [.number(2), .blank, .text("x"), .number(3)])),
-        ]), 6)
+    @Test func productIgnoresNonNumbersInARange() throws {
+        #expect(try number("PRODUCT", [ .array(CellMatrix(column: [.number(2), .blank, .text("x"), .number(3)])), ]).isEqual(to: 6))
     }
 
-    func testGreatestCommonDivisor() throws {
-        XCTAssertEqual(try number("GCD", [.number(24), .number(36)]), 12)
-        XCTAssertEqual(try number("GCD", [.number(7), .number(13)]), 1)
-        XCTAssertEqual(try number("GCD", [.number(0), .number(5)]), 5)
+    @Test func greatestCommonDivisor() throws {
+        #expect(try number("GCD", [.number(24), .number(36)]).isEqual(to: 12))
+        #expect(try number("GCD", [.number(7), .number(13)]).isEqual(to: 1))
+        #expect(try number("GCD", [.number(0), .number(5)]).isEqual(to: 5))
     }
 
     // MARK: - Regression and the normal distribution
@@ -705,84 +678,77 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // this binding has to get right: reversed, it returns the slope of x on y, which
     // is a real number, plausibly sized, and wrong.
 
-    func testSlopeOfAPerfectLine() throws {
+    @Test func slopeOfAPerfectLine() throws {
         // y = 2x + 1 through (1,3) (2,5) (3,7) (4,9): slope 2, intercept 1, exactly.
         let ys = column([3, 5, 7, 9])
         let xs = column([1, 2, 3, 4])
-        XCTAssertEqual(try number("SLOPE", [ys, xs]), 2, accuracy: 1e-12)
-        XCTAssertEqual(try number("INTERCEPT", [ys, xs]), 1, accuracy: 1e-12)
+        #expect(try abs(number("SLOPE", [ys, xs]) - 2) <= 1e-12)
+        #expect(try abs(number("INTERCEPT", [ys, xs]) - 1) <= 1e-12)
     }
 
     /// Microsoft's worked example, published as `0.305556`.
-    func testSlopeOnMicrosoftsExample() throws {
+    @Test func slopeOnMicrosoftsExample() throws {
         let ys = column([2, 3, 9, 1, 8, 7, 5])
         let xs = column([6, 5, 11, 7, 5, 4, 4])
-        XCTAssertEqual(try number("SLOPE", [ys, xs]), 0.3055555555555556, accuracy: 1e-12)
+        #expect(try abs(number("SLOPE", [ys, xs]) - 0.3055555555555556) <= 1e-12)
         // Computed from the documented formula on the same data, not quoted.
-        XCTAssertEqual(try number("INTERCEPT", [ys, xs]), 3.1666666666666665, accuracy: 1e-12)
+        #expect(try abs(number("INTERCEPT", [ys, xs]) - 3.1666666666666665) <= 1e-12)
     }
 
     /// Reversing the arguments must change the answer, or the binding is not doing
     /// the one job it exists for.
-    func testSlopeIsNotSymmetric() throws {
+    @Test func slopeIsNotSymmetric() throws {
         let ys = column([2, 3, 9, 1, 8, 7, 5])
         let xs = column([6, 5, 11, 7, 5, 4, 4])
-        XCTAssertNotEqual(try number("SLOPE", [ys, xs]),
-                          try number("SLOPE", [xs, ys]), accuracy: 1e-9)
+        #expect(try abs(number("SLOPE", [ys, xs]) - number("SLOPE", [xs, ys])) > 1e-9)
     }
 
-    func testSlopeRefusesMismatchedOrEmptyRanges() throws {
-        XCTAssertEqual(try function("SLOPE").evaluate([column([1, 2, 3]), column([1, 2])]),
-                       .error(.na), "Excel gives #N/A for different-sized ranges")
+    @Test func slopeRefusesMismatchedOrEmptyRanges() throws {
+        #expect(try function("SLOPE").evaluate([column([1, 2, 3]), column([1, 2])]) == .error(.na), "Excel gives #N/A for different-sized ranges")
     }
 
     /// `NORM.DIST(x, mean, standard_dev, cumulative)`. Microsoft's example:
     /// `NORM.DIST(42, 40, 1.5, TRUE)` is published as `0.908789`.
-    func testNormalDistributionCumulative() throws {
-        XCTAssertEqual(try number("NORM.DIST", [.number(42), .number(40), .number(1.5),
-                                                .bool(true)]),
-                       0.9087887802741321, accuracy: 1e-9)
+    @Test func normalDistributionCumulative() throws {
+        #expect(try abs(number("NORM.DIST", [.number(42), .number(40), .number(1.5),
+                                                .bool(true)]) - 0.9087887802741321) <= 1e-9)
     }
 
     /// With `cumulative` FALSE it is the density, which peaks at the mean.
-    func testNormalDistributionDensity() throws {
+    @Test func normalDistributionDensity() throws {
         let atMean = try number("NORM.DIST", [.number(40), .number(40), .number(1.5),
                                               .bool(false)])
         let away = try number("NORM.DIST", [.number(43), .number(40), .number(1.5),
                                             .bool(false)])
-        XCTAssertGreaterThan(atMean, away)
+        #expect(atMean > away)
         // The density at the mean is 1/(σ√2π).
-        XCTAssertEqual(atMean, 1 / (1.5 * (2 * Double.pi).squareRoot()), accuracy: 1e-9)
+        #expect(abs(atMean - (1 / (1.5 * (2 * Double.pi).squareRoot()))) <= 1e-9)
     }
 
     /// A standard deviation of zero or less is `#NUM!`.
-    func testNormalDistributionRefusesANonPositiveDeviation() throws {
-        XCTAssertEqual(try function("NORM.DIST").evaluate(
-            [.number(1), .number(0), .number(0), .bool(true)]), .error(.num))
+    @Test func normalDistributionRefusesANonPositiveDeviation() throws {
+        #expect(try function("NORM.DIST").evaluate(
+            [.number(1), .number(0), .number(0), .bool(true)]) == .error(.num))
     }
 
     /// `NORM.S.DIST(z, cumulative)` is the same with mean 0 and deviation 1.
-    func testStandardNormalDistribution() throws {
-        XCTAssertEqual(try number("NORM.S.DIST", [.number(0), .bool(true)]),
-                       0.5, accuracy: 1e-12)
-        XCTAssertEqual(try number("NORM.S.DIST", [.number(1.333333), .bool(true)]),
-                       0.9087887256040951, accuracy: 1e-9)
+    @Test func standardNormalDistribution() throws {
+        #expect(try abs(number("NORM.S.DIST", [.number(0), .bool(true)]) - 0.5) <= 1e-12)
+        #expect(try abs(number("NORM.S.DIST", [.number(1.333333), .bool(true)]) - 0.9087887256040951) <= 1e-9)
     }
 
     /// `NORM.INV` inverts `NORM.DIST`, so the pair must round-trip.
-    func testNormalInverseRoundTrips() throws {
-        XCTAssertEqual(try number("NORM.INV", [.number(0.5), .number(40), .number(1.5)]),
-                       40, accuracy: 1e-9, "the median of a normal is its mean")
+    @Test func normalInverseRoundTrips() throws {
+        #expect(try abs(number("NORM.INV", [.number(0.5), .number(40), .number(1.5)]) - 40) <= 1e-9, "the median of a normal is its mean")
         let p = try number("NORM.DIST", [.number(42), .number(40), .number(1.5), .bool(true)])
-        XCTAssertEqual(try number("NORM.INV", [.number(p), .number(40), .number(1.5)]),
-                       42, accuracy: 1e-6)
+        #expect(try abs(number("NORM.INV", [.number(p), .number(40), .number(1.5)]) - 42) <= 1e-6)
     }
 
     /// "If probability <= 0 or if probability >= 1, NORM.INV returns #NUM!."
-    func testNormalInverseRefusesProbabilitiesOutsideTheOpenInterval() throws {
+    @Test func normalInverseRefusesProbabilitiesOutsideTheOpenInterval() throws {
         for p in [0.0, 1.0, -0.1, 1.1] {
-            XCTAssertEqual(try function("NORM.INV").evaluate(
-                [.number(p), .number(0), .number(1)]), .error(.num), "p = \(p)")
+            #expect(try function("NORM.INV").evaluate(
+                [.number(p), .number(0), .number(1)]) == .error(.num), "p = \(p)")
         }
     }
 
@@ -792,39 +758,37 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // or omitted, Excel ranks number as if ref were a list sorted in descending
     // order." Ties take the *top* rank, and the ranks after a tie are skipped.
 
-    func testRankDescendingByDefault() throws {
+    @Test func rankDescendingByDefault() throws {
         let list = column([10, 20, 30])
-        XCTAssertEqual(try number("RANK", [.number(30), list]), 1)
-        XCTAssertEqual(try number("RANK", [.number(20), list]), 2)
-        XCTAssertEqual(try number("RANK", [.number(10), list]), 3)
+        #expect(try number("RANK", [.number(30), list]).isEqual(to: 1))
+        #expect(try number("RANK", [.number(20), list]).isEqual(to: 2))
+        #expect(try number("RANK", [.number(10), list]).isEqual(to: 3))
     }
 
-    func testRankAscendingWithANonZeroOrder() throws {
+    @Test func rankAscendingWithANonZeroOrder() throws {
         let list = column([10, 20, 30])
-        XCTAssertEqual(try number("RANK", [.number(10), list, .number(1)]), 1)
-        XCTAssertEqual(try number("RANK", [.number(30), list, .number(1)]), 3)
+        #expect(try number("RANK", [.number(10), list, .number(1)]).isEqual(to: 1))
+        #expect(try number("RANK", [.number(30), list, .number(1)]).isEqual(to: 3))
     }
 
     /// "If two numbers have the same rank, the presence of that number affects the
     /// ranks of subsequent numbers" — two 30s are both rank 1, and 20 is rank 3.
-    func testRankGivesTiesTheTopRankAndSkipsAfter() throws {
+    @Test func rankGivesTiesTheTopRankAndSkipsAfter() throws {
         let list = column([30, 30, 20, 10])
-        XCTAssertEqual(try number("RANK", [.number(30), list]), 1)
-        XCTAssertEqual(try number("RANK", [.number(20), list]), 3, "rank 2 is consumed")
-        XCTAssertEqual(try number("RANK", [.number(10), list]), 4)
+        #expect(try number("RANK", [.number(30), list]).isEqual(to: 1))
+        #expect(try number("RANK", [.number(20), list]).isEqual(to: 3), "rank 2 is consumed")
+        #expect(try number("RANK", [.number(10), list]).isEqual(to: 4))
     }
 
     /// A number that is not in the list is `#N/A`.
-    func testRankOfSomethingAbsentIsNotAvailable() throws {
-        XCTAssertEqual(try function("RANK").evaluate([.number(99), column([1, 2, 3])]),
-                       .error(.na))
+    @Test func rankOfSomethingAbsentIsNotAvailable() throws {
+        #expect(try function("RANK").evaluate([.number(99), column([1, 2, 3])]) == .error(.na))
     }
 
     /// `RANK.EQ` is the modern spelling of exactly this behaviour.
-    func testRankEqMatchesRank() throws {
+    @Test func rankEqMatchesRank() throws {
         let list = column([30, 30, 20, 10])
-        XCTAssertEqual(try number("RANK.EQ", [.number(20), list]),
-                       try number("RANK", [.number(20), list]))
+        #expect(try number("RANK.EQ", [.number(20), list]).isEqual(to: number("RANK", [.number(20), list])))
     }
 
     // MARK: - GETPIVOTDATA
@@ -847,10 +811,9 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // the reference its second argument names, and a bare `evaluate(_:)` hands it values
     // with no addresses in them.
 
-    func testGetPivotDataReportsAMissingPivotTable() throws {
-        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3)"), .error(.ref))
-        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3, \"Region\", \"North\")"),
-                       .error(.ref))
+    @Test func getPivotDataReportsAMissingPivotTable() throws {
+        #expect(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3)") == .error(.ref))
+        #expect(try pivotAnswer("GETPIVOTDATA(\"Sales\", $A$3, \"Region\", \"North\")") == .error(.ref))
     }
 
     /// Evaluates against a provider that models no workbook, so it has no pivots to offer.
@@ -872,13 +835,13 @@ final class MicrosoftSpecificationTests: XCTestCase {
 
     /// It is registered, so a workbook full of it reads as a known function that
     /// cannot resolve rather than an unknown name.
-    func testGetPivotDataIsRegistered() {
-        XCTAssertNotNil(FunctionRegistry.builtin.function(named: "GETPIVOTDATA"))
+    @Test func getPivotDataIsRegistered() {
+        #expect(FunctionRegistry.builtin.resolvedName("GETPIVOTDATA") == "GETPIVOTDATA")
     }
 
     /// An error argument still propagates, so the first failure is the one reported.
-    func testGetPivotDataPropagatesAnError() throws {
-        XCTAssertEqual(try pivotAnswer("GETPIVOTDATA(#NAME?, $A$3)"), .error(.name))
+    @Test func getPivotDataPropagatesAnError() throws {
+        #expect(try pivotAnswer("GETPIVOTDATA(#NAME?, $A$3)") == .error(.name))
     }
 
     // MARK: - Legacy spellings
@@ -886,62 +849,59 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// Excel renamed the statistical functions and kept the old names working. A
     /// workbook saved before the rename still writes `NORMSINV`, and 34 corpus cells
     /// do — which would be `#NAME?` over a full stop.
-    func testLegacySpellingsResolve() {
+    @Test func legacySpellingsResolve() {
         let registry = FunctionRegistry.builtin
         for (legacy, modern) in [("NORMSINV", "NORM.S.INV"), ("NORMSDIST", "NORM.S.DIST"),
                                  ("NORMDIST", "NORM.DIST"), ("NORMINV", "NORM.INV"),
                                  ("STDEV", "STDEV.S")] {
-            XCTAssertNotNil(registry.function(named: legacy), legacy)
-            XCTAssertNotNil(registry.function(named: modern), modern)
+            #expect(registry.resolvedName(legacy) == FunctionRegistry.canonical(legacy), "\(legacy)")
+            #expect(registry.resolvedName(modern) == FunctionRegistry.canonical(modern), "\(modern)")
         }
     }
 
     /// An alias exists only in the registry, not in any group's `all`, so it is
     /// looked up the way a formula would reach it.
-    func testLegacyAndModernAgree() throws {
+    @Test func legacyAndModernAgree() throws {
         let registry = FunctionRegistry.builtin
-        let legacy = try XCTUnwrap(registry.function(named: "NORMSINV"))
-        let modern = try XCTUnwrap(registry.function(named: "NORM.S.INV"))
+        let legacy = try #require(registry.function(named: "NORMSINV"))
+        let modern = try #require(registry.function(named: "NORM.S.INV"))
         let probability = CellValue.number(0.9087887802741321)
-        XCTAssertEqual(try legacy.evaluate([probability]),
-                       try modern.evaluate([probability]))
+        #expect(try legacy.evaluate([probability]) == modern.evaluate([probability]))
     }
 
     // MARK: - TRUE() and FALSE()
 
     /// Excel accepts the booleans with parentheses, and a workbook writing
     /// `IF(ISTEXT(B2)=TRUE(), …)` is doing something ordinary.
-    func testTheBooleansAreCallable() throws {
-        XCTAssertEqual(try function("TRUE").evaluate([]), .bool(true))
-        XCTAssertEqual(try function("FALSE").evaluate([]), .bool(false))
+    @Test func theBooleansAreCallable() throws {
+        #expect(try function("TRUE").evaluate([]) == .bool(true))
+        #expect(try function("FALSE").evaluate([]) == .bool(false))
     }
 
     // MARK: - Character codes
 
     /// `UNICODE` gives the whole code point, where `CODE` gives only the first byte
     /// of the legacy set. They agree on ASCII and part company above it.
-    func testUnicodeReadsTheCodePoint() throws {
-        XCTAssertEqual(try number("UNICODE", [.text("A")]), 65)
-        XCTAssertEqual(try number("UNICODE", [.text("€")]), 8364)
-        XCTAssertEqual(try number("UNICODE", [.text("Abc")]), 65, "the first character only")
+    @Test func unicodeReadsTheCodePoint() throws {
+        #expect(try number("UNICODE", [.text("A")]).isEqual(to: 65))
+        #expect(try number("UNICODE", [.text("€")]).isEqual(to: 8364))
+        #expect(try number("UNICODE", [.text("Abc")]).isEqual(to: 65), "the first character only")
     }
 
-    func testUnicodeOfNothingIsAValueError() throws {
-        XCTAssertEqual(try function("UNICODE").evaluate([.text("")]), .error(.value))
+    @Test func unicodeOfNothingIsAValueError() throws {
+        #expect(try function("UNICODE").evaluate([.text("")]) == .error(.value))
     }
 
-    func testUnicharRoundTripsWithUnicode() throws {
-        XCTAssertEqual(try function("UNICHAR").evaluate([.number(65)]), .text("A"))
-        XCTAssertEqual(try function("UNICHAR").evaluate([.number(8364)]), .text("€"))
-        XCTAssertEqual(try number("UNICODE", [try function("UNICHAR").evaluate([.number(233)])]),
-                       233)
+    @Test func unicharRoundTripsWithUnicode() throws {
+        #expect(try function("UNICHAR").evaluate([.number(65)]) == .text("A"))
+        #expect(try function("UNICHAR").evaluate([.number(8364)]) == .text("€"))
+        #expect(try number("UNICODE", [try function("UNICHAR").evaluate([.number(233)])]).isEqual(to: 233))
     }
 
     /// Zero, the surrogate block and anything past the range name no character.
-    func testUnicharRefusesWhatIsNotACharacter() throws {
+    @Test func unicharRefusesWhatIsNotACharacter() throws {
         for value in [0.0, 55_296.0, 1_114_112.0] {
-            XCTAssertEqual(try function("UNICHAR").evaluate([.number(value)]),
-                           .error(.value), "\(value)")
+            #expect(try function("UNICHAR").evaluate([.number(value)]) == .error(.value), "\(value)")
         }
     }
 
@@ -950,59 +910,50 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // Excel's engineering conversions work in two's complement over a fixed window,
     // which is why DEC2HEX(-1) is all Fs rather than a signed literal.
 
-    func testDecimalToOtherBases() throws {
-        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255)]), .text("FF"))
-        XCTAssertEqual(try function("DEC2BIN").evaluate([.number(9)]), .text("1001"))
-        XCTAssertEqual(try function("DEC2OCT").evaluate([.number(8)]), .text("10"))
+    @Test func decimalToOtherBases() throws {
+        #expect(try function("DEC2HEX").evaluate([.number(255)]) == .text("FF"))
+        #expect(try function("DEC2BIN").evaluate([.number(9)]) == .text("1001"))
+        #expect(try function("DEC2OCT").evaluate([.number(8)]) == .text("10"))
     }
 
-    func testNegativesWrapIntoTheWindow() throws {
-        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(-1)]),
-                       .text("FFFFFFFFFF"), "ten hex digits of two's complement")
-        XCTAssertEqual(try function("DEC2BIN").evaluate([.number(-1)]),
-                       .text("1111111111"), "ten binary digits")
+    @Test func negativesWrapIntoTheWindow() throws {
+        #expect(try function("DEC2HEX").evaluate([.number(-1)]) == .text("FFFFFFFFFF"), "ten hex digits of two's complement")
+        #expect(try function("DEC2BIN").evaluate([.number(-1)]) == .text("1111111111"), "ten binary digits")
     }
 
     /// The `places` argument pads, and Microsoft: "If places is negative, DEC2HEX
     /// returns the #NUM! error value."
-    func testPlacesPadsAndValidates() throws {
-        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255), .number(4)]),
-                       .text("00FF"))
-        XCTAssertEqual(try function("DEC2HEX").evaluate([.number(255), .number(1)]),
-                       .error(.num), "too few places for the value")
+    @Test func placesPadsAndValidates() throws {
+        #expect(try function("DEC2HEX").evaluate([.number(255), .number(4)]) == .text("00FF"))
+        #expect(try function("DEC2HEX").evaluate([.number(255), .number(1)]) == .error(.num), "too few places for the value")
     }
 
-    func testConversionsRoundTrip() throws {
-        XCTAssertEqual(try number("HEX2DEC", [.text("FF")]), 255)
-        XCTAssertEqual(try number("BIN2DEC", [.text("1001")]), 9)
-        XCTAssertEqual(try number("OCT2DEC", [.text("10")]), 8)
-        XCTAssertEqual(try number("HEX2DEC", [.text("FFFFFFFFFF")]), -1,
-                       "the top bit is the sign, matching DEC2HEX")
+    @Test func conversionsRoundTrip() throws {
+        #expect(try number("HEX2DEC", [.text("FF")]).isEqual(to: 255))
+        #expect(try number("BIN2DEC", [.text("1001")]).isEqual(to: 9))
+        #expect(try number("OCT2DEC", [.text("10")]).isEqual(to: 8))
+        #expect(try number("HEX2DEC", [.text("FFFFFFFFFF")]).isEqual(to: -1), "the top bit is the sign, matching DEC2HEX")
     }
 
     /// `BASE` is unsigned and has no wrapping, which is what separates it from the
     /// `DEC2*` family.
-    func testBaseIsUnsigned() throws {
-        XCTAssertEqual(try function("BASE").evaluate([.number(255), .number(16)]),
-                       .text("FF"))
-        XCTAssertEqual(try function("BASE").evaluate([.number(7), .number(2)]), .text("111"))
-        XCTAssertEqual(try function("BASE").evaluate([.number(7), .number(2), .number(8)]),
-                       .text("00000111"))
-        XCTAssertEqual(try function("BASE").evaluate([.number(-1), .number(16)]),
-                       .error(.num), "no two's complement here")
+    @Test func baseIsUnsigned() throws {
+        #expect(try function("BASE").evaluate([.number(255), .number(16)]) == .text("FF"))
+        #expect(try function("BASE").evaluate([.number(7), .number(2)]) == .text("111"))
+        #expect(try function("BASE").evaluate([.number(7), .number(2), .number(8)]) == .text("00000111"))
+        #expect(try function("BASE").evaluate([.number(-1), .number(16)]) == .error(.num), "no two's complement here")
     }
 
-    func testDecimalInvertsBase() throws {
-        XCTAssertEqual(try number("DECIMAL", [.text("FF"), .number(16)]), 255)
-        XCTAssertEqual(try number("DECIMAL", [.text("111"), .number(2)]), 7)
-        XCTAssertEqual(try function("DECIMAL").evaluate([.text("ZZ"), .number(16)]),
-                       .error(.num))
+    @Test func decimalInvertsBase() throws {
+        #expect(try number("DECIMAL", [.text("FF"), .number(16)]).isEqual(to: 255))
+        #expect(try number("DECIMAL", [.text("111"), .number(2)]).isEqual(to: 7))
+        #expect(try function("DECIMAL").evaluate([.text("ZZ"), .number(16)]) == .error(.num))
     }
 
     // MARK: - CELL
 
     /// `CELL("contents"| "type", ref)` follows from the value.
-    func testCellReadsContentsAndType() throws {
+    @Test func cellReadsContentsAndType() throws {
         // CELL needs the calling context to answer positional questions, so it is
         // reached through the evaluator rather than called directly.
         func cell(_ info: String, _ argument: FormulaAST) throws -> CellValue {
@@ -1010,23 +961,23 @@ final class MicrosoftSpecificationTests: XCTestCase {
                 .function("CELL", [.text(info), argument]),
                 cells: NoCells(), names: NamedRangeCollection())
         }
-        XCTAssertEqual(try cell("contents", .number(42)), .number(42))
-        XCTAssertEqual(try cell("type", .text("hello")), .text("l"), "l for label")
-        XCTAssertEqual(try cell("type", .number(1)), .text("v"))
-        XCTAssertEqual(try cell("type", .text("")), .text("b"))
+        #expect(try cell("contents", .number(42)) == .number(42))
+        #expect(try cell("type", .text("hello")) == .text("l"), "l for label")
+        #expect(try cell("type", .number(1)) == .text("v"))
+        #expect(try cell("type", .text("")) == .text("b"))
     }
 
     /// `"address"`, `"row"` and `"col"` read the reference as written, so they answer
     /// about where it points rather than about the value inside it.
-    func testCellAnswersPositionalQuestions() throws {
+    @Test func cellAnswersPositionalQuestions() throws {
         func cell(_ info: String) throws -> CellValue {
             try FormulaEvaluator.evaluate(
                 .function("CELL", [.text(info), .cellRef(CellRef("D7"))]),
                 cells: NoCells(), names: NamedRangeCollection())
         }
-        XCTAssertEqual(try cell("row"), .number(7))
-        XCTAssertEqual(try cell("col"), .number(4))
-        XCTAssertEqual(try cell("address"), .text("$D$7"), "Excel reports it absolute")
+        #expect(try cell("row") == .number(7))
+        #expect(try cell("col") == .number(4))
+        #expect(try cell("address") == .text("$D$7"), "Excel reports it absolute")
     }
 
     /// The environment-dependent info types are refused rather than guessed.
@@ -1034,12 +985,12 @@ final class MicrosoftSpecificationTests: XCTestCase {
     /// `"filename"` is what the corpus writes — 185 calls across nine workbooks — and
     /// it names where the file sits on disk, which no formula's value can depend on
     /// here. An empty string would be a plausible-looking lie.
-    func testCellRefusesWhatItCannotKnow() throws {
+    @Test func cellRefusesWhatItCannotKnow() throws {
         for info in ["filename", "format", "color", "width", "protect", "prefix"] {
             let result = try FormulaEvaluator.evaluate(
                 .function("CELL", [.text(info), .number(1)]),
                 cells: NoCells(), names: NamedRangeCollection())
-            XCTAssertEqual(result, .error(.value), info)
+            #expect(result == .error(.value), "\(info)")
         }
     }
 
@@ -1067,47 +1018,38 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // `#NAME?`; we answered `#N/A`, which says "looked and did not find" about a
     // lookup that never happened.
 
-    func testTheLookupsPropagateAnErrorLookupValue() throws {
+    @Test func theLookupsPropagateAnErrorLookupValue() throws {
         let table = grid([[.number(1), .text("a")], [.number(2), .text("b")]])
         for name in ["VLOOKUP", "HLOOKUP"] {
-            XCTAssertEqual(
-                try function(name).evaluate([.error(.name), table, .number(2), .bool(false)]),
-                .error(.name), name)
+            #expect(try function(name).evaluate([.error(.name), table, .number(2), .bool(false)]) == .error(.name), "\(name)")
         }
-        XCTAssertEqual(try function("MATCH").evaluate([.error(.name), table, .number(0)]),
-                       .error(.name))
+        #expect(try function("MATCH").evaluate([.error(.name), table, .number(0)]) == .error(.name))
     }
 
-    func testTheLookupsPropagateAnErrorTable() throws {
+    @Test func theLookupsPropagateAnErrorTable() throws {
         for name in ["VLOOKUP", "HLOOKUP"] {
-            XCTAssertEqual(
-                try function(name).evaluate([.number(1), .error(.div0), .number(2), .bool(false)]),
-                .error(.div0), name)
+            #expect(try function(name).evaluate([.number(1), .error(.div0), .number(2), .bool(false)]) == .error(.div0), "\(name)")
         }
     }
 
-    func testTheLookupsPropagateAnErrorIndex() throws {
+    @Test func theLookupsPropagateAnErrorIndex() throws {
         let table = grid([[.number(1), .text("a")], [.number(2), .text("b")]])
         for name in ["VLOOKUP", "HLOOKUP"] {
-            XCTAssertEqual(
-                try function(name).evaluate([.number(1), table, .error(.value), .bool(false)]),
-                .error(.value), name)
+            #expect(try function(name).evaluate([.number(1), table, .error(.value), .bool(false)]) == .error(.value), "\(name)")
         }
     }
 
     /// The first error wins, so the result names the failure nearest the start of
     /// the argument list rather than whichever the implementation happened to test.
-    func testTheFirstErrorArgumentIsTheOneReturned() throws {
-        XCTAssertEqual(
-            try function("VLOOKUP").evaluate([.error(.na), .error(.div0), .number(2)]),
-            .error(.na))
+    @Test func theFirstErrorArgumentIsTheOneReturned() throws {
+        #expect(try function("VLOOKUP").evaluate([.error(.na), .error(.div0), .number(2)]) == .error(.na))
     }
 
     /// `INDEX` already did this, and must keep doing it.
-    func testIndexPropagatesAnError() throws {
+    @Test func indexPropagatesAnError() throws {
         let table = grid([[.number(1), .text("a")]])
-        XCTAssertEqual(try function("INDEX").evaluate([.error(.ref), .number(1)]), .error(.ref))
-        XCTAssertEqual(try function("INDEX").evaluate([table, .error(.ref)]), .error(.ref))
+        #expect(try function("INDEX").evaluate([.error(.ref), .number(1)]) == .error(.ref))
+        #expect(try function("INDEX").evaluate([table, .error(.ref)]) == .error(.ref))
     }
 
     // MARK: - EOMONTH
@@ -1115,22 +1057,19 @@ final class MicrosoftSpecificationTests: XCTestCase {
     // Microsoft: "Returns the serial number for the last day of the month that is
     // the indicated number of months before or after start_date."
 
-    func testEomonthMovesForwardAndLands() throws {
+    @Test func eomonthMovesForwardAndLands() throws {
         // 2020-01-31 + 1 month is 2020-02-29, a leap February.
         let jan31_2020 = 43861.0
-        XCTAssertEqual(try number("EOMONTH", [.number(jan31_2020), .number(1)]),
-                       Self.feb29_2020, accuracy: 0)
+        #expect(try abs(number("EOMONTH", [.number(jan31_2020), .number(1)]) - Self.feb29_2020) <= 0)
     }
 
-    func testEomonthMovesBackward() throws {
+    @Test func eomonthMovesBackward() throws {
         // 2020-12-31 back ten months is 2020-02-29.
-        XCTAssertEqual(try number("EOMONTH", [.number(Self.dec31_2020), .number(-10)]),
-                       Self.feb29_2020, accuracy: 0)
+        #expect(try abs(number("EOMONTH", [.number(Self.dec31_2020), .number(-10)]) - Self.feb29_2020) <= 0)
     }
 
-    func testEomonthWithZeroIsTheEndOfTheSameMonth() throws {
+    @Test func eomonthWithZeroIsTheEndOfTheSameMonth() throws {
         // 2020-02-29 is already the month end and stays put.
-        XCTAssertEqual(try number("EOMONTH", [.number(Self.feb29_2020), .number(0)]),
-                       Self.feb29_2020, accuracy: 0)
+        #expect(try abs(number("EOMONTH", [.number(Self.feb29_2020), .number(0)]) - Self.feb29_2020) <= 0)
     }
 }

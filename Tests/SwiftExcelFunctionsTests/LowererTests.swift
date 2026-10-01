@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -13,7 +14,7 @@ import BusinessMath
 ///
 /// So the bar is not "does it produce a number". It is **"does it produce the same numbers
 /// the interpreted path does, bit for bit"**, and every test here is written against that.
-final class LowererTests: XCTestCase {
+@Suite struct LowererTests {
 
     private struct Sheet: CellValueProvider, PopulatedCellProvider {
         var cells: [CellRef: CellValue] = [:]
@@ -48,7 +49,7 @@ final class LowererTests: XCTestCase {
 
     // MARK: - What lowers
 
-    func testArithmeticLowers() throws {
+    @Test func arithmeticLowers() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "B1*2+3",
@@ -57,14 +58,14 @@ final class LowererTests: XCTestCase {
         let lowered = try Lowerer().lower(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
 
-        XCTAssertEqual(lowered.inputCount, 1)
-        XCTAssertGreaterThan(lowered.instructionCount, 0)
+        #expect(lowered.inputCount == 1)
+        #expect(lowered.instructionCount > 0)
         // input 0.5 → 0.5*2+3 = 4
-        XCTAssertEqual(try lowered.model.evaluate(inputs: [0.5]), 4.0, accuracy: 1e-12)
+        #expect(try abs(lowered.model.evaluate(inputs: [0.5]) - 4.0) <= 1e-12)
     }
 
     /// `Expression` has a ternary, so `IF` is a direct lowering rather than a workaround.
-    func testConditionalLowers() throws {
+    @Test func conditionalLowers() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "IF(B1>0.5, 10, 20)",
@@ -73,12 +74,12 @@ final class LowererTests: XCTestCase {
         let lowered = try Lowerer().lower(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
 
-        XCTAssertEqual(try lowered.model.evaluate(inputs: [0.9]), 10.0, accuracy: 1e-12)
-        XCTAssertEqual(try lowered.model.evaluate(inputs: [0.1]), 20.0, accuracy: 1e-12)
+        #expect(try abs(lowered.model.evaluate(inputs: [0.9]) - 10.0) <= 1e-12)
+        #expect(try abs(lowered.model.evaluate(inputs: [0.1]) - 20.0) <= 1e-12)
     }
 
     /// `SUM` over a range folds; `SUMPRODUCT` is `ExpressionArray.dot(_:)` exactly.
-    func testRangeAggregatesLower() throws {
+    @Test func rangeAggregatesLower() throws {
         let sheet = try Sheet(
             formulas: [
                 "A1": "PsiUniform(0, 1)",
@@ -88,12 +89,12 @@ final class LowererTests: XCTestCase {
         let lowered = try Lowerer().lower(
             output: CellRef("D1"), survey: survey(sheet), cells: sheet)
 
-        XCTAssertEqual(try lowered.model.evaluate(inputs: [5]), 115.0, accuracy: 1e-12)
+        #expect(try abs(lowered.model.evaluate(inputs: [5]) - 115.0) <= 1e-12)
     }
 
     /// A cell read twice is one draw, not two — the input index is per call site and the
     /// inlined subtree refers back to the same index.
-    func testACellReadTwiceIsOneInput() throws {
+    @Test func aCellReadTwiceIsOneInput() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "B1+B1",
@@ -102,8 +103,8 @@ final class LowererTests: XCTestCase {
         let lowered = try Lowerer().lower(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
 
-        XCTAssertEqual(lowered.inputCount, 1)
-        XCTAssertEqual(try lowered.model.evaluate(inputs: [3]), 6.0, accuracy: 1e-12)
+        #expect(lowered.inputCount == 1)
+        #expect(try abs(lowered.model.evaluate(inputs: [3]) - 6.0) <= 1e-12)
     }
 
     // MARK: - What refuses
@@ -111,7 +112,7 @@ final class LowererTests: XCTestCase {
     /// §5.1: refuse rather than approximate. `Expression` is `Double`-only, so a model
     /// whose trial path can produce text has no faithful lowering — and a NaN standing in
     /// for a string would propagate into a mean nobody could question.
-    func testTextRefuses() throws {
+    @Test func textRefuses() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "\"total: \"&B1",
@@ -119,12 +120,12 @@ final class LowererTests: XCTestCase {
         ])
         let failures = Lowerer().audit(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
-        XCTAssertFalse(failures.isEmpty)
+        #expect(!failures.isEmpty)
     }
 
     /// §5.2: `OFFSET` and `INDIRECT` compute their *address*, so the shape of the
     /// expression would vary per trial. They can never lower.
-    func testComputedAddressRefuses() throws {
+    @Test func computedAddressRefuses() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "OFFSET(A1, B1, 0)",
@@ -132,11 +133,11 @@ final class LowererTests: XCTestCase {
         ])
         let failures = Lowerer().audit(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
-        XCTAssertTrue(failures.contains { if case .computedAddress = $0 { return true } else { return false } })
+        #expect(failures.contains { if case .computedAddress = $0 { return true } else { return false } })
     }
 
     /// A function with no opcode is named, not approximated.
-    func testUnrepresentableFunctionIsNamed() throws {
+    @Test func unrepresentableFunctionIsNamed() throws {
         let sheet = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)",
             "B2": "VLOOKUP(B1, A1:A3, 1)",
@@ -144,7 +145,7 @@ final class LowererTests: XCTestCase {
         ])
         let failures = Lowerer().audit(
             output: CellRef("B3"), survey: survey(sheet), cells: sheet)
-        XCTAssertTrue(failures.contains {
+        #expect(failures.contains {
             if case .unrepresentableFunction(let name, _) = $0 { return name == "VLOOKUP" }
             return false
         })
@@ -152,12 +153,12 @@ final class LowererTests: XCTestCase {
 
     /// `audit` returning empty is the precondition for `lower` succeeding, and both are
     /// pure functions of the model — which is what makes a corpus survey cheap.
-    func testAuditIsEmptyExactlyWhenLoweringSucceeds() throws {
+    @Test func auditIsEmptyExactlyWhenLoweringSucceeds() throws {
         let ok = try Sheet(formulas: [
             "B1": "PsiUniform(0, 1)", "B2": "B1*2", "B3": "B2+PsiOutput()"
         ])
-        XCTAssertTrue(Lowerer().audit(output: CellRef("B3"), survey: survey(ok), cells: ok).isEmpty)
-        XCTAssertNoThrow(try Lowerer().lower(output: CellRef("B3"), survey: survey(ok), cells: ok))
+        #expect(Lowerer().audit(output: CellRef("B3"), survey: survey(ok), cells: ok).isEmpty)
+        #expect(throws: Never.self) { try Lowerer().lower(output: CellRef("B3"), survey: survey(ok), cells: ok) }
     }
 
     // MARK: - The test that earns the design
@@ -171,7 +172,7 @@ final class LowererTests: XCTestCase {
     /// This is the test that makes it safe to add lowering rules at all: §3.1's two paths
     /// are a correctness baseline and a fast path, and this is the sentence that says they
     /// are the same computation.
-    func testCompiledAgreesWithInterpretedBitForBit() throws {
+    @Test func compiledAgreesWithInterpretedBitForBit() throws {
         let sheet = try Sheet(
             formulas: [
                 "B1": "PsiUniform(0, 1)",
@@ -201,7 +202,6 @@ final class LowererTests: XCTestCase {
             compiled.append(try lowered.model.evaluate(inputs: inputs))
         }
 
-        XCTAssertEqual(interpreted.results(for: CellRef("B5"))?.values, compiled,
-                       "the two paths disagree — the lowering is wrong, not the randomness")
+        #expect(interpreted.results(for: CellRef("B5"))?.values.isElementwiseEqual(to: compiled) == true, "the two paths disagree — the lowering is wrong, not the randomness")
     }
 }

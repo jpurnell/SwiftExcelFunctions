@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -7,7 +8,7 @@ import SwiftExcelCore
 /// **Every expectation in this file is measured against Excel for Mac rather than taken
 /// from the published specification, which is wrong about this argument in three separate
 /// ways.** See ``ETSArguments/Aggregation`` for the measurements and the method.
-final class ETSAggregationTests: XCTestCase {
+@Suite struct ETSAggregationTests {
 
     private func nums(_ v: [Double]) -> CellValue { .array(CellMatrix(row: v.map { .number($0) })) }
 
@@ -33,7 +34,7 @@ final class ETSAggregationTests: XCTestCase {
     private func pair(
         _ group: [Double],
         _ aggregation: ETSArguments.Aggregation,
-        line: UInt = #line
+        sourceLocation: SourceLocation = #_sourceLocation
     ) throws -> ETSArguments.Paired {
         let ranges = repeated(group)
         switch ETSArguments.paired(values: ranges.values,
@@ -42,15 +43,15 @@ final class ETSAggregationTests: XCTestCase {
         case .success(let pair):
             return pair
         case .failure(let error):
-            XCTFail("expected a pair, got \(error)", line: line)
-            throw XCTSkip("no pair")
+            Issue.record("expected a pair, got \(error)")
+            throw TestFailure("no pair")
         }
     }
 
     /// The aggregated observation at the repeated timestamp.
     private func atThree(_ pair: ETSArguments.Paired) throws -> Double {
-        let index = try XCTUnwrap(pair.timeline.firstIndex(of: 3))
-        return try XCTUnwrap(pair.observations[index])
+        let index = try #require(pair.timeline.firstIndex(of: 3))
+        return try #require(pair.observations[index])
     }
 
     // MARK: - Duplicates are combined, not rejected
@@ -59,24 +60,24 @@ final class ETSAggregationTests: XCTestCase {
     /// `#VALUE!`; Excel aggregates it. Eleven measured calls, no `#VALUE!` among them, and
     /// the answer changes with the aggregation code — which it could not do if duplicates
     /// were rejected.
-    func testDuplicateTimestampsAreAggregated() throws {
+    @Test func duplicateTimestampsAreAggregated() throws {
         let pair = try pair([1, 2, 9], .sum)
-        XCTAssertEqual(pair.timeline, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        XCTAssertEqual(try atThree(pair), 12, accuracy: 1e-12)
+        #expect(pair.timeline == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        #expect(try abs(atThree(pair) - 12) <= 1e-12)
     }
 
     /// The step is read *after* de-duplication. Read before, the repeated `3` gives a zero
     /// interval and the whole call fails as a duplicate — which is the ordering bug this
     /// pipeline had until the measurements came back.
-    func testStepComesFromTheDeduplicatedTimeline() throws {
-        XCTAssertEqual(try pair([1, 2, 9], .average).step, 1, accuracy: 1e-12)
+    @Test func stepComesFromTheDeduplicatedTimeline() throws {
+        #expect(try abs(pair([1, 2, 9], .average).step - 1) <= 1e-12)
     }
 
     // MARK: - The measured code mapping
 
     /// Codes are **1-based and alphabetical**, which is neither the order nor the base
     /// Microsoft publishes. Each expectation below is an aggregate of `1, 2, 9`.
-    func testCodeMapping() throws {
+    @Test func codeMapping() throws {
         let expected: [(Int, ETSArguments.Aggregation)] = [
             (1, .average), (2, .count), (3, .countA),
             (4, .max), (5, .median), (6, .min), (7, .sum),
@@ -84,61 +85,61 @@ final class ETSAggregationTests: XCTestCase {
         for (code, aggregation) in expected {
             switch ETSArguments.Aggregation.code(code) {
             case .success(let parsed):
-                XCTAssertEqual(parsed, aggregation, "code \(code)")
+                #expect(parsed == aggregation, "code \(code)")
             case .failure(let error):
-                XCTFail("code \(code) should map to \(aggregation), got \(error)")
+                Issue.record("code \(code) should map to \(aggregation), got \(error)")
             }
         }
     }
 
     /// **Code `0` is `#NUM!`**, though the specification names it as both AVERAGE and the
     /// default. Measured twice, on two statistic types.
-    func testCodeZeroIsNum() throws {
+    @Test func codeZeroIsNum() throws {
         guard case .failure(let error) = ETSArguments.Aggregation.code(0) else {
-            return XCTFail("expected an error")
+            Issue.record("expected an error"); return
         }
-        XCTAssertEqual(error, .num)
+        #expect(error == .num)
     }
 
     /// The default is AVERAGE — the specification is right about the function and wrong
     /// about its number.
-    func testDefaultIsAverage() throws {
+    @Test func defaultIsAverage() throws {
         let ranges = repeated([1, 2, 9])
         guard case .success(let pair) = ETSArguments.paired(values: ranges.values,
                                                             timeline: ranges.timeline) else {
-            return XCTFail("pairing failed")
+            Issue.record("pairing failed"); return
         }
-        XCTAssertEqual(try atThree(pair), 4, accuracy: 1e-12)
+        #expect(try abs(atThree(pair) - 4) <= 1e-12)
     }
 
     // MARK: - Each function
 
-    func testAverage() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .average)), 4, accuracy: 1e-12)
+    @Test func average() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .average)) - 4) <= 1e-12)
     }
 
-    func testSum() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .sum)), 12, accuracy: 1e-12)
+    @Test func sum() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .sum)) - 12) <= 1e-12)
     }
 
-    func testMax() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .max)), 9, accuracy: 1e-12)
+    @Test func max() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .max)) - 9) <= 1e-12)
     }
 
-    func testMin() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .min)), 1, accuracy: 1e-12)
+    @Test func min() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .min)) - 1) <= 1e-12)
     }
 
     /// Median of an odd group is its middle value once sorted.
-    func testMedianOfOddGroup() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .median)), 2, accuracy: 1e-12)
+    @Test func medianOfOddGroup() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .median)) - 2) <= 1e-12)
     }
 
     /// Median of an even group is the mean of the middle pair. Not measured — no even
     /// group was tested against Excel — so this is the conventional definition rather than
     /// an observation, and is the first thing to check if a workbook ever disagrees.
-    func testMedianOfEvenGroup() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 3, 10], .median)), 2.5, accuracy: 1e-12)
+    @Test func medianOfEvenGroup() throws {
+        #expect(try abs(atThree(try pair([1, 2, 3, 10], .median)) - 2.5) <= 1e-12)
     }
 
     /// **COUNT returns one less than the group size, which is not what the name means.**
@@ -146,29 +147,29 @@ final class ETSAggregationTests: XCTestCase {
     /// Measured on both of Excel's answers: a group of 2 gave 1, a group of 3 gave 2. It is
     /// reproduced rather than corrected, because the point of this layer is to answer what
     /// Excel answers. See ``ETSArguments/Aggregation`` for why the measurement is trusted.
-    func testCountIsGroupSizeLessOne() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .count)), 2, accuracy: 1e-12)
-        XCTAssertEqual(try atThree(try pair([0, 100], .count)), 1, accuracy: 1e-12)
+    @Test func countIsGroupSizeLessOne() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .count)) - 2) <= 1e-12)
+        #expect(try abs(atThree(try pair([0, 100], .count)) - 1) <= 1e-12)
     }
 
     /// `COUNTA` measured identically to `COUNT` in both datasets.
-    func testCountAMatchesCount() throws {
-        XCTAssertEqual(try atThree(try pair([1, 2, 9], .countA)), 2, accuracy: 1e-12)
+    @Test func countAMatchesCount() throws {
+        #expect(try abs(atThree(try pair([1, 2, 9], .countA)) - 2) <= 1e-12)
     }
 
     // MARK: - Groups of one
 
     /// A timestamp appearing once is aggregated too — trivially, to itself — under every
     /// function except the counts, where a group of one measures as zero by the rule above.
-    func testSingleObservationIsUnchangedUnderValueFunctions() throws {
+    @Test func singleObservationIsUnchangedUnderValueFunctions() throws {
         for aggregation in [ETSArguments.Aggregation.average, .sum, .max, .min, .median] {
             let ranges = repeated([7])
             guard case .success(let pair) = ETSArguments.paired(values: ranges.values,
                                                                 timeline: ranges.timeline,
                                                                 aggregation: aggregation) else {
-                return XCTFail("pairing failed for \(aggregation)")
+                Issue.record("pairing failed for \(aggregation)"); return
             }
-            XCTAssertEqual(try atThree(pair), 7, accuracy: 1e-12, "\(aggregation)")
+            #expect(try abs(atThree(pair) - 7) <= 1e-12, "\(aggregation)")
         }
     }
 }

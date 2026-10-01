@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import CorpusWalk
 
 /// The enumeration of a corpus, and whether it survives being interrupted.
@@ -16,24 +17,24 @@ import XCTest
 ///
 /// So the manifest is the walk's own resume state, and these tests hold it to the two things
 /// that matter: a finished walk is never repeated, and an unfinished one keeps what it got.
-final class CorpusManifestTests: XCTestCase {
+/// A class rather than a struct for its `deinit`: Swift Testing makes one instance per test,
+/// so `init` lays down a fresh fixture directory and `deinit` takes it away again.
+@Suite final class CorpusManifestTests {
 
     // MARK: - Fixtures
 
-    private var root: URL!
-    private var manifest: URL!
+    private let root: URL
+    private let manifest: URL
 
-    override func setUpWithError() throws {
-        try super.setUpWithError()
+    init() throws {
         root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("corpus-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         manifest = root.appendingPathComponent("manifest.tsv")
     }
 
-    override func tearDownWithError() throws {
-        if let root { try? FileManager.default.removeItem(at: root) }
-        try super.tearDownWithError()
+    deinit {
+        try? FileManager.default.removeItem(at: root)
     }
 
     /// Why a fixture could not be laid down.
@@ -87,7 +88,7 @@ final class CorpusManifestTests: XCTestCase {
 
     // MARK: - The walk itself
 
-    func testAFreshWalkFindsEveryWorkbookBeneathTheRoot() throws {
+    @Test func aFreshWalkFindsEveryWorkbookBeneathTheRoot() throws {
         try put("alpha/one.xlsx")
         try put("alpha/nested/two.xlsx")
         try put("beta/three.xlsx")
@@ -95,38 +96,35 @@ final class CorpusManifestTests: XCTestCase {
 
         let found = try subject().workbooks()
 
-        XCTAssertEqual(found, ["alpha/nested/two.xlsx", "alpha/one.xlsx",
-                               "beta/three.xlsx", "top.xlsx"],
-                       "sorted, and relative to the root")
+        #expect(found == ["alpha/nested/two.xlsx", "alpha/one.xlsx",
+                               "beta/three.xlsx", "top.xlsx"], "sorted, and relative to the root")
     }
 
-    func testWhatIsNotAWorkbookIsNotCounted() throws {
+    @Test func whatIsNotAWorkbookIsNotCounted() throws {
         try put("alpha/one.xlsx")
         try put("alpha/notes.txt")
         try put("alpha/~$one.xlsx")
         try put("alpha/book.xls")
 
-        XCTAssertEqual(try subject().workbooks(), ["alpha/one.xlsx"],
-                       "an Excel lock file is not a workbook, and neither is a .txt or a .xls")
+        #expect(try subject().workbooks() == ["alpha/one.xlsx"], "an Excel lock file is not a workbook, and neither is a .txt or a .xls")
     }
 
     // MARK: - The resume, which is the point
 
-    func testAFinishedWalkIsReadRatherThanWalkedAgain() throws {
+    @Test func aFinishedWalkIsReadRatherThanWalkedAgain() throws {
         try put("alpha/one.xlsx")
         let first = try subject().workbooks()
-        XCTAssertEqual(first, ["alpha/one.xlsx"])
+        #expect(first == ["alpha/one.xlsx"])
 
         // Put a second workbook on disk *after* the manifest says the walk finished. A run
         // that returns it has walked the tree again, which is the cost this whole mechanism
         // exists to avoid — so its absence is the assertion.
         try put("alpha/two.xlsx")
 
-        XCTAssertEqual(try subject().workbooks(), ["alpha/one.xlsx"],
-                       "a complete manifest is the answer; the tree is not consulted")
+        #expect(try subject().workbooks() == ["alpha/one.xlsx"], "a complete manifest is the answer; the tree is not consulted")
     }
 
-    func testAnUnfinishedWalkKeepsTheDirectoriesItFinished() throws {
+    @Test func anUnfinishedWalkKeepsTheDirectoriesItFinished() throws {
         try put("alpha/one.xlsx")
         try put("beta/two.xlsx")
 
@@ -142,13 +140,11 @@ final class CorpusManifestTests: XCTestCase {
         let spy = ReportSpy()
         let found = try subject(reporting: spy).workbooks()
 
-        XCTAssertEqual(found, ["alpha/one.xlsx", "beta/two.xlsx"],
-                       "the finished directory is trusted, the unfinished one is walked")
-        XCTAssertFalse(spy.lines.contains { $0.contains("alpha") && $0.contains("walking") },
-                       "alpha was already done and must not be walked a second time")
+        #expect(found == ["alpha/one.xlsx", "beta/two.xlsx"], "the finished directory is trusted, the unfinished one is walked")
+        #expect(!(spy.lines.contains { $0.contains("alpha") && $0.contains("walking") }), "alpha was already done and must not be walked a second time")
     }
 
-    func testAResumedWalkFinishesTheManifest() throws {
+    @Test func aResumedWalkFinishesTheManifest() throws {
         try put("alpha/one.xlsx")
         try put("beta/two.xlsx")
         try [
@@ -163,11 +159,10 @@ final class CorpusManifestTests: XCTestCase {
         // Having finished, the next run must take the cheap path — the same assertion as
         // above, reached by resuming rather than by starting clean.
         try put("beta/three.xlsx")
-        XCTAssertEqual(try subject().workbooks(), ["alpha/one.xlsx", "beta/two.xlsx"],
-                       "the resumed run wrote its own completion line")
+        #expect(try subject().workbooks() == ["alpha/one.xlsx", "beta/two.xlsx"], "the resumed run wrote its own completion line")
     }
 
-    func testAManifestWrittenForAnotherRootIsNotBelieved() throws {
+    @Test func aManifestWrittenForAnotherRootIsNotBelieved() throws {
         try put("alpha/one.xlsx")
         try [
             "root\t/somewhere/else",
@@ -178,13 +173,11 @@ final class CorpusManifestTests: XCTestCase {
 
         let found = try subject().workbooks()
 
-        XCTAssertEqual(found, ["alpha/one.xlsx"],
-                       "a manifest names the root it describes, and a mismatch starts fresh")
-        XCTAssertFalse(try String(contentsOf: manifest, encoding: .utf8).contains("absent.xlsx"),
-                       "and the stale contents are gone rather than appended to")
+        #expect(found == ["alpha/one.xlsx"], "a manifest names the root it describes, and a mismatch starts fresh")
+        #expect(try !String(contentsOf: manifest, encoding: .utf8).contains("absent.xlsx"), "and the stale contents are gone rather than appended to")
     }
 
-    func testADirectoryThatCannotBeReadIsNeitherCheckpointedNorCompleted() throws {
+    @Test func aDirectoryThatCannotBeReadIsNeitherCheckpointedNorCompleted() throws {
         try put("alpha/one.xlsx")
         try put("sealed/two.xlsx")
 
@@ -200,22 +193,19 @@ final class CorpusManifestTests: XCTestCase {
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755], ofItemAtPath: sealed.path)
 
-        XCTAssertEqual(found, ["alpha/one.xlsx"], "what could be read is still reported")
+        #expect(found == ["alpha/one.xlsx"], "what could be read is still reported")
 
         let written = try String(contentsOf: manifest, encoding: .utf8)
-        XCTAssertFalse(written.contains("dir\tsealed"),
-                       "a directory that could not be read must not be marked done")
-        XCTAssertFalse(written.contains("complete"),
-                       "and a walk that missed one has not completed")
+        #expect(!written.contains("dir\tsealed"), "a directory that could not be read must not be marked done")
+        #expect(!written.contains("complete"), "and a walk that missed one has not completed")
 
         // The point of all of it: the next run tries again rather than skipping for ever.
-        XCTAssertEqual(try subject().workbooks(), ["alpha/one.xlsx", "sealed/two.xlsx"],
-                       "the retry finds what the sealed run could not")
+        #expect(try subject().workbooks() == ["alpha/one.xlsx", "sealed/two.xlsx"], "the retry finds what the sealed run could not")
     }
 
     // MARK: - Saying what it is doing
 
-    func testTheWalkSaysWhatItIsDoingWhileItDoesIt() throws {
+    @Test func theWalkSaysWhatItIsDoingWhileItDoesIt() throws {
         try put("alpha/one.xlsx")
         try put("beta/two.xlsx")
 
@@ -225,17 +215,14 @@ final class CorpusManifestTests: XCTestCase {
         // The last run could not be told apart from a hung one without `sample`-ing the
         // process. A walk that names each directory as it starts it cannot go silent for
         // four minutes with nothing to show.
-        XCTAssertTrue(spy.lines.contains { $0.contains("alpha") },
-                      "it named the directory it was walking: \(spy.lines)")
-        XCTAssertTrue(spy.lines.contains { $0.contains("beta") },
-                      "and the next one: \(spy.lines)")
+        #expect(spy.lines.contains { $0.contains("alpha") }, "it named the directory it was walking: \(spy.lines)")
+        #expect(spy.lines.contains { $0.contains("beta") }, "and the next one: \(spy.lines)")
     }
 
-    func testAnUnreadableRootIsRefusedRatherThanReportedEmpty() throws {
+    @Test func anUnreadableRootIsRefusedRatherThanReportedEmpty() throws {
         let missing = root.appendingPathComponent("no-such-directory", isDirectory: true)
         let subject = CorpusManifest(root: missing, location: manifest, report: { _ in })
 
-        XCTAssertThrowsError(try subject.workbooks(),
-                             "an empty corpus and an unreadable one must not look alike")
+        #expect(throws: (any Error).self, "an empty corpus and an unreadable one must not look alike") { try subject.workbooks() }
     }
 }

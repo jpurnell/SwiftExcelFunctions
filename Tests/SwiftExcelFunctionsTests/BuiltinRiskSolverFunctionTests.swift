@@ -1,13 +1,14 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
 /// The parts of Risk Solver a spreadsheet can carry that are not simulation.
-final class BuiltinRiskSolverFunctionTests: XCTestCase {
+@Suite struct BuiltinRiskSolverFunctionTests {
 
     private func eval(_ name: String, _ args: CellValue...) throws -> CellValue {
         guard let fn = BuiltinRiskSolverFunctions.all.first(where: { $0.name == name }) else {
-            XCTFail("\(name) is not registered")
+            Issue.record("\(name) is not registered")
             return .error(.name)
         }
         return try fn.evaluate(args)
@@ -18,32 +19,30 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
     /// Structural rather than a list of names: the distributions have their own
     /// inventory tests, and a second hand-maintained copy of fifty-odd names here
     /// would go stale rather than catch anything.
-    func testAllIsExactlyItsParts() {
+    @Test func allIsExactlyItsParts() {
         let markers = ["PSIOUTPUT", "PSIBASECASE", "PSINAME"]
         let expected = Set(markers)
             .union(BuiltinRiskSolverFunctions.distributions.map(\.name))
             .union(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name))
             .union(BuiltinRiskSolverFunctions.completingDistributions.map(\.name))
-        XCTAssertEqual(Set(BuiltinRiskSolverFunctions.all.map(\.name)), expected)
-        XCTAssertEqual(BuiltinRiskSolverFunctions.all.count, expected.count,
-                       "a name is registered twice")
+        #expect(Set(BuiltinRiskSolverFunctions.all.map(\.name)) == expected)
+        #expect(BuiltinRiskSolverFunctions.all.count == expected.count, "a name is registered twice")
         for marker in markers {
-            XCTAssertTrue(BuiltinRiskSolverFunctions.all.contains { $0.name == marker },
-                          "\(marker) is missing")
+            #expect(BuiltinRiskSolverFunctions.all.contains { $0.name == marker }, "\(marker) is missing")
         }
     }
 
     /// `PsiOutput()` marks a cell as a simulation result. It contributes nothing to
     /// the arithmetic, which is why it can be appended to a real formula.
-    func testPsiOutputIsZero() throws {
-        XCTAssertEqual(try eval("PSIOUTPUT"), .number(0))
+    @Test func psiOutputIsZero() throws {
+        #expect(try eval("PSIOUTPUT") == .number(0))
     }
 
     /// The shape the corpus actually writes: `SUM(J2:J11)+_xll.PsiOutput()`.
     ///
     /// 167 cells across 41 workbooks carry it — the most widespread of the family —
     /// and every one of them is an ordinary formula with a marker stuck on the end.
-    func testAMarkedFormulaEvaluatesToTheFormula() throws {
+    @Test func aMarkedFormulaEvaluatesToTheFormula() throws {
         let plain = try FormulaEvaluator.evaluate(
             .function("SUM", [.number(10), .number(20), .number(12)]),
             cells: EmptyCells(), names: NamedRangeCollection())
@@ -51,41 +50,40 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
             .add(.function("SUM", [.number(10), .number(20), .number(12)]),
                  .function("_xll.PsiOutput", [])),
             cells: EmptyCells(), names: NamedRangeCollection())
-        XCTAssertEqual(marked, plain)
-        XCTAssertEqual(marked, .number(42))
+        #expect(marked == plain)
+        #expect(marked == .number(42))
     }
 
     // MARK: - Property functions
 
     /// `PsiBaseCase(v)` is `v`. It is what a distribution shows when nothing is
     /// simulating, and it is deterministic — the one part of the family that is.
-    func testPsiBaseCaseIsItsArgument() throws {
-        XCTAssertEqual(try eval("PSIBASECASE", .number(42)), .number(42))
-        XCTAssertEqual(try eval("PSIBASECASE", .text("x")), .text("x"))
+    @Test func psiBaseCaseIsItsArgument() throws {
+        #expect(try eval("PSIBASECASE", .number(42)) == .number(42))
+        #expect(try eval("PSIBASECASE", .text("x")) == .text("x"))
     }
 
-    func testPsiNameIsItsLabel() throws {
-        XCTAssertEqual(try eval("PSINAME", .text("Aggressive Launch")),
-                       .text("Aggressive Launch"))
+    @Test func psiNameIsItsLabel() throws {
+        #expect(try eval("PSINAME", .text("Aggressive Launch")) == .text("Aggressive Launch"))
     }
 
     /// The reason they are implemented before the distributions are: they are
     /// *arguments*, so the evaluator evaluates them regardless, and an unregistered
     /// one is `#NAME?` that propagation then carries outward — failing a distribution
     /// that is otherwise correct.
-    func testAPropertyFunctionDoesNotPoisonItsEnclosingCall() throws {
+    @Test func aPropertyFunctionDoesNotPoisonItsEnclosingCall() throws {
         let result = try FormulaEvaluator.evaluate(
             .function("SUM", [.number(10),
                               .function("_xll.PsiBaseCase", [.number(5)])]),
             cells: EmptyCells(), names: NamedRangeCollection())
-        XCTAssertEqual(result, .number(15))
+        #expect(result == .number(15))
     }
 
     /// They resolve through the add-in prefix, as the corpus writes them.
-    func testThePropertyFunctionsResolveThroughThePrefix() {
+    @Test func thePropertyFunctionsResolveThroughThePrefix() {
         let registry = FunctionRegistry.builtin
-        XCTAssertNotNil(registry.function(named: "_xll.PsiBaseCase"))
-        XCTAssertNotNil(registry.function(named: "_xll.PsiName"))
+        #expect(registry.resolvedName("_xll.PsiBaseCase") == "PSIBASECASE")
+        #expect(registry.resolvedName("_xll.PsiName") == "PSINAME")
     }
 
     // MARK: - Excel's "not my name" prefixes
@@ -93,12 +91,12 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
     /// `_xll.` marks an add-in function and `_xlfn.` one newer than the file format.
     /// Neither is part of the function's identity — Excel displays both without the
     /// prefix — so the registry resolves through them.
-    func testTheRegistryLooksThroughExcelsPrefixes() {
+    @Test func theRegistryLooksThroughExcelsPrefixes() {
         let registry = FunctionRegistry.builtin
-        XCTAssertNotNil(registry.function(named: "_xll.PsiOutput"))
-        XCTAssertNotNil(registry.function(named: "_XLL.PSIOUTPUT"))
-        XCTAssertNotNil(registry.function(named: "_xlfn.SUMIFS"), "a modern spelling")
-        XCTAssertNotNil(registry.function(named: "SUM"), "and a plain name still works")
+        #expect(registry.resolvedName("_xll.PsiOutput") == "PSIOUTPUT")
+        #expect(registry.resolvedName("_XLL.PSIOUTPUT") == "PSIOUTPUT")
+        #expect(registry.resolvedName("_xlfn.SUMIFS") == "SUMIFS", "a modern spelling")
+        #expect(registry.resolvedName("SUM") == "SUM", "and a plain name still works")
     }
 
     /// A prefix on a name nothing defines is still unknown, rather than resolving to
@@ -114,9 +112,9 @@ final class BuiltinRiskSolverFunctionTests: XCTestCase {
     /// It replaced `PsiPert`, which was the example until BusinessMath 2.15.0 made it
     /// answerable. That is the failure mode to watch for here: an example chosen
     /// because it was missing stops testing anything the moment it arrives.
-    func testAnUnknownPrefixedNameStaysUnknown() {
-        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xll.PsiSip"))
-        XCTAssertNil(FunctionRegistry.builtin.function(named: "_xlfn.NOTAFUNCTION"))
+    @Test func anUnknownPrefixedNameStaysUnknown() {
+        #expect(FunctionRegistry.builtin.function(named: "_xll.PsiSip") == nil)
+        #expect(FunctionRegistry.builtin.function(named: "_xlfn.NOTAFUNCTION") == nil)
     }
 
     private struct EmptyCells: CellValueProvider {

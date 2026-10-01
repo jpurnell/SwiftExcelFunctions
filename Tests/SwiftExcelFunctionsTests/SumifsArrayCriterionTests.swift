@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -25,7 +26,7 @@ import SwiftXLSX
 ///   5        West        3        300
 ///   6        East        2         10
 /// ```
-final class SumifsArrayCriterionTests: XCTestCase {
+@Suite struct SumifsArrayCriterionTests {
 
     private struct Book: CellValueProvider {
         static let cells: [String: CellValue] = [
@@ -57,38 +58,34 @@ final class SumifsArrayCriterionTests: XCTestCase {
     }
 
     /// **The corpus shape.** Three months summed for one division, totalled by `SUMPRODUCT`.
-    func testSumproductOverAnArrayCriterion() throws {
-        XCTAssertEqual(
-            try evaluate("SUMPRODUCT(SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,E1:E3))"),
-            .number(600), "100 + 200 + 300")
+    @Test func sumproductOverAnArrayCriterion() throws {
+        #expect(try evaluate("SUMPRODUCT(SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,E1:E3))") == .number(600), "100 + 200 + 300")
     }
 
     /// The array is the criterion's shape, one sum per element and in its order.
-    func testTheResultIsOnePerCriterionElement() throws {
+    @Test func theResultIsOnePerCriterionElement() throws {
         guard case .array(let matrix) =
                 try evaluate("SUMIFS(C2:C6,A2:A6,\"East\",B2:B6,E1:E3)") else {
-            return XCTFail("expected an array, one element per month")
+            Issue.record("expected an array, one element per month"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(40), .number(10), .number(0)],
-                       "month 3 has no East row, which is a zero rather than a gap")
+        #expect(matrix.elements == [.number(40), .number(10), .number(0)], "month 3 has no East row, which is a zero rather than a gap")
     }
 
     /// A one-element criterion range is still a single answer — nothing becomes an array
     /// merely for having been written as a reference.
-    func testAOneCellCriterionStaysScalar() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,E1:E1)"), .number(100))
+    @Test func aOneCellCriterionStaysScalar() throws {
+        #expect(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,E1:E1)") == .number(100))
     }
 
     /// Ordinary scalar criteria are untouched.
-    func testScalarCriteriaAreUnchanged() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,2)"), .number(200))
-        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\")"), .number(600))
+    @Test func scalarCriteriaAreUnchanged() throws {
+        #expect(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\",B2:B6,2)") == .number(200))
+        #expect(try evaluate("SUMIFS(C2:C6,A2:A6,\"West\")") == .number(600))
     }
 
     /// `SUMIF` takes the same treatment — same criterion, different argument order.
-    func testSumifAlsoAnswersPerElement() throws {
-        XCTAssertEqual(try evaluate("SUMPRODUCT(SUMIF(B2:B6,E1:E3,C2:C6))"), .number(650),
-                       "every division: 140 + 210 + 300")
+    @Test func sumifAlsoAnswersPerElement() throws {
+        #expect(try evaluate("SUMPRODUCT(SUMIF(B2:B6,E1:E3,C2:C6))") == .number(650), "every division: 140 + 210 + 300")
     }
 
     /// **Two array criteria pair up element by element**, measured in round sixteen.
@@ -101,26 +98,22 @@ final class SumifsArrayCriterionTests: XCTestCase {
     /// coincidence of this data.
     ///
     /// So they are paired, and a mismatch in length is what is refused now.
-    func testTwoArrayCriteriaPairElementwise() throws {
+    @Test func twoArrayCriteriaPairElementwise() throws {
         guard case .array(let matrix) =
                 try evaluate("SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E2)") else {
-            return XCTFail("expected one answer per position")
+            Issue.record("expected one answer per position"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(100), .number(10)],
-                       "West with month 1, then East with month 2")
+        #expect(matrix.elements == [.number(100), .number(10)], "West with month 1, then East with month 2")
     }
 
     /// The corpus-shaped whole: `SUMPRODUCT` totals what the pairing produced.
-    func testSumproductOverTwoArrayCriteria() throws {
-        XCTAssertEqual(
-            try evaluate("SUMPRODUCT(SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E2))"),
-            .number(110))
+    @Test func sumproductOverTwoArrayCriteria() throws {
+        #expect(try evaluate("SUMPRODUCT(SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E2))") == .number(110))
     }
 
     /// **Arrays of different lengths are refused**, which is the part still unmeasured: Excel
     /// broadcasts by orientation there, and nothing has asked it what shape comes back.
-    func testArrayCriteriaOfDifferentLengthsRefuse() throws {
-        XCTAssertEqual(try evaluate("SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E3)"),
-                       .error(.value))
+    @Test func arrayCriteriaOfDifferentLengthsRefuse() throws {
+        #expect(try evaluate("SUMIFS(C2:C6,A2:A6,{\"West\";\"East\"},B2:B6,E1:E3)") == .error(.value))
     }
 }

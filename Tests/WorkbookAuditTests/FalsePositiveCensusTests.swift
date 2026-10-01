@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookAudit
 import SwiftExcelCore
 import SwiftXLSX
@@ -16,12 +17,16 @@ import SwiftXLSX
 /// ```
 /// RISK_SOLVER_WORKBOOKS=<dir> swift test --filter FalsePositiveCensus
 /// ```
-final class FalsePositiveCensusTests: XCTestCase {
+@Suite(.enabled(
+    if: !(ProcessInfo.processInfo.environment["RISK_SOLVER_WORKBOOKS"] ?? "").isEmpty,
+    "Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models. The workbooks are private and are not in this repository."
+))
+struct FalsePositiveCensusTests {
 
     private func workbooks() throws -> [(name: String, workbook: Workbook)] {
         guard let root = ProcessInfo.processInfo.environment["RISK_SOLVER_WORKBOOKS"],
               !root.isEmpty else {
-            throw XCTSkip("Set RISK_SOLVER_WORKBOOKS to a directory of real models.")
+            throw TestFailure("Set RISK_SOLVER_WORKBOOKS to a directory of real models.")
         }
         let url = URL(fileURLWithPath: root, isDirectory: true)
         let paths = ((try? FileManager.default.subpathsOfDirectory(atPath: url.path)) ?? [])
@@ -35,7 +40,7 @@ final class FalsePositiveCensusTests: XCTestCase {
         }
     }
 
-    func testCensusAcrossRealWorkbooks() throws {
+    @Test func censusAcrossRealWorkbooks() throws {
         let auditor = WorkbookAuditor()
         var byChecker: [String: Int] = [:]
         var workbooksWithFindings = 0
@@ -70,6 +75,6 @@ final class FalsePositiveCensusTests: XCTestCase {
 
         """)
 
-        XCTAssertGreaterThan(examined, 0, "no workbooks were examined")
+        #expect(examined > 0, "no workbooks were examined")
     }
 }

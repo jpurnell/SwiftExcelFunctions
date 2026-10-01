@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -9,7 +10,7 @@ import SwiftExcelCore
 /// "compiles, runs, and answers a plausible number for a different distribution".
 /// The parameterisation conversions therefore get exact assertions rather than
 /// range checks — a range check would pass with the conversion removed.
-final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
+@Suite struct BuiltinRiskSolverMoreDistributionTests {
 
     /// Column A holds 10, 20, 30, 40; column B holds equal weights.
     private struct ListCells: CellValueProvider {
@@ -58,7 +59,7 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
             .function(name, args), cells: Cells(),
             names: NamedRangeCollection(), random: FixedSource([p]))
         guard case .number(let value) = result else {
-            XCTFail("\(name) gave \(result)")
+            Issue.record("\(name) gave \(result)")
             return .nan
         }
         return value
@@ -66,12 +67,12 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
 
     // MARK: - The group
 
-    func testEveryFurtherDistributionIsRegistered() {
-        XCTAssertEqual(BuiltinRiskSolverFunctions.furtherDistributions.count, 45)
+    @Test func everyFurtherDistributionIsRegistered() {
+        #expect(BuiltinRiskSolverFunctions.furtherDistributions.count == 45)
         let names = Set(BuiltinRiskSolverFunctions.all.map(\.name))
         for expected in ["PSIBETA", "PSIWEIBULL", "PSIGAMMA", "PSIEXPONENTIAL", "PSIPARETO",
                          "PSILOGISTIC", "PSISTUDENT", "PSIHYPERGEO", "PSIMYERSON"] {
-            XCTAssertTrue(names.contains(expected), "\(expected) is missing")
+            #expect(names.contains(expected), "\(expected) is missing")
         }
     }
 
@@ -102,10 +103,9 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     ///
     /// `PsiMetalog` is the one exclusion: its coefficients are a *range*, which a
     /// table of scalars cannot express, so it has its own test below.
-    func testTheValidCallTableCoversTheWholeGroup() {
+    @Test func theValidCallTableCoversTheWholeGroup() {
         let tabulated = Set(Self.validCalls.map(\.0)).union(["PSIMETALOG"])
-        XCTAssertEqual(tabulated,
-                       Set(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name)))
+        #expect(tabulated == Set(BuiltinRiskSolverFunctions.furtherDistributions.map(\.name)))
     }
 
     /// `PsiMetalog(min, max, coefficients)` — bounded, and its quantile stays inside
@@ -115,7 +115,7 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// property-function slot — the one carrying `PsiTruncate`, `PsiBaseCase`,
     /// `PsiName` — not a parameter, and `attached(_:_:)` removes it before the
     /// distribution sees anything.
-    func testMetalogStaysInsideItsBounds() throws {
+    @Test func metalogStaysInsideItsBounds() throws {
         let coefficients = FormulaAST.cellRange(CellRange(from: CellRef(column: 3, row: 1),
                                                           to: CellRef(column: 3, row: 2)))
         for p in [0.2, 0.5, 0.8] {
@@ -123,11 +123,11 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
                 .function("PSIMETALOG", [.number(0), .number(100), coefficients]),
                 cells: ListCells(), names: NamedRangeCollection(), random: FixedSource([p]))
             guard case .number(let value) = drawn else {
-                return XCTFail("PSIMETALOG gave \(drawn)")
+                Issue.record("PSIMETALOG gave \(drawn)"); return
             }
-            XCTAssertTrue(value.isFinite, "not finite at p=\(p)")
-            XCTAssertGreaterThanOrEqual(value, 0)
-            XCTAssertLessThanOrEqual(value, 100)
+            #expect(value.isFinite, "not finite at p=\(p)")
+            #expect(value >= 0)
+            #expect(value <= 100)
         }
     }
 
@@ -136,11 +136,11 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// The broadest thing worth asserting across forty-one bindings: that each is
     /// wired to something that answers, rather than trapping, returning `NaN`, or
     /// refusing a call it should accept.
-    func testEveryDistributionDrawsAFiniteNumber() throws {
+    @Test func everyDistributionDrawsAFiniteNumber() throws {
         for (name, args) in Self.validCalls {
             for p in [0.1, 0.5, 0.9] {
                 let value = try number(name, args.map { FormulaAST.number($0) }, at: p)
-                XCTAssertTrue(value.isFinite, "\(name) at p=\(p) gave \(value)")
+                #expect(value.isFinite, "\(name) at p=\(p) gave \(value)")
             }
         }
     }
@@ -150,26 +150,26 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// Driven through the evaluator rather than `function.evaluate(_:)`, because the
     /// latter takes the context-free fallback and would answer `#VALUE!` whatever the
     /// body did — a test that passes without exercising anything.
-    func testTheyAllRefuseWithoutASource() throws {
+    @Test func theyAllRefuseWithoutASource() throws {
         for (name, args) in Self.validCalls {
             let answer = try FormulaEvaluator.evaluate(
                 .function(name, args.map { FormulaAST.number($0) }), cells: Cells(),
                 names: NamedRangeCollection(), random: nil)
-            XCTAssertEqual(answer, .error(.value), "\(name) should refuse")
+            #expect(answer == .error(.value), "\(name) should refuse")
         }
     }
 
     /// A quantile is non-decreasing in its probability — the contract the whole
     /// inverse-transform approach rests on. A binding that scrambled a parameter
     /// into a shape can break this while still returning finite numbers.
-    func testEveryQuantileIsMonotone() throws {
+    @Test func everyQuantileIsMonotone() throws {
         for (name, args) in Self.validCalls {
             let asts = args.map { FormulaAST.number($0) }
             let low = try number(name, asts, at: 0.2)
             let mid = try number(name, asts, at: 0.5)
             let high = try number(name, asts, at: 0.8)
-            XCTAssertLessThanOrEqual(low, mid, "\(name) not monotone at 0.2 -> 0.5")
-            XCTAssertLessThanOrEqual(mid, high, "\(name) not monotone at 0.5 -> 0.8")
+            #expect(low <= mid, "\(name) not monotone at 0.2 -> 0.5")
+            #expect(mid <= high, "\(name) not monotone at 0.5 -> 0.8")
         }
     }
 
@@ -180,10 +180,10 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// The median of an exponential with mean β is `β·ln 2`. For β = 100 that is
     /// 69.31. Without the inversion the answer would be 0.00693 — right sign, right
     /// shape, wrong by four orders of magnitude.
-    func testExponentialTakesTheMeanAndInvertsIt() throws {
+    @Test func exponentialTakesTheMeanAndInvertsIt() throws {
         let median = try number("PSIEXPONENTIAL", [.number(100)], at: 0.5)
-        XCTAssertEqual(median, 100 * Foundation.log(2.0), accuracy: 1e-6)
-        XCTAssertGreaterThan(median, 1, "an un-inverted rate would give ~0.007")
+        #expect(abs(median - (100 * Foundation.log(2.0))) <= 1e-6)
+        #expect(median > 1, "an un-inverted rate would give ~0.007")
     }
 
     /// **`PsiLogistic(mu, s)` states the scale; BusinessMath takes the deviation.**
@@ -191,9 +191,9 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// A logistic's standard deviation is `s·π/√3`. At p = 0.75 the quantile is
     /// `mu + s·ln 3`, so with mu = 0 and s = 2 the answer is 2·ln 3 = 2.1972.
     /// Passing the scale through unconverted narrows it by a factor of 1.814.
-    func testLogisticTakesTheScaleAndConvertsIt() throws {
+    @Test func logisticTakesTheScaleAndConvertsIt() throws {
         let upperQuartile = try number("PSILOGISTIC", [.number(0), .number(2)], at: 0.75)
-        XCTAssertEqual(upperQuartile, 2 * Foundation.log(3.0), accuracy: 1e-6)
+        #expect(abs(upperQuartile - (2 * Foundation.log(3.0))) <= 1e-6)
     }
 
     /// **`PsiGamma` has a real shape, so it cannot use `DistributionGamma`.**
@@ -202,82 +202,81 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// Rounding 2.5 to 2 answers a different distribution; this asserts the
     /// half-integer shape is honoured by checking it sits strictly between the two
     /// integer neighbours.
-    func testGammaHonoursARealShape() throws {
+    @Test func gammaHonoursARealShape() throws {
         let atTwo = try number("PSIGAMMA", [.number(2), .number(1)], at: 0.5)
         let atHalf = try number("PSIGAMMA", [.number(2.5), .number(1)], at: 0.5)
         let atThree = try number("PSIGAMMA", [.number(3), .number(1)], at: 0.5)
-        XCTAssertGreaterThan(atHalf, atTwo)
-        XCTAssertLessThan(atHalf, atThree)
+        #expect(atHalf > atTwo)
+        #expect(atHalf < atThree)
     }
 
     /// `PsiLogNorm2` takes the log-scale parameters directly — the counterpart to
     /// `PsiLogNormal`, which takes the arithmetic ones and converts. Binding both
     /// the same way would make one of them wrong; the median here is `e^mu`.
-    func testLogNorm2TakesLogScaleParametersUnconverted() throws {
+    @Test func logNorm2TakesLogScaleParametersUnconverted() throws {
         let median = try number("PSILOGNORM2", [.number(1), .number(0.5)], at: 0.5)
-        XCTAssertEqual(median, Foundation.exp(1.0), accuracy: 1e-6)
+        #expect(abs(median - Foundation.exp(1.0)) <= 1e-6)
     }
 
     // MARK: - Supports and shapes
 
     /// Beta lives on [0, 1] and is symmetric when its shapes are equal.
-    func testBetaIsBoundedAndSymmetric() throws {
+    @Test func betaIsBoundedAndSymmetric() throws {
         let median = try number("PSIBETA", [.number(2), .number(2)], at: 0.5)
-        XCTAssertEqual(median, 0.5, accuracy: 1e-6)
+        #expect(abs(median - 0.5) <= 1e-6)
     }
 
     /// Weibull with shape 1 is exponential, whose median is `scale·ln 2`.
-    func testWeibullAtShapeOneIsExponential() throws {
+    @Test func weibullAtShapeOneIsExponential() throws {
         let median = try number("PSIWEIBULL", [.number(1), .number(10)], at: 0.5)
-        XCTAssertEqual(median, 10 * Foundation.log(2.0), accuracy: 1e-6)
+        #expect(abs(median - (10 * Foundation.log(2.0))) <= 1e-6)
     }
 
     /// Pareto's median is `scale · 2^(1/shape)`, straight from its documentation.
-    func testParetoTakesScaleThenShape() throws {
+    @Test func paretoTakesScaleThenShape() throws {
         let median = try number("PSIPARETO", [.number(5), .number(2)], at: 0.5)
-        XCTAssertEqual(median, 5 * Foundation.pow(2.0, 0.5), accuracy: 1e-6)
+        #expect(abs(median - (5 * Foundation.pow(2.0, 0.5))) <= 1e-6)
     }
 
     /// A symmetric distribution's median is its location, which pins argument one
     /// as the location rather than the scale for the whole location-scale family.
-    func testTheLocationScaleFamilyPutsLocationFirst() throws {
+    @Test func theLocationScaleFamilyPutsLocationFirst() throws {
         for name in ["PSICAUCHY", "PSILAPLACE", "PSIHYPSECANT"] {
-            XCTAssertEqual(try number(name, [.number(42), .number(3)], at: 0.5), 42,
-                           accuracy: 1e-6, "\(name) argument order")
+            #expect(try abs(number(name, [.number(42), .number(3)], at: 0.5) - 42) <= 1e-6, "\(name) argument order")
         }
     }
 
     /// Reciprocal is log-uniform, so its median is the *geometric* mean of its
     /// bounds — √(1·100) = 10, not the arithmetic 50.5.
-    func testReciprocalIsLogUniform() throws {
+    @Test func reciprocalIsLogUniform() throws {
         let median = try number("PSIRECIPROCAL", [.number(1), .number(100)], at: 0.5)
-        XCTAssertEqual(median, 10, accuracy: 1e-6)
+        #expect(abs(median - 10) <= 1e-6)
     }
 
     /// Student's t with large degrees of freedom approaches the standard normal;
     /// its median is zero at any df.
-    func testStudentIsCentredAtZero() throws {
-        XCTAssertEqual(try number("PSISTUDENT", [.number(10)], at: 0.5), 0, accuracy: 1e-6)
+    @Test func studentIsCentredAtZero() throws {
+        #expect(try abs(number("PSISTUDENT", [.number(10)], at: 0.5) - 0) <= 1e-6)
     }
 
     /// The discrete rows return whole numbers, never a fractional count.
-    func testTheDiscreteRowsReturnCounts() throws {
+    @Test func theDiscreteRowsReturnCounts() throws {
         for (name, args) in [("PSIHYPERGEO", [FormulaAST.number(10), .number(20), .number(50)]),
                              ("PSINEGBINOMIAL", [.number(5), .number(0.4)]),
                              ("PSIGEOMETRIC", [.number(0.3)]),
                              ("PSILOGARITHMIC", [.number(0.5)])] {
             let drawn = try number(name, args, at: 0.5)
-            XCTAssertEqual(drawn, drawn.rounded(), "\(name) should be a whole count")
-            XCTAssertGreaterThanOrEqual(drawn, 0, "\(name) should be non-negative")
+            #expect(drawn.isEqual(to: drawn.rounded()), "\(name) should be a whole count")
+            #expect(drawn >= 0, "\(name) should be non-negative")
         }
     }
 
     /// `PsiMinExtreme` is a distinct distribution from `PsiMaxExtreme`, not its
     /// negation — the shortcut BusinessMath's own work list warns against.
-    func testTheTwoGumbelsAreNotEachOthersNegation() throws {
+    @Test func theTwoGumbelsAreNotEachOthersNegation() throws {
         let maximum = try number("PSIMAXEXTREME", [.number(0), .number(1)], at: 0.3)
         let minimum = try number("PSIMINEXTREME", [.number(0), .number(1)], at: 0.3)
-        XCTAssertNotEqual(maximum, -minimum, accuracy: 1e-9)
+        #expect(abs(maximum - -minimum) > 1e-9)
     }
 
     /// The list-taking rows return a value from the list, never an index into it.
@@ -285,7 +284,7 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
     /// `DistributionDiscreteUniform.quantile` answers an index, so returning it
     /// directly would give 0, 1, 2, 3 here — every one a plausible number and none
     /// of them in the data.
-    func testTheListTakingRowsReturnValuesNotIndices() throws {
+    @Test func theListTakingRowsReturnValuesNotIndices() throws {
         let column = FormulaAST.cellRange(CellRange(from: CellRef(column: 1, row: 1),
                                                     to: CellRef(column: 1, row: 4)))
         for name in ["PSIDISUNIFORM", "PSIRESAMPLE", "PSISHUFFLE"] {
@@ -294,16 +293,15 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
                     .function(name, [column]), cells: ListCells(),
                     names: NamedRangeCollection(), random: FixedSource([p]))
                 guard case .number(let value) = drawn else {
-                    return XCTFail("\(name) gave \(drawn)")
+                    Issue.record("\(name) gave \(drawn)"); return
                 }
-                XCTAssertTrue(ListCells.list.contains(value),
-                              "\(name) at p=\(p) gave \(value), which is not in the data")
+                #expect(ListCells.list.contains(value), "\(name) at p=\(p) gave \(value), which is not in the data")
             }
         }
     }
 
     /// A parameter outside the support is `#NUM!` rather than a trap or a `NaN`.
-    func testImpossibleParametersAreNum() throws {
+    @Test func impossibleParametersAreNum() throws {
         let cases: [(String, [Double])] = [
             ("PSIBETA", [-1, 2]),
             ("PSIWEIBULL", [0, 1]),
@@ -314,7 +312,7 @@ final class BuiltinRiskSolverMoreDistributionTests: XCTestCase {
             let answer = try FormulaEvaluator.evaluate(
                 .function(name, args.map { FormulaAST.number($0) }), cells: Cells(),
                 names: NamedRangeCollection(), random: FixedSource([0.5]))
-            XCTAssertEqual(answer, .error(.num), "\(name)")
+            #expect(answer == .error(.num), "\(name)")
         }
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -19,9 +20,14 @@ import SwiftXLSX
 /// RISK_SOLVER_WORKBOOKS="/path/to/models" swift test --filter RiskSolverWorkbook
 /// ```
 ///
-/// Skipped otherwise, on the same principle as `ExcelOracleTests` — a test that cannot
-/// see its data reports that, rather than passing vacuously.
-final class RiskSolverWorkbookTests: XCTestCase {
+/// Disabled otherwise, by a suite trait that names the variable, on the same principle as
+/// `ExcelOracleTests` — a test that cannot see its data reports that, rather than passing
+/// vacuously.
+@Suite(.enabled(
+    if: !(ProcessInfo.processInfo.environment["RISK_SOLVER_WORKBOOKS"] ?? "").isEmpty,
+    "Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models. The workbooks are private and are not in this repository."
+))
+struct RiskSolverWorkbookTests {
 
     private struct Model {
         let name: String
@@ -32,7 +38,7 @@ final class RiskSolverWorkbookTests: XCTestCase {
     private func models() throws -> [Model] {
         let environment = ProcessInfo.processInfo.environment
         guard let root = environment["RISK_SOLVER_WORKBOOKS"], !root.isEmpty else {
-            throw XCTSkip("""
+            throw TestFailure("""
                 Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models to run this.
                 The workbooks are private and are not in this repository.
                 """)
@@ -55,7 +61,7 @@ final class RiskSolverWorkbookTests: XCTestCase {
         }
 
         guard !found.isEmpty else {
-            throw XCTSkip("RISK_SOLVER_WORKBOOKS is set but no workbook under it carries a Psi call")
+            throw TestFailure("RISK_SOLVER_WORKBOOKS is set but no workbook under it carries a Psi call")
         }
         return found
     }
@@ -84,7 +90,7 @@ final class RiskSolverWorkbookTests: XCTestCase {
     /// It is deliberately not an assertion. What a real corpus contains is a fact to be
     /// discovered, and a test that asserted a particular census would fail the moment
     /// someone added a workbook — which is not a defect.
-    func testCensusOfPsiFunctionsInTheWild() throws {
+    @Test func censusOfPsiFunctionsInTheWild() throws {
         var byFunction: [String: Int] = [:]
         var byWorkbook: [String: Set<String>] = [:]
 
@@ -109,7 +115,7 @@ final class RiskSolverWorkbookTests: XCTestCase {
                 + "\(calls) calls, \(books) workbook(s)\n"
         }
         print("\n── Psi census, real workbooks ──────────────────\n\(table)")
-        XCTAssertFalse(rows.isEmpty)
+        #expect(!rows.isEmpty)
     }
 
     /// **The claim that matters: nothing is silently misread.**
@@ -118,7 +124,7 @@ final class RiskSolverWorkbookTests: XCTestCase {
     /// a marker, a registered distribution, or a property it reports by name. A name that
     /// is none of those is a name the surveyor would ignore entirely, and ignoring a
     /// `PsiMean` is how a model gets simulated with a statistic treated as a constant.
-    func testEveryPsiNameInTheWildIsAccountedFor() throws {
+    @Test func everyPsiNameInTheWildIsAccountedFor() throws {
         let distributions = Set(
             PsiRecognizer.defaultDistributions.map { FunctionRegistry.canonical($0.name) })
         var unaccounted: [String: Int] = [:]
@@ -150,24 +156,21 @@ final class RiskSolverWorkbookTests: XCTestCase {
             "PSIMEAN", "PSISTDDEV", "PSICVAR", "PSIBVAR", "PSITARGET", "PSIPERCENTILE"
         ]
         let surprises = unaccounted.keys.filter { !knownStatistics.contains($0) }.sorted()
-        XCTAssertEqual(surprises, [],
-                       "Psi names in the wild that are neither classified nor known statistics")
+        #expect(surprises == [], "Psi names in the wild that are neither classified nor known statistics")
     }
 
     /// The surveyor, end to end, on every sheet of every model.
     ///
     /// Asserts the index contract rather than any particular model's shape: contiguous
     /// from zero, and one index per call site.
-    func testSurveyorAssignsAContiguousIndexPerCallSite() throws {
+    @Test func surveyorAssignsAContiguousIndexPerCallSite() throws {
         let surveyor = ModelSurveyor()
         var simulable = 0
 
         for model in try models() {
             for sheet in model.workbook.sheets {
                 let survey = surveyor.survey(SheetProvider(sheet: sheet))
-                XCTAssertEqual(
-                    survey.uncertain.map(\.inputIndex), Array(0..<survey.uncertain.count),
-                    "\(model.name) / \(sheet.name): indices are not contiguous from zero")
+                #expect(survey.uncertain.map(\.inputIndex) == Array(0..<survey.uncertain.count), "\(model.name) / \(sheet.name): indices are not contiguous from zero")
                 if survey.isSimulable { simulable += 1 }
 
                 if !survey.isFullyModelled {

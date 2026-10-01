@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
 /// Functions over the shape of a rectangle rather than its contents.
-final class BuiltinArrayFunctionTests: XCTestCase {
+@Suite struct BuiltinArrayFunctionTests {
 
     // MARK: - Helpers
 
@@ -24,28 +25,28 @@ final class BuiltinArrayFunctionTests: XCTestCase {
 
     private func eval(_ name: String, _ args: CellValue...) throws -> CellValue {
         guard let fn = BuiltinArrayFunctions.all.first(where: { $0.name == name }) else {
-            XCTFail("\(name) is not registered")
+            Issue.record("\(name) is not registered")
             return .error(.name)
         }
         return try fn.evaluate(args)
     }
 
     private func grid(_ rows: [[CellValue]],
-                      file: StaticString = #filePath, line: UInt = #line) -> CellValue {
+                      sourceLocation: SourceLocation = #_sourceLocation) -> CellValue {
         let width = rows.first?.count ?? 0
         guard rows.allSatisfy({ $0.count == width }),
               let matrix = CellMatrix(elements: rows.flatMap { $0 },
                                       rows: rows.count, columns: width) else {
-            XCTFail("ragged table", file: file, line: line)
+            Issue.record("ragged table")
             return .error(.value)
         }
         return .array(matrix)
     }
 
     private func matrix(of value: CellValue,
-                        file: StaticString = #filePath, line: UInt = #line) throws -> CellMatrix {
+                        sourceLocation: SourceLocation = #_sourceLocation) throws -> CellMatrix {
         guard case .array(let matrix) = value else {
-            XCTFail("expected an array, got \(value)", file: file, line: line)
+            Issue.record("expected an array, got \(value)")
             return CellMatrix(row: [])
         }
         return matrix
@@ -53,8 +54,8 @@ final class BuiltinArrayFunctionTests: XCTestCase {
 
     // MARK: - Registration
 
-    func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(Set(BuiltinArrayFunctions.all.map(\.name)), ["TRANSPOSE", "COUNTBLANK"])
+    @Test func allContainsEveryFunctionInTheGroup() {
+        #expect(Set(BuiltinArrayFunctions.all.map(\.name)) == ["TRANSPOSE", "COUNTBLANK"])
     }
 
     // MARK: - TRANSPOSE
@@ -63,61 +64,61 @@ final class BuiltinArrayFunctionTests: XCTestCase {
     ///
     /// The shape is the whole result: both flatten to the same three values, and
     /// under the old representation this function could not have been written.
-    func testTransposeAColumnIntoARow() throws {
+    @Test func transposeAColumnIntoARow() throws {
         let column = CellValue.array(CellMatrix(column: [.number(1), .number(2), .number(3)]))
         let result = try matrix(of: try eval("TRANSPOSE", column))
-        XCTAssertEqual(result.rows, 1)
-        XCTAssertEqual(result.columns, 3)
-        XCTAssertEqual(result.elements, [.number(1), .number(2), .number(3)])
+        #expect(result.rows == 1)
+        #expect(result.columns == 3)
+        #expect(result.elements == [.number(1), .number(2), .number(3)])
     }
 
-    func testTransposeARowIntoAColumn() throws {
+    @Test func transposeARowIntoAColumn() throws {
         let row = CellValue.array(CellMatrix(row: [.text("a"), .text("b")]))
         let result = try matrix(of: try eval("TRANSPOSE", row))
-        XCTAssertEqual(result.rows, 2)
-        XCTAssertEqual(result.columns, 1)
+        #expect(result.rows == 2)
+        #expect(result.columns == 1)
     }
 
     /// A block, where elements actually move.
-    func testTransposeABlock() throws {
+    @Test func transposeABlock() throws {
         // 1 2 3        1 4
         // 4 5 6   ->   2 5
         //              3 6
         let block = grid([[.number(1), .number(2), .number(3)],
                           [.number(4), .number(5), .number(6)]])
         let result = try matrix(of: try eval("TRANSPOSE", block))
-        XCTAssertEqual(result.rows, 3)
-        XCTAssertEqual(result.columns, 2)
-        XCTAssertEqual(result[0, 1], .number(4))
-        XCTAssertEqual(result[2, 0], .number(3))
+        #expect(result.rows == 3)
+        #expect(result.columns == 2)
+        #expect(result[0, 1] == .number(4))
+        #expect(result[2, 0] == .number(3))
     }
 
-    func testTransposeBlanksKeepTheirPlace() throws {
+    @Test func transposeBlanksKeepTheirPlace() throws {
         let block = grid([[.number(1), .blank], [.blank, .number(4)]])
         let result = try matrix(of: try eval("TRANSPOSE", block))
-        XCTAssertEqual(result[0, 1], .blank)
-        XCTAssertEqual(result[1, 0], .blank)
+        #expect(result[0, 1] == .blank)
+        #expect(result[1, 0] == .blank)
     }
 
     /// A lone value is a 1×1 rectangle, and transposing it changes nothing.
-    func testTransposeASingleValue() throws {
+    @Test func transposeASingleValue() throws {
         let result = try matrix(of: try eval("TRANSPOSE", .number(7)))
-        XCTAssertEqual(result.rows, 1)
-        XCTAssertEqual(result.columns, 1)
-        XCTAssertEqual(result[0, 0], .number(7))
+        #expect(result.rows == 1)
+        #expect(result.columns == 1)
+        #expect(result[0, 0] == .number(7))
     }
 
-    func testTransposeTwiceIsTheIdentity() throws {
+    @Test func transposeTwiceIsTheIdentity() throws {
         let block = grid([[.number(1), .number(2), .number(3)],
                           [.number(4), .number(5), .number(6)]])
-        XCTAssertEqual(try eval("TRANSPOSE", try eval("TRANSPOSE", block)), block)
+        #expect(try eval("TRANSPOSE", try eval("TRANSPOSE", block)) == block)
     }
 
     /// End to end, the shape the corpus's own formulas ask for.
     ///
     /// `TRANSPOSE(Assumptions!B11:B32)` is a column read across a row. Here in
     /// miniature: `A1:A3` down the sheet, coming back 1×3.
-    func testTransposeARangeReadFromTheSheet() throws {
+    @Test func transposeARangeReadFromTheSheet() throws {
         var cells = Cells()
         cells.stored[CellRef("A1")] = .number(10)
         cells.stored[CellRef("A2")] = .number(20)
@@ -129,16 +130,16 @@ final class BuiltinArrayFunctionTests: XCTestCase {
             ]),
             cells: cells, names: NamedRangeCollection())
         guard case .array(let transposed) = result else {
-            return XCTFail("expected an array, got \(result)")
+            Issue.record("expected an array, got \(result)"); return
         }
-        XCTAssertEqual(transposed.rows, 1)
-        XCTAssertEqual(transposed.columns, 3)
-        XCTAssertEqual(transposed.elements, [.number(10), .number(20), .number(30)])
+        #expect(transposed.rows == 1)
+        #expect(transposed.columns == 3)
+        #expect(transposed.elements == [.number(10), .number(20), .number(30)])
     }
 
     /// Nested inside another function, which is where a transposed value is
     /// actually usable without spilling it across cells.
-    func testTransposeNestedInAnAggregate() throws {
+    @Test func transposeNestedInAnAggregate() throws {
         var cells = Cells()
         cells.stored[CellRef("A1")] = .number(1)
         cells.stored[CellRef("A2")] = .number(2)
@@ -151,24 +152,24 @@ final class BuiltinArrayFunctionTests: XCTestCase {
                 ]),
             ]),
             cells: cells, names: NamedRangeCollection())
-        XCTAssertEqual(result, .number(6))
+        #expect(result == .number(6))
     }
 
-    func testTransposePropagatesAnError() throws {
-        XCTAssertEqual(try eval("TRANSPOSE", .error(.na)), .error(.na))
+    @Test func transposePropagatesAnError() throws {
+        #expect(try eval("TRANSPOSE", .error(.na)) == .error(.na))
     }
 
     // MARK: - COUNTBLANK
 
     /// Counts the holes — which was not merely absent before but impossible,
     /// since blanks never reached a function.
-    func testCountBlankCountsEmptyCells() throws {
+    @Test func countBlankCountsEmptyCells() throws {
         let block = grid([[.number(1), .blank, .number(3)],
                           [.blank, .blank, .number(6)]])
-        XCTAssertEqual(try eval("COUNTBLANK", block), .number(3))
+        #expect(try eval("COUNTBLANK", block) == .number(3))
     }
 
-    func testCountBlankOverARangeReadFromTheSheet() throws {
+    @Test func countBlankOverARangeReadFromTheSheet() throws {
         var cells = Cells()
         cells.stored[CellRef("A1")] = .number(10)
         // A2, A3 empty
@@ -179,25 +180,25 @@ final class BuiltinArrayFunctionTests: XCTestCase {
                 .cellRange(CellRange(from: CellRef("A1"), to: CellRef("A4"))),
             ]),
             cells: cells, names: NamedRangeCollection())
-        XCTAssertEqual(result, .number(2))
+        #expect(result == .number(2))
     }
 
-    func testCountBlankOfNothingIsZero() throws {
-        XCTAssertEqual(try eval("COUNTBLANK", .number(1)), .number(0))
+    @Test func countBlankOfNothingIsZero() throws {
+        #expect(try eval("COUNTBLANK", .number(1)) == .number(0))
     }
 
     /// Excel counts the empty string as blank here, which is the one place it
     /// does. Text of any other length is not.
-    func testCountBlankCountsTheEmptyString() throws {
+    @Test func countBlankCountsTheEmptyString() throws {
         let row = CellValue.array(CellMatrix(row: [.text(""), .text("a"), .blank]))
-        XCTAssertEqual(try eval("COUNTBLANK", row), .number(2))
+        #expect(try eval("COUNTBLANK", row) == .number(2))
     }
 
     // MARK: - Registry
 
-    func testTheseFunctionsAreInTheDefaultRegistry() {
+    @Test func theseFunctionsAreInTheDefaultRegistry() {
         let registry = FunctionRegistry.builtin
-        XCTAssertNotNil(registry.function(named: "TRANSPOSE"))
-        XCTAssertNotNil(registry.function(named: "COUNTBLANK"))
+        #expect(registry.resolvedName("TRANSPOSE") == "TRANSPOSE")
+        #expect(registry.resolvedName("COUNTBLANK") == "COUNTBLANK")
     }
 }

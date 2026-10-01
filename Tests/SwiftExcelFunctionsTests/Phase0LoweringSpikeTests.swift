@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import BusinessMath
@@ -60,7 +61,7 @@ import BusinessMath
 /// The graph is hand-built. There is no `.xlsx`, no recognizer, no `ModelGraph` type, and
 /// no lowering pass — writing those is Phase 1 and 2, and their order depends on what this
 /// prints.
-final class Phase0LoweringSpikeTests: XCTestCase {
+@Suite struct Phase0LoweringSpikeTests {
 
     // MARK: - The model
 
@@ -112,7 +113,7 @@ final class Phase0LoweringSpikeTests: XCTestCase {
 
     private static func number(_ value: CellValue) throws -> Double {
         guard case .number(let d) = value else {
-            throw XCTSkip("expected a number, got \(value)")
+            throw TestFailure("expected a number, got \(value)")
         }
         return d
     }
@@ -221,16 +222,15 @@ final class Phase0LoweringSpikeTests: XCTestCase {
 
     // MARK: - The measurement
 
-    func testInterpretedAndCompiledAgreeAtEveryDepth() throws {
+    @Test func interpretedAndCompiledAgreeAtEveryDepth() throws {
         for depth in [0, 10, 100] {
             let interpreted = try runInterpreted(depth: depth)
             let compiled = try runCompiled(depth: depth)
-            XCTAssertEqual(interpreted, compiled.values,
-                           "depth \(depth): the paths disagree — the lowering is wrong, not the randomness")
+            #expect(interpreted.isElementwiseEqual(to: compiled.values), "depth \(depth): the paths disagree — the lowering is wrong, not the randomness")
         }
     }
 
-    func testPropagationCostRatioIsRecorded() throws {
+    @Test func propagationCostRatioIsRecorded() throws {
         let depths = [0, 10, 50, 100, 250, 500]
         var rows: [(depth: Int, ops: Int, a: Double, b: Double)] = []
 
@@ -250,8 +250,12 @@ final class Phase0LoweringSpikeTests: XCTestCase {
         // sampling cost, which cancels; what is left is the marginal cost of one
         // propagation operation on each path.
         guard let first = rows.first, let last = rows.last, last.depth > first.depth else {
-            XCTFail("need at least two depths"); return
+            Issue.record("need at least two depths"); return
         }
+        // The one structural claim the timing rests on: a deeper chain compiles to more
+        // instructions. If it did not, the slope below would be measuring nothing.
+        #expect(zip(rows, rows.dropFirst()).allSatisfy { $0.ops < $1.ops },
+                "instruction count must grow with depth: \(rows.map(\.ops))")
         let steps = Double(last.depth - first.depth)
         let perOpA = (last.a - first.a) / steps / Double(Self.trials) * 1e9
         let perOpB = (last.b - first.b) / steps / Double(Self.trials) * 1e9

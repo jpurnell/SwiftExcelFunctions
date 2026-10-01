@@ -1,6 +1,7 @@
 import Foundation
 import SwiftExcelCore
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// The seven date functions that were in the unreviewed bucket.
@@ -18,23 +19,23 @@ import XCTest
 /// None is taken from what this package returns, which is the whole point: two
 /// implementations reasoning from one person's reading of a definition agree with each
 /// other and are both wrong.
-final class WorkingDayAndWeekTests: XCTestCase {
+@Suite struct WorkingDayAndWeekTests {
 
     private let registry = FunctionRegistry.builtin
 
     private func call(_ name: String, _ args: CellValue...) throws -> CellValue {
         guard let function = registry.function(named: name) else {
-            XCTFail("\(name) is not registered"); return .error(.name)
+            Issue.record("\(name) is not registered"); return .error(.name)
         }
         return try function.evaluate(args)
     }
 
     private func number(_ name: String, _ args: CellValue...) throws -> Double {
         guard let function = registry.function(named: name) else {
-            XCTFail("\(name) is not registered"); return .nan
+            Issue.record("\(name) is not registered"); return .nan
         }
         guard case .number(let value) = try function.evaluate(args) else {
-            XCTFail("\(name) did not answer with a number"); return .nan
+            Issue.record("\(name) did not answer with a number"); return .nan
         }
         return value
     }
@@ -53,26 +54,23 @@ final class WorkingDayAndWeekTests: XCTestCase {
     // MARK: - NETWORKDAYS
 
     /// Microsoft's published example, all three lines of it.
-    func testNetworkdaysMatchesThePublishedExample() throws {
-        XCTAssertEqual(try number("NETWORKDAYS", october1_2012, march1_2013), 110)
-        XCTAssertEqual(try number("NETWORKDAYS", october1_2012, march1_2013, thanksgiving2012), 109)
-        XCTAssertEqual(
-            try number("NETWORKDAYS", october1_2012, march1_2013,
-                       .array(CellMatrix(row: [thanksgiving2012, december4_2012, january21_2013]))),
-            107)
+    @Test func networkdaysMatchesThePublishedExample() throws {
+        #expect(try number("NETWORKDAYS", october1_2012, march1_2013).isEqual(to: 110))
+        #expect(try number("NETWORKDAYS", october1_2012, march1_2013, thanksgiving2012).isEqual(to: 109))
+        #expect(try number("NETWORKDAYS", october1_2012, march1_2013, .array(CellMatrix(row: [thanksgiving2012, december4_2012, january21_2013]))).isEqual(to: 107))
     }
 
     /// Both endpoints count, which is what makes this the function a timesheet uses.
-    func testBothEndpointsCount() throws {
-        XCTAssertEqual(try number("NETWORKDAYS", monday, monday), 1)
-        XCTAssertEqual(try number("NETWORKDAYS", saturday, saturday), 0)
+    @Test func bothEndpointsCount() throws {
+        #expect(try number("NETWORKDAYS", monday, monday).isEqual(to: 1))
+        #expect(try number("NETWORKDAYS", saturday, saturday) == 0)
         // Monday to the Friday of the same week.
-        XCTAssertEqual(try number("NETWORKDAYS", monday, .number(46283)), 5)
+        #expect(try number("NETWORKDAYS", monday, .number(46283)).isEqual(to: 5))
     }
 
     /// A reversed interval is a negative count rather than an error.
-    func testAReversedIntervalCountsBackwards() throws {
-        XCTAssertEqual(try number("NETWORKDAYS", march1_2013, october1_2012), -110)
+    @Test func aReversedIntervalCountsBackwards() throws {
+        #expect(try number("NETWORKDAYS", march1_2013, october1_2012).isEqual(to: -110))
     }
 
     // MARK: - NETWORKDAYS.INTL
@@ -82,53 +80,45 @@ final class WorkingDayAndWeekTests: XCTestCase {
     /// September 2026 was chosen because it starts on a Tuesday: a month starting on a
     /// Monday would give several codes the same answer and hide a mapping that is off by
     /// a day.
-    func testEveryWeekendCodeAgreesWithAnIndependentImplementation() throws {
+    @Test func everyWeekendCodeAgreesWithAnIndependentImplementation() throws {
         let expected: [Int: Double] = [
             1: 22, 2: 22, 3: 21, 4: 20, 5: 21, 6: 22, 7: 22,
             11: 26, 12: 26, 13: 25, 14: 25, 15: 26, 16: 26, 17: 26,
         ]
         for (code, days) in expected.sorted(by: { $0.key < $1.key }) {
-            XCTAssertEqual(
-                try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .number(Double(code))),
-                days, "weekend code \(code)")
+            #expect(try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .number(Double(code))).isEqual(to: days), "weekend code \(code)")
         }
     }
 
     /// Two arguments is `NETWORKDAYS` exactly, and the mask spells out code 1.
-    func testTheDefaultAndTheWrittenOutMaskAgree() throws {
-        XCTAssertEqual(try number("NETWORKDAYS.INTL", september1_2026, september30_2026), 22)
-        XCTAssertEqual(
-            try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("0000011")), 22)
+    @Test func theDefaultAndTheWrittenOutMaskAgree() throws {
+        #expect(try number("NETWORKDAYS.INTL", september1_2026, september30_2026).isEqual(to: 22))
+        #expect(try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("0000011")).isEqual(to: 22))
         // Monday first: this one rests on Monday and Tuesday, which is code 3.
-        XCTAssertEqual(
-            try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("1100000")), 21)
+        #expect(try number("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("1100000")).isEqual(to: 21))
     }
 
     /// What Excel refuses, and with which error — the two are not interchangeable.
-    func testTheWeekendArgumentIsValidated() throws {
+    @Test func theWeekendArgumentIsValidated() throws {
         // A code in no block.
-        XCTAssertEqual(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .number(8)),
-                       .error(.num))
+        #expect(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .number(8)) == .error(.num))
         // A mask of the wrong length, or with something other than 0 and 1 in it.
-        XCTAssertEqual(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("000001")),
-                       .error(.value))
-        XCTAssertEqual(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("000001x")),
-                       .error(.value))
+        #expect(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("000001")) == .error(.value))
+        #expect(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("000001x")) == .error(.value))
         // A week that never works. Answering zero would be defensible and is not what
         // Excel does — and it is the case that would otherwise walk WORKDAY.INTL to the
         // end of the calendar.
-        XCTAssertEqual(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("1111111")),
-                       .error(.value))
+        #expect(try call("NETWORKDAYS.INTL", september1_2026, september30_2026, .text("1111111")) == .error(.value))
     }
 
     // MARK: - WORKDAY.INTL
 
     /// Against `numpy.busday_offset`, from a Monday so the roll rule cannot hide.
-    func testWorkdayIntlStepsAsAnIndependentImplementationDoes() throws {
-        XCTAssertEqual(try number("WORKDAY.INTL", monday, .number(1)), 46280)
-        XCTAssertEqual(try number("WORKDAY.INTL", monday, .number(5)), 46286)
-        XCTAssertEqual(try number("WORKDAY.INTL", monday, .number(10)), 46293)
-        XCTAssertEqual(try number("WORKDAY.INTL", monday, .number(-1)), 46276)
+    @Test func workdayIntlStepsAsAnIndependentImplementationDoes() throws {
+        #expect(try number("WORKDAY.INTL", monday, .number(1)).isEqual(to: 46280))
+        #expect(try number("WORKDAY.INTL", monday, .number(5)).isEqual(to: 46286))
+        #expect(try number("WORKDAY.INTL", monday, .number(10)).isEqual(to: 46293))
+        #expect(try number("WORKDAY.INTL", monday, .number(-1)).isEqual(to: 46276))
     }
 
     /// The start is not counted and not snapped.
@@ -136,27 +126,26 @@ final class WorkingDayAndWeekTests: XCTestCase {
     /// Zero working days from a Saturday is that Saturday. Excel does not move a weekend
     /// start to the nearest working day, and an implementation that does is wrong twice a
     /// week in a way that looks right the other five times.
-    func testAWeekendStartIsNotSnapped() throws {
-        XCTAssertEqual(try number("WORKDAY.INTL", saturday, .number(0)), 46277)
-        XCTAssertEqual(try number("WORKDAY.INTL", saturday, .number(1)), 46279)
-        XCTAssertEqual(try number("WORKDAY.INTL", saturday, .number(-1)), 46276)
+    @Test func aWeekendStartIsNotSnapped() throws {
+        #expect(try number("WORKDAY.INTL", saturday, .number(0)).isEqual(to: 46277))
+        #expect(try number("WORKDAY.INTL", saturday, .number(1)).isEqual(to: 46279))
+        #expect(try number("WORKDAY.INTL", saturday, .number(-1)).isEqual(to: 46276))
     }
 
     /// The weekend and holidays arguments do what they do in the counting function.
-    func testWorkdayIntlHonoursTheWeekendAndTheHolidays() throws {
+    @Test func workdayIntlHonoursTheWeekendAndTheHolidays() throws {
         // Code 11: Sunday is the only day off, so five days from Monday reaches Saturday.
-        XCTAssertEqual(try number("WORKDAY.INTL", monday, .number(5), .number(11)), 46284)
+        #expect(try number("WORKDAY.INTL", monday, .number(5), .number(11)).isEqual(to: 46284))
         // The Wednesday in the way is a holiday, so the answer moves on by one day.
-        XCTAssertEqual(
-            try number("WORKDAY.INTL", monday, .number(5), .number(1), .number(46281)), 46287)
+        #expect(try number("WORKDAY.INTL", monday, .number(5), .number(1), .number(46281)).isEqual(to: 46287))
     }
 
     // MARK: - WEEKNUM and ISOWEEKNUM
 
     /// Microsoft's published example: 9 March 2012 is week 10, or week 11 from Monday.
-    func testWeeknumMatchesThePublishedExample() throws {
-        XCTAssertEqual(try number("WEEKNUM", .number(40977)), 10)
-        XCTAssertEqual(try number("WEEKNUM", .number(40977), .number(2)), 11)
+    @Test func weeknumMatchesThePublishedExample() throws {
+        #expect(try number("WEEKNUM", .number(40977)).isEqual(to: 10))
+        #expect(try number("WEEKNUM", .number(40977), .number(2)).isEqual(to: 11))
     }
 
     /// Week 1 is the week containing 1 January, however short it is.
@@ -165,14 +154,14 @@ final class WorkingDayAndWeekTests: XCTestCase {
     /// Saturday after it are the whole of week 1 — and the ISO answer for the same day is
     /// week 53 of 2015. The two functions disagree by a year, which is the point of having
     /// both.
-    func testWeekOneCanBeTwoDaysLong() throws {
-        XCTAssertEqual(try number("WEEKNUM", .number(42370)), 1)        // 1 January 2016
-        XCTAssertEqual(try number("WEEKNUM", .number(42372)), 2)        // Sunday 3 January
-        XCTAssertEqual(try number("ISOWEEKNUM", .number(42370)), 53)
+    @Test func weekOneCanBeTwoDaysLong() throws {
+        #expect(try number("WEEKNUM", .number(42370)).isEqual(to: 1))        // 1 January 2016
+        #expect(try number("WEEKNUM", .number(42372)).isEqual(to: 2))        // Sunday 3 January
+        #expect(try number("ISOWEEKNUM", .number(42370)).isEqual(to: 53))
     }
 
     /// Against Python's `date.isocalendar()`, including both ways a year can overlap.
-    func testIsoWeeksAgreeWithAnIndependentImplementation() throws {
+    @Test func isoWeeksAgreeWithAnIndependentImplementation() throws {
         let expected: [(serial: Double, week: Double, date: String)] = [
             (38718, 52, "2006-01-01"),   // a Sunday, so the last week of 2005
             (40909, 52, "2012-01-01"),
@@ -184,37 +173,37 @@ final class WorkingDayAndWeekTests: XCTestCase {
             (46279, 38, "2026-09-14"),
         ]
         for row in expected {
-            XCTAssertEqual(try number("ISOWEEKNUM", .number(row.serial)), row.week, row.date)
+            #expect(try number("ISOWEEKNUM", .number(row.serial)).isEqual(to: row.week), "\(row.date)")
             // Type 21 is the same function under another name.
-            XCTAssertEqual(try number("WEEKNUM", .number(row.serial), .number(21)), row.week, row.date)
+            #expect(try number("WEEKNUM", .number(row.serial), .number(21)).isEqual(to: row.week), "\(row.date)")
         }
     }
 
     /// A return type in none of the three blocks is `#NUM!`.
-    func testAnUnknownReturnTypeIsRefused() throws {
-        XCTAssertEqual(try call("WEEKNUM", .number(46279), .number(4)), .error(.num))
-        XCTAssertEqual(try call("WEEKNUM", .number(46279), .number(22)), .error(.num))
+    @Test func anUnknownReturnTypeIsRefused() throws {
+        #expect(try call("WEEKNUM", .number(46279), .number(4)) == .error(.num))
+        #expect(try call("WEEKNUM", .number(46279), .number(22)) == .error(.num))
     }
 
     // MARK: - DATEDIF
 
     /// Microsoft's published examples, all four.
-    func testDatedifMatchesThePublishedExamples() throws {
+    @Test func datedifMatchesThePublishedExamples() throws {
         // 1 January 2001 to 1 January 2003.
-        XCTAssertEqual(try number("DATEDIF", .number(36892), .number(37622), .text("Y")), 2)
+        #expect(try number("DATEDIF", .number(36892), .number(37622), .text("Y")).isEqual(to: 2))
         // 1 June 2001 to 15 August 2002.
-        XCTAssertEqual(try number("DATEDIF", .number(37043), .number(37483), .text("D")), 440)
-        XCTAssertEqual(try number("DATEDIF", .number(37043), .number(37483), .text("YD")), 75)
-        XCTAssertEqual(try number("DATEDIF", .number(37043), .number(37483), .text("MD")), 14)
+        #expect(try number("DATEDIF", .number(37043), .number(37483), .text("D")).isEqual(to: 440))
+        #expect(try number("DATEDIF", .number(37043), .number(37483), .text("YD")).isEqual(to: 75))
+        #expect(try number("DATEDIF", .number(37043), .number(37483), .text("MD")).isEqual(to: 14))
     }
 
     /// A period is complete only when the day of the month has come round again.
-    func testAPeriodIsCompleteOrItDoesNotCount() throws {
+    @Test func aPeriodIsCompleteOrItDoesNotCount() throws {
         // 31 January 2016 to 29 February 2016: the day never comes round, so no month.
-        XCTAssertEqual(try number("DATEDIF", .number(42400), .number(42429), .text("M")), 0)
+        #expect(try number("DATEDIF", .number(42400), .number(42429), .text("M")) == 0)
         // 31 January to 31 March is two.
-        XCTAssertEqual(try number("DATEDIF", .number(42400), .number(42460), .text("M")), 2)
-        XCTAssertEqual(try number("DATEDIF", .number(42400), .number(42460), .text("YM")), 2)
+        #expect(try number("DATEDIF", .number(42400), .number(42460), .text("M")).isEqual(to: 2))
+        #expect(try number("DATEDIF", .number(42400), .number(42460), .text("YM")).isEqual(to: 2))
     }
 
     /// `"MD"` reproduces Excel's own wrong answer, deliberately.
@@ -222,44 +211,42 @@ final class WorkingDayAndWeekTests: XCTestCase {
     /// 31 January 2016 to 1 March 2016 is −1 in Excel: the borrow is February's 29 days
     /// against a gap of 30. Microsoft documents the unit as not recommended for exactly
     /// this reason. We match it rather than fix it — see the function's own note.
-    func testTheBrokenUnitIsBrokenTheSameWay() throws {
-        XCTAssertEqual(try number("DATEDIF", .number(42400), .number(42430), .text("MD")), -1)
+    @Test func theBrokenUnitIsBrokenTheSameWay() throws {
+        #expect(try number("DATEDIF", .number(42400), .number(42430), .text("MD")).isEqual(to: -1))
     }
 
     /// A start after the end is refused in every unit.
-    func testABackwardsIntervalIsRefused() throws {
-        XCTAssertEqual(try call("DATEDIF", .number(37483), .number(37043), .text("D")), .error(.num))
-        XCTAssertEqual(try call("DATEDIF", .number(37483), .number(37043), .text("MD")), .error(.num))
+    @Test func aBackwardsIntervalIsRefused() throws {
+        #expect(try call("DATEDIF", .number(37483), .number(37043), .text("D")) == .error(.num))
+        #expect(try call("DATEDIF", .number(37483), .number(37043), .text("MD")) == .error(.num))
     }
 
     /// An unknown unit is `#NUM!`, and the known ones are case-insensitive.
-    func testTheUnitIsReadLoosely() throws {
-        XCTAssertEqual(try number("DATEDIF", .number(37043), .number(37483), .text("d")), 440)
-        XCTAssertEqual(try call("DATEDIF", .number(37043), .number(37483), .text("W")), .error(.num))
+    @Test func theUnitIsReadLoosely() throws {
+        #expect(try number("DATEDIF", .number(37043), .number(37483), .text("d")).isEqual(to: 440))
+        #expect(try call("DATEDIF", .number(37043), .number(37483), .text("W")) == .error(.num))
     }
 
     // MARK: - TIMEVALUE
 
     /// Microsoft's published examples, and the two that are always wrong somewhere.
-    func testTimevalueReadsTheClock() throws {
-        XCTAssertEqual(try number("TIMEVALUE", .text("2:24 PM")), 0.6, accuracy: 1e-12)
-        XCTAssertEqual(try number("TIMEVALUE", .text("22-Aug-2011 6:35 AM")),
-                       0.2743055555555556, accuracy: 1e-12)
+    @Test func timevalueReadsTheClock() throws {
+        #expect(try abs(number("TIMEVALUE", .text("2:24 PM")) - 0.6) <= 1e-12)
+        #expect(try abs(number("TIMEVALUE", .text("22-Aug-2011 6:35 AM")) - 0.2743055555555556) <= 1e-12)
         // Midnight and noon: 12 AM is hour 0 and 12 PM is hour 12, which is the pair that
         // a naive `hour % 12` gets backwards in both directions.
-        XCTAssertEqual(try number("TIMEVALUE", .text("12:00 AM")), 0, accuracy: 1e-12)
-        XCTAssertEqual(try number("TIMEVALUE", .text("12:00 PM")), 0.5, accuracy: 1e-12)
-        XCTAssertEqual(try number("TIMEVALUE", .text("13:30")), 0.5625, accuracy: 1e-12)
-        XCTAssertEqual(try number("TIMEVALUE", .text("13:30:45")),
-                       (13 * 3600 + 30 * 60 + 45) / 86_400, accuracy: 1e-12)
+        #expect(try abs(number("TIMEVALUE", .text("12:00 AM")) - 0) <= 1e-12)
+        #expect(try abs(number("TIMEVALUE", .text("12:00 PM")) - 0.5) <= 1e-12)
+        #expect(try abs(number("TIMEVALUE", .text("13:30")) - 0.5625) <= 1e-12)
+        #expect(try abs(number("TIMEVALUE", .text("13:30:45")) - ((13 * 3600 + 30 * 60 + 45) / 86_400)) <= 1e-12)
     }
 
     /// Text that names no time is `#VALUE!` rather than a guess.
-    func testTimevalueRefusesWhatItCannotRead() throws {
-        XCTAssertEqual(try call("TIMEVALUE", .text("abc")), .error(.value))
-        XCTAssertEqual(try call("TIMEVALUE", .text("25:00")), .error(.value))
-        XCTAssertEqual(try call("TIMEVALUE", .text("13:60")), .error(.value))
-        XCTAssertEqual(try call("TIMEVALUE", .text("13 PM")), .error(.value))
+    @Test func timevalueRefusesWhatItCannotRead() throws {
+        #expect(try call("TIMEVALUE", .text("abc")) == .error(.value))
+        #expect(try call("TIMEVALUE", .text("25:00")) == .error(.value))
+        #expect(try call("TIMEVALUE", .text("13:60")) == .error(.value))
+        #expect(try call("TIMEVALUE", .text("13 PM")) == .error(.value))
     }
 
     // MARK: - Registration
@@ -269,11 +256,11 @@ final class WorkingDayAndWeekTests: XCTestCase {
     /// `NETWORKDAYS.INTL` and `WORKDAY.INTL` are saved by older versions as
     /// `_xlfn.NETWORKDAYS.INTL`, and a lookup that does not resolve the prefix reports
     /// `#NAME?` for a purely clerical reason.
-    func testTheNamesResolveIncludingTheModernPrefix() {
+    @Test func theNamesResolveIncludingTheModernPrefix() {
         for name in ["NETWORKDAYS", "NETWORKDAYS.INTL", "WORKDAY.INTL",
                      "WEEKNUM", "ISOWEEKNUM", "DATEDIF", "TIMEVALUE"] {
-            XCTAssertNotNil(registry.function(named: name), name)
-            XCTAssertNotNil(registry.function(named: "_xlfn.\(name)"), "_xlfn.\(name)")
+            #expect(registry.resolvedName(name) == FunctionRegistry.canonical(name), "\(name)")
+            #expect(registry.resolvedName("_xlfn.\(name)") == FunctionRegistry.canonical("_xlfn.\(name)"), "_xlfn.\(name)")
         }
     }
 }

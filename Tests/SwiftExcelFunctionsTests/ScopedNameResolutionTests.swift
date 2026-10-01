@@ -1,7 +1,8 @@
 import Foundation
 import SwiftExcelCore
 import SwiftXLSX
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// A defined name means different things on different sheets.
@@ -14,7 +15,7 @@ import XCTest
 /// The evaluator resolved names with no sheet at all, so it always found the workbook-scoped
 /// definition. **31 cells in that one workbook read another sheet's number**, answering 0.3
 /// where Excel answers 0.812. Nothing errored; the answers were simply from the wrong place.
-final class ScopedNameResolutionTests: XCTestCase {
+@Suite struct ScopedNameResolutionTests {
 
     /// Two sheets, each with a cell of its own, plus a third the workbook-scoped name points at.
     private struct Cells: CellValueProvider {
@@ -57,26 +58,26 @@ final class ScopedNameResolutionTests: XCTestCase {
     }
 
     /// On a sheet with its own definition, that one wins.
-    func testASheetScopedNameBeatsTheWorkbookOne() throws {
-        XCTAssertEqual(try evaluate("Cost", onSheet: "Breakeven"), .number(0.812))
+    @Test func aSheetScopedNameBeatsTheWorkbookOne() throws {
+        #expect(try evaluate("Cost", onSheet: "Breakeven") == .number(0.812))
     }
 
     /// On any other sheet, the workbook definition is the only one there is.
-    func testTheWorkbookNameIsUsedWhereNoSheetScopedOneExists() throws {
-        XCTAssertEqual(try evaluate("Cost", onSheet: "Model"), .number(0.3))
-        XCTAssertEqual(try evaluate("Cost", onSheet: "Somewhere Else"), .number(0.3))
+    @Test func theWorkbookNameIsUsedWhereNoSheetScopedOneExists() throws {
+        #expect(try evaluate("Cost", onSheet: "Model") == .number(0.3))
+        #expect(try evaluate("Cost", onSheet: "Somewhere Else") == .number(0.3))
     }
 
     /// Evaluated outside any sheet, the workbook definition still resolves.
     ///
     /// The empty sheet name is "no sheet" rather than a sheet called `""`, and passing it
     /// through as a name to match would make every scoped lookup fail.
-    func testNoSheetStillFindsTheWorkbookName() throws {
-        XCTAssertEqual(try evaluate("Cost", onSheet: ""), .number(0.3))
+    @Test func noSheetStillFindsTheWorkbookName() throws {
+        #expect(try evaluate("Cost", onSheet: "") == .number(0.3))
     }
 
     /// A name nothing defines is `#NAME?`, scoped or not.
-    func testAnUndefinedNameIsStillAnError() throws {
-        XCTAssertEqual(try evaluate("Nonexistent", onSheet: "Breakeven"), .error(.name))
+    @Test func anUndefinedNameIsStillAnError() throws {
+        #expect(try evaluate("Nonexistent", onSheet: "Breakeven") == .error(.name))
     }
 }

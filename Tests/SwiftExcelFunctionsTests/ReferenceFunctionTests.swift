@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -12,7 +13,7 @@ import SwiftExcelCore
 ///
 /// Measured across 79 workbooks: `COLUMN` 86,620 calls, `INDIRECT` 20,978,
 /// `OFFSET` 9,798, `ROW` 1,222.
-final class ReferenceFunctionTests: XCTestCase {
+@Suite struct ReferenceFunctionTests {
 
     /// A sheet held as a dictionary, which is all a provider has to be.
     private struct Cells: CellValueProvider {
@@ -78,7 +79,7 @@ final class ReferenceFunctionTests: XCTestCase {
         case "ISREF(\"A1\")": return .function("ISREF", [.text("A1")])
         case "OFFSET(A1,-5,0)":
             return .function("OFFSET", [.cellRef(CellRef("A1")), .number(-5), .number(0)])
-        default: throw XCTSkip("unbuilt formula \(formula)")
+        default: throw TestFailure("unbuilt formula \(formula)")
         }
     }
 
@@ -86,91 +87,90 @@ final class ReferenceFunctionTests: XCTestCase {
 
     /// With no argument, the answer is about the cell the formula sits in. D7 is
     /// column 4, row 7.
-    func testColumnAndRowWithNoArgumentDescribeTheCallingCell() throws {
-        XCTAssertEqual(try evaluate("COLUMN()"), .number(4))
-        XCTAssertEqual(try evaluate("ROW()"), .number(7))
+    @Test func columnAndRowWithNoArgumentDescribeTheCallingCell() throws {
+        #expect(try evaluate("COLUMN()") == .number(4))
+        #expect(try evaluate("ROW()") == .number(7))
     }
 
     /// With an argument, the answer is about the address it names — not the value
     /// in it. The cell holds 99 and the answer is still 2.
-    func testColumnAndRowWithAnArgumentDescribeThatReference() throws {
+    @Test func columnAndRowWithAnArgumentDescribeThatReference() throws {
         var cells = Cells()
         cells.values["B5"] = .number(99)
-        XCTAssertEqual(try evaluate("COLUMN(B5)", cells: cells), .number(2))
-        XCTAssertEqual(try evaluate("ROW(B5)", cells: cells), .number(5))
+        #expect(try evaluate("COLUMN(B5)", cells: cells) == .number(2))
+        #expect(try evaluate("ROW(B5)", cells: cells) == .number(5))
     }
 
     /// Evaluated outside a sheet there is no calling cell, and no position to
     /// report. Inventing one would be worse than saying so.
-    func testColumnWithoutACallingCellReportsRatherThanGuesses() throws {
-        XCTAssertEqual(try evaluate("COLUMN()", at: nil), .error(.value))
+    @Test func columnWithoutACallingCellReportsRatherThanGuesses() throws {
+        #expect(try evaluate("COLUMN()", at: nil) == .error(.value))
     }
 
     // MARK: - INDIRECT
 
-    func testIndirectReadsTheCellItsTextNames() throws {
+    @Test func indirectReadsTheCellItsTextNames() throws {
         var cells = Cells()
         cells.values["B2"] = .number(42)
-        XCTAssertEqual(try evaluate("INDIRECT(\"B2\")", cells: cells), .number(42))
+        #expect(try evaluate("INDIRECT(\"B2\")", cells: cells) == .number(42))
     }
 
-    func testIndirectResolvesASheetQualifiedReference() throws {
+    @Test func indirectResolvesASheetQualifiedReference() throws {
         var cells = Cells()
         cells.sheets["Other Sheet"] = ["A1": .text("found")]
-        XCTAssertEqual(
-            try evaluate("INDIRECT(\"'Other Sheet'!A1\")", cells: cells), .text("found"))
+        #expect(try evaluate("INDIRECT(\"'Other Sheet'!A1\")", cells: cells) == .text("found"))
     }
 
     /// Text that names no cell is `#REF!` — the error Excel gives, and the reason
     /// this function is invisible to static analysis.
-    func testIndirectOnUnreadableTextIsARefError() throws {
-        XCTAssertEqual(try evaluate("INDIRECT(\"nonsense\")"), .error(.ref))
+    @Test func indirectOnUnreadableTextIsARefError() throws {
+        #expect(try evaluate("INDIRECT(\"nonsense\")") == .error(.ref))
     }
 
     /// R1C1 style is refused rather than misread. Answering in A1 style would
     /// return a plausible value for a different cell.
-    func testIndirectRefusesR1C1RatherThanMisreadingIt() throws {
-        XCTAssertEqual(try evaluate("INDIRECT(\"B2\",FALSE)"), .error(.ref))
+    @Test func indirectRefusesR1C1RatherThanMisreadingIt() throws {
+        #expect(try evaluate("INDIRECT(\"B2\",FALSE)") == .error(.ref))
     }
 
     // MARK: - ISREF
 
     /// `ISREF` asks about the *formula*, not the sheet: whether the argument was
     /// written as a reference. Text that looks like one is not one.
-    func testIsRefDistinguishesAReferenceFromTextThatLooksLikeOne() throws {
-        XCTAssertEqual(try evaluate("ISREF(A1)"), .bool(true))
-        XCTAssertEqual(try evaluate("ISREF(\"A1\")"), .bool(false))
+    @Test func isRefDistinguishesAReferenceFromTextThatLooksLikeOne() throws {
+        #expect(try evaluate("ISREF(A1)") == .bool(true))
+        #expect(try evaluate("ISREF(\"A1\")") == .bool(false))
     }
 
     // MARK: - OFFSET
 
     /// Three arguments name a single cell, so the result is that cell's value.
     /// This is how every one of the corpus's 9,798 calls is written.
-    func testOffsetWithThreeArgumentsReadsOneCell() throws {
+    @Test func offsetWithThreeArgumentsReadsOneCell() throws {
         var cells = Cells()
         cells.values["B2"] = .text("hit")
-        XCTAssertEqual(try evaluate("OFFSET(A1,1,1)", cells: cells), .text("hit"))
+        #expect(try evaluate("OFFSET(A1,1,1)", cells: cells) == .text("hit"))
     }
 
     /// Five arguments name a block, and the values come back as an array so that
     /// `SUM(OFFSET(...))` works without references ever becoming values.
-    func testOffsetWithHeightAndWidthReturnsTheBlocksValues() throws {
+    @Test func offsetWithHeightAndWidthReturnsTheBlocksValues() throws {
         var cells = Cells()
         cells.values["A1"] = .number(1)
         cells.values["A2"] = .number(2)
         cells.values["A3"] = .number(3)
         guard case .array(let matrix) = try evaluate("OFFSET(A1,0,0,3,1)", cells: cells) else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(1), .number(2), .number(3)])
+        #expect(matrix.elements == [.number(1), .number(2), .number(3)])
         // Height 3, width 1 — the shape OFFSET was asked for, which the result
         // can now actually state.
-        XCTAssertEqual(matrix.rows, 3)
-        XCTAssertEqual(matrix.columns, 1)
+        #expect(matrix.rows == 3)
+        #expect(matrix.columns == 1)
     }
 
     /// Displacing off the top of the sheet is `#REF!`, as in Excel.
-    func testOffsetOffTheSheetIsARefError() throws {
-        XCTAssertEqual(try evaluate("OFFSET(A1,-5,0)"), .error(.ref))
+    @Test func offsetOffTheSheetIsARefError() throws {
+        #expect(try evaluate("OFFSET(A1,-5,0)") == .error(.ref))
     }
 }

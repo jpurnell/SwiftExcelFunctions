@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
-final class BuiltinLogicFunctionTests: XCTestCase {
+@Suite struct BuiltinLogicFunctionTests {
 
     // MARK: - Helpers
 
@@ -19,19 +20,6 @@ final class BuiltinLogicFunctionTests: XCTestCase {
         try function(named: name).evaluate(args)
     }
 
-    /// Assert a CellValue is a specific Excel error.
-    private func assertError(
-        _ result: CellValue,
-        _ expectedError: ExcelError,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .error(let err) = result else {
-            XCTFail("Expected .error(\(expectedError)), got \(result)", file: file, line: line)
-            return
-        }
-        XCTAssertEqual(err, expectedError, file: file, line: line)
-    }
 
     // MARK: - Registration count
 
@@ -39,248 +27,246 @@ final class BuiltinLogicFunctionTests: XCTestCase {
     ///
     /// A count alone says a function was added but not which, and it fails the
     /// same way whether something arrived or something was lost.
-    func testAllContainsEveryFunctionInTheGroup() {
-        XCTAssertEqual(
-            Set(BuiltinLogicFunctions.all.map(\.name)),
-            ["IF", "AND", "OR", "NOT", "XOR", "IFERROR", "IFNA", "IFS", "SWITCH",
+    @Test func allContainsEveryFunctionInTheGroup() {
+        #expect(Set(BuiltinLogicFunctions.all.map(\.name)) == ["IF", "AND", "OR", "NOT", "XOR", "IFERROR", "IFNA", "IFS", "SWITCH",
              "ISERROR", "ISERR", "ISNA", "ISBLANK", "ISNUMBER", "ISTEXT", "NA", "ISREF",
              "TRUE", "FALSE"])
     }
 
     // MARK: - IF
 
-    func testIFTrueCondition() throws {
+    @Test func ifTrueCondition() throws {
         let result = try eval("IF", .bool(true), .text("yes"), .text("no"))
-        XCTAssertEqual(result, .text("yes"))
+        #expect(result == .text("yes"))
     }
 
-    func testIFFalseCondition() throws {
+    @Test func ifFalseCondition() throws {
         let result = try eval("IF", .bool(false), .text("yes"), .text("no"))
-        XCTAssertEqual(result, .text("no"))
+        #expect(result == .text("no"))
     }
 
-    func testIFNonZeroNumber() throws {
+    @Test func ifNonZeroNumber() throws {
         let result = try eval("IF", .number(42), .text("truthy"), .text("falsy"))
-        XCTAssertEqual(result, .text("truthy"))
+        #expect(result == .text("truthy"))
     }
 
-    func testIFZeroNumber() throws {
+    @Test func ifZeroNumber() throws {
         let result = try eval("IF", .number(0), .text("truthy"), .text("falsy"))
-        XCTAssertEqual(result, .text("falsy"))
+        #expect(result == .text("falsy"))
     }
 
-    func testIFBlankIsFalsy() throws {
+    @Test func ifBlankIsFalsy() throws {
         let result = try eval("IF", .blank, .text("truthy"), .text("falsy"))
-        XCTAssertEqual(result, .text("falsy"))
+        #expect(result == .text("falsy"))
     }
 
-    func testIFTextReturnsValueError() throws {
+    @Test func ifTextReturnsValueError() throws {
         let result = try eval("IF", .text("hello"), .text("yes"), .text("no"))
-        assertError(result, .value)
+        #expect(result == .error(.value))
     }
 
-    func testIFErrorPropagation() throws {
+    @Test func ifErrorPropagation() throws {
         let result = try eval("IF", .error(.ref), .text("yes"), .text("no"))
-        assertError(result, .ref)
+        #expect(result == .error(.ref))
     }
 
-    func testIFTwoArgs() throws {
+    @Test func ifTwoArgs() throws {
         // IF with only 2 args: if false, return FALSE
         let result = try eval("IF", .bool(false), .text("yes"))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testIFTwoArgsTrue() throws {
+    @Test func ifTwoArgsTrue() throws {
         let result = try eval("IF", .bool(true), .number(10))
-        XCTAssertEqual(result, .number(10))
+        #expect(result == .number(10))
     }
 
     // MARK: - AND
 
-    func testANDAllTrue() throws {
+    @Test func andAllTrue() throws {
         let result = try eval("AND", .bool(true), .bool(true), .bool(true))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testANDOneFalse() throws {
+    @Test func andOneFalse() throws {
         let result = try eval("AND", .bool(true), .bool(false), .bool(true))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testANDWithNumbers() throws {
+    @Test func andWithNumbers() throws {
         let result = try eval("AND", .number(1), .number(5), .number(-3))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testANDWithZero() throws {
+    @Test func andWithZero() throws {
         let result = try eval("AND", .number(1), .number(0))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testANDFlattensArrays() throws {
+    @Test func andFlattensArrays() throws {
         let result = try eval("AND", .array(CellMatrix(row: [.bool(true), .bool(true)])), .bool(true))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testANDFlattensArraysWithFalse() throws {
+    @Test func andFlattensArraysWithFalse() throws {
         let result = try eval("AND", .array(CellMatrix(row: [.bool(true), .bool(false)])))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testANDErrorPropagation() throws {
+    @Test func andErrorPropagation() throws {
         let result = try eval("AND", .bool(true), .error(.na))
-        assertError(result, .na)
+        #expect(result == .error(.na))
     }
 
     // MARK: - OR
 
-    func testORAllFalse() throws {
+    @Test func orAllFalse() throws {
         let result = try eval("OR", .bool(false), .bool(false))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testOROneTrue() throws {
+    @Test func orOneTrue() throws {
         let result = try eval("OR", .bool(false), .bool(true), .bool(false))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testORWithNumbers() throws {
+    @Test func orWithNumbers() throws {
         let result = try eval("OR", .number(0), .number(5))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testORAllZeros() throws {
+    @Test func orAllZeros() throws {
         let result = try eval("OR", .number(0), .number(0))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testORFlattensArrays() throws {
+    @Test func orFlattensArrays() throws {
         let result = try eval("OR", .array(CellMatrix(row: [.bool(false), .bool(true)])))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testORErrorPropagation() throws {
+    @Test func orErrorPropagation() throws {
         let result = try eval("OR", .error(.div0), .bool(true))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
     // MARK: - NOT
 
-    func testNOTTrue() throws {
+    @Test func notTrue() throws {
         let result = try eval("NOT", .bool(true))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testNOTFalse() throws {
+    @Test func notFalse() throws {
         let result = try eval("NOT", .bool(false))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testNOTNumber() throws {
+    @Test func notNumber() throws {
         let result = try eval("NOT", .number(0))
-        XCTAssertEqual(result, .bool(true))
+        #expect(result == .bool(true))
     }
 
-    func testNOTNonZero() throws {
+    @Test func notNonZero() throws {
         let result = try eval("NOT", .number(1))
-        XCTAssertEqual(result, .bool(false))
+        #expect(result == .bool(false))
     }
 
-    func testNOTTextReturnsValueError() throws {
+    @Test func notTextReturnsValueError() throws {
         let result = try eval("NOT", .text("hello"))
-        assertError(result, .value)
+        #expect(result == .error(.value))
     }
 
-    func testNOTErrorPropagation() throws {
+    @Test func notErrorPropagation() throws {
         let result = try eval("NOT", .error(.num))
-        assertError(result, .num)
+        #expect(result == .error(.num))
     }
 
     // MARK: - IFERROR
 
-    func testIFERRORWithError() throws {
+    @Test func iferrorWithError() throws {
         let result = try eval("IFERROR", .error(.div0), .number(0))
-        XCTAssertEqual(result, .number(0))
+        #expect(result == .number(0))
     }
 
-    func testIFERRORWithoutError() throws {
+    @Test func iferrorWithoutError() throws {
         let result = try eval("IFERROR", .number(42), .number(0))
-        XCTAssertEqual(result, .number(42))
+        #expect(result == .number(42))
     }
 
-    func testIFERRORWithNAError() throws {
+    @Test func iferrorWithNAError() throws {
         let result = try eval("IFERROR", .error(.na), .text("not found"))
-        XCTAssertEqual(result, .text("not found"))
+        #expect(result == .text("not found"))
     }
 
-    func testIFERRORWithBlank() throws {
+    @Test func iferrorWithBlank() throws {
         let result = try eval("IFERROR", .blank, .number(0))
-        XCTAssertEqual(result, .blank)
+        #expect(result == .blank)
     }
 
-    func testIFERRORWithText() throws {
+    @Test func iferrorWithText() throws {
         let result = try eval("IFERROR", .text("hello"), .number(0))
-        XCTAssertEqual(result, .text("hello"))
+        #expect(result == .text("hello"))
     }
 
     // MARK: - IFNA
 
-    func testIFNAWithNAError() throws {
+    @Test func ifnaWithNAError() throws {
         let result = try eval("IFNA", .error(.na), .text("not found"))
-        XCTAssertEqual(result, .text("not found"))
+        #expect(result == .text("not found"))
     }
 
-    func testIFNAWithOtherError() throws {
+    @Test func ifnaWithOtherError() throws {
         // Non-NA errors pass through
         let result = try eval("IFNA", .error(.div0), .text("not found"))
-        assertError(result, .div0)
+        #expect(result == .error(.div0))
     }
 
-    func testIFNAWithValue() throws {
+    @Test func ifnaWithValue() throws {
         let result = try eval("IFNA", .number(42), .text("not found"))
-        XCTAssertEqual(result, .number(42))
+        #expect(result == .number(42))
     }
 
-    func testIFNAWithBlank() throws {
+    @Test func ifnaWithBlank() throws {
         let result = try eval("IFNA", .blank, .text("not found"))
-        XCTAssertEqual(result, .blank)
+        #expect(result == .blank)
     }
 
     // MARK: - Metadata
 
-    func testIFMetadata() {
+    @Test func ifMetadata() {
         let fn = function(named: "IF")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 3)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 3)
     }
 
-    func testANDMetadata() {
+    @Test func andMetadata() {
         let fn = function(named: "AND")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
-    func testORMetadata() {
+    @Test func orMetadata() {
         let fn = function(named: "OR")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertNil(fn.maxArgs)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == nil)
     }
 
-    func testNOTMetadata() {
+    @Test func notMetadata() {
         let fn = function(named: "NOT")
-        XCTAssertEqual(fn.minArgs, 1)
-        XCTAssertEqual(fn.maxArgs, 1)
+        #expect(fn.minArgs == 1)
+        #expect(fn.maxArgs == 1)
     }
 
-    func testIFERRORMetadata() {
+    @Test func iferrorMetadata() {
         let fn = function(named: "IFERROR")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 2)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 2)
     }
 
-    func testIFNAMetadata() {
+    @Test func ifnaMetadata() {
         let fn = function(named: "IFNA")
-        XCTAssertEqual(fn.minArgs, 2)
-        XCTAssertEqual(fn.maxArgs, 2)
+        #expect(fn.minArgs == 2)
+        #expect(fn.maxArgs == 2)
     }
 }

@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -20,7 +21,7 @@ import SwiftExcelCore
 /// resolves that text to ``NamedRangeTarget/formula(_:)`` at evaluation time, where it has a
 /// parser and this package does not. The storage form is untouched by that, which is the
 /// point of doing it at use.
-final class NamedLambdaTests: XCTestCase {
+@Suite struct NamedLambdaTests {
 
     private struct Cells: CellValueProvider {
         var data: [String: CellValue] = [:]
@@ -51,15 +52,15 @@ final class NamedLambdaTests: XCTestCase {
 
     // MARK: - Calling one
 
-    func testANamedLambdaIsCalled() throws {
+    @Test func aNamedLambdaIsCalled() throws {
         let names = Names(targets: [
             "increment": lambda(["x"], .add(.namedRange("x"), .number(1))),
         ])
-        XCTAssertEqual(try eval(.function("INCREMENT", [.number(5)]), names: names), .number(6))
+        #expect(try eval(.function("INCREMENT", [.number(5)]), names: names) == .number(6))
     }
 
     /// The shape from the corpus, prefixes and all.
-    func testTheCorpusShape() throws {
+    @Test func theCorpusShape() throws {
         let names = Names(targets: [
             "maxexp": .formula(.function("_XLFN.LAMBDA", [
                 .namedRange("_xlpm.arr"), .namedRange("_xlpm.y"),
@@ -70,42 +71,40 @@ final class NamedLambdaTests: XCTestCase {
         let call = FormulaAST.function("maxEXP", [
             .cellRange(CellRange(from: "B1", to: "B3")), .number(2),
         ])
-        XCTAssertEqual(try eval(call, cells: cells, names: names), .number(25))
+        #expect(try eval(call, cells: cells, names: names) == .number(25))
     }
 
-    func testTwoParameters() throws {
+    @Test func twoParameters() throws {
         let names = Names(targets: [
             "hyp": lambda(["a", "b"], .function("SQRT", [
                 .add(.power(.namedRange("a"), .number(2)),
                      .power(.namedRange("b"), .number(2))),
             ])),
         ])
-        XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4)]), names: names),
-                       .number(5))
+        #expect(try eval(.function("HYP", [.number(3), .number(4)]), names: names) == .number(5))
     }
 
-    func testNoParameters() throws {
+    @Test func noParameters() throws {
         let names = Names(targets: ["answer": lambda([], .number(42))])
-        XCTAssertEqual(try eval(.function("ANSWER", []), names: names), .number(42))
+        #expect(try eval(.function("ANSWER", []), names: names) == .number(42))
     }
 
     // MARK: - Scope
 
     /// A parameter shadows a workbook name, and only inside the body.
-    func testAParameterShadowsAWorkbookName() throws {
+    @Test func aParameterShadowsAWorkbookName() throws {
         let names = Names(targets: [
             "rate": .cell(CellRef("A1")),
             "twice": lambda(["rate"], .multiply(.namedRange("rate"), .number(2))),
         ])
         let cells = Cells(data: ["A1": .number(100)])
 
-        XCTAssertEqual(try eval(.function("TWICE", [.number(7)]), cells: cells, names: names),
-                       .number(14))
-        XCTAssertEqual(try eval(.namedRange("rate"), cells: cells, names: names), .number(100))
+        #expect(try eval(.function("TWICE", [.number(7)]), cells: cells, names: names) == .number(14))
+        #expect(try eval(.namedRange("rate"), cells: cells, names: names) == .number(100))
     }
 
     /// The body still reaches names it did not bind.
-    func testTheBodySeesTheWorkbook() throws {
+    @Test func theBodySeesTheWorkbook() throws {
         let names = Names(targets: [
             "rate": .cell(CellRef("A1")),
             "grossed": lambda(["net"], .multiply(.namedRange("net"),
@@ -118,26 +117,25 @@ final class NamedLambdaTests: XCTestCase {
         // an unmeasured one; it is not what this test is about, so the arithmetic is chosen
         // to be exact and the question is written down instead.
         let cells = Cells(data: ["A1": .number(0.25)])
-        XCTAssertEqual(try eval(.function("GROSSED", [.number(200)]), cells: cells, names: names),
-                       .number(250))
+        #expect(try eval(.function("GROSSED", [.number(200)]), cells: cells, names: names) == .number(250))
     }
 
     /// Arguments are evaluated in the caller's scope, not the body's.
-    func testArgumentsAreEvaluatedOutside() throws {
+    @Test func argumentsAreEvaluatedOutside() throws {
         let names = Names(targets: [
             "x": .cell(CellRef("A1")),
             "double": lambda(["x"], .multiply(.namedRange("x"), .number(2))),
         ])
         let cells = Cells(data: ["A1": .number(5)])
         // The argument `x` is the workbook's; the parameter `x` is what the body sees.
-        XCTAssertEqual(try eval(.function("DOUBLE", [.namedRange("x")]),
-                                cells: cells, names: names), .number(10))
+        #expect(try eval(.function("DOUBLE", [.namedRange("x")]),
+                                cells: cells, names: names) == .number(10))
     }
 
     // MARK: - Recursion
 
     /// Recursion by name, which is how a spreadsheet author writes a loop.
-    func testALambdaCanCallItself() throws {
+    @Test func aLambdaCanCallItself() throws {
         let names = Names(targets: [
             "fact": lambda(["n"], .function("IF", [
                 .lessOrEqual(.namedRange("n"), .number(1)),
@@ -149,8 +147,8 @@ final class NamedLambdaTests: XCTestCase {
         // Named `FACT_` in the body so it does not collide with the builtin `FACT`.
         var targets = names.targets
         targets["fact_"] = targets["fact"]
-        XCTAssertEqual(try eval(.function("FACT_", [.number(5)]),
-                                names: Names(targets: targets)), .number(120))
+        #expect(try eval(.function("FACT_", [.number(5)]),
+                                names: Names(targets: targets)) == .number(120))
     }
 
     /// Recursion works to the depth this evaluator's **stack** allows, which is not Excel's.
@@ -171,7 +169,7 @@ final class NamedLambdaTests: XCTestCase {
     /// that the two budgets stay separate — a recursion 4,090 deep must not be refused for
     /// exhausting a 65-call nesting budget, which is what would happen if a lambda call
     /// counted as nesting.
-    func testRecursionWorksToTheDepthTheStackAllows() throws {
+    @Test func recursionWorksToTheDepthTheStackAllows() async throws {
         let names = Names(targets: [
             "countdown": lambda(["n"], .function("IF", [
                 .lessOrEqual(.namedRange("n"), .number(0)),
@@ -182,12 +180,13 @@ final class NamedLambdaTests: XCTestCase {
         ])
         // Far past the 65-call nesting budget, which proves the budgets are separate: each
         // level is a function call, and counting them as nesting would refuse this at 33.
-        XCTAssertEqual(try eval(.function("COUNTDOWN", [.number(100)]), names: names),
-                       .number(100))
+        #expect(try await onMeasuredStack {
+            try eval(.function("COUNTDOWN", [.number(100)]), names: names)
+        } == .number(100))
     }
 
     /// Deeper than the stack allows is refused rather than crashed into.
-    func testTooDeepIsRefusedRatherThanCrashing() throws {
+    @Test func tooDeepIsRefusedRatherThanCrashing() async throws {
         let names = Names(targets: [
             "countdown": lambda(["n"], .function("IF", [
                 .lessOrEqual(.namedRange("n"), .number(0)),
@@ -196,9 +195,11 @@ final class NamedLambdaTests: XCTestCase {
                      .function("COUNTDOWN", [.subtract(.namedRange("n"), .number(1))])),
             ])),
         ])
-        XCTAssertThrowsError(try eval(.function("COUNTDOWN", [.number(10_000)]), names: names)) {
-            XCTAssertEqual($0 as? FormulaEvaluator.EvaluationError, .nodeDepthExceeded,
-                           "the stack guard, not Excel's recursion bound, is what bites first")
+        await #expect(
+            throws: FormulaEvaluator.EvaluationError.nodeDepthExceeded,
+            "the stack guard, not Excel's recursion bound, is what bites first"
+        ) {
+            try await onMeasuredStack { try eval(.function("COUNTDOWN", [.number(10_000)]), names: names) }
         }
     }
 
@@ -210,16 +211,17 @@ final class NamedLambdaTests: XCTestCase {
     /// does not — the subtlest of the measured findings and the easiest to get wrong by being
     /// helpful. It travels as a thrown error for exactly that reason: `IFERROR`'s lazy path
     /// evaluates its first argument with `try`, so the throw goes straight past it.
-    func testTheRefusalIsNotCatchable() throws {
+    @Test func theRefusalIsNotCatchable() async throws {
         let names = Names(targets: [
             "forever": lambda(["n"], .add(.number(1), .function("FOREVER", [.namedRange("n")]))),
         ])
         let guarded = FormulaAST.function("IFERROR", [
             .function("FOREVER", [.number(1)]), .text("caught"),
         ])
-        XCTAssertThrowsError(try eval(guarded, names: names)) { error in
-            XCTAssertNotNil(error as? FormulaEvaluator.EvaluationError)
+        let error = await #expect(throws: (any Error).self) {
+            try await onMeasuredStack { try eval(guarded, names: names) }
         }
+        #expect(error is FormulaEvaluator.EvaluationError, "a thrown refusal, not a value IFERROR caught")
     }
 
     // MARK: - Malformed
@@ -234,35 +236,32 @@ final class NamedLambdaTests: XCTestCase {
     ///
     /// The original assertion was right and the reasoning that overturned it was documentation.
     /// Sixth time that has happened here.
-    func testArityIsExact() throws {
+    @Test func arityIsExact() throws {
         let names = Names(targets: [
             "hyp": lambda(["a", "b"], .add(.namedRange("a"), .namedRange("b"))),
         ])
-        XCTAssertEqual(try eval(.function("HYP", [.number(3)]), names: names), .error(.value))
-        XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4), .number(5)]),
-                                names: names), .error(.value))
-        XCTAssertEqual(try eval(.function("HYP", [.number(3), .number(4)]), names: names),
-                       .number(7))
+        #expect(try eval(.function("HYP", [.number(3)]), names: names) == .error(.value))
+        #expect(try eval(.function("HYP", [.number(3), .number(4), .number(5)]),
+                                names: names) == .error(.value))
+        #expect(try eval(.function("HYP", [.number(3), .number(4)]), names: names) == .number(7))
     }
 
     /// A name that is not a lambda is still not a function.
     ///
     /// `#NAME?` rather than a thrown error since the corpus run: an unknown name is a value
     /// Excel hands back, not a failure that destroys the formula around it.
-    func testANameHoldingSomethingElseIsStillUnknown() throws {
+    @Test func aNameHoldingSomethingElseIsStillUnknown() throws {
         let names = Names(targets: ["taxrate": .cell(CellRef("A1"))])
-        XCTAssertEqual(try eval(.function("TAXRATE", [.number(1)]), names: names), .error(.name))
-        XCTAssertEqual(try eval(.function("NOSUCHNAME", [.number(1)]), names: names),
-                       .error(.name))
+        #expect(try eval(.function("TAXRATE", [.number(1)]), names: names) == .error(.name))
+        #expect(try eval(.function("NOSUCHNAME", [.number(1)]), names: names) == .error(.name))
     }
 
     /// A registered function wins over a name that shares its spelling.
     ///
     /// Excel resolves a call to the built-in first, and a workbook cannot define a name that
     /// shadows `SUM`. Checking the registry first is what makes that true here.
-    func testTheRegistryWinsOverAName() throws {
+    @Test func theRegistryWinsOverAName() throws {
         let names = Names(targets: ["sum": lambda(["x"], .number(-1))])
-        XCTAssertEqual(try eval(.function("SUM", [.number(1), .number(2)]), names: names),
-                       .number(3))
+        #expect(try eval(.function("SUM", [.number(1), .number(2)]), names: names) == .number(3))
     }
 }

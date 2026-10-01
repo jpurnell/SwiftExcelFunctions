@@ -1,6 +1,7 @@
 import Foundation
 import SwiftExcelCore
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// `TEXT` with a date or time format code.
@@ -13,22 +14,22 @@ import XCTest
 ///
 /// That matters because a weekday is exactly the sort of value that can be wrong by one and
 /// look entirely plausible — every answer is a real day of the week.
-final class TextDateFormatTests: XCTestCase {
+@Suite struct TextDateFormatTests {
 
     private let registry = FunctionRegistry.builtin
 
     private func text(_ serial: Double, _ format: String) throws -> String {
-        let function = try XCTUnwrap(registry.function(named: "TEXT"))
+        let function = try #require(registry.function(named: "TEXT"))
         let result = try function.evaluate([.number(serial), .text(format)])
         guard case .text(let value) = result else {
-            XCTFail("TEXT(\(serial), \(format)) returned \(result)"); return ""
+            Issue.record("TEXT(\(serial), \(format)) returned \(result)"); return ""
         }
         return value
     }
 
     /// `TEXT` applied to text, measured in round fifteen.
     private func textOfText(_ value: String, _ format: String) throws -> CellValue {
-        let function = try XCTUnwrap(registry.function(named: "TEXT"))
+        let function = try #require(registry.function(named: "TEXT"))
         return try function.evaluate([.text(value), .text(format)])
     }
 
@@ -40,12 +41,11 @@ final class TextDateFormatTests: XCTestCase {
     /// `NumberFormatter` defaults to banker's rounding — and 1234 is the even neighbour. The
     /// two agree on every value except an exact half, which is the one value a test is least
     /// likely to pick by accident and a financial model is most likely to contain.
-    func testAThousandsFormatRoundsHalfAwayFromZero() throws {
-        XCTAssertEqual(try text(1234.5, "#,##0"), "1,235")
-        XCTAssertEqual(try text(1235.5, "#,##0"), "1,236",
-                       "the odd neighbour too — banker's rounding would agree here by luck")
-        XCTAssertEqual(try text(-1234.5, "#,##0"), "-1,235", "away from zero, so downward")
-        XCTAssertEqual(try text(1234.4, "#,##0"), "1,234", "and nothing else moves")
+    @Test func aThousandsFormatRoundsHalfAwayFromZero() throws {
+        #expect(try text(1234.5, "#,##0") == "1,235")
+        #expect(try text(1235.5, "#,##0") == "1,236", "the odd neighbour too — banker's rounding would agree here by luck")
+        #expect(try text(-1234.5, "#,##0") == "-1,235", "away from zero, so downward")
+        #expect(try text(1234.4, "#,##0") == "1,234", "and nothing else moves")
     }
 
     // MARK: - TEXT applied to something that is not a number
@@ -61,11 +61,10 @@ final class TextDateFormatTests: XCTestCase {
     ///
     /// Asking the obvious reading of the symptom — `TEXT(41640,"mmm")` — would have agreed
     /// and taught nothing.
-    func testTextThatIsNotANumberPassesThrough() throws {
-        XCTAssertEqual(try textOfText("May", "mmm"), .text("May"))
-        XCTAssertEqual(try textOfText("hello", "0.00"), .text("hello"),
-                       "a numeric code over text passes it through just the same")
-        XCTAssertEqual(try textOfText("", "mmm"), .text(""), "and empty text stays empty")
+    @Test func textThatIsNotANumberPassesThrough() throws {
+        #expect(try textOfText("May", "mmm") == .text("May"))
+        #expect(try textOfText("hello", "0.00") == .text("hello"), "a numeric code over text passes it through just the same")
+        #expect(try textOfText("", "mmm") == .text(""), "and empty text stays empty")
     }
 
     /// Text that **does** read as a date is coerced and then formatted.
@@ -73,21 +72,21 @@ final class TextDateFormatTests: XCTestCase {
     /// The line is drawn by whether the value can be read, not by the format code: `"May"`
     /// passes through and `"2014-01-01"` becomes `"Jan"`. Measured in the same round, which
     /// is the only reason the distinction is here rather than a guess in either direction.
-    func testTextThatReadsAsADateIsFormatted() throws {
-        XCTAssertEqual(try textOfText("2014-01-01", "mmm"), .text("Jan"))
+    @Test func textThatReadsAsADateIsFormatted() throws {
+        #expect(try textOfText("2014-01-01", "mmm") == .text("Jan"))
     }
 
     // MARK: - Measured against Excel
 
     /// Serial-to-weekday pairs taken from Excel's own cached values.
-    func testWeekdayAbbreviationsMatchExcel() throws {
+    @Test func weekdayAbbreviationsMatchExcel() throws {
         let measured: [(Double, String)] = [
             (41572, "Fri"), (41573, "Sat"), (41574, "Sun"), (41575, "Mon"),
             (41576, "Tue"), (41577, "Wed"), (41578, "Thu"), (41579, "Fri"),
             (41580, "Sat"), (41581, "Sun"), (41582, "Mon"), (41583, "Tue"),
         ]
         for (serial, expected) in measured {
-            XCTAssertEqual(try text(serial, "ddd"), expected, "serial \(serial)")
+            #expect(try text(serial, "ddd") == expected, "serial \(serial)")
         }
     }
 
@@ -96,70 +95,70 @@ final class TextDateFormatTests: XCTestCase {
     /// Two routes to one answer must not disagree — the reason `IMPOWER` was rewritten. A
     /// `Calendar` would also be wrong across Excel's phantom 29 February 1900, because the
     /// bug lives in the serial numbering rather than in any real calendar.
-    func testTheWeekdayAgreesWithTheWeekdayFunction() throws {
-        let weekday = try XCTUnwrap(registry.function(named: "WEEKDAY"))
+    @Test func theWeekdayAgreesWithTheWeekdayFunction() throws {
+        let weekday = try #require(registry.function(named: "WEEKDAY"))
         let names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         for serial in stride(from: 40000.0, through: 40020.0, by: 1) {
             let result = try weekday.evaluate([.number(serial)])
-            guard case .number(let index) = result else { return XCTFail("WEEKDAY gave \(result)") }
-            XCTAssertEqual(try text(serial, "dddd"), names[Int(index) - 1], "serial \(serial)")
+            guard case .number(let index) = result else { Issue.record("WEEKDAY gave \(result)"); return }
+            #expect(try text(serial, "dddd") == names[Int(index) - 1], "serial \(serial)")
         }
     }
 
     // MARK: - The rest of the family
 
-    func testTheDateComponents() throws {
+    @Test func theDateComponents() throws {
         // Serial 41583 is Tuesday 5 November 2013.
-        XCTAssertEqual(try text(41583, "dddd"), "Tuesday")
-        XCTAssertEqual(try text(41583, "yyyy"), "2013")
-        XCTAssertEqual(try text(41583, "yy"), "13")
-        XCTAssertEqual(try text(41583, "mmm"), "Nov")
-        XCTAssertEqual(try text(41583, "mmmm"), "November")
-        XCTAssertEqual(try text(41583, "mmmmm"), "N")
-        XCTAssertEqual(try text(41583, "d"), "5")
-        XCTAssertEqual(try text(41583, "dd"), "05")
-        XCTAssertEqual(try text(41583, "mm/dd/yyyy"), "11/05/2013")
-        XCTAssertEqual(try text(41583, "d mmm yyyy"), "5 Nov 2013")
+        #expect(try text(41583, "dddd") == "Tuesday")
+        #expect(try text(41583, "yyyy") == "2013")
+        #expect(try text(41583, "yy") == "13")
+        #expect(try text(41583, "mmm") == "Nov")
+        #expect(try text(41583, "mmmm") == "November")
+        #expect(try text(41583, "mmmmm") == "N")
+        #expect(try text(41583, "d") == "5")
+        #expect(try text(41583, "dd") == "05")
+        #expect(try text(41583, "mm/dd/yyyy") == "11/05/2013")
+        #expect(try text(41583, "d mmm yyyy") == "5 Nov 2013")
     }
 
-    func testTheTimeComponents() throws {
+    @Test func theTimeComponents() throws {
         // .53125 of a day is 12:45:00.
-        XCTAssertEqual(try text(41583.53125, "h:mm"), "12:45")
-        XCTAssertEqual(try text(41583.53125, "hh:mm:ss"), "12:45:00")
-        XCTAssertEqual(try text(41583.53125, "h:mm AM/PM"), "12:45 PM")
+        #expect(try text(41583.53125, "h:mm") == "12:45")
+        #expect(try text(41583.53125, "hh:mm:ss") == "12:45:00")
+        #expect(try text(41583.53125, "h:mm AM/PM") == "12:45 PM")
         // Midnight's hour is 12 on a twelve-hour clock, not 0 — the one case where the
         // twelve-hour conversion is not a remainder.
-        XCTAssertEqual(try text(41583.03125, "h:mm AM/PM"), "12:45 AM")
-        XCTAssertEqual(try text(41583.03125, "h:mm"), "0:45", "the 24-hour clock does use 0")
+        #expect(try text(41583.03125, "h:mm AM/PM") == "12:45 AM")
+        #expect(try text(41583.03125, "h:mm") == "0:45", "the 24-hour clock does use 0")
     }
 
     /// `m` is minutes after an hour code and months otherwise — the same two characters.
     ///
     /// Reading them the same way is wrong in one case and never looks wrong: both produce a
     /// small number where a small number belongs.
-    func testMMeansMinutesOnlyBesideAnHourOrSecond() throws {
+    @Test func mMeansMinutesOnlyBesideAnHourOrSecond() throws {
         // 5 November, 12:45 — month 11, minute 45, and both spelled `mm`.
-        XCTAssertEqual(try text(41583.53125, "mm"), "11", "alone, mm is the month")
-        XCTAssertEqual(try text(41583.53125, "h:mm"), "12:45", "after h, mm is minutes")
-        XCTAssertEqual(try text(41583.53125, "mm:ss"), "45:00", "before s, mm is minutes")
-        XCTAssertEqual(try text(41583.53125, "mm/dd"), "11/05", "before d, mm is the month")
+        #expect(try text(41583.53125, "mm") == "11", "alone, mm is the month")
+        #expect(try text(41583.53125, "h:mm") == "12:45", "after h, mm is minutes")
+        #expect(try text(41583.53125, "mm:ss") == "45:00", "before s, mm is minutes")
+        #expect(try text(41583.53125, "mm/dd") == "11/05", "before d, mm is the month")
     }
 
     // MARK: - Number formats are untouched
 
-    func testNumberFormatsStillWork() throws {
-        XCTAssertEqual(try text(3.14159, "0.00"), "3.14")
-        XCTAssertEqual(try text(1234567, "#,##0"), "1,234,567")
-        XCTAssertEqual(try text(0.25, "0%"), "25%")
+    @Test func numberFormatsStillWork() throws {
+        #expect(try text(3.14159, "0.00") == "3.14")
+        #expect(try text(1234567, "#,##0") == "1,234,567")
+        #expect(try text(0.25, "0%") == "25%")
     }
 
     /// A format with no date letters is a number format, whatever else is in it.
-    func testTheTwoFamiliesAreToldApartByTheirLetters() {
-        XCTAssertTrue(ExcelDateFormat.isDateFormat("ddd"))
-        XCTAssertTrue(ExcelDateFormat.isDateFormat("mm/dd/yyyy"))
-        XCTAssertTrue(ExcelDateFormat.isDateFormat("h:mm:ss"))
-        XCTAssertFalse(ExcelDateFormat.isDateFormat("0.00"))
-        XCTAssertFalse(ExcelDateFormat.isDateFormat("#,##0"))
-        XCTAssertFalse(ExcelDateFormat.isDateFormat("0%"))
+    @Test func theTwoFamiliesAreToldApartByTheirLetters() {
+        #expect(ExcelDateFormat.isDateFormat("ddd"))
+        #expect(ExcelDateFormat.isDateFormat("mm/dd/yyyy"))
+        #expect(ExcelDateFormat.isDateFormat("h:mm:ss"))
+        #expect(!ExcelDateFormat.isDateFormat("0.00"))
+        #expect(!ExcelDateFormat.isDateFormat("#,##0"))
+        #expect(!ExcelDateFormat.isDateFormat("0%"))
     }
 }

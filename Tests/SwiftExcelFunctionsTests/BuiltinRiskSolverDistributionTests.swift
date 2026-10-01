@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -10,7 +11,7 @@ import SwiftExcelCore
 /// and 19 cache a draw, with nothing in the file to say which. So the oracle
 /// excludes the family and these assert the published contract instead: the support,
 /// the quantile at a known probability, and the behaviour when nothing is simulating.
-final class BuiltinRiskSolverDistributionTests: XCTestCase {
+@Suite struct BuiltinRiskSolverDistributionTests {
 
     private struct Cells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -63,7 +64,7 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
 
     private func number(_ ast: FormulaAST, random: RandomSource? = nil) throws -> Double {
         guard case .number(let value) = try evaluate(ast, random: random) else {
-            XCTFail("expected a number, got \(try evaluate(ast, random: random))")
+            Issue.record("expected a number, got \(try evaluate(ast, random: random))")
             return .nan
         }
         return value
@@ -71,20 +72,20 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
 
     // MARK: - The group
 
-    func testTheNineCorpusDistributionsAreRegistered() {
+    @Test func theNineCorpusDistributionsAreRegistered() {
         let names = Set(BuiltinRiskSolverFunctions.all.map(\.name))
         for expected in ["PSIBERNOULLI", "PSINORMAL", "PSILOGNORMAL", "PSITRIANGULAR",
                          "PSIDISCRETE", "PSIUNIFORM", "PSIBINOMIAL", "PSIINTUNIFORM",
                          "PSIPOISSON"] {
-            XCTAssertTrue(names.contains(expected), "\(expected) is not registered")
+            #expect(names.contains(expected), "\(expected) is not registered")
         }
     }
 
     /// Excel writes these with the add-in prefix, and the registry resolves through it.
-    func testTheAddInPrefixResolves() throws {
+    @Test func theAddInPrefixResolves() throws {
         let value = try number(.function("_xll.PsiUniform", [.number(0), .number(10)]),
                               random: FixedSource([0.5]))
-        XCTAssertEqual(value, 5, accuracy: 1e-12)
+        #expect(abs(value - 5) <= 1e-12)
     }
 
     // MARK: - What a distribution answers when nothing is simulating
@@ -98,53 +99,52 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
     /// So a property function must be recognised from the unevaluated AST. Written as
     /// an ordinary value function, this call would read 99 as a fourth *parameter* and
     /// be wrong in a way that produces plausible numbers.
-    func testABaseCaseIsNotReadAsAParameter() throws {
+    @Test func aBaseCaseIsNotReadAsAParameter() throws {
         let ast = FormulaAST.function("_xll.PsiTriangular", [
             .number(1), .number(2), .number(3),
             .function("_xll.PsiBaseCase", [.number(99)]),
         ])
         // Idle: the base case is what Risk Solver displays.
-        XCTAssertEqual(try number(ast), 99, accuracy: 1e-12)
+        #expect(try abs(number(ast) - 99) <= 1e-12)
 
         // Simulating: a draw from the distribution, which cannot be 99 — it is
         // outside the support. If 99 came back here, the base case was read as a
         // parameter and the support was widened by it.
         let sample = try number(ast, random: FixedSource([0.5]))
-        XCTAssertGreaterThanOrEqual(sample, 1)
-        XCTAssertLessThanOrEqual(sample, 3)
+        #expect(sample >= 1)
+        #expect(sample <= 3)
     }
 
     /// A label is a property too, and must not be read as a parameter either.
-    func testANameIsNotReadAsAParameter() throws {
+    @Test func aNameIsNotReadAsAParameter() throws {
         let ast = FormulaAST.function("_xll.PsiUniform", [
             .number(0), .number(10),
             .function("_xll.PsiName", [.text("Aggressive Launch")]),
         ])
-        XCTAssertEqual(try number(ast, random: FixedSource([0.25])), 2.5, accuracy: 1e-12)
+        #expect(try abs(number(ast, random: FixedSource([0.25])) - 2.5) <= 1e-12)
     }
 
     /// No source and no base case is a refusal, which is the same rule `RAND()`
     /// follows: this package supplies no randomness of its own and will not invent
     /// any. Returning a mean unasked would be a number nobody requested, and nothing
     /// downstream could distinguish it from a real one.
-    func testWithoutASourceOrABaseCaseItRefuses() throws {
-        XCTAssertEqual(try evaluate(.function("_xll.PsiNormal", [.number(0), .number(1)])),
-                       .error(.value))
+    @Test func withoutASourceOrABaseCaseItRefuses() throws {
+        #expect(try evaluate(.function("_xll.PsiNormal", [.number(0), .number(1)])) == .error(.value))
     }
 
     // MARK: - The support and the quantile
 
     /// Inverse transform: at p = 0.5 a symmetric distribution is at its mean.
-    func testNormalAtTheMedianIsItsMean() throws {
-        XCTAssertEqual(try number(.function("PSINORMAL", [.number(7), .number(2)]),
-                                  random: FixedSource([0.5])), 7, accuracy: 1e-9)
+    @Test func normalAtTheMedianIsItsMean() throws {
+        #expect(try abs(number(.function("PSINORMAL", [.number(7), .number(2)]),
+                                  random: FixedSource([0.5])) - 7) <= 1e-9)
     }
 
     /// A uniform draw is linear in the probability, so both ends are reachable.
-    func testUniformSpansItsRange() throws {
+    @Test func uniformSpansItsRange() throws {
         let ast = FormulaAST.function("PSIUNIFORM", [.number(10), .number(20)])
-        XCTAssertEqual(try number(ast, random: FixedSource([0.0])), 10, accuracy: 1e-12)
-        XCTAssertEqual(try number(ast, random: FixedSource([0.5])), 15, accuracy: 1e-12)
+        #expect(try abs(number(ast, random: FixedSource([0.0])) - 10) <= 1e-12)
+        #expect(try abs(number(ast, random: FixedSource([0.5])) - 15) <= 1e-12)
     }
 
     /// `PsiTriangular` is published `(a, c, b)` — positionally `(min, likely, max)`.
@@ -153,32 +153,31 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
     /// to (min, max, likely) would still produce numbers inside a plausible range.
     /// This asserts the asymmetry: with the mode hard against the lower bound, the
     /// median must sit below the midpoint of the range.
-    func testTriangularTakesItsModeInTheMiddlePosition() throws {
+    @Test func triangularTakesItsModeInTheMiddlePosition() throws {
         let median = try number(.function("PSITRIANGULAR",
                                           [.number(0), .number(0), .number(10)]),
                                 random: FixedSource([0.5]))
-        XCTAssertGreaterThanOrEqual(median, 0)
-        XCTAssertLessThanOrEqual(median, 10)
-        XCTAssertLessThan(median, 5, "mode at the floor must pull the median below the midpoint")
+        #expect(median >= 0)
+        #expect(median <= 10)
+        #expect(median < 5, "mode at the floor must pull the median below the midpoint")
     }
 
     /// Bernoulli is a two-point distribution, and the degenerate cases pin the
     /// direction: p = 1 is always a success, p = 0 never.
-    func testBernoulliAtTheDegenerateProbabilities() throws {
-        XCTAssertEqual(try number(.function("PSIBERNOULLI", [.number(1)]),
-                                  random: FixedSource([0.5])), 1)
-        XCTAssertEqual(try number(.function("PSIBERNOULLI", [.number(0)]),
-                                  random: FixedSource([0.5])), 0)
+    @Test func bernoulliAtTheDegenerateProbabilities() throws {
+        #expect(try number(.function("PSIBERNOULLI", [.number(1)]), random: FixedSource([0.5])).isEqual(to: 1))
+        #expect(try number(.function("PSIBERNOULLI", [.number(0)]),
+                                  random: FixedSource([0.5])) == 0)
     }
 
     /// Binomial over n trials is bounded by 0 and n, and n = 0 has no outcome but 0.
-    func testBinomialIsBoundedByItsTrialCount() throws {
-        XCTAssertEqual(try number(.function("PSIBINOMIAL", [.number(0), .number(0.5)]),
-                                  random: FixedSource([0.5])), 0)
+    @Test func binomialIsBoundedByItsTrialCount() throws {
+        #expect(try number(.function("PSIBINOMIAL", [.number(0), .number(0.5)]),
+                                  random: FixedSource([0.5])) == 0)
         let draw = try number(.function("PSIBINOMIAL", [.number(10), .number(0.5)]),
                               random: FixedSource([0.5]))
-        XCTAssertGreaterThanOrEqual(draw, 0)
-        XCTAssertLessThanOrEqual(draw, 10)
+        #expect(draw >= 0)
+        #expect(draw <= 10)
     }
 
     /// A discrete distribution returns one of its own values, never an index.
@@ -187,7 +186,7 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
     /// an *index* into its value list, and `valueAt(_:)` maps that to the outcome.
     /// Returning the index would produce 0, 1 or 2 here — all plausible-looking
     /// numbers, none of them one of the stated outcomes.
-    func testDiscreteReturnsAValueAndNotAnIndex() throws {
+    @Test func discreteReturnsAValueAndNotAnIndex() throws {
         let outcomes = FormulaAST.cellRange(CellRange(from: CellRef(column: 1, row: 1),
                                                       to: CellRef(column: 1, row: 3)))
         let weights = FormulaAST.cellRange(CellRange(from: CellRef(column: 2, row: 1),
@@ -198,31 +197,30 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
                                                       names: NamedRangeCollection(),
                                                       random: FixedSource([p]))
             guard case .number(let value) = drawn else {
-                return XCTFail("expected a number, got \(drawn)")
+                Issue.record("expected a number, got \(drawn)"); return
             }
-            XCTAssertTrue([100.0, 200.0, 300.0].contains(value),
-                          "\(value) is not one of the stated outcomes")
+            #expect([100.0, 200.0, 300.0].contains(value), "\(value) is not one of the stated outcomes")
         }
     }
 
     /// Both bounds are reachable, which is what "integer uniform" has to mean.
-    func testIntUniformIsInclusiveAtBothEnds() throws {
+    @Test func intUniformIsInclusiveAtBothEnds() throws {
         let ast = FormulaAST.function("PSIINTUNIFORM", [.number(1), .number(6)])
-        XCTAssertEqual(try number(ast, random: FixedSource([0.0])), 1)
-        XCTAssertEqual(try number(ast, random: FixedSource([0.999_999_999])), 6)
+        #expect(try number(ast, random: FixedSource([0.0])).isEqual(to: 1))
+        #expect(try number(ast, random: FixedSource([0.999_999_999])).isEqual(to: 6))
     }
 
     /// A Poisson process with no arrivals has no outcome but zero.
-    func testPoissonAtZeroIntensity() throws {
-        XCTAssertEqual(try number(.function("PSIPOISSON", [.number(0)]),
-                                  random: FixedSource([0.5])), 0)
+    @Test func poissonAtZeroIntensity() throws {
+        #expect(try number(.function("PSIPOISSON", [.number(0)]),
+                                  random: FixedSource([0.5])) == 0)
     }
 
     /// Lognormal is positive on all of its support, whatever the draw.
-    func testLogNormalIsPositive() throws {
+    @Test func logNormalIsPositive() throws {
         for p in [0.01, 0.5, 0.99] {
-            XCTAssertGreaterThan(try number(.function("PSILOGNORMAL", [.number(1), .number(0.5)]),
-                                            random: FixedSource([p])), 0)
+            #expect(try number(.function("PSILOGNORMAL", [.number(1), .number(0.5)]),
+                                            random: FixedSource([p])) > 0)
         }
     }
 
@@ -238,40 +236,37 @@ final class BuiltinRiskSolverDistributionTests: XCTestCase {
     /// m = 10, s = 2 that is 9.805807. Passing the arithmetic moments through
     /// unconverted would put the median at e^10 — off by four orders of magnitude,
     /// which is the size of mistake this conversion prevents.
-    func testLogNormalTakesArithmeticMomentsAndConvertsThem() throws {
+    @Test func logNormalTakesArithmeticMomentsAndConvertsThem() throws {
         let median = try number(.function("PSILOGNORMAL", [.number(10), .number(2)]),
                                 random: FixedSource([0.5]))
-        XCTAssertEqual(median, 10 / (1 + 4.0 / 100).squareRoot(), accuracy: 1e-6)
-        XCTAssertEqual(median, 9.805806, accuracy: 1e-5)
+        #expect(abs(median - (10 / (1 + 4.0 / 100).squareRoot())) <= 1e-6)
+        #expect(abs(median - 9.805806) <= 1e-5)
     }
 
     // MARK: - Determinism and errors
 
     /// The same seed gives the same workbook twice. Nothing external can be matched,
     /// so this is the only reproducibility that means anything here.
-    func testTheSameSeedGivesTheSameDraw() throws {
+    @Test func theSameSeedGivesTheSameDraw() throws {
         let ast = FormulaAST.function("PSINORMAL", [.number(0), .number(1)])
         let first = try number(ast, random: SeededRandomSource(seed: 42))
         let second = try number(ast, random: SeededRandomSource(seed: 42))
-        XCTAssertEqual(first, second)
+        #expect(first.isEqual(to: second))
     }
 
     /// An error argument propagates rather than being absorbed, the same rule the
     /// lookups follow: the answer should name the failure nearest the start.
-    func testAnErrorArgumentPropagates() throws {
-        XCTAssertEqual(try evaluate(.function("PSINORMAL", [.error(.ref), .number(1)]),
-                                    random: FixedSource([0.5])),
-                       .error(.ref))
+    @Test func anErrorArgumentPropagates() throws {
+        #expect(try evaluate(.function("PSINORMAL", [.error(.ref), .number(1)]),
+                                    random: FixedSource([0.5])) == .error(.ref))
     }
 
     /// A parameter outside the distribution's support is `#NUM!`, not a trap and not
     /// a silently clamped answer.
-    func testAnImpossibleParameterIsNum() throws {
-        XCTAssertEqual(try evaluate(.function("PSINORMAL", [.number(0), .number(-1)]),
-                                    random: FixedSource([0.5])),
-                       .error(.num))
-        XCTAssertEqual(try evaluate(.function("PSIBERNOULLI", [.number(1.5)]),
-                                    random: FixedSource([0.5])),
-                       .error(.num))
+    @Test func anImpossibleParameterIsNum() throws {
+        #expect(try evaluate(.function("PSINORMAL", [.number(0), .number(-1)]),
+                                    random: FixedSource([0.5])) == .error(.num))
+        #expect(try evaluate(.function("PSIBERNOULLI", [.number(1.5)]),
+                                    random: FixedSource([0.5])) == .error(.num))
     }
 }

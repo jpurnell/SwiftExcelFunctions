@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -11,72 +12,70 @@ import SwiftExcelCore
 ///
 /// These ask about a *value*, so they belong with the logic functions rather
 /// than with navigation: none of them needs to know where it was called from.
-final class InformationFunctionTests: XCTestCase {
+@Suite struct InformationFunctionTests {
 
     private let registry = FunctionRegistry.builtin
 
     private func call(_ name: String, _ args: [CellValue]) throws -> CellValue {
-        let function = try XCTUnwrap(registry.function(named: name), "\(name) is not registered")
+        let function = try #require(registry.function(named: name), "\(name) is not registered")
         return try function.evaluate(args)
     }
 
     // MARK: - Error predicates
 
     /// `ISERROR` is true for every Excel error, `#N/A` included.
-    func testIsErrorIsTrueForAnyError() throws {
+    @Test func isErrorIsTrueForAnyError() throws {
         for error in [ExcelError.div0, .value, .ref, .name, .num, .na] {
-            XCTAssertEqual(try call("ISERROR", [.error(error)]), .bool(true), "\(error)")
+            #expect(try call("ISERROR", [.error(error)]) == .bool(true), "\(error)")
         }
-        XCTAssertEqual(try call("ISERROR", [.number(1)]), .bool(false))
+        #expect(try call("ISERROR", [.number(1)]) == .bool(false))
     }
 
     /// `ISERR` is `ISERROR` minus `#N/A`. The distinction exists so a formula can
     /// treat "no value yet" differently from "the arithmetic went wrong".
-    func testIsErrExcludesNotAvailable() throws {
-        XCTAssertEqual(try call("ISERR", [.error(.div0)]), .bool(true))
-        XCTAssertEqual(try call("ISERR", [.error(.na)]), .bool(false), "#N/A is not an ISERR error")
+    @Test func isErrExcludesNotAvailable() throws {
+        #expect(try call("ISERR", [.error(.div0)]) == .bool(true))
+        #expect(try call("ISERR", [.error(.na)]) == .bool(false), "#N/A is not an ISERR error")
     }
 
-    func testIsNAIsTrueOnlyForNotAvailable() throws {
-        XCTAssertEqual(try call("ISNA", [.error(.na)]), .bool(true))
-        XCTAssertEqual(try call("ISNA", [.error(.div0)]), .bool(false))
-        XCTAssertEqual(try call("ISNA", [.number(1)]), .bool(false))
+    @Test func isNAIsTrueOnlyForNotAvailable() throws {
+        #expect(try call("ISNA", [.error(.na)]) == .bool(true))
+        #expect(try call("ISNA", [.error(.div0)]) == .bool(false))
+        #expect(try call("ISNA", [.number(1)]) == .bool(false))
     }
 
     /// `NA()` produces `#N/A`, which is how a sheet says "deliberately absent".
-    func testNAProducesNotAvailable() throws {
-        XCTAssertEqual(try call("NA", []), .error(.na))
+    @Test func naProducesNotAvailable() throws {
+        #expect(try call("NA", []) == .error(.na))
     }
 
     // MARK: - Type predicates
 
-    func testIsBlankIsTrueOnlyForAnEmptyCell() throws {
-        XCTAssertEqual(try call("ISBLANK", [.blank]), .bool(true))
-        XCTAssertEqual(try call("ISBLANK", [.text("")]), .bool(false), "an empty string is a value")
-        XCTAssertEqual(try call("ISBLANK", [.number(0)]), .bool(false))
+    @Test func isBlankIsTrueOnlyForAnEmptyCell() throws {
+        #expect(try call("ISBLANK", [.blank]) == .bool(true))
+        #expect(try call("ISBLANK", [.text("")]) == .bool(false), "an empty string is a value")
+        #expect(try call("ISBLANK", [.number(0)]) == .bool(false))
     }
 
-    func testIsNumberIsTrueForNumbersOnly() throws {
-        XCTAssertEqual(try call("ISNUMBER", [.number(0)]), .bool(true))
-        XCTAssertEqual(try call("ISNUMBER", [.text("1")]), .bool(false), "text is not a number")
-        XCTAssertEqual(try call("ISNUMBER", [.bool(true)]), .bool(false))
-        XCTAssertEqual(try call("ISNUMBER", [.blank]), .bool(false))
+    @Test func isNumberIsTrueForNumbersOnly() throws {
+        #expect(try call("ISNUMBER", [.number(0)]) == .bool(true))
+        #expect(try call("ISNUMBER", [.text("1")]) == .bool(false), "text is not a number")
+        #expect(try call("ISNUMBER", [.bool(true)]) == .bool(false))
+        #expect(try call("ISNUMBER", [.blank]) == .bool(false))
     }
 
-    func testIsTextIsTrueForTextOnly() throws {
-        XCTAssertEqual(try call("ISTEXT", [.text("x")]), .bool(true))
-        XCTAssertEqual(try call("ISTEXT", [.number(1)]), .bool(false))
-        XCTAssertEqual(try call("ISTEXT", [.blank]), .bool(false))
+    @Test func isTextIsTrueForTextOnly() throws {
+        #expect(try call("ISTEXT", [.text("x")]) == .bool(true))
+        #expect(try call("ISTEXT", [.number(1)]) == .bool(false))
+        #expect(try call("ISTEXT", [.blank]) == .bool(false))
     }
 
     /// A predicate never propagates the error it is asked about — that is the
     /// whole point of it. `ISERROR(1/0)` is `TRUE`, not `#DIV/0!`.
-    func testAPredicateAnswersAboutAnErrorRatherThanPropagatingIt() throws {
+    @Test func aPredicateAnswersAboutAnErrorRatherThanPropagatingIt() throws {
         for name in ["ISERROR", "ISERR", "ISNA", "ISBLANK", "ISNUMBER", "ISTEXT"] {
             let result = try call(name, [.error(.div0)])
-            guard case .bool = result else {
-                return XCTFail("\(name) propagated the error instead of answering: \(result)")
-            }
+            #expect(result.isBool, "\(name) propagated the error instead of answering: \(result)")
         }
     }
 }

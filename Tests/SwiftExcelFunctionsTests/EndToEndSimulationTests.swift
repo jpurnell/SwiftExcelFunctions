@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -20,7 +21,11 @@ import BusinessMath
 /// ```
 /// RISK_SOLVER_WORKBOOKS=<dir> swift test --filter EndToEndSimulation
 /// ```
-final class EndToEndSimulationTests: XCTestCase {
+@Suite(.enabled(
+    if: !(ProcessInfo.processInfo.environment["RISK_SOLVER_WORKBOOKS"] ?? "").isEmpty,
+    "Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models. The workbooks are private and are not in this repository."
+))
+struct EndToEndSimulationTests {
 
     /// Adds enumeration to SwiftXLSX's own workbook-backed provider.
     ///
@@ -62,7 +67,7 @@ final class EndToEndSimulationTests: XCTestCase {
     private func workbooks() throws -> [(name: String, workbook: Workbook)] {
         let environment = ProcessInfo.processInfo.environment
         guard let root = environment["RISK_SOLVER_WORKBOOKS"], !root.isEmpty else {
-            throw XCTSkip("Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models.")
+            throw TestFailure("Set RISK_SOLVER_WORKBOOKS to a directory of Risk Solver models.")
         }
         let url = URL(fileURLWithPath: root, isDirectory: true)
         let paths = ((try? FileManager.default.subpathsOfDirectory(atPath: url.path)) ?? [])
@@ -96,7 +101,7 @@ final class EndToEndSimulationTests: XCTestCase {
     /// Deliberately a report rather than a pass/fail on any particular model: what a real
     /// corpus can and cannot do is a fact to discover, and asserting a count would fail the
     /// moment someone added a workbook.
-    func testRunsEveryModelItCan() throws {
+    @Test func runsEveryModelItCan() throws {
         var ran = 0, refused = 0
         var reasons: [String: Int] = [:]
         var report = ""
@@ -140,7 +145,7 @@ final class EndToEndSimulationTests: XCTestCase {
 
         """)
 
-        XCTAssertGreaterThan(ran, 0, "no real model ran end to end")
+        #expect(ran > 0, "no real model ran end to end")
     }
 
     /// **The lowering histogram — Phase 2's deliverable, and the work list.**
@@ -152,7 +157,7 @@ final class EndToEndSimulationTests: XCTestCase {
     ///
     /// It is also the number that says whether the 118× is reachable at all. A fast path
     /// that compiles nothing is a fast path in name only.
-    func testLoweringHistogramAcrossRealModels() throws {
+    @Test func loweringHistogramAcrossRealModels() throws {
         let lowerer = Lowerer()
         var lowered = 0, refused = 0
         var reasons: [String: Int] = [:]
@@ -217,7 +222,7 @@ final class EndToEndSimulationTests: XCTestCase {
 
         """)
 
-        XCTAssertGreaterThan(total, 0, "no outputs were audited")
+        #expect(total > 0, "no outputs were audited")
     }
 
     /// A seeded run of a real model reproduces exactly.
@@ -225,7 +230,7 @@ final class EndToEndSimulationTests: XCTestCase {
     /// The property every downstream number depends on, asserted on a real model rather
     /// than a fixture — real ones have lookups, blanks and cached errors that a
     /// hand-written sheet does not.
-    func testARealModelReproducesUnderTheSameSeed() throws {
+    @Test func aRealModelReproducesUnderTheSameSeed() throws {
         var checked = 0
 
         for (_, workbook) in try workbooks() {
@@ -244,13 +249,12 @@ final class EndToEndSimulationTests: XCTestCase {
                 else { continue }
 
                 for (address, results) in first.outputs {
-                    XCTAssertEqual(results.values, second.outputs[address]?.values,
-                                   "\(sheet.name)!\(address.cell.reference) did not reproduce")
+                    #expect(results.values == second.outputs[address]?.values, "\(sheet.name)!\(address.cell.reference) did not reproduce")
                 }
                 checked += 1
             }
         }
 
-        XCTAssertGreaterThan(checked, 0, "no real model was checked for reproducibility")
+        #expect(checked > 0, "no real model was checked for reproducibility")
     }
 }

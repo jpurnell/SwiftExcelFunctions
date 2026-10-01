@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -15,7 +16,7 @@ import SwiftExcelCore
 ///
 /// Each would otherwise evaluate to something plausible rather than to an error — which is
 /// the failure a workbook checker cannot afford, since it reports on other people's files.
-final class LambdaAsValueTests: XCTestCase {
+@Suite struct LambdaAsValueTests {
 
     private struct Cells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -38,56 +39,56 @@ final class LambdaAsValueTests: XCTestCase {
 
     // MARK: - A lambda is a value
 
-    func testAnUncalledLambdaEvaluatesToALambda() throws {
+    @Test func anUncalledLambdaEvaluatesToALambda() throws {
         let result = try eval(.function("LAMBDA", [
             .namedRange("x"), .add(.namedRange("x"), .number(1)),
         ]))
         guard case .lambda(let parameters, _, _) = result else {
-            return XCTFail("expected a lambda, got \(result)")
+            Issue.record("expected a lambda, got \(result)"); return
         }
-        XCTAssertEqual(parameters, ["x"])
+        #expect(parameters == ["x"])
     }
 
     /// In a cell, that value shows as `#CALC!` — a function where a value belongs.
-    func testALambdaUsedAsANumberIsCalc() throws {
+    @Test func aLambdaUsedAsANumberIsCalc() throws {
         let sum = FormulaAST.add(
             .function("LAMBDA", [.namedRange("x"), .namedRange("x")]), .number(1))
-        XCTAssertEqual(try eval(sum), .error(.calc))
+        #expect(try eval(sum) == .error(.calc))
     }
 
     /// `#CALC!` and not `#VALUE!`, which is a different mistake.
     ///
     /// `=myLambda + 1` has not used the wrong *kind* of value; it has forgotten to call
     /// something. Excel draws that distinction and so does this.
-    func testItIsCalcRatherThanValue() throws {
+    @Test func itIsCalcRatherThanValue() throws {
         let wrongKind = FormulaAST.add(.text("banana"), .number(1))
-        XCTAssertEqual(try eval(wrongKind), .error(.value))
+        #expect(try eval(wrongKind) == .error(.value))
 
         let uncalled = FormulaAST.add(
             .function("LAMBDA", [.namedRange("x"), .namedRange("x")]), .number(1))
-        XCTAssertEqual(try eval(uncalled), .error(.calc))
+        #expect(try eval(uncalled) == .error(.calc))
     }
 
-    func testALambdaConcatenatedIsCalc() throws {
+    @Test func aLambdaConcatenatedIsCalc() throws {
         let joined = FormulaAST.concatenate(
             .text("f="), .function("LAMBDA", [.namedRange("x"), .namedRange("x")]))
-        XCTAssertEqual(try eval(joined), .text("f=#CALC!"))
+        #expect(try eval(joined) == .text("f=#CALC!"))
     }
 
     // MARK: - The three shapes
 
     /// Bound by a `LET`, then called.
-    func testALambdaBoundByLetCanBeCalled() throws {
+    @Test func aLambdaBoundByLetCanBeCalled() throws {
         let ast = FormulaAST.function("LET", [
             .namedRange("double"),
             .function("LAMBDA", [.namedRange("x"), .multiply(.namedRange("x"), .number(2))]),
             .function("DOUBLE", [.number(21)]),
         ])
-        XCTAssertEqual(try eval(ast), .number(42))
+        #expect(try eval(ast) == .number(42))
     }
 
     /// Chosen by an `IF`, then called.
-    func testALambdaChosenByAnIfCanBeCalled() throws {
+    @Test func aLambdaChosenByAnIfCanBeCalled() throws {
         let ast = FormulaAST.function("LET", [
             .namedRange("f"),
             .function("IF", [
@@ -97,7 +98,7 @@ final class LambdaAsValueTests: XCTestCase {
             ]),
             .function("F", [.number(4)]),
         ])
-        XCTAssertEqual(try eval(ast), .number(40))
+        #expect(try eval(ast) == .number(40))
     }
 
     /// **Returned by a lambda, which is what `captured` is for.**
@@ -106,7 +107,7 @@ final class LambdaAsValueTests: XCTestCase {
     /// lambda escapes the scope that gave `x` its value, so it has to carry `x` with it. A
     /// lambda without a captured frame does not fail here — it answers `#NAME?` or, worse,
     /// finds a workbook name called `x` and returns a plausible number.
-    func testALambdaReturnedByALambdaRemembersItsScope() throws {
+    @Test func aLambdaReturnedByALambdaRemembersItsScope() throws {
         let adder = FormulaAST.function("LAMBDA", [
             .namedRange("x"),
             .function("LAMBDA", [
@@ -120,11 +121,11 @@ final class LambdaAsValueTests: XCTestCase {
                 .function("ADD3", [.number(4)]),
             ]),
         ])
-        XCTAssertEqual(try eval(ast), .number(7))
+        #expect(try eval(ast) == .number(7))
     }
 
     /// The captured value is the one from the scope that made the lambda, not the caller's.
-    func testTheCapturedValueWinsOverTheCallersName() throws {
+    @Test func theCapturedValueWinsOverTheCallersName() throws {
         let ast = FormulaAST.function("LET", [
             .namedRange("x"), .number(100),
             .function("LET", [
@@ -137,29 +138,28 @@ final class LambdaAsValueTests: XCTestCase {
                 .function("F", [.number(0)]),
             ]),
         ])
-        XCTAssertEqual(try eval(ast), .number(1), "the lambda closed over x = 1, not x = 100")
+        #expect(try eval(ast) == .number(1), "the lambda closed over x = 1, not x = 100")
     }
 
     // MARK: - Arity
 
-    func testCallingWithTheWrongCountIsRefused() throws {
+    @Test func callingWithTheWrongCountIsRefused() throws {
         let ast = FormulaAST.function("LET", [
             .namedRange("f"),
             .function("LAMBDA", [.namedRange("x"), .namedRange("x")]),
             .function("F", [.number(1), .number(2)]),
         ])
-        XCTAssertEqual(try eval(ast), .error(.value))
+        #expect(try eval(ast) == .error(.value))
     }
 
     /// A `LAMBDA` with no body is not a lambda.
-    func testALambdaNeedsABody() throws {
-        XCTAssertEqual(try eval(.function("LAMBDA", [])), .error(.calc))
+    @Test func aLambdaNeedsABody() throws {
+        #expect(try eval(.function("LAMBDA", [])) == .error(.calc))
     }
 
     /// A parameter list with something other than a name in it is malformed.
-    func testAParameterMustBeAName() throws {
-        XCTAssertEqual(
-            try eval(.function("LAMBDA", [.number(1), .number(2)])), .error(.calc))
+    @Test func aParameterMustBeAName() throws {
+        #expect(try eval(.function("LAMBDA", [.number(1), .number(2)])) == .error(.calc))
     }
 }
 
@@ -167,7 +167,7 @@ final class LambdaAsValueTests: XCTestCase {
 ///
 /// The third of the three corpus shapes, and the last to work. The parser learned it in
 /// SwiftXLSX 0.28.0; this is the other half — evaluating what it produces.
-final class ImmediatelyInvokedLambdaTests: XCTestCase {
+@Suite struct ImmediatelyInvokedLambdaTests {
 
     private struct Cells: CellValueProvider {
         var data: [String: CellValue] = [:]
@@ -190,16 +190,16 @@ final class ImmediatelyInvokedLambdaTests: XCTestCase {
         .function("LAMBDA", parameters.map { .namedRange($0) } + [body])
     }
 
-    func testALambdaAppliedWhereItIsWritten() throws {
+    @Test func aLambdaAppliedWhereItIsWritten() throws {
         let ast = FormulaAST.call(
             lambda(["x"], .multiply(.namedRange("x"), .number(3))), [.number(7)])
-        XCTAssertEqual(try eval(ast), .number(21))
+        #expect(try eval(ast) == .number(21))
     }
 
     /// Currying, with no name between the two calls.
-    func testCallsChain() throws {
+    @Test func callsChain() throws {
         let adder = lambda(["x"], lambda(["y"], .add(.namedRange("x"), .namedRange("y"))))
-        XCTAssertEqual(try eval(.call(.call(adder, [.number(3)]), [.number(4)])), .number(7))
+        #expect(try eval(.call(.call(adder, [.number(3)]), [.number(4)])) == .number(7))
     }
 
     /// **The self-application trick**, which is how a recursive lambda is written with nothing
@@ -212,7 +212,7 @@ final class ImmediatelyInvokedLambdaTests: XCTestCase {
     /// The body takes *itself* as a parameter and invokes that, so no defined name is needed.
     /// Two conformance rounds were lost to a `depthProbe` nobody had added by hand before this
     /// form removed the precondition altogether.
-    func testSelfApplicationRecurses() throws {
+    @Test func selfApplicationRecurses() async throws {
         let body = lambda(["f", "n"], .function("IF", [
             .lessOrEqual(.namedRange("n"), .number(0)),
             .number(0),
@@ -220,17 +220,16 @@ final class ImmediatelyInvokedLambdaTests: XCTestCase {
                                    [.namedRange("f"),
                                     .subtract(.namedRange("n"), .number(1))])),
         ]))
-        XCTAssertEqual(try eval(.call(body, [body, .number(100)])), .number(100))
+        #expect(try await onMeasuredStack { try eval(.call(body, [body, .number(100)])) } == .number(100))
     }
 
     /// Calling something that is not a function is `#VALUE!`.
-    func testCallingANonFunctionIsRefused() throws {
-        XCTAssertEqual(try eval(.call(.number(5), [.number(1)])), .error(.value))
+    @Test func callingANonFunctionIsRefused() throws {
+        #expect(try eval(.call(.number(5), [.number(1)])) == .error(.value))
     }
 
     /// An error in the callee is the answer, and the arguments are not reached.
-    func testAnErrorInTheCalleePropagates() throws {
-        XCTAssertEqual(try eval(.call(.divide(.number(1), .number(0)), [.number(1)])),
-                       .error(.div0))
+    @Test func anErrorInTheCalleePropagates() throws {
+        #expect(try eval(.call(.divide(.number(1), .number(0)), [.number(1)])) == .error(.div0))
     }
 }

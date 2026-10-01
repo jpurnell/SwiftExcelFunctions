@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -13,7 +14,7 @@ import SwiftXLSX
 /// Every expectation here is a formula string parsed by the real parser, because a
 /// recognizer tested against hand-built ASTs proves only that it agrees with whoever
 /// built them.
-final class PsiRecognizerTests: XCTestCase {
+@Suite struct PsiRecognizerTests {
 
     private let recognizer = PsiRecognizer()
 
@@ -23,18 +24,18 @@ final class PsiRecognizerTests: XCTestCase {
 
     // MARK: - Nothing to find
 
-    func testOrdinaryFormulaCarriesNoRole() throws {
+    @Test func ordinaryFormulaCarriesNoRole() throws {
         let found = try recognize("SUM(A1:A10)*2")
-        XCTAssertFalse(found.isOutput)
-        XCTAssertFalse(found.isUncertain)
-        XCTAssertEqual(found.distributions.count, 0)
+        #expect(!found.isOutput)
+        #expect(!found.isUncertain)
+        #expect(found.distributions.count == 0)
     }
 
     /// A statistical function that is not Frontline's. `NORMDIST` is Excel's own and
     /// draws nothing; matching on a loose name test would claim it.
-    func testExcelsOwnStatisticsAreNotDistributions() throws {
+    @Test func excelsOwnStatisticsAreNotDistributions() throws {
         let found = try recognize("NORMDIST(5, 0, 1, TRUE)")
-        XCTAssertFalse(found.isUncertain)
+        #expect(!found.isUncertain)
     }
 
     // MARK: - Outputs
@@ -42,45 +43,45 @@ final class PsiRecognizerTests: XCTestCase {
     /// The corpus writes `PsiOutput` *onto* a real formula rather than instead of one,
     /// 167 times across 41 workbooks. So the marker is a subexpression and the
     /// recognizer has to walk the tree rather than inspect the root.
-    func testOutputMarkerIsFoundInsideAnExpression() throws {
+    @Test func outputMarkerIsFoundInsideAnExpression() throws {
         let found = try recognize("SUM(J2:J11)+_xll.PsiOutput()")
-        XCTAssertTrue(found.isOutput)
-        XCTAssertEqual(found.outputMarkers, 1)
-        XCTAssertFalse(found.isUncertain)
+        #expect(found.isOutput)
+        #expect(found.outputMarkers == 1)
+        #expect(!found.isUncertain)
     }
 
-    func testBothLegacyPrefixesResolve() throws {
-        XCTAssertTrue(try recognize("A1+_xll.PsiOutput()").isOutput)
-        XCTAssertTrue(try recognize("A1+_xlfn.PsiOutput()").isOutput)
-        XCTAssertTrue(try recognize("A1+PsiOutput()").isOutput)
+    @Test func bothLegacyPrefixesResolve() throws {
+        #expect(try recognize("A1+_xll.PsiOutput()").isOutput)
+        #expect(try recognize("A1+_xlfn.PsiOutput()").isOutput)
+        #expect(try recognize("A1+PsiOutput()").isOutput)
     }
 
     // MARK: - Distributions
 
-    func testDistributionIsRecognisedWithItsParameters() throws {
+    @Test func distributionIsRecognisedWithItsParameters() throws {
         let found = try recognize("PsiNormal(100, 10)")
-        XCTAssertTrue(found.isUncertain)
-        XCTAssertEqual(found.distributions.count, 1)
+        #expect(found.isUncertain)
+        #expect(found.distributions.count == 1)
 
-        let call = try XCTUnwrap(found.distributions.first)
-        XCTAssertEqual(call.function, "PSINORMAL")
-        XCTAssertEqual(call.parameters, [.number(100), .number(10)])
-        XCTAssertNil(call.baseCase)
-        XCTAssertNil(call.label)
+        let call = try #require(found.distributions.first)
+        #expect(call.function == "PSINORMAL")
+        #expect(call.parameters == [.number(100), .number(10)])
+        #expect(call.baseCase == nil)
+        #expect(call.label == nil)
     }
 
     /// `PsiTriangular(min, likely, max)` is published as `(a, c, b)` — deliberately not
     /// alphabetical. The recognizer must not reorder; it reports what was written.
-    func testParametersKeepTheirWrittenOrder() throws {
-        let call = try XCTUnwrap(try recognize("PsiTriangular(5, 7, 12)").distributions.first)
-        XCTAssertEqual(call.parameters, [.number(5), .number(7), .number(12)])
+    @Test func parametersKeepTheirWrittenOrder() throws {
+        let call = try #require(try recognize("PsiTriangular(5, 7, 12)").distributions.first)
+        #expect(call.parameters == [.number(5), .number(7), .number(12)])
     }
 
     /// A distribution nested inside ordinary arithmetic is still a draw.
-    func testDistributionNestedInAnExpressionIsFound() throws {
+    @Test func distributionNestedInAnExpressionIsFound() throws {
         let found = try recognize("IF(A1>0, PsiNormal(0, 1), 0)")
-        XCTAssertEqual(found.distributions.count, 1)
-        XCTAssertEqual(found.distributions.first?.function, "PSINORMAL")
+        #expect(found.distributions.count == 1)
+        #expect(found.distributions.first?.function == "PSINORMAL")
     }
 
     /// **The reason uncertainty attaches to a call site and not to a cell.**
@@ -89,10 +90,10 @@ final class PsiRecognizerTests: XCTestCase {
     /// them two different uniforms. Modelling the *cell* as the unit of uncertainty
     /// would collapse them into one and silently correlate two variables that the
     /// workbook declared independent.
-    func testTwoDistributionsInOneFormulaAreTwoDraws() throws {
+    @Test func twoDistributionsInOneFormulaAreTwoDraws() throws {
         let found = try recognize("PsiNormal(0, 1) + PsiNormal(0, 1)")
-        XCTAssertEqual(found.distributions.count, 2)
-        XCTAssertEqual(found.distributions.map(\.function), ["PSINORMAL", "PSINORMAL"])
+        #expect(found.distributions.count == 2)
+        #expect(found.distributions.map(\.function) == ["PSINORMAL", "PSINORMAL"])
     }
 
     // MARK: - Property functions
@@ -100,25 +101,22 @@ final class PsiRecognizerTests: XCTestCase {
     /// Property functions are arguments, not syntax, and they are not parameters.
     /// Counting `PsiBaseCase(7)` as a fourth parameter would hand the distribution an
     /// arity it does not have.
-    func testBaseCaseAndNameAreLiftedOutOfTheParameters() throws {
-        let call = try XCTUnwrap(
-            try recognize("PsiTriangular(5, 7, 12, PsiBaseCase(7), PsiName(\"Launch\"))")
+    @Test func baseCaseAndNameAreLiftedOutOfTheParameters() throws {
+        let call = try #require(try recognize("PsiTriangular(5, 7, 12, PsiBaseCase(7), PsiName(\"Launch\"))")
                 .distributions.first)
-        XCTAssertEqual(call.parameters, [.number(5), .number(7), .number(12)])
-        XCTAssertEqual(call.baseCase, .number(7))
-        XCTAssertEqual(call.label, "Launch")
+        #expect(call.parameters == [.number(5), .number(7), .number(12)])
+        #expect(call.baseCase == .number(7))
+        #expect(call.label == "Launch")
     }
 
     /// The failure this guards against is silent and numeric. A property function the
     /// recognizer does not model must be *named*, never left in the parameter list —
     /// one unrecognised `PsiTruncate` would shift every parameter after it and the
     /// distribution would still compute, wrongly.
-    func testUnmodelledPropertyFunctionIsNamedRatherThanTreatedAsAParameter() throws {
-        let call = try XCTUnwrap(
-            try recognize("PsiNormal(100, 10, PsiTruncate(0, 200))").distributions.first)
-        XCTAssertEqual(call.parameters, [.number(100), .number(10)],
-                       "PsiTruncate must not be counted as a third parameter")
-        XCTAssertEqual(call.unhandledProperties, ["PSITRUNCATE"])
+    @Test func unmodelledPropertyFunctionIsNamedRatherThanTreatedAsAParameter() throws {
+        let call = try #require(try recognize("PsiNormal(100, 10, PsiTruncate(0, 200))").distributions.first)
+        #expect(call.parameters == [.number(100), .number(10)], "PsiTruncate must not be counted as a third parameter")
+        #expect(call.unhandledProperties == ["PSITRUNCATE"])
     }
 
     /// The corpus attests these two, so `unhandledProperties` is not a hypothetical
@@ -126,21 +124,19 @@ final class PsiRecognizerTests: XCTestCase {
     /// among the functions real workbooks call, and classifies them as declarations
     /// describing how a run is set up — which makes them properties of the draw, not
     /// parameters of the distribution.
-    func testCorpusAttestedCorrelationDeclarationsAreReportedNotAbsorbed() throws {
-        let call = try XCTUnwrap(
-            try recognize("PsiNormal(100, 10, PsiCorrIndep(1))").distributions.first)
-        XCTAssertEqual(call.parameters, [.number(100), .number(10)])
-        XCTAssertEqual(call.unhandledProperties, ["PSICORRINDEP"])
+    @Test func corpusAttestedCorrelationDeclarationsAreReportedNotAbsorbed() throws {
+        let call = try #require(try recognize("PsiNormal(100, 10, PsiCorrIndep(1))").distributions.first)
+        #expect(call.parameters == [.number(100), .number(10)])
+        #expect(call.unhandledProperties == ["PSICORRINDEP"])
     }
 
     /// A distribution's parameter can be an ordinary function call, and that *is* a
     /// parameter. The partition rule keys on the `Psi` prefix, not on being a call.
-    func testAnOrdinaryFunctionArgumentStaysAParameter() throws {
-        let call = try XCTUnwrap(
-            try recognize("PsiNormal(AVERAGE(A1:A9), 10)").distributions.first)
-        XCTAssertEqual(call.parameters.count, 2)
-        XCTAssertEqual(call.parameters.last, .number(10))
-        XCTAssertEqual(call.unhandledProperties, [])
+    @Test func anOrdinaryFunctionArgumentStaysAParameter() throws {
+        let call = try #require(try recognize("PsiNormal(AVERAGE(A1:A9), 10)").distributions.first)
+        #expect(call.parameters.count == 2)
+        #expect(call.parameters.last == .number(10))
+        #expect(call.unhandledProperties == [])
     }
 
     // MARK: - The drift guard
@@ -160,7 +156,7 @@ final class PsiRecognizerTests: XCTestCase {
     /// So every registered Risk Solver function must be *deliberately* classified. When
     /// this fails, the fix is to decide what the new function is — not to widen the set
     /// until it passes.
-    func testEveryRegisteredRiskSolverFunctionIsClassified() {
+    @Test func everyRegisteredRiskSolverFunctionIsClassified() {
         let distributions = Set(
             PsiRecognizer.defaultDistributions.map { FunctionRegistry.canonical($0.name) })
 
@@ -168,9 +164,7 @@ final class PsiRecognizerTests: XCTestCase {
             .map { FunctionRegistry.canonical($0.name) }
             .filter { !PsiRecognizer.markers.contains($0) && !distributions.contains($0) }
 
-        XCTAssertEqual(
-            unclassified.sorted(), [],
-            """
+        #expect(unclassified.sorted() == [], """
             Registered but classified as neither marker nor distribution: \(unclassified.sorted()).
             Decide what each one is. If it is a statistic that reads a completed run, it             must not be recognised as a distribution — see PROPOSAL_model_graph_simulation §6.4.
             """)
@@ -179,9 +173,9 @@ final class PsiRecognizerTests: XCTestCase {
     // MARK: - Both roles at once
 
     /// A cell can draw and report in the same formula.
-    func testACellCanBeBothUncertainAndAnOutput() throws {
+    @Test func aCellCanBeBothUncertainAndAnOutput() throws {
         let found = try recognize("PsiNormal(0, 1)+PsiOutput()")
-        XCTAssertTrue(found.isUncertain)
-        XCTAssertTrue(found.isOutput)
+        #expect(found.isUncertain)
+        #expect(found.isOutput)
     }
 }

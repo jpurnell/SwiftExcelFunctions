@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
@@ -18,7 +19,7 @@ import SwiftExcelCore
 /// The recursion half has nothing to count yet — `LAMBDA` is not implemented — so the bound
 /// is stated here and tested where it is used. What this file pins is the nesting bound and,
 /// more importantly, **what a nesting level is**.
-final class EvaluationDepthTests: XCTestCase {
+@Suite struct EvaluationDepthTests {
 
     private struct Cells: CellValueProvider {
         func value(at ref: CellRef) -> CellValue? { nil }
@@ -56,8 +57,9 @@ final class EvaluationDepthTests: XCTestCase {
     /// Excel kept the cells asking for 2, 8, 32, 60, 62, 63, 64 and 65, and deleted exactly
     /// those asking for 66, 70, 100 and 128 — at *file load*, reporting the workbook as
     /// damaged rather than evaluating anything.
-    func testSixtyFiveNestedCallsEvaluate() throws {
-        XCTAssertEqual(try eval(nestedCalls(65)), .number(0))
+    @Test func sixtyFiveNestedCallsEvaluate() async throws {
+        let ast = nestedCalls(65)
+        #expect(try await onMeasuredStack { try eval(ast) } == .number(0))
     }
 
     /// 66 is refused, as it is by Excel — though not in the same manner, which it cannot be.
@@ -66,9 +68,10 @@ final class EvaluationDepthTests: XCTestCase {
     /// has nothing to delete, so the honest analogue is to refuse the formula and let the
     /// caller decide. A file arriving with 66-deep nesting was written by something that is
     /// not Excel.
-    func testSixtySixNestedCallsAreRefused() {
-        XCTAssertThrowsError(try eval(nestedCalls(66))) { error in
-            XCTAssertEqual(error as? FormulaEvaluator.EvaluationError, .callDepthExceeded)
+    @Test func sixtySixNestedCallsAreRefused() async {
+        let ast = nestedCalls(66)
+        await #expect(throws: FormulaEvaluator.EvaluationError.callDepthExceeded) {
+            try await onMeasuredStack { try eval(ast) }
         }
     }
 
@@ -81,26 +84,28 @@ final class EvaluationDepthTests: XCTestCase {
     /// Excel's own limit on it is the 8,192-character formula length, not the 64 nested
     /// levels. Counting AST nodes refused it at 256, so the evaluator was **wrong about
     /// working spreadsheets**, which is the more expensive direction to be wrong in.
-    func testALongChainOfOperatorsIsNotNesting() throws {
+    @Test func aLongChainOfOperatorsIsNotNesting() async throws {
         var ast = FormulaAST.number(1)
         for _ in 0..<300 { ast = .add(ast, .number(1)) }
-        XCTAssertEqual(try eval(ast), .number(301))
+        let chain = ast
+        #expect(try await onMeasuredStack { try eval(chain) } == .number(301))
     }
 
     /// Nor is a stack of unary operators.
-    func testAStackOfNegationsIsNotNesting() throws {
+    @Test func aStackOfNegationsIsNotNesting() async throws {
         var ast = FormulaAST.number(42)
         for _ in 0..<300 { ast = .negate(ast) }
-        XCTAssertEqual(try eval(ast), .number(42))
+        let stack = ast
+        #expect(try await onMeasuredStack { try eval(stack) } == .number(42))
     }
 
     /// Arguments sit side by side rather than one inside another.
     ///
     /// `SUM(1, 2, 3, …)` with many arguments is one call at one level. A counter that
     /// incremented per node would see the width as depth.
-    func testManyArgumentsAreOneLevel() throws {
+    @Test func manyArgumentsAreOneLevel() throws {
         let terms = (1...200).map { FormulaAST.number(Double($0)) }
-        XCTAssertEqual(try eval(.function("SUM", terms)), .number(20100))
+        #expect(try eval(.function("SUM", terms)) == .number(20100))
     }
 
     // MARK: - The bound that is ours rather than Excel's
@@ -111,19 +116,19 @@ final class EvaluationDepthTests: XCTestCase {
     /// one character, so nothing Excel can hold reaches that depth. This bound exists only so
     /// that a hand-built AST cannot exhaust the stack, and it is named for what it is rather
     /// than presented as a rule about spreadsheets.
-    func testAnAbsurdlyDeepTreeIsRefusedRatherThanCrashing() {
+    @Test func anAbsurdlyDeepTreeIsRefusedRatherThanCrashing() async {
         var ast = FormulaAST.number(1)
         for _ in 0..<(FormulaEvaluator.maxNodeDepth + 10) { ast = .negate(ast) }
-        XCTAssertThrowsError(try eval(ast)) { error in
-            XCTAssertEqual(error as? FormulaEvaluator.EvaluationError, .nodeDepthExceeded)
+        let tree = ast
+        await #expect(throws: FormulaEvaluator.EvaluationError.nodeDepthExceeded) {
+            try await onMeasuredStack { try eval(tree) }
         }
     }
 
     /// The three bounds are the measured ones, and separate.
-    func testTheBoundsAreTheMeasuredOnes() {
-        XCTAssertEqual(FormulaEvaluator.maxCallDepth, 65)
-        XCTAssertEqual(FormulaEvaluator.maxRecursionDepth, 4096)
-        XCTAssertNotEqual(FormulaEvaluator.maxCallDepth, FormulaEvaluator.maxRecursionDepth,
-                          "Excel keeps two counters and so must this")
+    @Test func theBoundsAreTheMeasuredOnes() {
+        #expect(FormulaEvaluator.maxCallDepth == 65)
+        #expect(FormulaEvaluator.maxRecursionDepth == 4096)
+        #expect(FormulaEvaluator.maxCallDepth != FormulaEvaluator.maxRecursionDepth, "Excel keeps two counters and so must this")
     }
 }

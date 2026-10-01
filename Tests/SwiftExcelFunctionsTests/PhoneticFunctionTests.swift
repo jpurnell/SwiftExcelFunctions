@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -8,7 +9,7 @@ import SwiftExcelCore
 /// reading is not in the cell's value — 山田 is what the cell says, ヤマダ is how to say it —
 /// so it cannot arrive as an argument. It comes through the same seam `COLUMN(B5)` uses to
 /// recover an address instead of the number inside it.
-final class PhoneticFunctionTests: XCTestCase {
+@Suite struct PhoneticFunctionTests {
 
     /// A sheet that knows one reading, for one cell.
     private struct Cells: CellValueProvider {
@@ -33,8 +34,8 @@ final class PhoneticFunctionTests: XCTestCase {
             at: CellAddress(sheet: "Sheet1", ref: "D7"), inSheet: "Sheet1")
     }
 
-    func testReadsTheReadingOfTheReferencedCell() throws {
-        XCTAssertEqual(try evaluate(.cellRef(CellRef("A1"))), .text("ヤマダ"))
+    @Test func readsTheReadingOfTheReferencedCell() throws {
+        #expect(try evaluate(.cellRef(CellRef("A1"))) == .text("ヤマダ"))
     }
 
     /// **A cell with no reading answers with empty text, not an error.** Every workbook
@@ -43,13 +44,13 @@ final class PhoneticFunctionTests: XCTestCase {
     ///
     /// Not measured against Excel — producing furigana needs a Japanese-locale editor —
     /// so this pins our answer rather than confirming theirs.
-    func testCellWithoutAReadingIsEmptyText() throws {
-        XCTAssertEqual(try evaluate(.cellRef(CellRef("B2"))), .text(""))
+    @Test func cellWithoutAReadingIsEmptyText() throws {
+        #expect(try evaluate(.cellRef(CellRef("B2"))) == .text(""))
     }
 
     /// **It needs the reference, not the value.** `PHONETIC` given a literal has no cell to
     /// ask about, which is the same shape as `COLUMN(5)`.
-    func testALiteralHasNoCellToAskAbout() throws {
-        XCTAssertEqual(try evaluate(.text("山田")), .error(.value))
+    @Test func aLiteralHasNoCellToAskAbout() throws {
+        #expect(try evaluate(.text("山田")) == .error(.value))
     }
 }

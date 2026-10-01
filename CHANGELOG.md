@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The test suite is Swift Testing, as the guidelines require.** All 130 XCTest files
+  are converted, and every one of the 2,018 tests still runs. The new `test-quality`
+  checker flagged the XCTest imports, and nothing was suppressed to get past it.
+  Moving the assertions into `#expect` let the checker read them for the first time, and
+  it found 225 exact floating-point comparisons and roughly 320 tests that asserted only
+  through helper functions:
+  - Exact comparisons are now named comparisons: `isEqual(to:)`, and
+    `isElementwiseEqual(to:)` for arrays. That is the same claim `XCTAssertEqual` made
+    (whole-number spreadsheet results), only stated, so nothing was loosened.
+  - The `assertNumber`/`assertError`/`assertClose` helpers became predicates
+    (`CellValue.isNumber(_:within:)`, `Double.isClose(to:within:)`). The `#expect` now sits
+    in each test body, and a failure reports the actual value.
+  - Lookups that were checked with `!= nil` now assert what they resolved to
+    (`resolvedName(_:) == "SUMIFS"`).
+- **No `XCTSkip`.** Where a helper used to skip because a function returned the wrong kind
+  of value, it now fails (`TestFailure`), because that is a defect and not missing data.
+  The suites that read private workbooks (`RISK_SOLVER_WORKBOOKS`, the Excel oracle) are
+  gated by `.enabled(if:)` traits that name the variable to set.
+
+### Found
+
+- **`FormulaEvaluator.maxNodeDepth` holds only on an 8 MiB stack.** It was measured on the
+  main thread under XCTest. Swift Testing runs tests on the cooperative pool, which has
+  512 KiB of stack, and there a debug build crashed with `SIGBUS` at 65 nested `IF`s. That
+  is legal Excel. Eleven depth and recursion tests now run on a thread with the measured
+  stack (`onMeasuredStack`), so they test the bound rather than the runner's choice of
+  thread. **This does not make callers safe.** Any caller inside Swift concurrency has the
+  small stack. The limitation is documented on `maxNodeDepth` and remains open until
+  `evaluateNode` stops recursing.
+
 ## [1.0.0-alpha.5] - 2026-09-29
 
 ### Changed

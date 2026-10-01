@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -27,7 +28,7 @@ import WorkbookAudit
 /// ## Not a gate checker
 ///
 /// This is a measurement. It needs private workbooks the repository cannot hold, so
-/// it skips unless configured, and a checker that silently skips reports green —
+/// it is disabled unless configured, and a checker that silently skips reports green —
 /// which is worse than no checker. Individual findings graduate into ordinary
 /// regression tests once they have a fixture small enough to commit, the way
 /// `testTheFebruaryEndOfMonthRule` did.
@@ -37,7 +38,11 @@ import WorkbookAudit
 /// Roots come from `BUSINESSMATHEXCEL_CORPUS` (colon-separated), or from an
 /// `.excel-corpus` file found by walking up from the package. Either way the run is
 /// opt-in — see ``corpusRoots()``.
-final class ExcelOracleTests: XCTestCase {
+@Suite(.enabled(
+    if: OracleOptIn.isSet,
+    "The oracle is opt-in: it reads whole document trees and takes minutes. Set BUSINESSMATHEXCEL_ORACLE=1 to run it against the roots in .excel-corpus, or BUSINESSMATHEXCEL_CORPUS to a colon-separated list of your own."
+))
+struct ExcelOracleTests {
 
     // MARK: - Judging
     //
@@ -50,7 +55,7 @@ final class ExcelOracleTests: XCTestCase {
 
     // MARK: - The measurement
 
-    func testHowWellWeAgreeWithExcel() throws {
+    @Test func howWellWeAgreeWithExcel() throws {
         let workbooks = try Self.corpusWorkbooks()
         var report = OracleReport()
         var read = 0
@@ -77,8 +82,7 @@ final class ExcelOracleTests: XCTestCase {
 
         // A floor, not a target. It exists so that a change which halves agreement
         // fails loudly instead of being read past in a log.
-        XCTAssertGreaterThan(report.agreement, 0.5,
-                             "agreement collapsed; see the by-function list above")
+        #expect(report.agreement > 0.5, "agreement collapsed; see the by-function list above")
     }
 
     /// The harness has to be able to see a defect we already know about.
@@ -89,11 +93,15 @@ final class ExcelOracleTests: XCTestCase {
     ///
     /// It flips when BusinessMath ships the NASD February rule, which also proves
     /// the harness notices a fix and not only a break.
-    func testTheHarnessSeesTheFebruaryDefect() throws {
+    @Test(.enabled("needs \(ExcelOracleTests.februaryWorkbook) under the configured roots") {
+        let roots = try ExcelOracleTests.corpusRoots()
+        return ExcelOracleTests.find(ExcelOracleTests.februaryWorkbook, under: roots) != nil
+    })
+    func theHarnessSeesTheFebruaryDefect() throws {
         let roots = try Self.corpusRoots()
-        let name = "Long Acre Team 2013 Probabilistic All.xlsx"
+        let name = Self.februaryWorkbook
         guard let url = Self.find(name, under: roots) else {
-            throw XCTSkip("\(name) is not in the configured roots")
+            throw TestFailure("\(name) is not in the configured roots")
         }
         let workbook = try Workbook(contentsOf: url)
         let report = WorkbookOracle.audit(workbook)
@@ -101,14 +109,14 @@ final class ExcelOracleTests: XCTestCase {
         let cell = report.findings.first {
             $0.sheet == "Lease Renewal" && $0.cell.reference == "L77"
         }
-        let finding = try XCTUnwrap(cell, "L77 was not audited")
+        let finding = try #require(cell, "L77 was not audited")
         switch finding.outcome {
         case .differed(let ours, let excel):
             print("ORACLE  L77 ours \(ours) vs excel \(excel)   (expected, until 2.11.0)")
         case .agreed:
             print("ORACLE  L77 agrees — BusinessMath's February rule has landed")
         default:
-            XCTFail("L77 was \(finding.outcome), which is neither agreement nor disagreement")
+            Issue.record("L77 was \(finding.outcome), which is neither agreement nor disagreement")
         }
     }
 
@@ -124,7 +132,7 @@ final class ExcelOracleTests: XCTestCase {
     /// appearing once are not the same piece of work. Workbook counts are printed
     /// beside them: something used once in forty workbooks is a different kind of
     /// important from something used four thousand times in one.
-    func testWhatTheCorpusCallsThatWeCannotAnswer() throws {
+    @Test func whatTheCorpusCallsThatWeCannotAnswer() throws {
         let workbooks = try Self.corpusWorkbooks()
         let registry = FunctionRegistry.builtin
 
@@ -149,6 +157,9 @@ final class ExcelOracleTests: XCTestCase {
             }
         }
 
+        // A census of nothing is not a census: the configured roots must hold something
+        // this build can open, or the empty list below would read as full coverage.
+        #expect(read > 0, "none of the \(workbooks.count) workbooks under the configured roots could be read")
         print("ORACLE  workbooks read: \(read)")
         print("ORACLE  unanswerable function names: \(calls.count)")
         print("ORACLE  \("name".padding(toLength: 26, withPad: " ", startingAt: 0)) calls  books")
@@ -170,14 +181,14 @@ final class ExcelOracleTests: XCTestCase {
     /// `BUSINESSMATHEXCEL_CORPUS` names the roots and enables the run in one go.
     /// `BUSINESSMATHEXCEL_ORACLE=1` enables it using the roots from `.excel-corpus`,
     /// which is where they are recorded so that nobody has to rediscover them.
-    private static func corpusRoots() throws -> [String] {
+    static func corpusRoots() throws -> [String] {
         let environment = ProcessInfo.processInfo.environment
         if let configured = environment["BUSINESSMATHEXCEL_CORPUS"], !configured.isEmpty {
             return configured.split(separator: ":").map(String.init)
         }
         guard let flag = environment["BUSINESSMATHEXCEL_ORACLE"],
               flag == "1" || flag.lowercased() == "true" else {
-            throw XCTSkip("""
+            throw TestFailure("""
                 The oracle is opt-in: it reads whole document trees and takes minutes. \
                 Set BUSINESSMATHEXCEL_ORACLE=1 to run it against the roots in \
                 .excel-corpus, or BUSINESSMATHEXCEL_CORPUS to a colon-separated list \
@@ -185,7 +196,7 @@ final class ExcelOracleTests: XCTestCase {
                 """)
         }
         guard let fromConfig = qualityGateRoots(), !fromConfig.isEmpty else {
-            throw XCTSkip("BUSINESSMATHEXCEL_ORACLE is set but .excel-corpus names no roots")
+            throw TestFailure("BUSINESSMATHEXCEL_ORACLE is set but .excel-corpus names no roots")
         }
         return fromConfig
     }
@@ -232,7 +243,10 @@ final class ExcelOracleTests: XCTestCase {
         return found.sorted { $0.path < $1.path }
     }
 
-    private static func find(_ name: String, under roots: [String]) -> URL? {
+    /// The workbook holding the known `YEARFRAC` February defect at `Lease Renewal!L77`.
+    static let februaryWorkbook = "Long Acre Team 2013 Probabilistic All.xlsx"
+
+    static func find(_ name: String, under roots: [String]) -> URL? {
         for root in roots {
             let expanded = NSString(string: root).expandingTildeInPath
             guard let walker = FileManager.default.enumerator(atPath: expanded) else { continue }
@@ -241,5 +255,22 @@ final class ExcelOracleTests: XCTestCase {
             }
         }
         return nil
+    }
+}
+
+/// Whether either opt-in variable is set — `ExcelOracleTests`' enabling condition.
+///
+/// Only the opt-in. A set variable with nothing behind it (an `.excel-corpus` naming no
+/// roots) is a misconfiguration, and `corpusRoots()` fails the run on it rather than
+/// letting the suite go quiet. Outside the suite because a `@Suite` trait cannot refer to
+/// the type it is attached to.
+private enum OracleOptIn {
+    static var isSet: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        if let configured = environment["BUSINESSMATHEXCEL_CORPUS"], !configured.isEmpty {
+            return true
+        }
+        guard let flag = environment["BUSINESSMATHEXCEL_ORACLE"] else { return false }
+        return flag == "1" || flag.lowercased() == "true"
     }
 }

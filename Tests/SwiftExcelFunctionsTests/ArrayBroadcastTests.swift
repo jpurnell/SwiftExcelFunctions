@@ -1,7 +1,8 @@
 import Foundation
 import SwiftExcelCore
 import SwiftXLSX
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 
 /// Excel's operators applied to rectangles.
@@ -17,7 +18,7 @@ import XCTest
 /// formula answered zero while looking entirely healthy. Excel's cached answers were 1, 2
 /// and 3. Nothing in 1,400 unit tests had asked what `A1:A10 = "x"` should be, because
 /// nobody writes that formula on purpose in a test — they write it in a spreadsheet.
-final class ArrayBroadcastTests: XCTestCase {
+@Suite struct ArrayBroadcastTests {
 
     private struct Cells: CellValueProvider {
         let values: [String: CellValue]
@@ -64,7 +65,7 @@ final class ArrayBroadcastTests: XCTestCase {
 
     private func numbers(_ formula: String) throws -> [Double] {
         guard case .array(let matrix) = try evaluate(formula) else {
-            XCTFail("\(formula) did not produce an array"); return []
+            Issue.record("\(formula) did not produce an array"); return []
         }
         return matrix.elements.map {
             if case .number(let value) = $0 { return value }
@@ -76,28 +77,28 @@ final class ArrayBroadcastTests: XCTestCase {
     // MARK: - Arithmetic
 
     /// A rectangle against a single value is a rectangle.
-    func testAScalarBroadcastsAcrossARange() throws {
-        XCTAssertEqual(try numbers("A1:A3*2"), [20, 40, 60])
-        XCTAssertEqual(try numbers("A1:A3+1"), [11, 21, 31])
-        XCTAssertEqual(try numbers("A1:A3/10"), [1, 2, 3])
-        XCTAssertEqual(try numbers("2^B1:B3"), [2, 4, 8])
+    @Test func aScalarBroadcastsAcrossARange() throws {
+        #expect(try numbers("A1:A3*2").isElementwiseEqual(to: [20, 40, 60]))
+        #expect(try numbers("A1:A3+1").isElementwiseEqual(to: [11, 21, 31]))
+        #expect(try numbers("A1:A3/10").isElementwiseEqual(to: [1, 2, 3]))
+        #expect(try numbers("2^B1:B3").isElementwiseEqual(to: [2, 4, 8]))
     }
 
     /// Two rectangles of the same shape pair off element by element.
-    func testTwoRangesPairOff() throws {
-        XCTAssertEqual(try numbers("A1:A3*B1:B3"), [10, 40, 90])
-        XCTAssertEqual(try numbers("A1:A3-B1:B3"), [9, 18, 27])
+    @Test func twoRangesPairOff() throws {
+        #expect(try numbers("A1:A3*B1:B3").isElementwiseEqual(to: [10, 40, 90]))
+        #expect(try numbers("A1:A3-B1:B3").isElementwiseEqual(to: [9, 18, 27]))
     }
 
     /// **A row against a column is a matrix**, which is Excel's answer and surprises
     /// everyone once.
-    func testARowAgainstAColumnIsAMatrix() throws {
+    @Test func aRowAgainstAColumnIsAMatrix() throws {
         guard case .array(let matrix) = try evaluate("D1:F1*B1:B3") else {
-            return XCTFail("expected a matrix")
+            Issue.record("expected a matrix"); return
         }
-        XCTAssertEqual(matrix.rows, 3)
-        XCTAssertEqual(matrix.columns, 3)
-        XCTAssertEqual(matrix.elements, [.number(1), .number(2), .number(3),
+        #expect(matrix.rows == 3)
+        #expect(matrix.columns == 3)
+        #expect(matrix.elements == [.number(1), .number(2), .number(3),
                                          .number(2), .number(4), .number(6),
                                          .number(3), .number(6), .number(9)])
     }
@@ -107,11 +108,11 @@ final class ArrayBroadcastTests: XCTestCase {
     /// Not clipped to the shorter side and not repeated from its edge: Excel refuses to
     /// decide what was meant, and either alternative would produce a plausible number from
     /// a mistake.
-    func testAShortfallIsNotAvailableRatherThanAGuess() throws {
+    @Test func aShortfallIsNotAvailableRatherThanAGuess() throws {
         guard case .array(let matrix) = try evaluate("A1:A3+B1:B2") else {
-            return XCTFail("expected a column")
+            Issue.record("expected a column"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(11), .number(22), .error(.na)])
+        #expect(matrix.elements == [.number(11), .number(22), .error(.na)])
     }
 
     // MARK: - Comparison
@@ -119,37 +120,36 @@ final class ArrayBroadcastTests: XCTestCase {
     /// A comparison against a rectangle is a rectangle of answers.
     ///
     /// The one that was wrong. `C1:C3="x"` was a single `FALSE`; it is three answers.
-    func testAComparisonBroadcasts() throws {
-        XCTAssertEqual(try numbers("C1:C3=\"x\""), [1, 0, 1])
-        XCTAssertEqual(try numbers("A1:A3>=20"), [0, 1, 1])
-        XCTAssertEqual(try numbers("A1:A3<>20"), [1, 0, 1])
+    @Test func aComparisonBroadcasts() throws {
+        #expect(try numbers("C1:C3=\"x\"").isElementwiseEqual(to: [1, 0, 1]))
+        #expect(try numbers("A1:A3>=20").isElementwiseEqual(to: [0, 1, 1]))
+        #expect(try numbers("A1:A3<>20").isElementwiseEqual(to: [1, 0, 1]))
     }
 
     /// `--` is how a spreadsheet turns those answers into numbers.
-    func testDoubleNegationTurnsThemIntoOnesAndZeros() throws {
-        XCTAssertEqual(try numbers("--(C1:C3=\"x\")"), [1, 0, 1])
-        XCTAssertEqual(try numbers("-A1:A3"), [-10, -20, -30])
+    @Test func doubleNegationTurnsThemIntoOnesAndZeros() throws {
+        #expect(try numbers("--(C1:C3=\"x\")").isElementwiseEqual(to: [1, 0, 1]))
+        #expect(try numbers("-A1:A3").isElementwiseEqual(to: [-10, -20, -30]))
     }
 
     /// The idiom, end to end, which is what the corpus actually writes.
     ///
     /// Two conditions and a value column: the classic conditional sum, written before
     /// `SUMIFS` existed and still written by anyone who learned it then.
-    func testTheSumproductIdiom() throws {
-        XCTAssertEqual(try evaluate("SUMPRODUCT(--(C1:C3=\"x\"),A1:A3)"), .number(40))
-        XCTAssertEqual(
-            try evaluate("SUMPRODUCT(--(C1:C3=\"x\"),--(A1:A3>10),A1:A3)"), .number(30))
-        XCTAssertEqual(try evaluate("SUMPRODUCT(--(C1:C3=\"z\"),A1:A3)"), .number(0))
+    @Test func theSumproductIdiom() throws {
+        #expect(try evaluate("SUMPRODUCT(--(C1:C3=\"x\"),A1:A3)") == .number(40))
+        #expect(try evaluate("SUMPRODUCT(--(C1:C3=\"x\"),--(A1:A3>10),A1:A3)") == .number(30))
+        #expect(try evaluate("SUMPRODUCT(--(C1:C3=\"z\"),A1:A3)") == .number(0))
     }
 
     // MARK: - Text
 
     /// Concatenation broadcasts too, which is how a column of labels is built.
-    func testConcatenationBroadcasts() throws {
+    @Test func concatenationBroadcasts() throws {
         guard case .array(let matrix) = try evaluate("C1:C3&\"!\"") else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.text("x!"), .text("y!"), .text("x!")])
+        #expect(matrix.elements == [.text("x!"), .text("y!"), .text("x!")])
     }
 
     // MARK: - What did not change
@@ -159,18 +159,18 @@ final class ArrayBroadcastTests: XCTestCase {
     /// The whole risk of this change is that it turns scalar arithmetic into rectangles of
     /// one element, which would be a different type flowing through every formula in the
     /// package.
-    func testScalarArithmeticIsUntouched() throws {
-        XCTAssertEqual(try evaluate("2*3"), .number(6))
-        XCTAssertEqual(try evaluate("A1+B1"), .number(11))
-        XCTAssertEqual(try evaluate("A1>B1"), .bool(true))
-        XCTAssertEqual(try evaluate("C1&C2"), .text("xy"))
+    @Test func scalarArithmeticIsUntouched() throws {
+        #expect(try evaluate("2*3") == .number(6))
+        #expect(try evaluate("A1+B1") == .number(11))
+        #expect(try evaluate("A1>B1") == .bool(true))
+        #expect(try evaluate("C1&C2") == .text("xy"))
     }
 
     /// An error in one element is that element's answer, not the rectangle's.
-    func testAnErrorStaysInItsOwnCell() throws {
+    @Test func anErrorStaysInItsOwnCell() throws {
         guard case .array(let matrix) = try evaluate("A1:A3/G1:G3") else {
-            return XCTFail("expected an array")
+            Issue.record("expected an array"); return
         }
-        XCTAssertEqual(matrix.elements, [.number(10), .error(.div0), .number(15)])
+        #expect(matrix.elements == [.number(10), .error(.div0), .number(15)])
     }
 }

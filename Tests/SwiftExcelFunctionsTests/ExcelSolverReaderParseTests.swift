@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -17,7 +18,7 @@ import SwiftExcelCore
 ///
 /// These tests use the text form on purpose. A fixture that agrees with the code about
 /// something neither has checked is not evidence.
-final class ExcelSolverReaderParseTests: XCTestCase {
+@Suite struct ExcelSolverReaderParseTests {
 
     /// Names as a resolver yields them: numbers as text, references as references.
     private func fileShaped() -> NamedRangeCollection {
@@ -46,34 +47,33 @@ final class ExcelSolverReaderParseTests: XCTestCase {
     }
 
     /// The engine is read, where before every file reported GRG.
-    func testEngineIsReadFromTextualForm() throws {
-        XCTAssertEqual(try XCTUnwrap(ExcelSolverReader.model(from: fileShaped())).engine,
-                       .simplexLP)
+    @Test func engineIsReadFromTextualForm() throws {
+        #expect(try #require(ExcelSolverReader.model(from: fileShaped())).engine == .simplexLP)
     }
 
     /// **The constraints are read at all**, which is the failure that mattered:
     /// `solver_num` as text meant a count of zero and a model with nothing to satisfy.
-    func testConstraintsAreReadFromTextualForm() throws {
-        let model = try XCTUnwrap(ExcelSolverReader.model(from: fileShaped()))
-        XCTAssertEqual(model.constraints.count, 2)
-        XCTAssertEqual(model.constraints.first?.relation, .lessOrEqual)
-        XCTAssertEqual(model.constraints.first?.rhs, .constant(10))
+    @Test func constraintsAreReadFromTextualForm() throws {
+        let model = try #require(ExcelSolverReader.model(from: fileShaped()))
+        #expect(model.constraints.count == 2)
+        #expect(model.constraints.first?.relation == .lessOrEqual)
+        #expect(model.constraints.first?.rhs == .constant(10))
     }
 
-    func testSenseAndNonNegativityFromTextualForm() throws {
-        let model = try XCTUnwrap(ExcelSolverReader.model(from: fileShaped()))
-        XCTAssertEqual(model.sense, .minimise)
-        XCTAssertFalse(model.assumesNonNegative)
-        XCTAssertEqual(model.formatVersion, 2)
+    @Test func senseAndNonNegativityFromTextualForm() throws {
+        let model = try #require(ExcelSolverReader.model(from: fileShaped()))
+        #expect(model.sense == .minimise)
+        #expect(!model.assumesNonNegative)
+        #expect(model.formatVersion == 2)
     }
 
     /// **A numeric bound stays a bound.** Numbers arrive as text, and so do the integrality
     /// labels, so the two must not be confused: `"10"` is a right-hand side and `"integer"`
     /// is a declaration.
-    func testANumericBoundIsNotMistakenForALabel() throws {
-        let model = try XCTUnwrap(ExcelSolverReader.model(from: fileShaped()))
-        XCTAssertEqual(model.constraints.first?.rhs, .constant(10))
-        XCTAssertEqual(model.constraints.last?.rhs, .label("integer"))
-        XCTAssertEqual(model.constraints.last?.relation, .integer)
+    @Test func aNumericBoundIsNotMistakenForALabel() throws {
+        let model = try #require(ExcelSolverReader.model(from: fileShaped()))
+        #expect(model.constraints.first?.rhs == .constant(10))
+        #expect(model.constraints.last?.rhs == .label("integer"))
+        #expect(model.constraints.last?.relation == .integer)
     }
 }

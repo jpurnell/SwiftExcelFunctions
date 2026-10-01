@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 
@@ -7,7 +8,7 @@ import SwiftExcelCore
 /// The join between the three pieces that already existed: ``ExcelSolverReader`` says what
 /// the model is, ``SpreadsheetFunction`` makes the sheet callable, and BusinessMath's
 /// optimizers do the searching.
-final class SolverRunTests: XCTestCase {
+@Suite struct SolverRunTests {
 
     /// `A1`, `A2` are the variables. `B1 = A1 + A2`. `C1 = A1 - A2`.
     private struct Sheet: CellValueProvider, PopulatedCellProvider {
@@ -61,38 +62,37 @@ final class SolverRunTests: XCTestCase {
     /// The answer is forced rather than searched for: equality pins `A1 = A2`, the bound
     /// pins `A1 >= 3`, so the minimum of `A1 + A2` is 6 at `(3, 3)`. A test with one
     /// feasible optimum does not depend on which optimizer ran or where it started.
-    func testMinimisesSubjectToConstraints() throws {
+    @Test func minimisesSubjectToConstraints() throws {
         let solution = try solve(model(constraints: [
             .init(lhs: [CellRef("C1")], relation: .equal, rhs: .constant(0)),
             .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(3)),
         ]))
-        XCTAssertEqual(solution.objective ?? .nan, 6, accuracy: 0.05)
-        XCTAssertEqual(solution.variables[CellRef("A1").positionKey] ?? .nan, 3, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 6) <= 0.05)
+        #expect(abs((solution.variables[CellRef("A1").positionKey] ?? .nan) - 3) <= 0.05)
     }
 
     /// Maximising is minimising the negation, and the result reports the objective in the
     /// caller's terms rather than the optimizer's.
-    func testMaximisesWithAnUpperBound() throws {
+    @Test func maximisesWithAnUpperBound() throws {
         let solution = try solve(model(
             sense: .maximise,
             constraints: [.init(lhs: [CellRef("B1")], relation: .lessOrEqual, rhs: .constant(4))]))
-        XCTAssertEqual(solution.objective ?? .nan, 4, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 4) <= 0.05)
     }
 
     /// **"Value of" drives the objective to a number**, which is a different problem from
     /// either extreme: the thing minimised is the distance to the target, and the reported
     /// objective is still the cell's own value.
-    func testTargetValue() throws {
+    @Test func targetValue() throws {
         let solution = try solve(model(sense: .target(7)))
-        XCTAssertEqual(solution.objective ?? .nan, 7, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 7) <= 0.05)
     }
 
     /// The solution carries the variables back keyed by cell, because an optimizer returns
     /// a vector and a caller needs to know which cell each slot was.
-    func testVariablesComeBackKeyedByCell() throws {
+    @Test func variablesComeBackKeyedByCell() throws {
         let solution = try solve(model())
-        XCTAssertEqual(Set(solution.variables.keys),
-                       Set([CellRef("A1").positionKey, CellRef("A2").positionKey]))
+        #expect(Set(solution.variables.keys) == Set([CellRef("A1").positionKey, CellRef("A2").positionKey]))
     }
 
     /// **A bound that names a cell is read from the sheet**, not treated as zero.
@@ -101,7 +101,7 @@ final class SolverRunTests: XCTestCase {
     /// An earlier draft compared cell-valued bounds against zero, which is wrong rather
     /// than unsupported — and silently so, since the search still converges, just to the
     /// answer for a different problem.
-    func testACellValuedBoundIsRead() throws {
+    @Test func aCellValuedBoundIsRead() throws {
         var sheet = Sheet()
         sheet.stored[CellRef("D1").positionKey] = .number(5)
         let bounded = SolverModel(
@@ -111,7 +111,7 @@ final class SolverRunTests: XCTestCase {
                                 rhs: .cells([CellRef("D1")]))],
             engine: .grgNonlinear)
         let solution = try SolverRun.solve(bounded, cells: sheet, names: NamedRangeCollection())
-        XCTAssertEqual(solution.objective ?? .nan, 5, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 5) <= 0.05)
     }
 
     // MARK: - What it refuses
@@ -120,7 +120,7 @@ final class SolverRunTests: XCTestCase {
     /// Set Objective blank and Solver looks for any point satisfying the constraints.
     /// Measured — such a workbook omits `solver_opt` entirely rather than writing it empty,
     /// though it still writes `solver_typ`, which therefore means nothing on its own.
-    func testAModelWithoutAnObjectiveSatisfiesConstraints() throws {
+    @Test func aModelWithoutAnObjectiveSatisfiesConstraints() throws {
         let headless = SolverModel(
             objective: nil, sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
@@ -129,17 +129,16 @@ final class SolverRunTests: XCTestCase {
             engine: .grgNonlinear)
         let solution = try SolverRun.solve(headless, cells: Sheet(),
                                            names: NamedRangeCollection())
-        XCTAssertNil(solution.objective, "there is no objective to report")
-        XCTAssertGreaterThanOrEqual(solution.variables[CellRef("A1").positionKey] ?? .nan,
-                                    4 - 0.05, "the constraint still holds")
+        #expect(solution.objective == nil, "there is no objective to report")
+        #expect((solution.variables[CellRef("A1").positionKey] ?? .nan) >= (4 - 0.05), "the constraint still holds")
     }
 
     /// A model with no variables has nothing to adjust.
-    func testAModelWithoutVariablesIsRefused() throws {
+    @Test func aModelWithoutVariablesIsRefused() throws {
         let fixed = SolverModel(objective: CellRef("B1"), sense: .minimise,
                                 variables: [], constraints: [], engine: .grgNonlinear)
-        XCTAssertThrowsError(try solve(fixed)) { error in
-            XCTAssertEqual(error as? SolverRunError, SolverRunError.noVariables)
+        if let error = #expect(throws: (any Error).self, performing: { try solve(fixed) }) {
+            #expect((error as? SolverRunError) == SolverRunError.noVariables)
         }
     }
 
@@ -152,7 +151,7 @@ final class SolverRunTests: XCTestCase {
     /// package promises to take no dependency on a file format — `Workbook` belongs to
     /// SwiftXLSX, and a library that evaluates a sheet which never came from a file cannot
     /// name it. `WorkbookAudit` is where the file-reading half lives.
-    func testSolvesFromNamesDirectly() throws {
+    @Test func solvesFromNamesDirectly() throws {
         var collection = NamedRangeCollection()
         let entries: [(String, NamedRangeTarget)] = [
             ("solver_opt", .cell(CellRef("B1"))),
@@ -167,16 +166,15 @@ final class SolverRunTests: XCTestCase {
             collection.add(NamedRange(name: name, reference: target, scope: .sheet("Sheet1")))
         }
 
-        let solution = try XCTUnwrap(
-            SolverRun.solve(cells: Sheet(), names: collection, inSheet: "Sheet1"))
+        let solution = try #require(try SolverRun.solve(cells: Sheet(), names: collection, inSheet: "Sheet1"))
         // Minimising A1 + A2 with A1 >= 3 and both non-negative by default: 3.
-        XCTAssertEqual(solution.objective ?? .nan, 3, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 3) <= 0.05)
     }
 
     /// **No model is `nil`, not a throw.** "This sheet has no Solver model" is an ordinary
     /// answer about an ordinary workbook, not a failure.
-    func testNoModelReturnsNil() throws {
-        XCTAssertNil(try SolverRun.solve(cells: Sheet(), names: NamedRangeCollection()))
+    @Test func noModelReturnsNil() throws {
+        #expect(try SolverRun.solve(cells: Sheet(), names: NamedRangeCollection()) == nil)
     }
 
     // MARK: - Integrality
@@ -184,20 +182,20 @@ final class SolverRunTests: XCTestCase {
     /// **An integer constraint is now honoured rather than refused.** Minimising `A1 + A2`
     /// with `A1 >= 2.4` and `A1` integral puts the answer at 3, not 2.4 — the constraint
     /// changes the optimum rather than merely rounding it.
-    func testIntegerConstraintIsHonoured() throws {
+    @Test func integerConstraintIsHonoured() throws {
         let solution = try solve(model(constraints: [
             .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(2.4)),
             .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
             .init(lhs: [CellRef("A1")], relation: .integer, rhs: .constant(0)),
         ]))
         let a1 = solution.variables[CellRef("A1").positionKey] ?? .nan
-        XCTAssertEqual(a1, a1.rounded(), accuracy: 1e-6, "A1 must be integral")
-        XCTAssertEqual(a1, 3, accuracy: 0.01)
-        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+        #expect(abs(a1 - a1.rounded()) <= 1e-6, "A1 must be integral")
+        #expect(abs(a1 - 3) <= 0.01)
+        #expect(solution.engineUsed == .branchAndBound)
     }
 
     /// A binary variable is 0 or 1 and nothing between.
-    func testBinaryConstraintIsHonoured() throws {
+    @Test func binaryConstraintIsHonoured() throws {
         let solution = try solve(model(
             sense: .maximise,
             constraints: [
@@ -206,12 +204,12 @@ final class SolverRunTests: XCTestCase {
                 .init(lhs: [CellRef("A2")], relation: .lessOrEqual, rhs: .constant(0)),
             ]))
         let a1 = solution.variables[CellRef("A1").positionKey] ?? .nan
-        XCTAssertTrue(abs(a1) < 1e-6 || abs(a1 - 1) < 1e-6, "A1 was \(a1), not 0 or 1")
+        #expect(abs(a1) < 1e-6 || abs(a1 - 1) < 1e-6, "A1 was \(a1), not 0 or 1")
     }
 
     /// **Integrality outranks the nominated engine**, as it does in Excel: a model with
     /// integer variables goes to branch-and-bound whatever the workbook asked for.
-    func testIntegralityOutranksTheNominatedEngine() throws {
+    @Test func integralityOutranksTheNominatedEngine() throws {
         let solution = try solve(model(
             constraints: [
                 .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(1)),
@@ -219,17 +217,16 @@ final class SolverRunTests: XCTestCase {
                 .init(lhs: [CellRef("A1")], relation: .integer, rhs: .constant(0)),
             ],
             engine: .simplexLP))
-        XCTAssertEqual(solution.engineUsed, .branchAndBound)
+        #expect(solution.engineUsed == .branchAndBound)
     }
 
     /// An integrality constraint on a cell that is not a decision variable is malformed —
     /// Excel only lets you declare one on an adjustable cell.
-    func testIntegerConstraintOnANonVariableIsRefused() throws {
-        XCTAssertThrowsError(try solve(model(constraints: [
+    @Test func integerConstraintOnANonVariableIsRefused() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try solve(model(constraints: [
             .init(lhs: [CellRef("B1")], relation: .integer, rhs: .constant(0)),
-        ]))) { error in
-            XCTAssertEqual(error as? SolverRunError,
-                           SolverRunError.integralityOnNonVariable(CellRef("B1")))
+        ])) }) {
+            #expect((error as? SolverRunError) == SolverRunError.integralityOnNonVariable(CellRef("B1")))
         }
     }
 
@@ -239,7 +236,7 @@ final class SolverRunTests: XCTestCase {
     /// number of cells in the group. So three variables must be a permutation of 1, 2, 3 —
     /// which makes their sum 6 whatever the objective wanted, and that is the point of the
     /// constraint rather than a coincidence of the test.
-    func testAllDifferentIsAPermutation() throws {
+    @Test func allDifferentIsAPermutation() throws {
         let permuted = SolverModel(
             objective: CellRef("D2"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2"), CellRef("A3")],
@@ -251,27 +248,25 @@ final class SolverRunTests: XCTestCase {
         let values = [CellRef("A1"), CellRef("A2"), CellRef("A3")]
             .map { solution.variables[$0.positionKey] ?? .nan }
         for value in values {
-            XCTAssertEqual(value, value.rounded(), accuracy: 1e-6, "must be integral")
-            XCTAssertGreaterThanOrEqual(value, 1 - 1e-6)
-            XCTAssertLessThanOrEqual(value, 3 + 1e-6)
+            #expect(abs(value - value.rounded()) <= 1e-6, "must be integral")
+            #expect(value >= (1 - 1e-6))
+            #expect(value <= (3 + 1e-6))
         }
-        XCTAssertEqual(Set(values.map { Int($0.rounded()) }), [1, 2, 3],
-                       "each of 1…3 exactly once")
+        #expect(Set(values.map { Int($0.rounded()) }) == [1, 2, 3], "each of 1…3 exactly once")
         // **No branch-and-bound.** Decoding makes the permutation structural, so these
         // variables need no integrality, no bounds and no distinctness constraints — and
         // therefore no integer solver. An earlier draft forced B&B because it encoded the
         // same thing as constraints.
-        XCTAssertEqual(solution.engineUsed, .nelderMead)
+        #expect(solution.engineUsed == .nelderMead)
     }
 
     /// All-different on a cell that is not a decision variable is malformed, as integrality
     /// is.
-    func testAllDifferentOnANonVariableIsRefused() throws {
-        XCTAssertThrowsError(try solve(model(constraints: [
+    @Test func allDifferentOnANonVariableIsRefused() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try solve(model(constraints: [
             .init(lhs: [CellRef("B1")], relation: .allDifferent, rhs: .constant(0)),
-        ]))) { error in
-            XCTAssertEqual(error as? SolverRunError,
-                           SolverRunError.integralityOnNonVariable(CellRef("B1")))
+        ])) }) {
+            #expect((error as? SolverRunError) == SolverRunError.integralityOnNonVariable(CellRef("B1")))
         }
     }
 
@@ -280,18 +275,18 @@ final class SolverRunTests: XCTestCase {
     /// **The default adds `x >= 0` to every variable**, which is what Excel's checkbox does.
     /// Minimising `A1 + A2` with nothing else said therefore bottoms out at 0, not at
     /// minus infinity.
-    func testNonNegativityIsAssumedByDefault() throws {
+    @Test func nonNegativityIsAssumedByDefault() throws {
         let solution = try solve(model())
-        XCTAssertEqual(solution.objective ?? .nan, 0, accuracy: 0.05)
+        #expect(abs((solution.objective ?? .nan) - 0) <= 0.05)
         for ref in [CellRef("A1"), CellRef("A2")] {
-            XCTAssertGreaterThanOrEqual(solution.variables[ref.positionKey] ?? .nan, -1e-6)
+            #expect((solution.variables[ref.positionKey] ?? .nan) >= (-1e-6))
         }
     }
 
     /// **Turning it off changes the answer**, which is the whole reason it is a setting.
     /// With `A1 >= -5` and negatives permitted, minimising `A1 + A2` reaches -5 rather
     /// than 0.
-    func testPermittingNegativesChangesTheAnswer() throws {
+    @Test func permittingNegativesChangesTheAnswer() throws {
         let signed = SolverModel(
             objective: CellRef("B1"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
@@ -302,11 +297,11 @@ final class SolverRunTests: XCTestCase {
             engine: .grgNonlinear,
             assumesNonNegative: false)
         let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
-        XCTAssertEqual(solution.objective ?? .nan, -5, accuracy: 0.1)
+        #expect(abs((solution.objective ?? .nan) - -5) <= 0.1)
     }
 
     /// And Simplex handles a free variable by splitting it, rather than refusing.
-    func testSimplexSolvesWithNegativesPermitted() throws {
+    @Test func simplexSolvesWithNegativesPermitted() throws {
         let signed = SolverModel(
             objective: CellRef("B1"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
@@ -317,15 +312,15 @@ final class SolverRunTests: XCTestCase {
             engine: .simplexLP,
             assumesNonNegative: false)
         let solution = try SolverRun.solve(signed, cells: Sheet(), names: NamedRangeCollection())
-        XCTAssertEqual(solution.engineUsed, .simplex)
-        XCTAssertEqual(solution.objective ?? .nan, -5, accuracy: 0.1)
+        #expect(solution.engineUsed == .simplex)
+        #expect(abs((solution.objective ?? .nan) - -5) <= 0.1)
     }
 
     // MARK: - Simplex
 
     /// **A linear model nominated for Simplex really runs Simplex.** `B1 = A1 + A2` is
     /// linear in both variables, so the coefficients extract and the LP solves.
-    func testLinearModelRunsOnSimplex() throws {
+    @Test func linearModelRunsOnSimplex() throws {
         let solution = try solve(model(
             sense: .maximise,
             constraints: [
@@ -334,30 +329,30 @@ final class SolverRunTests: XCTestCase {
                 .init(lhs: [CellRef("A2")], relation: .greaterOrEqual, rhs: .constant(0)),
             ],
             engine: .simplexLP))
-        XCTAssertEqual(solution.engineUsed, .simplex)
-        XCTAssertEqual(solution.objective ?? .nan, 7, accuracy: 0.01)
+        #expect(solution.engineUsed == .simplex)
+        #expect(abs((solution.objective ?? .nan) - 7) <= 0.01)
     }
 
     /// **A nonlinear model nominated for Simplex is refused, not silently re-solved.**
     /// Excel says the same thing — "the linearity conditions required by this LP Solver are
     /// not satisfied" — and it is the right answer: quietly switching engines would return
     /// a number the caller believes came from an LP.
-    func testNonlinearModelIsRefusedBySimplex() throws {
+    @Test func nonlinearModelIsRefusedBySimplex() throws {
         let squared = SolverModel(
             objective: CellRef("E1"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
             constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
                                 rhs: .constant(1))],
             engine: .simplexLP)
-        XCTAssertThrowsError(try solve(squared)) { error in
+        if let error = #expect(throws: (any Error).self, performing: { try solve(squared) }) {
             guard case .nonlinearModel = error as? SolverRunError else {
-                return XCTFail("expected nonlinearModel, got \(error)")
+                Issue.record("expected nonlinearModel, got \(error)"); return
             }
         }
     }
 
     /// The same nonlinear model solves happily under the nonlinear engine.
-    func testNonlinearModelSolvesUnderGRG() throws {
+    @Test func nonlinearModelSolvesUnderGRG() throws {
         let squared = SolverModel(
             objective: CellRef("E1"), sense: .minimise,
             variables: [CellRef("A1"), CellRef("A2")],
@@ -365,14 +360,14 @@ final class SolverRunTests: XCTestCase {
                                 rhs: .constant(2))],
             engine: .grgNonlinear)
         let solution = try solve(squared)
-        XCTAssertEqual(solution.objective ?? .nan, 4, accuracy: 0.1)
+        #expect(abs((solution.objective ?? .nan) - 4) <= 0.1)
     }
 
     // MARK: - Evolutionary
 
     /// The evolutionary engine is dispatched to, and reported. Both variables are bounded,
     /// because a population-based search has nowhere to sample otherwise.
-    func testEvolutionaryEngine() throws {
+    @Test func evolutionaryEngine() throws {
         let solution = try solve(model(
             constraints: [
                 .init(lhs: [CellRef("A1")], relation: .greaterOrEqual, rhs: .constant(1)),
@@ -381,20 +376,19 @@ final class SolverRunTests: XCTestCase {
                 .init(lhs: [CellRef("A2")], relation: .lessOrEqual, rhs: .constant(9)),
             ],
             engine: .evolutionary))
-        XCTAssertEqual(solution.engineUsed, .differentialEvolution)
-        XCTAssertEqual(solution.objective ?? .nan, 2, accuracy: 0.5)
+        #expect(solution.engineUsed == .differentialEvolution)
+        #expect(abs((solution.objective ?? .nan) - 2) <= 0.5)
     }
 
     /// **An unbounded variable is refused**, as Excel refuses it: a population-based search
     /// samples within a box, and inventing one would make the answer depend on a number
     /// nobody in the workbook chose.
-    func testEvolutionaryRefusesAnUnboundedVariable() throws {
-        XCTAssertThrowsError(try solve(model(
+    @Test func evolutionaryRefusesAnUnboundedVariable() throws {
+        if let error = #expect(throws: (any Error).self, performing: { try solve(model(
             constraints: [.init(lhs: [CellRef("A1")], relation: .greaterOrEqual,
                                 rhs: .constant(1))],
-            engine: .evolutionary))) { error in
-            XCTAssertEqual(error as? SolverRunError,
-                           SolverRunError.evolutionaryNeedsBounds(CellRef("A1")))
+            engine: .evolutionary)) }) {
+            #expect((error as? SolverRunError) == SolverRunError.evolutionaryNeedsBounds(CellRef("A1")))
         }
     }
 
@@ -402,8 +396,8 @@ final class SolverRunTests: XCTestCase {
 
     /// **The engine actually used is reported, not assumed.** The workbook nominates one;
     /// this reports what ran, so a caller is never misled about how their answer was found.
-    func testTheEngineUsedIsReported() throws {
+    @Test func theEngineUsedIsReported() throws {
         let solution = try solve(model(engine: .grgNonlinear))
-        XCTAssertEqual(solution.engineUsed, .nelderMead)
+        #expect(solution.engineUsed == .nelderMead)
     }
 }

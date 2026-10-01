@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookAudit
 import SwiftExcelCore
 import SwiftExcelFunctions
@@ -15,7 +16,7 @@ import SwiftXLSX
 /// unzipping the workbook by hand and reading the sheet XML. The answer turned out to be a
 /// measured date boundary — serial 0 is January 0, 1900, and Excel accepts it — which is
 /// exactly the kind of thing the findings file exists to surface without anyone opening a file.
-final class OracleOutcomeTests: XCTestCase {
+@Suite struct OracleOutcomeTests {
 
     private func workbook(
         constants: [String: Double] = [:],
@@ -34,7 +35,7 @@ final class OracleOutcomeTests: XCTestCase {
 
     private func outcome(of report: OracleReport) throws -> OracleOutcome {
         guard let finding = report.findings.first else {
-            throw XCTSkip("the audit produced no finding to judge")
+            throw TestFailure("the audit produced no finding to judge")
         }
         return finding.outcome
     }
@@ -57,7 +58,7 @@ final class OracleOutcomeTests: XCTestCase {
     /// It costs the comparable cells in such a file, deliberately. A cache that cannot be
     /// attributed to Excel is not evidence about Excel in either direction, and `notComparable`
     /// counts for neither — where a false agreement would be as damaging as a false accusation.
-    func testAGoogleSheetsExportIsNotComparable() throws {
+    @Test func aGoogleSheetsExportIsNotComparable() throws {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
         // An ordinary cell, which in any other workbook would be judged.
@@ -70,12 +71,12 @@ final class OracleOutcomeTests: XCTestCase {
 
         let report = WorkbookOracle.audit(book)
         let reasons = report.findings.map(\.outcome)
-        XCTAssertFalse(reasons.isEmpty, "the audit judged nothing at all")
+        #expect(!reasons.isEmpty, "the audit judged nothing at all")
         for outcome in reasons {
             guard case .notComparable(let reason) = outcome else {
-                return XCTFail("every cell of a Sheets export is notComparable, got \(outcome)")
+                Issue.record("every cell of a Sheets export is notComparable, got \(outcome)"); return
             }
-            XCTAssertTrue(reason.lowercased().contains("sheets"), "and says so: \(reason)")
+            #expect(reason.lowercased().contains("sheets"), "and says so: \(reason)")
         }
     }
 
@@ -92,7 +93,7 @@ final class OracleOutcomeTests: XCTestCase {
     /// already named the cost of getting this wrong — "counting it as one put a floor under
     /// the failure rate that no amount of work could lift" — and the name path walked straight
     /// past it.
-    func testAnExternalReferenceReachedThroughANameIsNotComparable() throws {
+    @Test func anExternalReferenceReachedThroughANameIsNotComparable() throws {
         let book = Workbook()
         let sheet = book.addSheet(name: "Model")
         sheet.write(2.0, to: "B1")
@@ -102,28 +103,27 @@ final class OracleOutcomeTests: XCTestCase {
                     to: "C1", cached: .text("October"))
 
         guard case .notComparable(let reason) = try outcome(of: WorkbookOracle.audit(book)) else {
-            return XCTFail("expected notComparable, got \(try outcome(of: WorkbookOracle.audit(book)))")
+            Issue.record("expected notComparable, got \(try outcome(of: WorkbookOracle.audit(book)))"); return
         }
-        XCTAssertTrue(reason.contains("external"),
-                      "and it says why, rather than counting as a disagreement: \(reason)")
+        #expect(reason.contains("external"), "and it says why, rather than counting as a disagreement: \(reason)")
     }
 
     /// A refusal records what Excel had, so the row can be triaged without the workbook.
-    func testARefusalCarriesExcelsValue() throws {
+    @Test func aRefusalCarriesExcelsValue() throws {
         // `SQRT(-1)` is `#NUM!` for us and a number in the cache — the shape of every
         // refusal: we answered an error where Excel answered something.
         let book = try workbook(formula: "SQRT(-1)", at: "B1", cached: .number(42))
 
         guard case .refused(let error, let excel) = try outcome(of: WorkbookOracle.audit(book))
         else {
-            return XCTFail("expected a refusal, got \(try outcome(of: WorkbookOracle.audit(book)))")
+            Issue.record("expected a refusal, got \(try outcome(of: WorkbookOracle.audit(book)))"); return
         }
-        XCTAssertEqual(error, .num, "the error we answered")
-        XCTAssertEqual(excel, .number(42), "and the value Excel had, which is the point")
+        #expect(error == .num, "the error we answered")
+        #expect(excel == .number(42), "and the value Excel had, which is the point")
     }
 
     /// So does a throw, for the same reason.
-    func testAThrowCarriesExcelsValue() throws {
+    @Test func aThrowCarriesExcelsValue() throws {
         // `IFERROR` with one argument: a Google Sheets signature Excel does not accept, and
         // the shape that produced 895 throws in the corpus. We refuse on argument count.
         let book = try workbook(
@@ -132,9 +132,9 @@ final class OracleOutcomeTests: XCTestCase {
 
         guard case .threw(let message, let excel) = try outcome(of: WorkbookOracle.audit(book))
         else {
-            throw XCTSkip("this build accepts a one-argument IFERROR; nothing threw")
+            throw TestFailure("this build accepts a one-argument IFERROR; nothing threw")
         }
-        XCTAssertFalse(message.isEmpty, "the throw is still described")
-        XCTAssertEqual(excel, .text("caught"), "and Excel's side survives into the row")
+        #expect(!message.isEmpty, "the throw is still described")
+        #expect(excel == .text("caught"), "and Excel's side survives into the row")
     }
 }

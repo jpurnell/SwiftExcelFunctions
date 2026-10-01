@@ -1,5 +1,6 @@
 import Foundation
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookCensus
 
 /// What a census row means for a run that resumes from it.
@@ -10,7 +11,7 @@ import XCTest
 /// the row exists, so the path is done. Forty-two workbooks were lost that way in one
 /// afternoon, all of them `POSIX 60 "Operation timed out"`, and all of them readable a few
 /// minutes later. These tests fix the distinction between *failed* and *not yet answered*.
-final class CensusResumeTests: XCTestCase {
+@Suite struct CensusResumeTests {
 
     /// The shape `Data(contentsOf:)` actually produced, reproduced from a recorded row:
     /// a Cocoa "couldn't be opened" wrapping a POSIX timeout.
@@ -22,82 +23,79 @@ final class CensusResumeTests: XCTestCase {
 
     // MARK: - Which failures are worth retrying
 
-    func testATimedOutReadIsTransient() {
+    @Test func aTimedOutReadIsTransient() {
         // POSIX 60, ETIMEDOUT — the one that was observed, 42 times.
-        XCTAssertTrue(TransientRead.isTransient(cocoaError(wrappingPOSIX: 60)))
+        #expect(TransientRead.isTransient(cocoaError(wrappingPOSIX: 60)))
     }
 
-    func testAResourceTemporarilyUnavailableReadIsTransient() {
+    @Test func aResourceTemporarilyUnavailableReadIsTransient() {
         // POSIX 35, EAGAIN — the same condition reported by a different layer.
-        XCTAssertTrue(TransientRead.isTransient(cocoaError(wrappingPOSIX: 35)))
+        #expect(TransientRead.isTransient(cocoaError(wrappingPOSIX: 35)))
     }
 
-    func testAMissingFileIsNotTransient() {
+    @Test func aMissingFileIsNotTransient() {
         // POSIX 2, ENOENT. Retrying will not make the file exist.
-        XCTAssertFalse(TransientRead.isTransient(cocoaError(wrappingPOSIX: 2)))
+        #expect(!TransientRead.isTransient(cocoaError(wrappingPOSIX: 2)))
     }
 
-    func testAPermissionFailureIsNotTransient() {
+    @Test func aPermissionFailureIsNotTransient() {
         // POSIX 13, EACCES. Retrying will not grant permission.
-        XCTAssertFalse(TransientRead.isTransient(cocoaError(wrappingPOSIX: 13)))
+        #expect(!TransientRead.isTransient(cocoaError(wrappingPOSIX: 13)))
     }
 
-    func testACocoaErrorWithNoUnderlyingCauseIsNotTransient() {
+    @Test func aCocoaErrorWithNoUnderlyingCauseIsNotTransient() {
         // "Couldn't be opened" on its own says nothing about why, so it is not a licence
         // to retry every malformed file in the corpus for ever.
-        XCTAssertFalse(TransientRead.isTransient(NSError(domain: NSCocoaErrorDomain, code: 256)))
+        #expect(!TransientRead.isTransient(NSError(domain: NSCocoaErrorDomain, code: 256)))
     }
 
     // MARK: - What a resumed run treats as answered
 
-    func testATransientRowIsNotCountedAsCompleted() {
+    @Test func aTransientRowIsNotCountedAsCompleted() {
         let row = CensusRow(path: "a/b.xlsx", outcome: .transientFailure, solverNames: 0,
                             models: 0, engines: [], relations: [], milliseconds: 1,
                             detail: "timed out")
-        XCTAssertNil(CensusRow.completedPath(ofLine: row.line),
-                     "a transient failure must be retried, not skipped for ever")
+        #expect(CensusRow.completedPath(ofLine: row.line) == nil, "a transient failure must be retried, not skipped for ever")
     }
 
     /// Encryption and wrong-file-type are answers, not failures to be retried.
     ///
     /// A census that re-examined every password-protected workbook on every pass would never
     /// converge, and the answer would be the same each time.
-    func testAClassifiedContainerIsCountedAsCompleted() {
+    @Test func aClassifiedContainerIsCountedAsCompleted() {
         for outcome: CensusRow.Outcome in [.encryptedWorkbook, .notAWorkbook] {
             let row = CensusRow(path: "a/b.xlsx", outcome: outcome, solverNames: 0, models: 0,
                                 engines: [], relations: [], milliseconds: 1, detail: "")
-            XCTAssertEqual(CensusRow.completedPath(ofLine: row.line), "a/b.xlsx",
-                           "\(outcome.rawValue) is a definite answer about the file")
+            #expect(CensusRow.completedPath(ofLine: row.line) == "a/b.xlsx", "\(outcome.rawValue) is a definite answer about the file")
         }
     }
 
-    func testAnExaminedRowIsCountedAsCompleted() {
+    @Test func anExaminedRowIsCountedAsCompleted() {
         for outcome: CensusRow.Outcome in [.ok, .unreadableFile, .unreadableWorkbook] {
             let row = CensusRow(path: "a/b.xlsx", outcome: outcome, solverNames: 0, models: 0,
                                 engines: [], relations: [], milliseconds: 1, detail: "")
-            XCTAssertEqual(CensusRow.completedPath(ofLine: row.line), "a/b.xlsx",
-                           "\(outcome.rawValue) is an answer and must not be re-examined")
+            #expect(CensusRow.completedPath(ofLine: row.line) == "a/b.xlsx", "\(outcome.rawValue) is an answer and must not be re-examined")
         }
     }
 
-    func testTheHeaderIsNotACompletedPath() {
-        XCTAssertNil(CensusRow.completedPath(ofLine: CensusRow.header))
+    @Test func theHeaderIsNotACompletedPath() {
+        #expect(CensusRow.completedPath(ofLine: CensusRow.header) == nil)
     }
 
-    func testATruncatedLineIsNotCountedAsCompleted() {
+    @Test func aTruncatedLineIsNotCountedAsCompleted() {
         // A row cut off mid-write by a killed run states no outcome, so it is not an answer.
-        XCTAssertNil(CensusRow.completedPath(ofLine: "a/b.xlsx"))
+        #expect(CensusRow.completedPath(ofLine: "a/b.xlsx") == nil)
     }
 
     /// A transient row still has to be *recorded*, even though it is not an answer.
     ///
     /// Leaving the row out entirely would make "skipped" and "never reached" identical from
     /// outside, which is the property the census exists to avoid.
-    func testATransientRowIsStillWrittenAndReadable() {
+    @Test func aTransientRowIsStillWrittenAndReadable() {
         let row = CensusRow(path: "a/b.xlsx", outcome: .transientFailure, solverNames: 0,
                             models: 0, engines: [], relations: [], milliseconds: 1,
                             detail: "Operation timed out")
-        XCTAssertTrue(row.line.contains("transientFailure"))
-        XCTAssertTrue(row.line.contains("Operation timed out"))
+        #expect(row.line.contains("transientFailure"))
+        #expect(row.line.contains("Operation timed out"))
     }
 }

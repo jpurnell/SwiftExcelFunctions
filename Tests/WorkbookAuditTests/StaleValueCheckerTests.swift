@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import WorkbookAudit
 import SwiftExcelCore
 import SwiftExcelFunctions
@@ -14,7 +15,7 @@ import SwiftXLSX
 /// The false-positive half carries more weight than the true-positive half, as it does for
 /// every checker here, and more so for this one: it is the only check that can report a
 /// defect in someone's workbook on the strength of our own arithmetic.
-final class StaleValueCheckerTests: XCTestCase {
+@Suite struct StaleValueCheckerTests {
 
     private func parse(_ formula: String) throws -> FormulaAST {
         try FormulaParser.parse(formula)
@@ -41,61 +42,61 @@ final class StaleValueCheckerTests: XCTestCase {
     // MARK: - Finding one
 
     /// The defect this checker exists for: a number that no longer follows from its formula.
-    func testAStaleCachedValueIsFound() throws {
+    @Test func aStaleCachedValueIsFound() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(999))])
 
         let findings = audit(workbook)
-        XCTAssertEqual(findings.count, 1)
-        let finding = try XCTUnwrap(findings.first)
-        XCTAssertEqual(finding.checker, "stale-value")
-        XCTAssertEqual(finding.severity, .error)
-        XCTAssertEqual(finding.address.cell, CellRef("B3"))
+        #expect(findings.count == 1)
+        let finding = try #require(findings.first)
+        #expect(finding.checker == "stale-value")
+        #expect(finding.severity == .error)
+        #expect(finding.address.cell == CellRef("B3"))
 
         // The finding carries its reasoning, which is what decides whether anyone acts on
         // it: both numbers and the formula that separates them.
-        let detail = try XCTUnwrap(finding.detail)
-        XCTAssertTrue(detail.contains("999"), "the finding must name what the file claims")
-        XCTAssertTrue(detail.contains("200"), "and what the formula actually computes")
-        XCTAssertTrue(detail.contains("B1*B2"), "and the formula itself")
+        let detail = try #require(finding.detail)
+        #expect(detail.contains("999"), "the finding must name what the file claims")
+        #expect(detail.contains("200"), "and what the formula actually computes")
+        #expect(detail.contains("B1*B2"), "and the formula itself")
     }
 
     /// A cached error that no longer follows is a warning rather than an error.
     ///
     /// Weaker deliberately. A half-built sheet is full of `#DIV/0!`, and this is also the
     /// direction in which our own gaps would show up.
-    func testACachedErrorThatNoLongerFollowsIsAWarning() throws {
+    @Test func aCachedErrorThatNoLongerFollowsIsAWarning() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 2],
             formulas: [("B3", "B1/B2", .error(.div0))])
 
         let findings = audit(workbook)
-        XCTAssertEqual(findings.count, 1)
-        XCTAssertEqual(findings.first?.severity, .warning)
+        #expect(findings.count == 1)
+        #expect(findings.first?.severity == .warning)
     }
 
     // MARK: - Not finding one
 
     /// **The half that matters more.** A workbook whose cache is correct says nothing.
-    func testACorrectCacheIsSilent() throws {
+    @Test func aCorrectCacheIsSilent() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(200)),
                        ("B4", "SUM(B1:B3)", .number(230)),
                        ("B5", "IF(B3>100,\"high\",\"low\")", .text("high"))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// A cached error that *does* follow is agreement, not a finding.
     ///
     /// A model full of `#DIV/0!` is a model whose author left it that way, and reproducing
     /// that faithfully is the job.
-    func testACachedErrorThatStillFollowsIsSilent() throws {
+    @Test func aCachedErrorThatStillFollowsIsSilent() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 0],
             formulas: [("B3", "B1/B2", .error(.div0))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// **One stale edit is one finding, not a column of them.**
@@ -104,7 +105,7 @@ final class StaleValueCheckerTests: XCTestCase {
     /// `B3` and its own cache agrees with the *stale* input, because that is the input
     /// Excel used too. So the cascade stays silent and the finding lands on the cell that
     /// was actually edited.
-    func testOnlyTheOriginOfAStaleChainIsReported() throws {
+    @Test func onlyTheOriginOfAStaleChainIsReported() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(999)),      // stale: should be 200
@@ -112,8 +113,8 @@ final class StaleValueCheckerTests: XCTestCase {
                        ("B5", "B4*2", .number(2000))])
 
         let findings = audit(workbook)
-        XCTAssertEqual(findings.count, 1, "the cascade must not be reported")
-        XCTAssertEqual(findings.first?.address.cell, CellRef("B3"))
+        #expect(findings.count == 1, "the cascade must not be reported")
+        #expect(findings.first?.address.cell == CellRef("B3"))
     }
 
     /// A formula we cannot evaluate is our gap, not the workbook's defect.
@@ -126,10 +127,10 @@ final class StaleValueCheckerTests: XCTestCase {
     /// `RTD` asks a live data server for a value. There is no server here and there will not
     /// be one, so it is refused by design rather than by backlog, and this fixture cannot rot
     /// the same way twice.
-    func testARefusalIsNotAFinding() throws {
+    @Test func aRefusalIsNotAFinding() throws {
         let workbook = try model(
             formulas: [("B3", "RTD(\"prog.id\",\"\",\"topic\")", .number(42))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// A function where *Excel* is the imprecise party is passed over.
@@ -137,37 +138,37 @@ final class StaleValueCheckerTests: XCTestCase {
     /// `BESSELJ(0,0)` is exactly 1 by definition and Excel caches `1.00000000283141`. That
     /// is a fact about Excel; reporting it would bury the real findings under noise
     /// generated by being correct.
-    func testExcelsOwnImprecisionIsNotAWorkbookDefect() throws {
+    @Test func excelsOwnImprecisionIsNotAWorkbookDefect() throws {
         let workbook = try model(
             formulas: [("B3", "BESSELJ(0,0)", .number(1.00000000283141))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// A function where *we* are the imprecise party is passed over too.
     ///
     /// `YEARFRAC` basis 0 misses the NASD February rule upstream, so a disagreement there is
     /// ours. Both directions of the honesty rule, and neither is a defect in the file.
-    func testOurOwnKnownDefectsAreNotWorkbookDefects() throws {
+    @Test func ourOwnKnownDefectsAreNotWorkbookDefects() throws {
         let workbook = try model(
             formulas: [("B3", "YEARFRAC(DATE(2020,2,29),DATE(2020,12,31),0)",
                         .number(301.0 / 360.0))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// The exclusion list matches through Excel's version prefixes.
     ///
     /// A workbook saved by an older Excel writes `_xlfn.BESSELJ`. A list matching only the
     /// bare name would fire on old files and not on new ones, for the same formula.
-    func testTheExclusionListSeesThroughTheModernPrefix() throws {
+    @Test func theExclusionListSeesThroughTheModernPrefix() throws {
         let workbook = try model(
             formulas: [("B3", "_xlfn.BESSELJ(0,0)", .number(1.00000000283141))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// A volatile function's cached value records an afternoon in 2013.
-    func testAVolatileFormulaIsNotComparable() throws {
+    @Test func aVolatileFormulaIsNotComparable() throws {
         let workbook = try model(formulas: [("B3", "TODAY()", .number(41_183))])
-        XCTAssertEqual(audit(workbook), [])
+        #expect(audit(workbook) == [])
     }
 
     /// **A cell holding a formula is never blank**, whatever the formula produced.
@@ -180,7 +181,7 @@ final class StaleValueCheckerTests: XCTestCase {
     /// The reader cannot distinguish an empty `<v/>` from a missing `<v>`, so the rule is
     /// applied at the point where a reference is read rather than at the point where the
     /// file is parsed.
-    func testAFormulaCellIsNeverBlankHoweverEmptyItsResult() throws {
+    @Test func aFormulaCellIsNeverBlankHoweverEmptyItsResult() throws {
         let workbook = Workbook()
         let sheet = workbook.addSheet(name: "Model")
         // A formula whose cached result is empty — what `<c t="str"><f>…</f><v/></c>` is.
@@ -189,7 +190,7 @@ final class StaleValueCheckerTests: XCTestCase {
         // And a genuinely empty cell beside it, which *is* blank.
         sheet.write(try parse("IF(NOT(ISBLANK(G4)),1,0)"), to: "H4", cached: .number(0))
 
-        XCTAssertEqual(audit(workbook), [], "neither cell is stale")
+        #expect(audit(workbook) == [], "neither cell is stale")
     }
 
     /// A name this package cannot turn into a reference is not comparable.
@@ -206,26 +207,22 @@ final class StaleValueCheckerTests: XCTestCase {
     ///
     /// What belongs here is unchanged: declining to judge a formula we knowingly cannot
     /// evaluate. A cell we cannot compare is not a cell that disagrees.
-    func testAnUnresolvableNameIsNotComparable() throws {
+    @Test func anUnresolvableNameIsNotComparable() throws {
         let names = Names(targets: [
             "amounts": .unparsed("Expenditures!$D:$D"),            // read, but not understood
             "label": .formula(.text("\"Total\"")),                // a text constant
             "rate": .cell(CellRef("B1")),                         // an ordinary name
         ])
         let sumifs = try parse("SUMIFS(amounts,amounts,\">1\")")
-        XCTAssertEqual(
-            WorkbookOracle.unresolvableName(in: sumifs, names: names, sheet: "Model"),
-            "amounts")
+        #expect(WorkbookOracle.unresolvableName(in: sumifs, names: names, sheet: "Model") == "amounts")
 
         // A text constant resolves, and an ordinary reference resolves.
-        XCTAssertNil(WorkbookOracle.unresolvableName(
-            in: try parse("label&rate"), names: names, sheet: "Model"))
+        #expect(WorkbookOracle.unresolvableName(
+            in: try parse("label&rate"), names: names, sheet: "Model") == nil)
 
         // A name with no definition at all: Excel cached a value, so it resolved for Excel.
-        XCTAssertEqual(
-            WorkbookOracle.unresolvableName(in: try parse("missing+1"),
-                                            names: names, sheet: "Model"),
-            "missing")
+        #expect(WorkbookOracle.unresolvableName(in: try parse("missing+1"),
+                                            names: names, sheet: "Model") == "missing")
     }
 
     private struct Names: NameResolver {
@@ -239,7 +236,7 @@ final class StaleValueCheckerTests: XCTestCase {
     ///
     /// A checker that drops most of what it sees looks identical to one that found nothing,
     /// and the whole claim here rests on dropping the right things.
-    func testWhatIsSkippedIsCounted() throws {
+    @Test func whatIsSkippedIsCounted() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(999)),                       // reported
@@ -247,11 +244,11 @@ final class StaleValueCheckerTests: XCTestCase {
                        ("B5", "RTD(\"prog.id\",\"\",\"t\")", .number(42))])        // ours
 
         let (findings, skipped) = StaleValueChecker.findings(in: WorkbookOracle.audit(workbook))
-        XCTAssertEqual(findings.count, 1)
-        XCTAssertEqual(skipped.unattributable, 1)
-        XCTAssertEqual(skipped.byFunction["BESSELJ"], 1)
-        XCTAssertEqual(skipped.ours, 1)
-        XCTAssertEqual(skipped.total, 2)
+        #expect(findings.count == 1)
+        #expect(skipped.unattributable == 1)
+        #expect(skipped.byFunction["BESSELJ"] == 1)
+        #expect(skipped.ours == 1)
+        #expect(skipped.total == 2)
     }
 
     // MARK: - Running at all
@@ -260,15 +257,15 @@ final class StaleValueCheckerTests: XCTestCase {
     ///
     /// Assembled without a workbook, this one cannot run — and says so, rather than
     /// returning nothing and letting the report look clean.
-    func testAModelWithNoWorkbookSaysSoRatherThanPassing() {
+    @Test func aModelWithNoWorkbookSaysSoRatherThanPassing() {
         let provider = EmptyProvider()
         let model = AuditModel(cells: provider, addresses: [],
                                graph: DependencyGraph(cells: [], provider: provider))
         let findings = StaleValueChecker().check(model)
 
-        XCTAssertEqual(findings.count, 1)
-        XCTAssertEqual(findings.first?.severity, .note)
-        XCTAssertTrue(findings.first?.summary.contains("did not run") ?? false)
+        #expect(findings.count == 1)
+        #expect(findings.first?.severity == .note)
+        #expect(findings.first?.summary.contains("did not run") ?? false)
     }
 
     private struct EmptyProvider: CellValueProvider {
@@ -286,15 +283,15 @@ final class StaleValueCheckerTests: XCTestCase {
     ///
     /// A validator whose output moves between runs cannot be diffed in CI, and one nobody
     /// can diff is one nobody wires up.
-    func testTheReportIsStableAcrossRuns() throws {
+    @Test func theReportIsStableAcrossRuns() throws {
         let workbook = try model(
             constants: ["B1": 10, "B2": 20],
             formulas: [("B3", "B1*B2", .number(999)),
                        ("C3", "B1+B2", .number(1)),
                        ("A3", "B1-B2", .number(2))])
         let first = audit(workbook)
-        XCTAssertEqual(first.count, 3)
-        XCTAssertEqual(first, audit(workbook))
-        XCTAssertEqual(first.map(\.address.cell.reference), ["A3", "B3", "C3"])
+        #expect(first.count == 3)
+        #expect(first == audit(workbook))
+        #expect(first.map(\.address.cell.reference) == ["A3", "B3", "C3"])
     }
 }

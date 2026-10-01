@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 import SwiftExcelCore
 @testable import SwiftExcelFunctions
 
 /// The dynamic-array family, over ranges the way a workbook supplies them.
-final class DynamicArrayTests: XCTestCase {
+@Suite struct DynamicArrayTests {
 
     private struct Cells: CellValueProvider {
         var data: [String: CellValue] = [:]
@@ -59,230 +60,215 @@ final class DynamicArrayTests: XCTestCase {
 
     // MARK: - FILTER
 
-    func testFilterKeepsTheRowsAColumnMaskSelects() throws {
+    @Test func filterKeepsTheRowsAColumnMaskSelects() throws {
         let (array, d1) = block("A", [n([1, 10]), n([2, 20]), n([3, 30])])
         let (mask, d2) = block("C", [[.bool(true)], [.bool(false)], [.bool(true)]])
         let result = try call("FILTER", [array, mask], d1.merging(d2) { a, _ in a })
-        XCTAssertEqual(grid(result)?.values, ["1", "10", "3", "30"])
-        XCTAssertEqual(grid(result)?.rows, 2)
+        #expect(grid(result)?.values == ["1", "10", "3", "30"])
+        #expect(grid(result)?.rows == 2)
     }
 
-    func testFilterKeepsTheColumnsARowMaskSelects() throws {
+    @Test func filterKeepsTheColumnsARowMaskSelects() throws {
         let (array, d1) = block("A", [n([1, 2, 3]), n([4, 5, 6])])
         let (mask, d2) = block("D", [[.bool(true), .bool(false), .bool(true)]])
         let result = try call("FILTER", [array, mask], d1.merging(d2) { a, _ in a })
-        XCTAssertEqual(grid(result)?.values, ["1", "3", "4", "6"])
-        XCTAssertEqual(grid(result)?.columns, 2)
+        #expect(grid(result)?.values == ["1", "3", "4", "6"])
+        #expect(grid(result)?.columns == 2)
     }
 
     /// Nothing kept is `if_empty`, or `#CALC!` when none was given — a result with no cells.
-    func testFilterWithNothingKept() throws {
+    @Test func filterWithNothingKept() throws {
         let (array, d1) = block("A", [n([1]), n([2])])
         let (mask, d2) = block("C", [[.bool(false)], [.bool(false)]])
         let data = d1.merging(d2) { a, _ in a }
-        XCTAssertEqual(try call("FILTER", [array, mask], data), .error(.calc))
-        XCTAssertEqual(try call("FILTER", [array, mask, .text("none")], data), .text("none"))
+        #expect(try call("FILTER", [array, mask], data) == .error(.calc))
+        #expect(try call("FILTER", [array, mask, .text("none")], data) == .text("none"))
     }
 
     /// A mask matching neither dimension is refused rather than guessed at.
-    func testFilterRefusesAMaskThatFitsNeitherWay() throws {
+    @Test func filterRefusesAMaskThatFitsNeitherWay() throws {
         let (array, d1) = block("A", [n([1, 2]), n([3, 4])])
         let (mask, d2) = block("D", [[.bool(true)], [.bool(true)], [.bool(true)]])
-        XCTAssertEqual(try call("FILTER", [array, mask], d1.merging(d2) { a, _ in a }),
-                       .error(.value))
+        #expect(try call("FILTER", [array, mask], d1.merging(d2) { a, _ in a }) == .error(.value))
     }
 
     // MARK: - UNIQUE
 
     /// Order is first appearance, not sorted.
-    func testUniqueKeepsFirstAppearanceOrder() throws {
+    @Test func uniqueKeepsFirstAppearanceOrder() throws {
         let (array, data) = block("A", [[.text("b")], [.text("a")], [.text("b")], [.text("c")]])
-        XCTAssertEqual(grid(try call("UNIQUE", [array], data))?.values, ["b", "a", "c"])
+        #expect(grid(try call("UNIQUE", [array], data))?.values == ["b", "a", "c"])
     }
 
     /// `exactly_once` is a different question from distinctness.
-    func testUniqueExactlyOnce() throws {
+    @Test func uniqueExactlyOnce() throws {
         let (array, data) = block("A", [[.text("b")], [.text("a")], [.text("b")]])
-        XCTAssertEqual(
-            grid(try call("UNIQUE", [array, .bool(false), .bool(true)], data))?.values, ["a"])
+        #expect(grid(try call("UNIQUE", [array, .bool(false), .bool(true)], data))?.values == ["a"])
     }
 
     /// Whole rows are compared, not cells.
-    func testUniqueComparesWholeRows() throws {
+    @Test func uniqueComparesWholeRows() throws {
         let (array, data) = block("A", [n([1, 2]), n([1, 3]), n([1, 2])])
-        XCTAssertEqual(grid(try call("UNIQUE", [array], data))?.rows, 2)
+        #expect(grid(try call("UNIQUE", [array], data))?.rows == 2)
     }
 
     // MARK: - SORT and SORTBY
 
-    func testSortOrdersByAColumn() throws {
+    @Test func sortOrdersByAColumn() throws {
         let (array, data) = block("A", [n([3, 30]), n([1, 10]), n([2, 20])])
-        XCTAssertEqual(grid(try call("SORT", [array], data))?.values,
-                       ["1", "10", "2", "20", "3", "30"])
-        XCTAssertEqual(grid(try call("SORT", [array, .number(2), .number(-1)], data))?.values,
-                       ["3", "30", "2", "20", "1", "10"])
+        #expect(grid(try call("SORT", [array], data))?.values == ["1", "10", "2", "20", "3", "30"])
+        #expect(grid(try call("SORT", [array, .number(2), .number(-1)], data))?.values == ["3", "30", "2", "20", "1", "10"])
     }
 
-    func testSortRefusesAnIndexOutsideTheArray() throws {
+    @Test func sortRefusesAnIndexOutsideTheArray() throws {
         let (array, data) = block("A", [n([1, 2])])
-        XCTAssertEqual(try call("SORT", [array, .number(5)], data), .error(.value))
+        #expect(try call("SORT", [array, .number(5)], data) == .error(.value))
     }
 
     /// `SORTBY` orders by a separate array, and a second key breaks ties in the first.
-    func testSortByUsesASeparateKeyAndIsStable() throws {
+    @Test func sortByUsesASeparateKeyAndIsStable() throws {
         let (array, d1) = block("A", [[.text("w")], [.text("x")], [.text("y")], [.text("z")]])
         let (major, d2) = block("C", [n([2]), n([1]), n([2]), n([1])])
         let (minor, d3) = block("D", [n([1]), n([2]), n([2]), n([1])])
         let data = d1.merging(d2) { a, _ in a }.merging(d3) { a, _ in a }
 
-        XCTAssertEqual(grid(try call("SORTBY", [array, major], data))?.values,
-                       ["x", "z", "w", "y"], "ties keep their original order")
-        XCTAssertEqual(grid(try call("SORTBY", [array, major, .number(1), minor], data))?.values,
-                       ["z", "x", "w", "y"], "the minor key breaks the tie")
+        #expect(grid(try call("SORTBY", [array, major], data))?.values == ["x", "z", "w", "y"], "ties keep their original order")
+        #expect(grid(try call("SORTBY", [array, major, .number(1), minor], data))?.values == ["z", "x", "w", "y"], "the minor key breaks the tie")
     }
 
     // MARK: - TAKE, DROP, EXPAND
 
-    func testTakeFromEitherEnd() throws {
+    @Test func takeFromEitherEnd() throws {
         let (array, data) = block("A", [n([1]), n([2]), n([3]), n([4])])
-        XCTAssertEqual(grid(try call("TAKE", [array, .number(2)], data))?.values, ["1", "2"])
-        XCTAssertEqual(grid(try call("TAKE", [array, .number(-2)], data))?.values, ["3", "4"])
+        #expect(grid(try call("TAKE", [array, .number(2)], data))?.values == ["1", "2"])
+        #expect(grid(try call("TAKE", [array, .number(-2)], data))?.values == ["3", "4"])
     }
 
-    func testDropIsTheComplementOfTake() throws {
+    @Test func dropIsTheComplementOfTake() throws {
         let (array, data) = block("A", [n([1]), n([2]), n([3]), n([4])])
-        XCTAssertEqual(grid(try call("DROP", [array, .number(2)], data))?.values, ["3", "4"])
-        XCTAssertEqual(grid(try call("DROP", [array, .number(-2)], data))?.values, ["1", "2"])
+        #expect(grid(try call("DROP", [array, .number(2)], data))?.values == ["3", "4"])
+        #expect(grid(try call("DROP", [array, .number(-2)], data))?.values == ["1", "2"])
     }
 
-    func testTakeInBothDimensions() throws {
+    @Test func takeInBothDimensions() throws {
         let (array, data) = block("A", [n([1, 2, 3]), n([4, 5, 6])])
-        XCTAssertEqual(grid(try call("TAKE", [array, .number(1), .number(2)], data))?.values,
-                       ["1", "2"])
+        #expect(grid(try call("TAKE", [array, .number(1), .number(2)], data))?.values == ["1", "2"])
     }
 
     /// The pad is `#N/A` by default: a cell that was never in the data has no value, and a
     /// zero is a number somebody might sum.
-    func testExpandPadsWithNotAvailable() throws {
+    @Test func expandPadsWithNotAvailable() throws {
         let (array, data) = block("A", [n([1, 2])])
         let result = try call("EXPAND", [array, .number(2), .number(3)], data)
-        XCTAssertEqual(grid(result)?.values, ["1", "2", "#N/A", "#N/A", "#N/A", "#N/A"])
-        XCTAssertEqual(grid(try call("EXPAND", [array, .number(1), .number(3), .number(0)],
-                                     data))?.values, ["1", "2", "0"])
+        #expect(grid(result)?.values == ["1", "2", "#N/A", "#N/A", "#N/A", "#N/A"])
+        #expect(grid(try call("EXPAND", [array, .number(1), .number(3), .number(0)],
+                                     data))?.values == ["1", "2", "0"])
     }
 
     /// Expanding cannot shrink.
-    func testExpandRefusesASmallerSize() throws {
+    @Test func expandRefusesASmallerSize() throws {
         let (array, data) = block("A", [n([1, 2, 3])])
-        XCTAssertEqual(try call("EXPAND", [array, .number(1), .number(2)], data), .error(.value))
+        #expect(try call("EXPAND", [array, .number(1), .number(2)], data) == .error(.value))
     }
 
     // MARK: - Stacking
 
-    func testVstackAndHstack() throws {
+    @Test func vstackAndHstack() throws {
         let (first, d1) = block("A", [n([1, 2])])
         let (second, d2) = block("C", [n([3, 4])])
         let data = d1.merging(d2) { a, _ in a }
 
         let stacked = try call("VSTACK", [first, second], data)
-        XCTAssertEqual(grid(stacked)?.rows, 2)
-        XCTAssertEqual(grid(stacked)?.values, ["1", "2", "3", "4"])
+        #expect(grid(stacked)?.rows == 2)
+        #expect(grid(stacked)?.values == ["1", "2", "3", "4"])
 
         let beside = try call("HSTACK", [first, second], data)
-        XCTAssertEqual(grid(beside)?.columns, 4)
-        XCTAssertEqual(grid(beside)?.values, ["1", "2", "3", "4"])
+        #expect(grid(beside)?.columns == 4)
+        #expect(grid(beside)?.values == ["1", "2", "3", "4"])
     }
 
     /// Ragged stacks are padded with `#N/A`, because a rectangle is what comes out.
-    func testStackingPadsShortLines() throws {
+    @Test func stackingPadsShortLines() throws {
         let (wide, d1) = block("A", [n([1, 2, 3])])
         let (narrow, d2) = block("D", [n([9])])
         let result = try call("VSTACK", [wide, narrow], d1.merging(d2) { a, _ in a })
-        XCTAssertEqual(grid(result)?.values, ["1", "2", "3", "9", "#N/A", "#N/A"])
+        #expect(grid(result)?.values == ["1", "2", "3", "9", "#N/A", "#N/A"])
     }
 
     // MARK: - Reshaping
 
-    func testToRowAndToCol() throws {
+    @Test func toRowAndToCol() throws {
         let (array, data) = block("A", [n([1, 2]), n([3, 4])])
-        XCTAssertEqual(grid(try call("TOROW", [array], data))?.values, ["1", "2", "3", "4"])
-        XCTAssertEqual(grid(try call("TOCOL", [array], data))?.rows, 4)
-        XCTAssertEqual(grid(try call("TOCOL", [array, .number(0), .bool(true)], data))?.values,
-                       ["1", "3", "2", "4"], "scanned by column")
+        #expect(grid(try call("TOROW", [array], data))?.values == ["1", "2", "3", "4"])
+        #expect(grid(try call("TOCOL", [array], data))?.rows == 4)
+        #expect(grid(try call("TOCOL", [array, .number(0), .bool(true)], data))?.values == ["1", "3", "2", "4"], "scanned by column")
     }
 
-    func testToColCanIgnoreBlanksAndErrors() throws {
+    @Test func toColCanIgnoreBlanksAndErrors() throws {
         let (array, data) = block("A", [[.number(1), .blank], [.error(.na), .number(4)]])
-        XCTAssertEqual(grid(try call("TOROW", [array, .number(3)], data))?.values, ["1", "4"])
+        #expect(grid(try call("TOROW", [array, .number(3)], data))?.values == ["1", "4"])
     }
 
-    func testWrapRowsAndWrapCols() throws {
+    @Test func wrapRowsAndWrapCols() throws {
         let (vector, data) = block("A", [n([1, 2, 3, 4, 5])])
-        XCTAssertEqual(grid(try call("WRAPROWS", [vector, .number(2)], data))?.values,
-                       ["1", "2", "3", "4", "5", "#N/A"])
-        XCTAssertEqual(grid(try call("WRAPROWS", [vector, .number(2), .number(0)], data))?.values,
-                       ["1", "2", "3", "4", "5", "0"])
+        #expect(grid(try call("WRAPROWS", [vector, .number(2)], data))?.values == ["1", "2", "3", "4", "5", "#N/A"])
+        #expect(grid(try call("WRAPROWS", [vector, .number(2), .number(0)], data))?.values == ["1", "2", "3", "4", "5", "0"])
 
         let columns = try call("WRAPCOLS", [vector, .number(2)], data)
-        XCTAssertEqual(grid(columns)?.rows, 2)
-        XCTAssertEqual(grid(columns)?.values, ["1", "3", "5", "2", "4", "#N/A"])
+        #expect(grid(columns)?.rows == 2)
+        #expect(grid(columns)?.values == ["1", "3", "5", "2", "4", "#N/A"])
     }
 
     // MARK: - CHOOSEROWS and CHOOSECOLS
 
-    func testChooseRowsSelectsInTheOrderNamed() throws {
+    @Test func chooseRowsSelectsInTheOrderNamed() throws {
         let (array, data) = block("A", [n([1]), n([2]), n([3])])
-        XCTAssertEqual(grid(try call("CHOOSEROWS", [array, .number(3), .number(1)], data))?.values,
-                       ["3", "1"])
-        XCTAssertEqual(grid(try call("CHOOSEROWS", [array, .number(-1)], data))?.values, ["3"])
+        #expect(grid(try call("CHOOSEROWS", [array, .number(3), .number(1)], data))?.values == ["3", "1"])
+        #expect(grid(try call("CHOOSEROWS", [array, .number(-1)], data))?.values == ["3"])
     }
 
     /// Repeats are allowed: it selects, it does not filter.
-    func testChooseRowsMayRepeat() throws {
+    @Test func chooseRowsMayRepeat() throws {
         let (array, data) = block("A", [n([1]), n([2])])
-        XCTAssertEqual(
-            grid(try call("CHOOSEROWS", [array, .number(1), .number(1), .number(2)], data))?.values,
-            ["1", "1", "2"])
+        #expect(grid(try call("CHOOSEROWS", [array, .number(1), .number(1), .number(2)], data))?.values == ["1", "1", "2"])
     }
 
-    func testChooseColsAndOutOfRange() throws {
+    @Test func chooseColsAndOutOfRange() throws {
         let (array, data) = block("A", [n([1, 2, 3])])
-        XCTAssertEqual(grid(try call("CHOOSECOLS", [array, .number(2)], data))?.values, ["2"])
-        XCTAssertEqual(try call("CHOOSECOLS", [array, .number(9)], data), .error(.value))
+        #expect(grid(try call("CHOOSECOLS", [array, .number(2)], data))?.values == ["2"])
+        #expect(try call("CHOOSECOLS", [array, .number(9)], data) == .error(.value))
     }
 
     // MARK: - XMATCH
 
     /// The default is **exact**, which is the difference from `MATCH`.
-    func testXmatchDefaultsToExact() throws {
+    @Test func xmatchDefaultsToExact() throws {
         let (array, data) = block("A", [n([10]), n([20]), n([30])])
-        XCTAssertEqual(try call("XMATCH", [.number(20), array], data), .number(2))
-        XCTAssertEqual(try call("XMATCH", [.number(25), array], data), .error(.na),
-                       "MATCH would have answered 2 and assumed the data were sorted")
+        #expect(try call("XMATCH", [.number(20), array], data) == .number(2))
+        #expect(try call("XMATCH", [.number(25), array], data) == .error(.na), "MATCH would have answered 2 and assumed the data were sorted")
     }
 
-    func testXmatchNearestInEitherDirection() throws {
+    @Test func xmatchNearestInEitherDirection() throws {
         let (array, data) = block("A", [n([10]), n([20]), n([30])])
-        XCTAssertEqual(try call("XMATCH", [.number(25), array, .number(-1)], data), .number(2))
-        XCTAssertEqual(try call("XMATCH", [.number(25), array, .number(1)], data), .number(3))
+        #expect(try call("XMATCH", [.number(25), array, .number(-1)], data) == .number(2))
+        #expect(try call("XMATCH", [.number(25), array, .number(1)], data) == .number(3))
     }
 
     /// Nearest is by value, so the data need not be sorted.
-    func testXmatchDoesNotAssumeSortedData() throws {
+    @Test func xmatchDoesNotAssumeSortedData() throws {
         let (array, data) = block("A", [n([30]), n([10]), n([20])])
-        XCTAssertEqual(try call("XMATCH", [.number(25), array, .number(-1)], data), .number(3))
+        #expect(try call("XMATCH", [.number(25), array, .number(-1)], data) == .number(3))
     }
 
-    func testXmatchSearchesBackwards() throws {
+    @Test func xmatchSearchesBackwards() throws {
         let (array, data) = block("A", [n([10]), n([20]), n([10])])
-        XCTAssertEqual(try call("XMATCH", [.number(10), array], data), .number(1))
-        XCTAssertEqual(
-            try call("XMATCH", [.number(10), array, .number(0), .number(-1)], data), .number(3))
+        #expect(try call("XMATCH", [.number(10), array], data) == .number(1))
+        #expect(try call("XMATCH", [.number(10), array, .number(0), .number(-1)], data) == .number(3))
     }
 
-    func testXmatchWildcards() throws {
+    @Test func xmatchWildcards() throws {
         let (array, data) = block("A", [[.text("apple")], [.text("banana")]])
-        XCTAssertEqual(try call("XMATCH", [.text("ban*"), array, .number(2)], data), .number(2))
-        XCTAssertEqual(try call("XMATCH", [.text("ban*"), array], data), .error(.na))
+        #expect(try call("XMATCH", [.text("ban*"), array, .number(2)], data) == .number(2))
+        #expect(try call("XMATCH", [.text("ban*"), array], data) == .error(.na))
     }
 }

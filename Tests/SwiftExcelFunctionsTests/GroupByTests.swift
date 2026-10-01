@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import SwiftExcelFunctions
 import SwiftExcelCore
 import SwiftXLSX
@@ -12,7 +13,7 @@ import SwiftXLSX
 /// Unlike the `Psi*` family these are Excel's own functions and **can** be measured — a
 /// workbook containing one opens and calculates. `ConformanceCases.roundTen` asks about the
 /// defaults below rather than leaving them as this package's opinion.
-final class GroupByTests: XCTestCase {
+@Suite struct GroupByTests {
 
     private struct Sheet: CellValueProvider {
         let cells: [String: CellValue]
@@ -52,7 +53,7 @@ final class GroupByTests: XCTestCase {
     private func matrix(_ formula: String) throws -> CellMatrix {
         let answer = try evaluate(formula)
         guard case .array(let matrix) = answer else {
-            XCTFail("\(formula) gave \(answer), expected an array")
+            Issue.record("\(formula) gave \(answer), expected an array")
             throw CocoaError(.featureUnsupported)
         }
         return matrix
@@ -63,11 +64,11 @@ final class GroupByTests: XCTestCase {
     /// **The aggregate is named, not called.** `SUM` here is the function itself.
     ///
     /// Two regions, their sales summed, plus a grand total: North 40, South 60, Total 100.
-    func testGroupBySumsByRegion() throws {
+    @Test func groupBySumsByRegion() throws {
         let result = try matrix("GROUPBY(A1:A4, C1:C4, SUM)")
-        XCTAssertEqual(result.columns, 2)
-        XCTAssertEqual(result.rows, 3, "two groups and a grand total")
-        XCTAssertEqual(result.elements, [
+        #expect(result.columns == 2)
+        #expect(result.rows == 3, "two groups and a grand total")
+        #expect(result.elements == [
             .text("North"), .number(40),
             .text("South"), .number(60),
             .text("Total"), .number(100),
@@ -75,19 +76,19 @@ final class GroupByTests: XCTestCase {
     }
 
     /// Groups sort ascending by key by default.
-    func testGroupsSortAscendingByDefault() throws {
+    @Test func groupsSortAscendingByDefault() throws {
         let result = try matrix("GROUPBY(A1:A4, C1:C4, SUM)")
-        XCTAssertEqual(result.elements.first, .text("North"))
+        #expect(result.elements.first == .text("North"))
         // Descending is asked for with a negative sort order.
         let descending = try matrix("GROUPBY(A1:A4, C1:C4, SUM, 0, 1, -1)")
-        XCTAssertEqual(descending.elements.first, .text("South"))
+        #expect(descending.elements.first == .text("South"))
     }
 
     /// `total_depth` of zero drops the total row.
-    func testTheTotalRowCanBeTurnedOff() throws {
+    @Test func theTotalRowCanBeTurnedOff() throws {
         let result = try matrix("GROUPBY(A1:A4, C1:C4, SUM, 0, 0)")
-        XCTAssertEqual(result.rows, 2)
-        XCTAssertFalse(result.elements.contains(.text("Total")))
+        #expect(result.rows == 2)
+        #expect(!result.elements.contains(.text("Total")))
     }
 
     /// **The grand total aggregates the data, not the group aggregates.**
@@ -96,7 +97,7 @@ final class GroupByTests: XCTestCase {
     /// means is 25 here, while the mean of the four values is 25 as well — so the test uses
     /// an unbalanced column where the two genuinely differ, which is the only way this
     /// assertion means anything.
-    func testTheGrandTotalIsOverTheDataNotTheGroups() throws {
+    @Test func theGrandTotalIsOverTheDataNotTheGroups() throws {
         // North has one row (10), South has three (20, 30, 40).
         let unbalanced = Sheet(cells: [
             "A1": .text("North"), "C1": .number(10),
@@ -107,36 +108,35 @@ final class GroupByTests: XCTestCase {
         let answer = try FormulaEvaluator.evaluate(
             try FormulaParser.parse("GROUPBY(A1:A4, C1:C4, AVERAGE)"),
             cells: unbalanced, names: NoNames())
-        guard case .array(let result) = answer else { return XCTFail("got \(answer)") }
+        guard case .array(let result) = answer else { Issue.record("got \(answer)"); return }
         // Group means: North 10, South 30. Their mean is 20; the data's mean is 25.
-        XCTAssertEqual(result.elements.last, .number(25),
-                       "the total is the mean of the data, not of the group means")
+        #expect(result.elements.last == .number(25), "the total is the mean of the data, not of the group means")
     }
 
     /// A `LAMBDA` works in the aggregate position, which is what makes it open-ended.
-    func testALambdaCanBeTheAggregate() throws {
+    @Test func aLambdaCanBeTheAggregate() throws {
         let result = try matrix("GROUPBY(A1:A4, C1:C4, LAMBDA(v, MAX(v)-MIN(v)), 0, 0)")
         // North spans 10…30, South spans 20…40; both ranges are 20.
-        XCTAssertEqual(result.elements, [
+        #expect(result.elements == [
             .text("North"), .number(20),
             .text("South"), .number(20),
         ])
     }
 
     /// Other aggregates reach the same groups.
-    func testOtherAggregates() throws {
+    @Test func otherAggregates() throws {
         let counted = try matrix("GROUPBY(A1:A4, C1:C4, COUNT, 0, 0)")
-        XCTAssertEqual(counted.elements, [
+        #expect(counted.elements == [
             .text("North"), .number(2), .text("South"), .number(2),
         ])
         let largest = try matrix("GROUPBY(A1:A4, C1:C4, MAX, 0, 0)")
-        XCTAssertEqual(largest.elements, [
+        #expect(largest.elements == [
             .text("North"), .number(30), .text("South"), .number(40),
         ])
     }
 
     /// Keys match case-insensitively, as Excel compares text everywhere else.
-    func testKeysMatchCaseInsensitively() throws {
+    @Test func keysMatchCaseInsensitively() throws {
         let mixed = Sheet(cells: [
             "A1": .text("North"), "C1": .number(10),
             "A2": .text("north"), "C2": .number(20),
@@ -144,29 +144,29 @@ final class GroupByTests: XCTestCase {
         let answer = try FormulaEvaluator.evaluate(
             try FormulaParser.parse("GROUPBY(A1:A2, C1:C2, SUM, 0, 0)"),
             cells: mixed, names: NoNames())
-        guard case .array(let result) = answer else { return XCTFail("got \(answer)") }
-        XCTAssertEqual(result.rows, 1, "North and north are one region")
-        XCTAssertEqual(result.elements.last, .number(30))
+        guard case .array(let result) = answer else { Issue.record("got \(answer)"); return }
+        #expect(result.rows == 1, "North and north are one region")
+        #expect(result.elements.last == .number(30))
     }
 
     /// Mismatched column lengths describe no table.
-    func testMismatchedColumnsAreRefused() throws {
-        XCTAssertEqual(try evaluate("GROUPBY(A1:A4, C1:C2, SUM)"), .error(.value))
+    @Test func mismatchedColumnsAreRefused() throws {
+        #expect(try evaluate("GROUPBY(A1:A4, C1:C2, SUM)") == .error(.value))
     }
 
     /// A name that is neither a function nor a lambda.
-    func testAnUnknownAggregateIsRefused() throws {
-        XCTAssertEqual(try evaluate("GROUPBY(A1:A4, C1:C4, NotAFunction)"), .error(.value))
+    @Test func anUnknownAggregateIsRefused() throws {
+        #expect(try evaluate("GROUPBY(A1:A4, C1:C4, NotAFunction)") == .error(.value))
     }
 
     // MARK: - PIVOTBY
 
     /// Regions down, quarters across, with a header row and totals both ways.
-    func testPivotByCrossTabulates() throws {
+    @Test func pivotByCrossTabulates() throws {
         let result = try matrix("PIVOTBY(A1:A4, B1:B4, C1:C4, SUM)")
-        XCTAssertEqual(result.columns, 4, "a corner, two quarters and a total")
-        XCTAssertEqual(result.rows, 4, "a header, two regions and a total")
-        XCTAssertEqual(result.elements, [
+        #expect(result.columns == 4, "a corner, two quarters and a total")
+        #expect(result.rows == 4, "a header, two regions and a total")
+        #expect(result.elements == [
             .blank,         .text("Q1"), .text("Q2"), .text("Total"),
             .text("North"), .number(10), .number(30), .number(40),
             .text("South"), .number(20), .number(40), .number(60),
@@ -179,7 +179,7 @@ final class GroupByTests: XCTestCase {
     /// No observation is not an observation of nothing. A zero there would be indistinguishable
     /// from a real zero to everything downstream — and would be counted and averaged with the
     /// genuine values.
-    func testAnEmptyIntersectionIsBlank() throws {
+    @Test func anEmptyIntersectionIsBlank() throws {
         let sparse = Sheet(cells: [
             "A1": .text("North"), "B1": .text("Q1"), "C1": .number(10),
             "A2": .text("South"), "B2": .text("Q2"), "C2": .number(20),
@@ -187,14 +187,14 @@ final class GroupByTests: XCTestCase {
         let answer = try FormulaEvaluator.evaluate(
             try FormulaParser.parse("PIVOTBY(A1:A2, B1:B2, C1:C2, SUM, 0, 0)"),
             cells: sparse, names: NoNames())
-        guard case .array(let result) = answer else { return XCTFail("got \(answer)") }
+        guard case .array(let result) = answer else { Issue.record("got \(answer)"); return }
         // North/Q2 and South/Q1 have no rows.
         //
         // The `Total` column is here because `col_total_depth` was omitted, and omitted is 1
         // — measured in round twelve, where `COLUMNS(PIVOTBY(…, SUM, 0, 0))` is 4. The two
         // depths are independent, and `0` in the fifth position suppresses only the total
         // *row*. This test asserted a 3×3 grid before that was known.
-        XCTAssertEqual(result.elements, [
+        #expect(result.elements == [
             .blank,         .text("Q1"), .text("Q2"), .text("Total"),
             .text("North"), .number(10), .blank,      .number(10),
             .text("South"), .blank,      .number(20), .number(20),
@@ -209,32 +209,28 @@ final class GroupByTests: XCTestCase {
     /// `field_headers` at 1 *or omitted* Excel answers three rows — two groups and a total —
     /// and only an explicit 0 treats the first row as data. This package had the default
     /// backwards, counting `k` as a third group.
-    func testAHeaderRowIsDetectedAndConsumed() throws {
-        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 1)").rows, 3,
-                       "field_headers 1 consumes the header")
-        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM)").rows, 3,
-                       "omitted detects it, which is the default Excel documents and keeps")
-        XCTAssertEqual(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 0)").rows, 4,
-                       "and an explicit 0 makes it data — the one case already agreeing")
+    @Test func aHeaderRowIsDetectedAndConsumed() throws {
+        #expect(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 1)").rows == 3, "field_headers 1 consumes the header")
+        #expect(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM)").rows == 3, "omitted detects it, which is the default Excel documents and keeps")
+        #expect(try matrix("GROUPBY({\"k\";\"a\";\"b\"}, {\"v\";1;2}, SUM, 0)").rows == 4, "and an explicit 0 makes it data — the one case already agreeing")
     }
 
     /// A negative `total_depth` puts the total **above**, it does not remove it.
     ///
     /// Measured: `ROWS(GROUPBY({"a";"a";"b"}, {1;2;3}, SUM, 0, -1))` is 3 — two groups and a
     /// total. This package read the sign as "no totals" and answered 2.
-    func testANegativeTotalDepthPutsTheTotalAbove() throws {
+    @Test func aNegativeTotalDepthPutsTheTotalAbove() throws {
         let result = try matrix("GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, -1)")
-        XCTAssertEqual(result.rows, 3, "the total is present, not suppressed")
-        XCTAssertEqual(result[0, 0], .text("Total"), "and it is the first row, not the last")
-        XCTAssertEqual(result[0, 1], .number(6))
+        #expect(result.rows == 3, "the total is present, not suppressed")
+        #expect(result[0, 0] == .text("Total"), "and it is the first row, not the last")
+        #expect(result[0, 1] == .number(6))
     }
 
     /// A `total_depth` deeper than the grouping is `#VALUE!`.
     ///
     /// Measured: one grouping level and `total_depth` 2 is refused. This package answered.
-    func testATotalDepthDeeperThanTheGroupingIsRefused() throws {
-        XCTAssertEqual(try evaluate("GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 2)"),
-                       .error(.value))
+    @Test func aTotalDepthDeeperThanTheGroupingIsRefused() throws {
+        #expect(try evaluate("GROUPBY({\"a\";\"a\";\"b\"}, {1;2;3}, SUM, 0, 2)") == .error(.value))
     }
 
     /// `sort_order` names a **column**, and its sign is the direction.
@@ -242,29 +238,25 @@ final class GroupByTests: XCTestCase {
     /// Measured: over keys `{"a";"b"}` and values `{2;1}`, `sort_order` 2 puts `"b"` first —
     /// sorted by the values column ascending — and −2 puts `"a"` first. This package ignored
     /// the magnitude and read only the sign, so both answered by key.
-    func testSortOrderNamesAColumn() throws {
-        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 2)")[0, 0],
-                       .text("b"), "column 2 ascending: b holds 1, a holds 2")
-        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -2)")[0, 0],
-                       .text("a"), "and descending")
-        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 1)")[0, 0],
-                       .text("a"), "column 1 ascending is still by key")
-        XCTAssertEqual(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -1)")[0, 0],
-                       .text("b"), "and by key descending")
+    @Test func sortOrderNamesAColumn() throws {
+        #expect(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 2)")[0, 0] == .text("b"), "column 2 ascending: b holds 1, a holds 2")
+        #expect(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -2)")[0, 0] == .text("a"), "and descending")
+        #expect(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, 1)")[0, 0] == .text("a"), "column 1 ascending is still by key")
+        #expect(try matrix("GROUPBY({\"a\";\"b\"}, {2;1}, SUM, 0, 0, -1)")[0, 0] == .text("b"), "and by key descending")
     }
 
     /// `filter_array` excludes the rows it marks false.
     ///
     /// Measured: `SUM(GROUPBY({"a";"b";"c"}, {1;2;3}, SUM, 0, 0, 1, {TRUE;FALSE;TRUE}))` is 4
     /// — 1 and 3, with the middle row dropped. This package ignored the argument and summed 6.
-    func testAFilterArrayExcludesRows() throws {
+    @Test func aFilterArrayExcludesRows() throws {
         let result = try matrix(
             "GROUPBY({\"a\";\"b\";\"c\"}, {1;2;3}, SUM, 0, 0, 1, {TRUE;FALSE;TRUE})")
-        XCTAssertEqual(result.rows, 2, "two groups survive the filter")
+        #expect(result.rows == 2, "two groups survive the filter")
         var total = 0.0
         for row in 0..<result.rows {
             if case .number(let value) = result[row, 1] { total += value }
         }
-        XCTAssertEqual(total, 4, accuracy: 1e-12, "1 and 3, not 6")
+        #expect(abs(total - 4) <= 1e-12, "1 and 3, not 6")
     }
 }
