@@ -237,11 +237,36 @@ public enum BuiltinTextConversionFunctions {
 
     // MARK: - Regular expressions
 
+    /// The longest text the regular-expression functions will search, in UTF-16 code units.
+    ///
+    /// Excel's own limit on the text a cell can hold is 32,767 characters, counted the way
+    /// `LEN` counts them. Nothing a workbook can put in a cell is longer, so this refuses
+    /// nothing Excel accepts — it bounds a host that hands the function text from elsewhere.
+    public static let maximumRegexSubjectLength = 32_767
+
+    /// The longest pattern the regular-expression functions will compile, in UTF-16 code units.
+    ///
+    /// Excel limits a formula's content to 8,192 characters, so no pattern written into a
+    /// formula is longer. A pattern read from a cell could reach 32,767, but a pattern is a
+    /// program, and one four times the length of any formula is not one a person wrote.
+    public static let maximumRegexPatternLength = 8_192
+
+    /// How long one call may spend matching before it gives up with `#VALUE!`.
+    ///
+    /// The length limits and the shape check leave patterns that are slow rather than
+    /// unbounded — quadratic on a long run of digits, say — and on a full-length cell those
+    /// run for over a minute. Ordinary patterns finish in microseconds, so a second is
+    /// generous; it is a ceiling on the damage, not a budget anything should approach.
+    public static let regexMatchDeadline: Duration = .seconds(1)
+
     /// `REGEXTEST(text, pattern, [case_sensitivity])` — whether the pattern is in the text.
+    ///
+    /// `#VALUE!` for a pattern that will not compile, and for input outside the bounds
+    /// described on ``maximumRegexPatternLength``.
     public static let regexTest = ExcelFunction(name: "REGEXTEST", minArgs: 2, maxArgs: 3) { args in
-        withRegex(args) { expression, text in
-            let range = NSRange(text.startIndex..., in: text)
-            return .bool(expression.firstMatch(in: text, range: range) != nil)
+        withRegex(args) { search in
+            guard let matches = search.matches(limit: 1) else { return .error(.value) }
+            return .bool(!matches.isEmpty)
         }
     }
 
@@ -259,26 +284,21 @@ public enum BuiltinTextConversionFunctions {
     ) { args in
         let mode = args.count > 2 ? (numeric(args[2]).map { Int($0.rounded(.towardZero)) }) : 0
         guard let mode, (0...2).contains(mode) else { return .error(.value) }
-        return withRegex(args, caseArgument: 3) { expression, text in
-            let whole = NSRange(text.startIndex..., in: text)
-            let matches = expression.matches(in: text, range: whole)
+        return withRegex(args, caseArgument: 3) { search in
+            // Only mode 1 wants more than the first match, so only mode 1 looks for more.
+            guard let matches = search.matches(limit: mode == 1 ? nil : 1) else { return .error(.value) }
             guard let first = matches.first else { return .error(.na) }
-
-            func piece(_ range: NSRange) -> String {
-                guard let converted = Range(range, in: text) else { return "" }
-                return String(text[converted])
-            }
 
             switch mode {
             case 1:
-                let all = matches.map { CellValue.text(piece($0.range)) }
+                let all = matches.map { CellValue.text(search.piece($0.range)) }
                 return .array(CellMatrix(column: all))
             case 2:
                 guard first.numberOfRanges > 1 else { return .error(.na) }
-                let groups = (1..<first.numberOfRanges).map { CellValue.text(piece(first.range(at: $0))) }
+                let groups = (1..<first.numberOfRanges).map { CellValue.text(search.piece(first.range(at: $0))) }
                 return .array(CellMatrix(row: groups))
             default:
-                return .text(piece(first.range))
+                return .text(search.piece(first.range))
             }
         }
     }
@@ -287,51 +307,126 @@ public enum BuiltinTextConversionFunctions {
     ///
     /// `occurrence` omitted or 0 replaces every match; a positive *n* replaces the *n*th;
     /// a negative *n* counts from the end.
+    ///
+    /// `#VALUE!` when the replacement, or the text that replacing would produce, is longer
+    /// than a cell can hold — the answer `CONCAT` and `REPT` give for the same overflow.
     public static let regexReplace = ExcelFunction(
         name: "REGEXREPLACE", minArgs: 3, maxArgs: 5
     ) { args in
         guard case .text(let replacement) = args[2].resolved else { return .error(.value) }
+        guard replacement.utf16.count <= maximumRegexSubjectLength else { return .error(.value) }
         let occurrence = args.count > 3 ? (numeric(args[3]).map { Int($0.rounded(.towardZero)) }) : 0
         guard let occurrence else { return .error(.value) }
 
-        return withRegex(args, caseArgument: 4) { expression, text in
-            let whole = NSRange(text.startIndex..., in: text)
-            guard occurrence != 0 else {
-                return .text(expression.stringByReplacingMatches(
-                    in: text, range: whole, withTemplate: replacement))
+        return withRegex(args, caseArgument: 4) { search in
+            // A positive occurrence needs no match past its own; the rest need them all.
+            guard let matches = search.matches(limit: occurrence > 0 ? occurrence : nil) else {
+                return .error(.value)
             }
-            let matches = expression.matches(in: text, range: whole)
+            guard occurrence != 0 else { return search.replacing(matches, with: replacement) }
             let index = occurrence > 0 ? occurrence - 1 : matches.count + occurrence
-            guard matches.indices.contains(index) else { return .text(text) }
+            guard matches.indices.contains(index) else { return .text(search.text) }
+            return search.replacing([matches[index]], with: replacement)
+        }
+    }
 
-            let match = matches[index]
-            guard let range = Range(match.range, in: text) else { return .text(text) }
-            let replaced = expression.replacementString(
-                for: match, in: text, offset: 0, template: replacement)
-            return .text(text.replacingCharacters(in: range, with: replaced))
+    /// A compiled pattern and the text it is to search, with matching held to a deadline.
+    private struct BoundedSearch {
+        let expression: NSRegularExpression
+        let text: String
+
+        /// The matches, in order, or `nil` if ``regexMatchDeadline`` passed first.
+        ///
+        /// - Parameter limit: Stop after this many matches; `nil` for every match.
+        /// - Returns: `nil` rather than a partial list when the deadline passed: a caller
+        ///   that was told "no match" could not tell it from "did not finish looking".
+        func matches(limit: Int?) -> [NSTextCheckingResult]? {
+            let deadline = ContinuousClock.now + BuiltinTextConversionFunctions.regexMatchDeadline
+            var found: [NSTextCheckingResult] = []
+            var expired = false
+            let whole = NSRange(text.startIndex..., in: text)
+            // `.reportProgress` is what makes the deadline real: the block is also called,
+            // with no result, at intervals while a long match is still running.
+            expression.enumerateMatches(in: text, options: [.reportProgress], range: whole) { result, _, stop in
+                if let result {
+                    found.append(result)
+                    if let limit, found.count >= limit {
+                        stop.pointee = true
+                        return
+                    }
+                }
+                if ContinuousClock.now >= deadline {
+                    expired = true
+                    stop.pointee = true
+                }
+            }
+            return expired ? nil : found
+        }
+
+        /// The text a match range covers; empty for a group that took no part in the match.
+        func piece(_ range: NSRange) -> String {
+            guard let converted = Range(range, in: text) else { return "" }
+            return String(text[converted])
+        }
+
+        /// The text with each of `matches` replaced by the template, expanded per match.
+        ///
+        /// - Returns: The new text, or `#VALUE!` once it would be longer than a cell holds.
+        ///   The length is checked as the text is built, so an overflowing result is never
+        ///   assembled only to be thrown away.
+        func replacing(_ matches: [NSTextCheckingResult], with template: String) -> CellValue {
+            let source = text as NSString
+            let limit = BuiltinTextConversionFunctions.maximumRegexSubjectLength
+            var output = ""
+            var cursor = 0
+            var length = 0
+            for match in matches {
+                let kept = source.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                let replaced = expression.replacementString(for: match, in: text, offset: 0, template: template)
+                length += kept.utf16.count + replaced.utf16.count
+                guard length <= limit else { return .error(.value) }
+                output += kept + replaced
+                cursor = match.range.location + match.range.length
+            }
+            let tail = source.substring(from: cursor)
+            guard length + tail.utf16.count <= limit else { return .error(.value) }
+            return .text(output + tail)
         }
     }
 
     /// Builds the expression and hands it to a body, or reports why it could not.
     ///
+    /// Three things are refused before anything is compiled, because the pattern is whatever
+    /// the workbook says it is: text or a pattern longer than Excel could have held, and a
+    /// pattern whose shape makes a backtracking engine exponential (see ``RegexShape``).
+    ///
     /// - Parameters:
     ///   - args: The call's arguments, text first and pattern second.
     ///   - caseArgument: Where the case-sensitivity flag sits, if the function has one.
     ///   - body: What to do with the compiled expression.
-    /// - Returns: The body's answer, or `#VALUE!` for a pattern that will not compile.
+    /// - Returns: The body's answer, or `#VALUE!` for a pattern that will not compile or an
+    ///   input that is refused.
     private static func withRegex(
         _ args: [CellValue], caseArgument: Int = 2,
-        _ body: (NSRegularExpression, String) -> CellValue
+        _ body: (BoundedSearch) -> CellValue
     ) -> CellValue {
         if let error = firstError(args) { return error }
         guard case .text(let text) = args[0].resolved,
               case .text(let pattern) = args[1].resolved else { return .error(.value) }
+
+        // Microsoft documents no error values for these functions. `#VALUE!` is what this
+        // package already answers for a pattern that will not compile, and what Excel answers
+        // when text outgrows a cell, so a refusal reads the same as either.
+        guard text.utf16.count <= maximumRegexSubjectLength,
+              pattern.utf16.count <= maximumRegexPatternLength,
+              RegexShape.catastrophicGroups(in: pattern).isEmpty else { return .error(.value) }
 
         // Excel's flag is *case sensitivity*: 0, the default, is sensitive.
         let sensitive = args.count > caseArgument ? (numeric(args[caseArgument]) ?? 0) == 0 : true
         let options: NSRegularExpression.Options = sensitive ? [] : [.caseInsensitive]
         let expression: NSRegularExpression
         do {
+            // SECURITY: the pattern is the workbook's by design; it is at most 8,192 units against at most 32,767 of text, nested repetition is refused above, and matching stops at a one-second deadline.
             expression = try NSRegularExpression(pattern: pattern, options: options)
         } catch {
             // A pattern that will not compile is `#VALUE!`, which is what Excel answers and
@@ -340,7 +435,7 @@ public enum BuiltinTextConversionFunctions {
             // guessing at.
             return .error(.value)
         }
-        return body(expression, text)
+        return body(BoundedSearch(expression: expression, text: text))
     }
 
     // MARK: - Shared
