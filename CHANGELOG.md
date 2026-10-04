@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`REGEXTEST`, `REGEXEXTRACT` and `REGEXREPLACE` are bounded.** The pattern is whatever
+  the workbook says it is, and it was compiled and run with no limit of any kind. A
+  backtracking engine is exponential on a pattern like `(a+)+$`: thirty characters that do
+  not match run for minutes, and a workbook is a file someone else can send you. The quality
+  gate's new `security.regex-from-input` rule (CWE-1333) reported the compile site. Four
+  bounds now apply, and each refusal answers `#VALUE!`:
+  - **Subject length** — at most `maximumRegexSubjectLength`, 32,767 UTF-16 units, which is
+    Excel's limit on the text in a cell. Nothing Excel can hold is refused.
+  - **Pattern length** — at most `maximumRegexPatternLength`, 8,192 units, Excel's limit on
+    a formula's content.
+  - **Shape** — a pattern with a repeated group that itself repeats without a separator
+    (`(a+)+`, `(\w+\s?)*`) or whose alternatives overlap (`(a|ab)+`) is refused before it
+    is compiled, whatever the subject. Repetition behind a separator (`(\d+,)*`,
+    `(?:\.\d+)*`), and possessive or atomic groups, are linear and run as before. The
+    reader (`RegexShape`, internal) is adapted from quality-gate-swift's `RegexStructure`;
+    it is copied, not depended on.
+  - **Time** — `regexMatchDeadline`, one second per call. The shape check does not see
+    patterns that are merely quadratic, and on a full-length cell those ran for over a
+    minute. Matching now reports progress and stops at the deadline.
+
+  `REGEXREPLACE` also refuses a replacement longer than a cell holds, and a result that
+  would be — `#VALUE!`, as `CONCAT` and `REPT` answer the same overflow — checked while the
+  text is built rather than after.
+
+  **Why `#VALUE!`:** Microsoft's reference for the three functions documents no error
+  values. `#VALUE!` is what this package already answered for a pattern that will not
+  compile, so a refused pattern reads the same as an invalid one.
+
+  **Where this departs from Excel:** Excel (PCRE2) will run `(a+)+$` against a short string
+  and answer; this package refuses the pattern outright, so the answer cannot depend on how
+  long the subject happens to be. And the deadline is wall-clock time, so a match that needs
+  about a second can answer on one machine and `#VALUE!` on a slower one. Ordinary patterns
+  finish in microseconds and are nowhere near it. Results for patterns that were already
+  fast are unchanged; the existing tests pass untouched.
+
 ### Changed
 
 - **The test suite is Swift Testing, as the guidelines require.** All 130 XCTest files

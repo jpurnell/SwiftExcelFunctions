@@ -735,7 +735,11 @@ over all 2,240 workbooks — 1,481 Solver models, all three engines and all six 
 attested, and four workbooks refused upstream by SwiftZIP. 1,251 tests in the main suite, and
 10 in a new `WorkbookCensusTests` target.
 
-**Last Updated:** 2026-09-29 — reconciled for **1.0.0-alpha.5**: a simulation spans sheets.
+**Last Updated:** 2026-10-04 — the `REGEX*` trio is bounded (subject and pattern length,
+catastrophic shapes refused, a one-second match deadline, result size); nothing else in the
+plan changed. Not yet released.
+
+**Earlier:** 2026-09-29 — reconciled for **1.0.0-alpha.5**: a simulation spans sheets.
 Every address a run works with carries its sheet, which is a breaking change to `ModelSurvey`,
 `SimulationRun`, `DistributionOverride` and both engines — the alpha exists to settle that
 surface. Recorded with it: the per-trial overlay had been keyed by position alone, so an
