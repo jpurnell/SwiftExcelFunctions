@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`PMT` with `nper = 0` answers `#NUM!`.** It answered a number: `-inf` at a zero rate,
+  where the payment is `-(pv + fv) / nper`, and `inf` or `NaN` otherwise, where the divisor
+  is `(1 + rate)^nper − 1`. A schedule of no payments has no payment, and a non-finite
+  `.number` is the worst way to say so — a column summing it carries it forward as a value.
+  `computePMT` now returns `nil` for it and each caller answers `#NUM!`.
+
+  **Why `#NUM!`:** Microsoft's reference page for `PMT` lists no error values. The
+  references that do document it (Corporate Finance Institute, WallStreetMojo) give `#NUM!`
+  for `nper = 0`, and it is what this file already answers for the neighbouring domain
+  errors (`per` outside `1…nper` in `IPMT`/`PPMT`). Not confirmed against Excel itself.
+
+  `IPMT` and `PPMT` share the calculation and were never exposed: both require
+  `1 <= per <= nper` first, so `nper` is at least one by the time it is divided by.
+
+- **The lowerer no longer folds a constant divided by a constant zero.** `=B1 + A1/A2` with
+  `A2` zero folded `A1/A2` to the constant `inf` at compile time, and every trial answered
+  `inf` without a word — while `=B1/A2`, the same division on a sampled cell, throws
+  `divisionByZero` from the bytecode. BusinessMath's own optimiser declines to fold a zero
+  divisor for exactly that reason; the constant fold here now makes the same refusal and
+  emits the division, so it throws at run time like any other. A zero division in a branch
+  an `IF` discards at compile time is still discarded: nothing that lowered before is
+  refused now, and no model with a non-zero divisor changes.
+
 ### Security
 
 - **`REGEXTEST`, `REGEXEXTRACT` and `REGEXREPLACE` are bounded.** The pattern is whatever
@@ -45,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fast are unchanged; the existing tests pass untouched.
 
 ### Changed
+
+- Two divisions that were already safe now say so on the divisor, where a reader and the
+  quality gate's widened `fp-division-unguarded` rule look for it. `T.TEST` (paired) divides
+  by a count the size check above it has already made at least two; `ODDFPRICE`/`ODDFYIELD`
+  divide by a frequency already restricted to 1, 2 or 4. Neither guard can fire, and no
+  result changes.
 
 - **The test suite is Swift Testing, as the guidelines require.** All 130 XCTest files
   are converted, and every one of the 2,018 tests still runs. The new `test-quality`

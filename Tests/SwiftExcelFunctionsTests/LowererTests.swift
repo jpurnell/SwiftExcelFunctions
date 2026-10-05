@@ -107,6 +107,58 @@ import BusinessMath
         #expect(try abs(lowered.model.evaluate(inputs: [3]) - 6.0) <= 1e-12)
     }
 
+    // MARK: - A constant divided by zero
+
+    /// The bytecode's divide throws on a zero divisor, and BusinessMath's own optimiser
+    /// declines to fold one for that reason. The lowerer's constant fold has to make the
+    /// same refusal: folded here, `1/0` became the constant infinity and every trial
+    /// answered `inf` without a word, where the identical division on a sampled cell throws.
+    @Test func aConstantDividedByZeroIsLeftToThrowAtRunTime() throws {
+        let sheet = try Sheet(formulas: [
+            "B1": "PsiUniform(0, 1)",
+            "B2": "B1+1/0",
+            "B3": "B2+PsiOutput()"
+        ])
+        let lowered = try Lowerer().lower(
+            output: CellRef("B3"), survey: survey(sheet), cells: sheet)
+
+        #expect(throws: (any Error).self) { try lowered.model.evaluate(inputs: [0.5]) }
+    }
+
+    /// The same division reached through cells rather than literals — a constant cell over
+    /// a zero cell, which is how a real model arrives at it.
+    @Test func aConstantCellDividedByAZeroCellThrowsAsASampledOneDoes() throws {
+        let constant = try Sheet(
+            formulas: ["B1": "PsiUniform(0, 1)", "B3": "B1+A1/A2+PsiOutput()"],
+            constants: ["A1": 5, "A2": 0])
+        let sampled = try Sheet(
+            formulas: ["B1": "PsiUniform(0, 1)", "B3": "B1/A2+PsiOutput()"],
+            constants: ["A2": 0])
+
+        let folded = try Lowerer().lower(
+            output: CellRef("B3"), survey: survey(constant), cells: constant)
+        let live = try Lowerer().lower(
+            output: CellRef("B3"), survey: survey(sampled), cells: sampled)
+
+        #expect(throws: (any Error).self) { try folded.model.evaluate(inputs: [0.5]) }
+        #expect(throws: (any Error).self) { try live.model.evaluate(inputs: [0.5]) }
+    }
+
+    /// A zero division in a branch the model never takes is not an error in Excel and must
+    /// not become one here: `IF` with a condition known at compile time discards the other
+    /// branch, and declining to fold must not turn that into a refusal or a throw.
+    @Test func aZeroDivisionInADiscardedBranchChangesNothing() throws {
+        let sheet = try Sheet(formulas: [
+            "B1": "PsiUniform(0, 1)",
+            "B2": "IF(1>2, 1/0, B1*2)",
+            "B3": "B2+PsiOutput()"
+        ])
+        let lowered = try Lowerer().lower(
+            output: CellRef("B3"), survey: survey(sheet), cells: sheet)
+
+        #expect(try abs(lowered.model.evaluate(inputs: [3]) - 6.0) <= 1e-12)
+    }
+
     // MARK: - What refuses
 
     /// §5.1: refuse rather than approximate. `Expression` is `Double`-only, so a model

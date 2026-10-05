@@ -67,14 +67,22 @@ public enum BuiltinFinancialFunctions {
         let futureValue = try optionalNumber(args, at: 3, default: 0.0)
         let type = try optionalNumber(args, at: 4, default: 0.0)
 
-        let result = computePMT(rate: r, nper: n, pv: presentValue, fv: futureValue, type: type)
+        guard let result = computePMT(
+            rate: r, nper: n, pv: presentValue, fv: futureValue, type: type
+        ) else { return .error(.num) }
         return .number(result)
     }
 
     /// Core PMT calculation shared with IPMT and PPMT.
+    ///
+    /// - Returns: The payment, or `nil` when `nper` is zero. A schedule of no payments has
+    ///   no payment: both branches below divide by something that is zero exactly then —
+    ///   `nper` itself at a zero rate, `(1 + rate)^nper − 1` otherwise — and Excel answers
+    ///   `#NUM!` for it, which is what each caller turns `nil` into.
     private static func computePMT(
         rate: Double, nper: Double, pv: Double, fv: Double, type: Double
-    ) -> Double {
+    ) -> Double? {
+        guard nper != 0 else { return nil }
         if rate == 0 {
             return -(pv + fv) / nper
         }
@@ -112,9 +120,9 @@ public enum BuiltinFinancialFunctions {
             return .error(.num)
         }
 
-        let result = computeIPMT(
+        guard let result = computeIPMT(
             rate: r, per: per, nper: n, pv: presentValue, fv: futureValue, type: type
-        )
+        ) else { return .error(.num) }
         return .number(result)
     }
 
@@ -145,15 +153,20 @@ public enum BuiltinFinancialFunctions {
     ///   - pv: The present value.
     ///   - fv: The value left at the end.
     ///   - type: 0 for payments at the end of the period, 1 for the start.
-    /// - Returns: The interest part of that payment.
+    /// - Returns: The interest part of that payment, or `nil` when there is no payment to
+    ///   take a part of — `nper` is zero. See ``computePMT(rate:nper:pv:fv:type:)``.
     private static func computeIPMT(
         rate: Double, per: Double, nper: Double, pv: Double, fv: Double, type: Double
-    ) -> Double {
+    ) -> Double? {
         guard rate != 0 else { return 0.0 }
         // A payment made at the start of the first period has accrued nothing.
         if type != 0, per <= 1 { return 0.0 }
 
-        let payment = computePMT(rate: rate, nper: nper, pv: pv, fv: fv, type: type)
+        // `nil` only for `nper == 0`, which no caller can pass: both require
+        // `1 <= per <= nper` first. Answered with `#NUM!` rather than assumed.
+        guard let payment = computePMT(rate: rate, nper: nper, pv: pv, fv: fv, type: type) else {
+            return nil
+        }
         let elapsed = per - 1
         let growth = pow(1.0 + rate, elapsed)
         let annuity = (growth - 1.0) / rate * (type != 0 ? 1.0 + rate : 1.0)
@@ -189,10 +202,11 @@ public enum BuiltinFinancialFunctions {
             return .error(.num)
         }
 
-        let payment = computePMT(rate: r, nper: n, pv: presentValue, fv: futureValue, type: type)
-        let interest = computeIPMT(
-            rate: r, per: per, nper: n, pv: presentValue, fv: futureValue, type: type
-        )
+        guard let payment = computePMT(
+                  rate: r, nper: n, pv: presentValue, fv: futureValue, type: type),
+              let interest = computeIPMT(
+                  rate: r, per: per, nper: n, pv: presentValue, fv: futureValue, type: type)
+        else { return .error(.num) }
         return .number(payment - interest)
     }
 

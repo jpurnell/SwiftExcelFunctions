@@ -230,6 +230,9 @@ public enum BuiltinOddPeriodBonds {
               rate >= 0, sixth > 0, redemption > 0 else { return .error(.num) }
 
         let periodsPerYear = Double(frequency)
+        // Already so: `frequency` is one of 1, 2 or 4 by the check above. Stated on the
+        // divisor itself, with the `#NUM!` Excel gives a frequency outside that set.
+        guard periodsPerYear > 0 else { return .error(.num) }
         let coupon = rate * 100 / periodsPerYear
 
         // The stub: from issue to the first coupon, as a fraction of a coupon period. The

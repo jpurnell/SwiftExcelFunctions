@@ -447,7 +447,12 @@ extension Lowerer {
 
         switch (kind, a, b) {
         case (_, .value(let x), .value(let y)):
-            return .value(Self.foldValues(kind, x, y))
+            if let folded = Self.foldValues(kind, x, y) { return .value(folded) }
+            // Declined: a constant over a constant zero. Emitted as a division instead, so
+            // it throws at run time exactly as the same division on a sampled cell does.
+            // An `IF` whose condition is known here still discards the branch it does not
+            // take, so a zero division the model can never reach never becomes bytecode.
+            return .expression(a.proxy(builder) / y)
 
         case (.power, .expression(let e), .value(let y)):
             return .expression(e.power(y))
@@ -476,12 +481,19 @@ extension Lowerer {
     }
 
     /// The value-level fold for a non-comparison operator.
-    private static func foldValues(_ kind: BinaryKind, _ x: Double, _ y: Double) -> Double {
+    ///
+    /// - Returns: The folded constant, or `nil` for a division by zero, which is left to run
+    ///   time. The bytecode's divide throws on a zero divisor and BusinessMath's optimiser
+    ///   declines to fold one so that it still does; folding it here would hand the model
+    ///   the constant `inf` and every trial would answer it silently.
+    private static func foldValues(_ kind: BinaryKind, _ x: Double, _ y: Double) -> Double? {
         switch kind {
         case .add: return x + y
         case .subtract: return x - y
         case .multiply: return x * y
-        case .divide: return x / y
+        case .divide:
+            guard y != 0 else { return nil }
+            return x / y
         case .power: return pow(x, y)
         default: return 0
         }

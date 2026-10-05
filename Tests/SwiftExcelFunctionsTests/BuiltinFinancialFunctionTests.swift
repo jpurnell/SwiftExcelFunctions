@@ -88,6 +88,27 @@ import SwiftExcelCore
         #expect(payment < endPayment)
     }
 
+    /// No payment schedule has zero payments. Excel answers `#NUM!` for `nper = 0`; this
+    /// used to answer `.number(-inf)`, which a caller summing a column would carry forward
+    /// as a number.
+    @Test func pmt_ZeroPeriodsAtZeroRateIsNumError() throws {
+        // PMT(0, 0, 1000) — the zero-rate branch divides by nper directly.
+        let result = try eval(
+            BuiltinFinancialFunctions.pmt,
+            .number(0), .number(0), .number(1000)
+        )
+        #expect(result == .error(.num))
+    }
+
+    @Test func pmt_ZeroPeriodsAtPositiveRateIsNumError() throws {
+        // PMT(0.05, 0, 1000) — (1+r)^0 − 1 is zero, the same hole by another route.
+        let result = try eval(
+            BuiltinFinancialFunctions.pmt,
+            .number(0.05), .number(0), .number(1000)
+        )
+        #expect(result == .error(.num))
+    }
+
     // MARK: - IPMT / PPMT Tests
 
     /// Microsoft's published example, and the sign it establishes.

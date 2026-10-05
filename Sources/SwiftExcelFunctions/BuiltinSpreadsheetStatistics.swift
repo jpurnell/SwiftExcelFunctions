@@ -300,6 +300,9 @@ public enum BuiltinSpreadsheetStatistics {
             guard a.count == b.count else { return .error(.na) }
             let differences = zip(a, b).map { $0 - $1 }
             let count = Double(differences.count)
+            // Already so: both samples hold at least two values and are the same length.
+            // Stated on the divisor itself, with the error the size check above gives.
+            guard count > 0 else { return .error(.div0) }
             let meanDifference = differences.reduce(0, +) / count
             let deviation = stdDevS(differences)
             // Identical samples differ by nothing, which is a probability of 1 rather than
