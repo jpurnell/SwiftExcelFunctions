@@ -226,6 +226,12 @@ public enum BuiltinDiscountSecurities {
             // Each later period takes a full instalment, until what is left reaches salvage.
             let taken = cost * rate * firstFraction + full * Double(period - 1)
             let remaining = cost - salvage - taken
+            // **A NaN fails `> 0` the way it fails every comparison**, so the guard below
+            // answered `0` — a plausible instalment — for a depreciation that was never
+            // computed. `salvage` is the one argument here with no guard in front of it, so
+            // this is reachable. `finite()` turns a NaN into `#NUM!`, which is what Excel
+            // says about a computation that has no result.
+            guard !remaining.isNaN else { return .nan }
             guard remaining > 0 else { return 0 }
             return Swift.min(full, remaining)
         }
@@ -259,7 +265,14 @@ public enum BuiltinDiscountSecurities {
                 instalment = remaining * degressive
             }
             let floorValue = Swift.max(salvage, 0)
-            return Swift.max(0, Swift.min(instalment, remaining - floorValue))
+            let headroom = remaining - floorValue
+            // **`Swift.max(0, .nan)` is `0`.** `max` returns its first argument when either
+            // side is a NaN, because `NaN > 0` is false — so the clamp reported a bound for
+            // a value that was never computed. Writing the value first at both levels would
+            // propagate it, but nothing about that spelling tells the next reader that the
+            // argument order is load-bearing. Tested instead, against named locals.
+            guard !instalment.isNaN, !headroom.isNaN else { return .nan }
+            return Swift.max(0, Swift.min(instalment, headroom))
         }
     }
 

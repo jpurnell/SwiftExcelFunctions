@@ -271,6 +271,32 @@ import SwiftExcelCore
         #expect(first > 0)
     }
 
+    /// **A depreciation that was never computed is not zero.**
+    ///
+    /// `salvage` is the one argument of these two with no guard in front of it, so a NaN
+    /// reaches the arithmetic. `remaining` then fails `> 0` the way a NaN fails every
+    /// comparison, and the guard behind it answered `0` — a plausible instalment for an
+    /// asset nobody could depreciate. `finite()` turns a NaN into `#NUM!`, which is what
+    /// Excel says about a computation with no result.
+    @Test func amorLincRefusesANaNRatherThanAnsweringZero() throws {
+        #expect(try call("AMORLINC", [
+            .number(2_400), day(2008, 8, 19), day(2008, 12, 31),
+            .number(.nan), .number(1), .number(0.15), .number(1),
+        ]) == .error(.num))
+    }
+
+    /// The same, through a clamp rather than a guard.
+    ///
+    /// `Swift.max(0, .nan)` is **`0`**: `max` returns its first argument when either side is
+    /// a NaN, because `NaN > 0` is false. So the clamp reported a bound for a value that was
+    /// never computed, and `AMORDEGRC` answered zero where it should have refused.
+    @Test func amorDegrcRefusesANaNRatherThanClampingItToZero() throws {
+        #expect(try call("AMORDEGRC", [
+            .number(2_400), day(2008, 8, 19), day(2008, 12, 31),
+            .number(.nan), .number(1), .number(0.15), .number(1),
+        ]) == .error(.num))
+    }
+
     /// Microsoft: the same asset under the declining-balance coefficient → 776.
     @Test func amorDegrc() throws {
         #expect(try call("AMORDEGRC", [
